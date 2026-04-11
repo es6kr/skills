@@ -1,0 +1,20 @@
+{
+  "description": "Reusable AI coding skills collection",
+  "name": "es6kr-skills",
+  "owner": {
+    "email": "drumrobot43@gmail.com",
+    "name": "es6.kr"
+  },
+  "plugins": [
+    {
+      "author": {
+        "email": "drumrobot43@gmail.com",
+        "name": "es6.kr"
+      },
+      "description": "Reusable AI coding skills: TDD, commit management, dotfile sync, and more",
+      "name": "es6kr-skills",
+      "source": "./",
+      "version": "0.1.0"
+    }
+  ]
+}
