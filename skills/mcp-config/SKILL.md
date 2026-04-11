@@ -1,5 +1,8 @@
 ---
 name: mcp-config
+metadata:
+  author: es6kr
+  version: "0.1.0"
 description: |
   MCP server configuration (.mcp.json) management. add - add server (scope selection + registration) [add.md], move - change server scope (project→local, local→user) [move.md], format - JSON format reference (differences per agent) [format.md], catalog - list of commonly used servers [catalog.md].
   Use when: "add MCP", "mcp-config", "MCP server config", "add context7", "MCP format", "MCP server list", "move MCP", "MCP scope", "scope change".

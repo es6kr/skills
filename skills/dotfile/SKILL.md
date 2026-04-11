@@ -1,5 +1,8 @@
 ---
 name: dotfile
+metadata:
+  author: es6kr
+  version: "0.1.0"
 description: Synchronization management with external tools. chezmoi - dotfile template management [chezmoi.md], knowledge - session knowledge → Serena memory [knowledge.md], mcp - MCP server synchronization [mcp.md], syncthing - chezmoi Syncthing sync and diagnostics [syncthing.md]. Use when "knowledge sync", "chezmoi add", "dotfile management", "syncthing", "MCP server add", "MCP sync", "external sync", "(?d)", ".stignore", "ignored files", "stignore settings", "sync incomplete", "sync status", "DB reset", "stale cache", "syncthing diagnostics", "index reset", "rescan". For ClawHub-related tasks → delegate to /clawhub skill.
 depends-on: [chezmoi]
 ---

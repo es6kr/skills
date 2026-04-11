@@ -1,5 +1,8 @@
 ---
 name: code-workflow
+metadata:
+  author: es6kr
+  version: "0.1.2"
 depends-on: [skill-kit, tdd]
 description: |
   4-stage workflow for code changes: research → plan → user review → implement (TDD). Applies to all tasks requiring code changes: issue implementation, fix_plan items, new feature additions. TDD (Red→Green→Refactor) is applied by default in the implementation stage; users can opt out with --no-tdd.

@@ -1,4 +1,7 @@
 ---
+metadata:
+  author: es6kr
+  version: "0.1.2"
 name: fix
 description: >-
   User behavior correction skill. Triggered by "fix:" prefix feedback (e.g., "fix: why didn't you commit?").
@@ -57,6 +60,7 @@ When fixing:
 ### 3. Fix Current Issue + Resume Original Work
 
 - After root cause fix, **immediately resolve the current problem**
+- **If unsure what to execute, AskUserQuestion** — don't skip execution because you don't know the command
 - Verify fix results (build/test/run)
 - **Continue the originally intended work with the corrected approach** — don't just clean up wrong artifacts, complete the original task
 - Register the original task with TaskCreate and execute immediately

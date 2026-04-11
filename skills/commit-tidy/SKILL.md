@@ -1,4 +1,7 @@
 ---
+metadata:
+  author: es6kr
+  version: "0.1.1"
 name: commit-tidy
 description: Analyze staged/committed changes and recommend splitting or squashing strategy. Use when the user says "commit split", "split commits", "should I split this commit", "squash commits", "tidy commits", or when reviewing large changesets before committing.
 ---

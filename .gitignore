@@ -1,4 +1,7 @@
+.agent/
 __pycache__/
+.omc/
+.playwright-mcp/
 .pytest_cache/
 *.pyc
 *.tmp

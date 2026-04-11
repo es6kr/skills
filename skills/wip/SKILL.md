@@ -1,5 +1,8 @@
 ---
 name: wip
+metadata:
+  author: es6kr
+  version: "0.1.0"
 description: Track in-session work progress with TodoWrite/TaskCreate. Auto-register steps for 3+ step tasks, update status per step, handle completion/abort. "wip", "track progress", "register tasks", "task register", "step tracking" triggers.
 ---
 

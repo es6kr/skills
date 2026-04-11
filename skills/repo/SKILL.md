@@ -1,5 +1,8 @@
 ---
 name: repo
+metadata:
+  author: es6kr
+  version: "0.1.0"
 description: Project initialization toolkit. contributing - auto-generate CONTRIBUTING.md from project structure [contributing.md]. "init", "project init", "initialize project", "contributing guide", "CONTRIBUTING.md", "contributing generate" triggers
 ---
 

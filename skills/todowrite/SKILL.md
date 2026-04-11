@@ -1,5 +1,8 @@
 ---
 name: todowrite
+metadata:
+  author: es6kr
+  version: "0.1.0"
 depends-on: [wip]
 description: Route TODO checklists to the right storage. session - in-session tracking via /wip, file - persistent TODO (fix_plan.md, TODO.md), issue - team-shared via GitHub Issues. "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue" triggers.
 ---

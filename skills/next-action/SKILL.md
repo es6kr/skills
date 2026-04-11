@@ -1,5 +1,8 @@
 ---
 name: next-action
+metadata:
+  author: es6kr
+  version: "0.1.0"
 description: Suggest next actions after completing any task. Use automatically when a task is finished to recommend 2-3 logical follow-up actions the user might want to take.
 ---
 

@@ -40,7 +40,11 @@ clawhub install <skill-name>
 
 ### Context7
 
-Available at [context7.com/es6kr/skills](https://context7.com/es6kr/skills)
+```bash
+npx ctx7 skills install es6kr/skills --all --global --universal --yes
+```
+
+Browse at [context7.com/es6kr/skills](https://context7.com/es6kr/skills)
 
 ## Development
 
