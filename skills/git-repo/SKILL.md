@@ -2,7 +2,7 @@
 name: git-repo
 metadata:
   author: es6kr
-  version: "0.1.0"
+  version: "0.1.1"
 depends-on: [commit-tidy]
 description: Git repository and SourceGit integration management. clone - ghq get with automatic SourceGit registration [clone.md], fix-worktree - bare repo worktree configuration recovery [fix-worktree.md], merge-duplicate - merge duplicate repositories with the same origin [merge-duplicate.md], migrate - migrate repositories to ghq structure [migrate.md], patrol - batch inspection of ghq repositories [patrol.md], sourcegit - SourceGit preference.json management [sourcegit.md]. "ghq get", "ghq clone", "sourcegit", "ghq migrate", "repo migrate", "folder rename", "repo patrol", "ghq inspect", "check all repos", "git batch inspect", "duplicate repo", "repo merge", "worktree fix", "bare convert", "multi-account clone" triggers
 allowed-tools:
