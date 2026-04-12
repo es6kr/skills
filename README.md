@@ -29,7 +29,7 @@ Reusable AI coding skills for Claude Code, Cursor, Codex, and Gemini.
 
 ```bash
 claude plugin marketplace add https://github.com/es6kr/skills
-claude plugin install es6kr-skills@es6kr-skills
+claude plugin install es6kr@es6kr-skills
 ```
 
 ### ClawHub

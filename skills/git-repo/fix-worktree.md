@@ -2,12 +2,12 @@
 
 A tool to fix incorrect worktree configuration in ghq bare repositories.
 
-## Problem Scenarios
+## Diagnosis (Problem Scenarios)
 
 The following issues can occur in ghq + git worktree structures:
 - `bare = false` but `core.worktree` points to a wrong path
-- Worktree exists but is not registered in the bare repo
-- Remaining `core.worktree` config causes git commands to fail
+- Worktree directory exists but is not registered in the bare repo
+- Incorrect `core.worktree` config causes git commands to fail
 
 ## Usage
 
