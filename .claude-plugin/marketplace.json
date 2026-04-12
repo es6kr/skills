@@ -11,10 +11,10 @@
         "email": "drumrobot43@gmail.com",
         "name": "es6.kr"
       },
-      "description": "Reusable AI coding skills: TDD, commit management, dotfile sync, and more",
-      "name": "es6kr-skills",
+      "description": "A collection of AI coding skills including TDD, commit management, dotfile sync, and more",
+      "name": "es6kr",
       "source": "./",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

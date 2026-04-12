@@ -1,14 +1,14 @@
-# SourceGit Management
+# SourceGit Integration
 
-Manage SourceGit GUI client repositories and workspaces by editing preference.json directly.
+Manage SourceGit GUI client's `preference.json` and custom actions.
 
-## Configuration File Location
+## Configuration Path
 
 | OS | Path |
 |----|------|
 | macOS | `~/Library/Application Support/SourceGit/preference.json` |
 | Linux | `~/.config/SourceGit/preference.json` |
-| Windows | `%APPDATA%/SourceGit/preference.json` |
+| Windows | `%APPDATA%\SourceGit\preference.json` |
 
 Detect OS and use the appropriate path.
 

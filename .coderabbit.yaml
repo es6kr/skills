@@ -1,0 +1,11 @@
+early_access: false
+enable_free_tier: true
+language: en-US
+reviews:
+  review_status: false
+  auto_review:
+    auto_incremental_review: false
+    enabled: true
+    base_branches:
+      - develop
+      - main
