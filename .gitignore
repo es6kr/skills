@@ -1,8 +1,12 @@
-.agent/
 __pycache__/
+.agent/
+.DS_Store
 .omc/
 .playwright-mcp/
 .pytest_cache/
+.stfolder/
+.stversions/
+*.bak
 *.pyc
 *.tmp
 skills/LICENSE
