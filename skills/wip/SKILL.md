@@ -1,7 +1,7 @@
 ---
 name: wip
 description: >-
-  Track in-session work progress. Auto-register steps for 3+ step tasks, update status per step, handle completion/abort.
+  Track in-session work progress. Register steps for 3+ step tasks, update status per step, handle completion/abort.
   antigravity - task.md artifact-based checklist [antigravity.md],
   claude - TodoWrite/TaskCreate API [claude.md].
   "wip", "track progress", "register tasks", "task register", "step tracking" triggers.
@@ -50,8 +50,8 @@ WIP tracking is unnecessary for:
 - Read-only queries
 - User explicitly says "keep it simple"
 
-## Rules (Common)
+## Rules (Sequential Flow)
 
-- **One in_progress at a time** — don't run multiple steps simultaneously
+- **One in_progress at a time** — applies to ordered/sequential tracking (TodoWrite/checklist mode)
 - **Update immediately on completion** — mark completed as soon as done
 - **No skipping** — proceed in order, don't start next step before completing current
