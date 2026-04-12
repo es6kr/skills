@@ -57,7 +57,7 @@ SKILLS_DIR="$REPO_ROOT/skills"
   while read -r skill; do
     local dir_name skill_name
     dir_name=$(basename "$(dirname "$skill")")
-    skill_name=$(sed -n '/^---$/,/^---$/p' "$skill" | grep '^name:' | sed 's/^name:[[:space:]]*//')
+    skill_name=$(awk '{gsub(/\r/,"")}/^---$/{if(++c==2)exit}c==1&&/^name:/{sub(/^name:[[:space:]]*/,"");print;exit}' "$skill")
     [[ "$skill_name" == "$dir_name" ]] || mismatches+=("$dir_name(name=$skill_name)")
   done < <(find "$SKILLS_DIR" -name "SKILL.md" -maxdepth 2)
   [[ ${#mismatches[@]} -eq 0 ]] || { echo "Mismatches: ${mismatches[*]}"; return 1; }

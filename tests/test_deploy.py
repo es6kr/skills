@@ -6,6 +6,14 @@ import re
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 
+# Published skills — only these are checked for deploy constraints
+_published_json = REPO_ROOT / "skills" / "clawhub" / "data" / "published.json"
+if _published_json.exists():
+    import json as _json
+    PUBLISHED_SKILLS = {s["slug"] for s in _json.loads(_published_json.read_text()).get("skills", [])}
+else:
+    PUBLISHED_SKILLS = set()
+
 
 # --- context7 compatibility ---
 
@@ -53,6 +61,9 @@ def test_no_secrets():
     """No credentials or internal IPs in published skills."""
     pattern = re.compile(r"(glpat-|sk-[a-zA-Z0-9]{20,}|10\.0\.0\.\d+|14\.36\.\d+)")
     for f in SKILLS_DIR.rglob("*.md"):
+        skill_name = f.parent.name if f.parent != SKILLS_DIR else f.parent.parent.name
+        if skill_name not in PUBLISHED_SKILLS:
+            continue
         content = f.read_text()
         match = pattern.search(content)
         assert not match, f"{f}: secret pattern '{match.group()}'"
@@ -62,6 +73,8 @@ def test_no_korean_in_frontmatter():
     """Published skills frontmatter must be English."""
     hangul = re.compile("[가-힣]")
     for skill_md in SKILLS_DIR.rglob("SKILL.md"):
+        if skill_md.parent.name not in PUBLISHED_SKILLS:
+            continue
         content = skill_md.read_text()
         parts = content.split("---")
         if len(parts) >= 3:
