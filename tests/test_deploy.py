@@ -50,7 +50,7 @@ def test_each_skill_has_license():
 
 
 def test_no_secrets():
-    """No credentials or internal IPs in published skills."""
+    """No credentials or internal IPs in any skill."""
     pattern = re.compile(r"(glpat-|sk-[a-zA-Z0-9]{20,}|10\.0\.0\.\d+|14\.36\.\d+)")
     for f in SKILLS_DIR.rglob("*.md"):
         content = f.read_text()
@@ -59,7 +59,7 @@ def test_no_secrets():
 
 
 def test_no_korean_in_frontmatter():
-    """Published skills frontmatter must be English."""
+    """All skills frontmatter must be English."""
     hangul = re.compile("[가-힣]")
     for skill_md in SKILLS_DIR.rglob("SKILL.md"):
         content = skill_md.read_text()
