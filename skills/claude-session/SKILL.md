@@ -2,7 +2,7 @@
 name: claude-session
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.2"
 description: Integrated skill for Claude Code session management. id - look up current session ID + keyword session search, import - import session, summarize - summarize session, analyze - session stats/analysis, classify - classify/organize sessions, compress - compress session, destroy - delete current session, migrate - move sessions between projects (main repo to worktree), repair - restore session structure (chain, tool_result), rename - assign custom title to session, url - generate claude-sessions web URL from session ID, Use when: "session ID", "current session", "session id", "get session", "session analysis", "session classify", "session compress", "session delete", "session repair", "chain repair", "session name", "name session", "session search", "find session", "which session", "session import", "session analyze", "session classify", "session compress", "session migrate", "session move", "worktree session", "move session", "worktree session move", "session repair", "session rename", "chain repair", "session url", "session web URL", "claude-sessions url", "session split", "split recommendations", "topic split", "session purge", "dead session", "clean dead sessions", "session cleanup"
 ---
 

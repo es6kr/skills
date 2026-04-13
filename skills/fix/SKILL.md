@@ -1,7 +1,7 @@
 ---
 metadata:
   author: es6kr
-  version: "0.1.2"
+  version: "0.1.3"
 name: fix
 description: >-
   User behavior correction skill. Triggered by "fix:" prefix feedback (e.g., "fix: why didn't you commit?").
@@ -35,9 +35,18 @@ TaskCreate: "4. Completion report"
 
 Step 0 is **the first tool call** after /fix activation. Text output before TaskCreate = violation.
 
-### 1. Root Cause Analysis
+### 1. Root Cause Analysis (5-Why depth)
 
-- Identify **what went wrong** from user feedback
+Don't stop at the direct cause. Dig at least **3 levels deep**:
+
+```
+Why 1: What went wrong? (symptom — the immediate mistake)
+Why 2: Why did I make that decision? (judgment — missing knowledge/rule)
+Why 3: Why was that knowledge/rule missing? (structural — skill/rule gap)
+```
+
+- Fixing only Why 1 = patching a symptom. It recurs in a different form.
+- Why 2-3 reveal **structural causes** (platform ignorance, DRY violation, etc.) — these go into rules/skills.
 - Search for the responsible **skill/rule/hook** files (Grep/Glob)
 
 ### 2. Root Cause Fix (Prevent Recurrence)
@@ -80,3 +89,4 @@ Fix complete:
 - Patching only the current issue without improving skills/rules/hooks
 - Text response without TaskCreate after /fix activation
 - Recording in failed-attempts.md when the root cause is a skill defect (skill fix is 1st priority)
+- **Stopping at Why 1** — fixing the symptom without asking Why 2-3 (structural cause)

@@ -15,8 +15,8 @@ def load_profanity_patterns():
         with open(data_path, "r", encoding="utf-8") as f:
             entries = json.load(f)
         return [(e["pattern"], e["replacement"]) for e in entries]
-    # Fallback if data file missing
-    return [(r'(fuck|shit|damn|bitch|ass)', '****')]
+    # Fallback if data file missing (\b avoids matching "ass" inside "assistant", etc.)
+    return [(r'\b(fuck|shit|damn|bitch|ass)\b', '****')]
 
 PROFANITY_PATTERNS = load_profanity_patterns()
 
@@ -113,11 +113,10 @@ def process_jsonl_file(file_path: Path) -> int:
     if modified_count > 0:
         bak_dir = Path.home() / '.claude' / 'projects' / '.bak'
         bak_dir.mkdir(exist_ok=True)
-        backup_path = bak_dir / file_path.name
-        if backup_path.exists():
-            # Use .orig suffix on collision
-            stem = file_path.stem
-            backup_path = bak_dir / f"{stem}.orig{file_path.suffix}"
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stem = file_path.stem
+        backup_path = bak_dir / f"{stem}.{timestamp}{file_path.suffix}"
         file_path.rename(backup_path)
 
         # Save modified content
