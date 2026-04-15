@@ -96,6 +96,15 @@ AskUserQuestion {
 
 **Forbidden**: Immediately fixing upon discovery. Must only modify items selected after AskUserQuestion.
 
+### 3-1. Version Change Rule ⚠️ Required
+
+**Do NOT bump `metadata.version` unless the skill will be published to ClawHub in the same session.**
+
+- Version reflects the **published** state, not local changes
+- Local-only changes (topic additions, frontmatter fixes) keep the current version
+- Version bump happens only during `/es6kr deploy` or `/clawhub publish` workflow
+- If unsure whether the skill will be deployed, leave the version unchanged
+
 ### 4. Plan Improvements
 
 | Improvement Type | Task |
