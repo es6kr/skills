@@ -2,7 +2,7 @@
 name: mcp-config
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.2"
 description: |
   MCP server configuration and diagnostics. add - add server (scope selection + registration) [add.md], move - change server scope (project→local, local→user) [move.md], format - JSON format reference (differences per agent) [format.md], catalog - list of commonly used servers [catalog.md], diagnostics - connection failure diagnosis and troubleshooting [diagnostics.md].
   Use when: "add MCP", "mcp-config", "MCP server config", "add context7", "MCP format", "MCP server list", "move MCP", "MCP scope", "scope change", "MCP connection failed", "MCP error", "Failed to reconnect", "code-mode not working", "MCP server issue".

@@ -4,15 +4,14 @@ Diagnose and resolve MCP server connection issues.
 
 ## Diagnostic Steps
 
-### 1. Check Logs
+### 1. Quick Status Check (Start Here)
 
 ```bash
-# Latest MCP logs
-ls -la ~/.claude/debug/latest/
-
-# Specific server log (e.g., code-mode)
-cat ~/.claude/debug/latest/mcp-code-mode* 2>/dev/null || echo "No logs found"
+# List all MCP servers and their connection status
+claude mcp list
 ```
+
+If the server appears as **Disconnected** or is missing entirely, proceed to Step 2.
 
 ### 2. Verify Configuration Files (Check ALL in order)
 
@@ -71,12 +70,29 @@ cat ~/.claude/debug/latest/mcp-code-mode* 2>/dev/null || echo "No logs found"
 }
 ```
 
-### 4. Manual Server Test
+### 4. Check Logs
 
 ```bash
-# Run directly to see errors
+# Latest MCP debug logs (UUID-based filenames)
+ls -lt ~/.claude/debug/ | head -5
+
+# Read a specific log
+cat ~/.claude/debug/<uuid>.txt
+```
+
+### 5. Manual Server Test
+
+Run the server command directly outside Claude Code to see raw errors:
+
+```bash
+# npx-based server
 npx -y @utcp/code-mode-mcp
 
-# With environment variables
+# npx with environment variables
 UTCP_CONFIG_FILE=~/.utcp_config.json npx -y @utcp/code-mode-mcp
+
+# uvx-based server (e.g., serena, postgres)
+uvx --from "git+https://github.com/oraios/serena" serena start-mcp-server --context claude-code
 ```
+
+**Key**: Copy the exact `command` + `args` from `~/.claude.json` and run it in your terminal. The error output will reveal the root cause (missing dependency, wrong argument, auth failure, etc.).

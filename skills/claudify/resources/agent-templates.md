@@ -297,6 +297,57 @@ prompt: "Review the changes from the recent commit"
 description: "Review recent commit"
 ```
 
+### 7. Interactive Supervisor Agent (User-Decision Pattern)
+
+Pattern for agents that collect decision items, then the **caller** presents them via AskUserQuestion for sequential resolution. The agent itself does NOT call AskUserQuestion.
+
+```markdown
+---
+name: my-supervisor
+description: |
+  Supervisor that collects items and reports back for user decisions.
+  Reports include a "Requires User Decision" section.
+  The caller presents these via AskUserQuestion.
+
+  <example>
+  user: "run supervisor"
+  assistant: "Launching supervisor..."
+  (agent completes)
+  assistant: "There are 3 items requiring user decision."
+  (AskUserQuestion with the 3 items)
+  </example>
+skills:
+  - relevant-skill
+---
+
+# My Supervisor
+
+## Workflow
+1. Phase 1: Collect data
+2. Phase 2: Analyze
+3. Phase 3: Report
+
+## Final Report Format
+
+Include a **Requires User Decision** section in the final report:
+
+### Requires User Decision
+- [ ] Item 1 — reason judgment is needed
+- [ ] Item 2 — reason judgment is needed
+```
+
+**Caller Responsibility** (parent session MUST):
+
+1. Parse "Requires User Decision" section from the agent's result
+2. Present items via AskUserQuestion (multiSelect for batch selection)
+3. Process selected items sequentially, asking direction per item
+4. Optionally offer reassignment to sub-agents for complex items:
+   ```
+   AskUserQuestion: "Handle directly" / "Delegate to sub-agent" / "Skip"
+   ```
+
+**Real example**: `.claude/agents/ralph-supervisor.md`
+
 ## Best Practices
 
 1. **Clear triggers**: Specify when to use in description

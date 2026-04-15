@@ -25,6 +25,8 @@ Ask clarifying questions:
 
 **Language rule**: Skills intended for distribution (ClawHub, plugins) must be written in **English** — SKILL.md frontmatter, headings, and body. Personal-only skills may use any language.
 
+**Description field language rule**: The `description` frontmatter field (including trigger keywords) must match the skill's language. If the skill is English, **all trigger keywords must be English** — no Korean mixed in. This applies to both new skills and upgrades.
+
 ### Step 2: Choose Location
 
 | Location | Purpose |
@@ -131,6 +133,31 @@ Dependencies or prerequisites.
 
 Dependencies or prerequisites.
 ```
+
+### Step 6.5: Document Topic Dependencies (multi-topic skills)
+
+For skills with multiple topics that depend on each other or on external skills, add a **Topic Dependencies** section to SKILL.md after the Topics table.
+
+```markdown
+## Topic Dependencies
+
+\```
+skill-name (main workflow)
+  └─→ external-skill/topic (used in step N)
+  └─→ topic-b (optional: extends main workflow)
+        └─→ another-skill (used by topic-b)
+\```
+
+- topic-a: always executed
+- topic-b: optional, opt-out with `--no-flag`
+```
+
+**Rules**:
+- Show the execution flow as an ASCII tree
+- Mark optional topics explicitly
+- Include cross-skill references (e.g., `tdd/cycle` used by `code-workflow` step 4)
+- Add opt-out flags where applicable
+- Also add referenced skills to the `depends-on` frontmatter field
 
 ### Step 7: Validate
 
