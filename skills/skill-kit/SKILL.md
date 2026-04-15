@@ -3,7 +3,7 @@ name: skill-kit
 metadata:
   author: es6kr
   version: "0.1.2"
-description: Claude Code skill management. writer - create new skills [writer.md], lint - validate and fix frontmatter [lint.md], merge - combine related skills [merge.md], dedup - find duplicate skills [dedup.md], convert - convert agents to skills [convert.md], architecture - multi-topic skill structure [architecture.md], upgrade - enhance existing skills, add topics [upgrade.md], route - recommend topic placement [route.md], trigger - declare SKILL.md triggers - auto-generate and register hooks [trigger.md]. Use when "skill writer", "skill lint", "skill merge", "skill dedup", "create skill", "frontmatter fix", "combine skills", "multi-topic skill", "agent to skill", "convert agent", "skill improve", "skill upgrade", "skill fix", "fix skill", "update skill", "add topic", "topic routing", "topic placement", "where to put", "topic route", "trigger compile", "compile triggers", "hook auto register", "trigger list".
+description: Claude Code skill management. writer - create new skills [writer.md], lint - validate and fix frontmatter [lint.md], merge - combine related skills [merge.md], dedup - find duplicate skills [dedup.md], convert - convert agents to skills [convert.md], architecture - multi-topic skill structure [architecture.md], upgrade - enhance existing skills, add topics [upgrade.md], route - recommend topic placement [route.md], trigger - declare SKILL.md triggers - auto-generate and register hooks [trigger.md], find - discover and install skills from open ecosystem via npx skills CLI [find.md]. Use when "skill writer", "skill lint", "skill merge", "skill dedup", "create skill", "frontmatter fix", "combine skills", "multi-topic skill", "agent to skill", "convert agent", "skill improve", "skill upgrade", "skill fix", "fix skill", "update skill", "add topic", "topic routing", "topic placement", "where to put", "topic route", "trigger compile", "compile triggers", "hook auto register", "trigger list", "find skill", "discover skill", "npx skills", "skills.sh", "install skill", "skill search".
 ---
 
 # Skill-Kit
@@ -17,6 +17,7 @@ Comprehensive toolkit for creating, managing, and maintaining Claude Code skills
 | architecture | Multi-topic skill structure and topics | [architecture.md](./architecture.md) |
 | convert | Convert agents or scripts to skills | [convert.md](./convert.md) |
 | dedup | Identify and merge duplicate skills | [dedup.md](./dedup.md) |
+| find | Discover and install skills via npx skills CLI | [find.md](./find.md) |
 | lint | Validate and fix SKILL.md frontmatter | [lint.md](./lint.md) |
 | merge | Combine related skills into one | [merge.md](./merge.md) |
 | route | Recommend topic placement within skills | [route.md](./route.md) |
