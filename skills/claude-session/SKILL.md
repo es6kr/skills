@@ -2,7 +2,7 @@
 name: claude-session
 metadata:
   author: es6kr
-  version: "0.1.3"
+  version: "0.1.4"
 description: Integrated skill for Claude Code session management. id - look up current session ID + keyword session search, import - import session, summarize - summarize session, analyze - session stats/analysis, classify - classify/organize sessions, compress - compress session, destroy - delete current session, migrate - move sessions between projects (main repo to worktree), move - move specific sessions by ID to another project + update cwd [move.md], repair - restore session structure (chain, tool_result), rename - assign custom title to session, url - generate claude-sessions web URL from session ID, Use when: "session ID", "current session", "session id", "get session", "session analysis", "session classify", "session compress", "session delete", "session repair", "chain repair", "session name", "name session", "session search", "find session", "which session", "session import", "session analyze", "session classify", "session compress", "session migrate", "session move", "move session to project", "update session cwd", "worktree session", "move session", "worktree session move", "session repair", "session rename", "chain repair", "session url", "session web URL", "claude-sessions url", "session split", "split recommendations", "topic split", "session purge", "dead session", "clean dead sessions", "session cleanup"
 ---
 
@@ -85,10 +85,12 @@ Integrated skill for managing Claude Code sessions.
 ### Move (Move Specific Sessions by ID)
 
 ```bash
-/session move <session_id> [session_id2 ...] <target_project_path>
+/session move <session_id> <target_project_path>                   # default: AskUserQuestion for cwd mode
+/session move <session_id> <target_project_path> --cwd-mode all    # update all cwd occurrences
+/session move <session_id> <target_project_path> --cwd-mode first  # update only first cwd
 ```
 
-Move explicit session IDs to another project directory and update `cwd` references. Unlike `migrate`, no classification — just direct move.
+Move explicit session IDs to another project directory and update `cwd` references via Python script. Cross-platform (Windows + macOS/Linux). Unlike `migrate`, no classification — just direct move.
 
 [Detailed guide](./move.md)
 
@@ -187,8 +189,8 @@ bash scripts/rename-session.sh --list
 
 | Actual Path | Project Name |
 |-------------|--------------|
-| `/Users/es6kr/works/.vscode` | `-Users-david-works--vscode` |
-| `/Users/es6kr/Sync/AI` | `-Users-david-Sync-AI` |
+| `/Users/es6kr/works/.vscode` | `-Users-es6kr-works--vscode` |
+| `/Users/es6kr/Sync/AI` | `-Users-es6kr-Sync-AI` |
 
 Rule: `/` → `-`, remove leading `/` from path
 
