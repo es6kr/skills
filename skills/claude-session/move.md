@@ -7,7 +7,9 @@ Unlike `migrate` (bulk classify+move), `move` targets explicit session IDs.
 ## Quick Start
 
 ```bash
-/session move <session_id> [session_id2 ...] <target_project_path>
+/session move <session_id> <target_project_path>
+/session move <id1> <id2> <target_project_path>
+/session move <session_id> <target_project_path> --cwd-mode all
 ```
 
 ## When to Use
@@ -18,60 +20,54 @@ Unlike `migrate` (bulk classify+move), `move` targets explicit session IDs.
 
 ## Workflow
 
-### 1. Locate Session Files
+### 1. Parse Arguments
 
-```bash
-find ~/.claude/projects -name "<session_id>.jsonl" 2>/dev/null
+- Last argument = target project path
+- All preceding arguments = session IDs
+- If `--cwd-mode` not specified, AskUserQuestion to ask
+
+### 2. AskUserQuestion: cwd Mode
+
+```
+AskUserQuestion {
+  question: "cwd를 어떻게 변경할까요?",
+  options: [
+    { label: "all (Recommended)", description: "파일 내 모든 cwd를 타겟 경로로 변경" },
+    { label: "first", description: "첫 번째 cwd만 변경 (서브디렉토리 이동 등 특수한 경우)" }
+  ]
+}
 ```
 
-### 2. Identify Source and Target Projects
-
-| Item | Example |
-|------|---------|
-| Source | `-Users-david-ghq-github-com-es6kr-claude-code-sessions` |
-| Target | `-Users-david-ghq-github-com-es6kr` |
-
-Target project directory is derived from the target path:
-- `/Users/david/ghq/github.com/es6kr` → `-Users-david-ghq-github-com-es6kr`
-
-### 3. Extract Current cwd Values
+### 3. Execute Script
 
 ```bash
-grep -o '"cwd":"[^"]*"' <session_file> | sort -u
+python ~/.claude/skills/claude-session/scripts/move-session.py \
+  <session_id> [session_id2 ...] <target_project_path> \
+  --cwd-mode <first|all>
 ```
 
-### 4. Determine cwd Replacement
+Add `--dry-run` for preview.
 
-Replace the source project path with the target project path in all `cwd` values.
+### 4. Verify
 
-| Before | After |
-|--------|-------|
-| `"cwd":"/Users/david/ghq/.../claude-code-sessions"` | `"cwd":"/Users/david/ghq/.../es6kr"` |
+Script prints:
+- Source/target project names
+- Current → updated cwd values
+- Replacement count
+- File move confirmation
 
-**Preserve other cwd values** — only replace the exact source path. Sub-paths (e.g., `packages/web`) and unrelated paths remain unchanged.
+## Script Options
 
-### 5. Execute
-
-```bash
-# Create target project dir if needed
-mkdir -p ~/.claude/projects/<target_project>
-
-# Update cwd and move
-sed -i '' 's|"cwd":"<old_path>"|"cwd":"<new_path>"|g' <session_file>
-mv <session_file> ~/.claude/projects/<target_project>/
-
-# Move subagent dir if exists
-[ -d "<source>/<session_id>" ] && mv "<source>/<session_id>" "<target>/"
-```
-
-### 6. Verify
-
-```bash
-grep -o '"cwd":"[^"]*"' <target>/<session_id>.jsonl | sort -u
-```
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--cwd-mode first` | ✓ | Only update the first cwd occurrence |
+| `--cwd-mode all` | | Update all cwd occurrences |
+| `--dry-run` | | Preview changes without modifying files |
 
 ## Notes
 
+- Cross-platform: works on Windows (Git Bash, PowerShell, cmd) and macOS/Linux
+- Uses `chr(92)` pattern for reliable Windows backslash handling in JSON
 - `sessions-index.json` is not updated — Claude Code rebuilds it automatically
 - Session content and summaries remain functional after move
 - Multiple session IDs can be processed in a single invocation

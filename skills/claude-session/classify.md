@@ -26,40 +26,29 @@ Analyzes all Claude sessions in a project and classifies them as delete/keep/ext
 
 ## Instructions
 
-### 1. List Project Sessions
+### 1. Run classify-sessions.py Script
 
+**Always use the script first** — do not inline grep/sed/jq for JSONL parsing:
+
+```bash
+python3 ~/.claude/skills/claude-session/scripts/classify-sessions.py <project-name>
 ```
-mcp__claude-sessions-mcp__list_sessions({
-  project_name: "<project-folder-name>"
-})
-```
+
+Output: TSV with columns `ID | Lines | UserMsgs | FirstDate | LastDate | Title | LastMessages`
 
 ### 2. Immediately Classify Empty Sessions
 
-Sessions with messageCount of 0 are immediately classified as **Delete Recommended**.
+Sessions with Lines < 10 and UserMsgs = 0 are immediately classified as **Delete Recommended**.
 
 ### 3. Analyze Each Session
 
 #### --depth=fast (default)
 
-Read actual content of each session to identify title and classification basis:
-
-```bash
-# 1) Title extraction priority
-# a) Check custom-title
-grep '"type":"custom-title"' ~/.claude/projects/{project}/{session}.jsonl \
-  | tail -1 | jq -r '.customTitle // empty'
-
-# b) If not found, use first user message text (first 80 chars)
-grep -m1 '"type":"user"' ~/.claude/projects/{project}/{session}.jsonl \
-  | jq -r '.message.content[]? | select(.type=="text") | .text' \
-  | head -c 80
-
-# 2) Last 3 user messages (to determine completion status)
-grep '"type":"user"' ~/.claude/projects/{project}/{session}.jsonl \
-  | tail -3 | jq -r '.message.content[]? | select(.type=="text") | .text' \
-  | head -c 200
-```
+Use the script output directly. The script extracts:
+- Custom title (priority) or first user message (fallback)
+- Last 3 user messages for completion status
+- Message counts and date range
+- Command tag cleanup (e.g., `<command-name>/chezmoi</command-name>` → `/chezmoi`)
 
 #### --depth=medium
 

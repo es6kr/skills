@@ -85,10 +85,12 @@ Integrated skill for managing Claude Code sessions.
 ### Move (Move Specific Sessions by ID)
 
 ```bash
-/session move <session_id> [session_id2 ...] <target_project_path>
+/session move <session_id> <target_project_path>                   # default: AskUserQuestion for cwd mode
+/session move <session_id> <target_project_path> --cwd-mode all    # update all cwd occurrences
+/session move <session_id> <target_project_path> --cwd-mode first  # update only first cwd
 ```
 
-Move explicit session IDs to another project directory and update `cwd` references. Unlike `migrate`, no classification — just direct move.
+Move explicit session IDs to another project directory and update `cwd` references via Python script. Cross-platform (Windows + macOS/Linux). Unlike `migrate`, no classification — just direct move.
 
 [Detailed guide](./move.md)
 
