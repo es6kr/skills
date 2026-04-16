@@ -87,7 +87,7 @@ After implementation, run tests using the **tdd skill's run topic** and report r
 
 **Commit after implementation**: If build + tests pass, proceed to commit. Do not ask the user whether to commit. If a related existing commit exists, confirm whether to amend via `AskUserQuestion`.
 
-**Push + PR draft (issue branch only)**: If the current branch was created for an issue (Step 3b), push and create a draft PR immediately after commit — no AskUserQuestion needed. Invoke `Skill("github-flow", "pr --draft")` — do NOT call `gh pr create` directly. The branch exists solely for this PR, so there is no ambiguity about intent.
+**Push + PR draft (issue branch only)**: If the current branch was created for an issue (Step 3b), push and create a draft PR immediately after commit — no AskUserQuestion needed. Use `github-flow/pr` skill with `--draft`. The branch exists solely for this PR, so there is no ambiguity about intent.
 
 Other:
 - Mark completed tasks/steps as `[x]` in fix_plan.md
