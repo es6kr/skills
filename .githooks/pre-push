@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+echo "Running pre-push checks..."
+
+if ! command -v bats >/dev/null 2>&1; then
+  echo "bats is required to run pre-push checks." >&2
+  exit 1
+fi
+
+if ! command -v uvx >/dev/null 2>&1; then
+  echo "uvx is required to run pre-push checks." >&2
+  exit 1
+fi
+
+echo "Checking SKILL.md frontmatter..."
+for skill in skills/*/SKILL.md; do
+  head -10 "$skill" | grep -q '^name:' || {
+    echo "FAIL: $skill missing name" >&2
+    exit 1
+  }
+  head -10 "$skill" | grep -q '^description:' || {
+    echo "FAIL: $skill missing description" >&2
+    exit 1
+  }
+done
+
+echo "Running bats tests..."
+bats tests/test_structure.bats
+
+echo "Running pytest..."
+uvx --from pytest pytest tests/test_deploy.py -v

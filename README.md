@@ -49,12 +49,17 @@ Browse at [context7.com/es6kr/skills](https://context7.com/es6kr/skills)
 ## Development
 
 ```bash
+# Install tracked git hooks
+make install-hooks
+
 # Run all tests
 make test
 
 # Quick frontmatter check
 make lint
 ```
+
+After installing hooks, every `git push` will run the same Bats and pytest checks from `.githooks/pre-push` before the push is sent. The hook expects `bats` and `uvx` to be available locally.
 
 ## Author
 
