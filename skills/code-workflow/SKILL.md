@@ -17,7 +17,7 @@ Trivial tasks such as simple configuration changes or 1~2 line edits may skip th
 
 ## Topic Dependencies
 
-```
+```text
 code-workflow (steps 1-4)
   └─→ tdd/cycle (step 4: TDD implementation)
   └─→ tdd/run (step 4: test execution after implementation)
@@ -66,7 +66,15 @@ Items for the user to verify:
 - Is the modification scope within the issue/PR scope?
 - Does it match existing patterns/conventions?
 
-On user feedback → revise plan and re-review. On approval → proceed to step 4.
+On user feedback → revise plan and re-review. On approval → proceed to step 3b (if applicable) or step 4.
+
+### Step 3b: Branch Creation (github-flow issue only)
+
+When invoked with `github-flow issue #N`, create an issue branch after plan approval and before implementation:
+
+1. `gh issue develop <N> --checkout --name "<tag>/<N>-<english-description>"`
+2. Branch naming follows `git.md` rules (conventional commit tag + issue number + English description)
+3. If already on a feature branch for this issue, skip this step
 
 ### Step 4: Implement (TDD applied by default)
 
@@ -74,6 +82,8 @@ Once the plan is approved, implement using the **tdd skill's cycle topic** (Red�
 After implementation, run tests using the **tdd skill's run topic** and report results.
 
 **TDD opt-out:** If the user specifies `--no-tdd`, implement without tests.
+
+**Monorepo build verification**: In monorepo projects, run `pnpm build` (full build) before committing — not just `tsc --noEmit` on the changed package. Cross-package issues (e.g., Node.js-only imports leaking into browser bundles) are only caught by building downstream consumers. If full build is too slow, at minimum build the changed package + its direct dependents.
 
 **Commit after implementation**: If build + tests pass, proceed to commit. Do not ask the user whether to commit. If a related existing commit exists, confirm whether to amend via `AskUserQuestion`.
 
@@ -102,9 +112,3 @@ Revise the plan and restart from step 3 (user review).
 | moderate (3~10 files, logic changes) | Start from step 2 (plan) |
 | complex (10+ files, new features, architecture changes) | Perform all steps from step 1 (research) |
 
-## Self-Improvement
-
-After this skill invocation completes, **self-improve based on the conversation**:
-
-1. Detect limitations, failures, and workaround patterns for this skill in the conversation
-2. If improvement candidates are found, run `/skill-kit upgrade code-workflow`

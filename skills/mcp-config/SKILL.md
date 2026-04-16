@@ -24,7 +24,7 @@ Correctly add and manage MCP servers in the `.mcp.json` file.
 
 ## Quick Reference
 
-```
+```text
 "add MCP"              → add topic (scope selection → registration)
 "add context7"         → add topic + refer to catalog for config
 "move MCP"             → move topic (scope change: remove + re-add)
