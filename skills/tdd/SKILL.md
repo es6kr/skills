@@ -3,7 +3,6 @@ name: tdd
 metadata:
   author: es6kr
   version: "0.1.0"
-depends-on: [skill-kit]
 description: Test-Driven Development for coding and bug fixing. cycle - Red→Green→Refactor cycle, defining expected behavior, bug-fix TDD, anti-patterns [cycle.md], run - test execution workflow (environment detection→impact scope→execution→result reporting) [run.md], test-strategies - boundary value·equivalence partitioning·decision table·error guessing·path coverage test design techniques [test-strategies.md]. "TDD", "test first", "failing test", "doesn't work", "not working", "test design", "boundary value test", "test strategies", "equivalence partitioning", "bug fix", "run tests", "execute tests", "test run", "verify" triggers
 ---
 

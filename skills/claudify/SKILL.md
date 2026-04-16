@@ -3,7 +3,6 @@ name: claudify
 metadata:
   author: es6kr
   version: "0.1.2"
-depends-on: [skill-kit]
 description: Convert functionality into Claude Code automation. Includes interactive supervisor agent pattern (see resources/agent-templates.md §7). Use when the user says "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", "interactive agent", "supervisor pattern", or wants to automate a workflow as an agent, skill, or plugin.
 allowed-tools:
   - Read
@@ -194,4 +193,3 @@ If `.ralph/` directory exists, operate in Ralph Mode.
 After changes are complete, **Self-improve based on conversation**:
 
 1. Identify failure and workaround patterns
-2. If candidates found, run `/skill-kit upgrade agentify`

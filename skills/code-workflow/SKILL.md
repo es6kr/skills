@@ -3,7 +3,7 @@ name: code-workflow
 metadata:
   author: es6kr
   version: "0.1.2"
-depends-on: [github-flow, skill-kit, tdd, ui-test]
+depends-on: [github-flow, tdd, web-ui-test]
 description: |
   4-stage workflow for code changes: research → plan → user review → implement (TDD). Applies to all tasks requiring code changes: issue implementation, fix_plan items, new feature additions. TDD (Red→Green→Refactor) is applied by default in the implementation stage; users can opt out with --no-tdd. After implementation, use github-flow/pr for PR creation and github-flow/plan-to-issue for issue registration.
   Use when: "coding workflow", "research plan implement", "research first", "write plan", "plan md", "user review", "review before implement", "code plan", "implementation process", "research md", "code changes".
