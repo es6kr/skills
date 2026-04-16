@@ -25,16 +25,18 @@ Activated when user gives feedback with "fix:" prefix. Finds the root cause of t
 
 **Before any analysis or text output**, register TODO items:
 
-```
+```text
 TodoWrite([
   { id: "fix-0", content: "fix: {user feedback summary} — root cause analysis", status: "in_progress" },
   { id: "fix-1", content: "Root cause fix", status: "pending" },
-  { id: "fix-2", content: "Fix current issue", status: "pending" },
+  { id: "fix-2", content: "Resume original work: {원래 작업 한 줄 요약}", status: "pending" },
   { id: "fix-3", content: "Completion report + cleanup", status: "pending" },
 ])
 ```
 
-Step 0 is **the first tool call** after /fix activation. Text output before TodoWrite = violation.
+- `fix-2`의 `{원래 작업}` 은 fix 진입 **직전에 수행 중이던 작업**을 구체적으로 기재 (e.g., "session classify 결과 테이블 출력")
+- fix-2 = "원래 작업을 수정된 접근법으로 끝까지 완료" — 스킬/룰 수정 자체가 아닌 **사용자가 원래 요청한 결과물 산출**이 목표
+- Step 0 is **the first tool call** after /fix activation. Text output before TodoWrite = violation.
 
 ### 1. Root Cause Analysis (5-Why depth)
 
@@ -63,17 +65,19 @@ Priority (check in order — **stop at the first match**):
 
 When fixing:
 - **Skill is 1st priority** — if the problem is a skill's incomplete procedure, fix the skill. Don't skip to failed-attempts.md
-- Skill improvements must follow **skill-kit upgrade** procedure (direct script/topic file edits allowed)
 - Rule location must be confirmed via **AskUserQuestion**
 - failed-attempts.md recording is **only for cases not covered by skill/rule/hook** — no duplicate recording if root cause is already reflected in a skill or rule
 
-### 3. Fix Current Issue + Resume Original Work
+### 3. Resume Original Work (fix-2)
 
-- After root cause fix, **immediately resolve the current problem**
-- **If unsure what to execute, AskUserQuestion** — don't skip execution because you don't know the command
-- Verify fix results (build/test/run)
-- **Continue the originally intended work with the corrected approach** — don't just clean up wrong artifacts, complete the original task
-- Resume the originally intended work with the corrected approach
+**This is the most important step.** The user's original request must be completed — not just the fix itself.
+
+1. Re-read `fix-2` subject to recall the original task
+2. Execute the original task using the corrected approach
+3. Produce the **original deliverable** the user asked for (e.g., classification table, plan document, deploy result)
+4. Verify the deliverable is complete
+
+**Anti-pattern**: "스크립트 생성 완료. 다음에 실행하면 됩니다" — fix는 도구 개선이 목적이 아니라 **원래 작업 완료**가 목적. 도구 개선은 수단일 뿐.
 
 ### 4. Completion Report + Cleanup
 

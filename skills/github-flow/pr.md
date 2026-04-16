@@ -148,7 +148,7 @@ If capture was performed (code-workflow Step 5) and `--no-capture` not set:
 
 ### Capture Naming
 
-```
+```text
 .github/assets/<issue-number>-<description>-before.webp
 .github/assets/<issue-number>-<description>-after.webp
 ```

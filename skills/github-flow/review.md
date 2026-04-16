@@ -30,11 +30,11 @@ If the user specifies a particular file, focus review on that file.
 # Full diff
 gh pr diff <NUMBER>
 
-# Specific file (if specified in fix_plan or user request)
-git show origin/master:<path/to/file>
+# Specific file diff within the PR
+gh pr diff <NUMBER> -- <path/to/file>
 ```
 
-For merged PRs, read from the merge commit or `origin/master`.
+For merged PRs, read from the merge commit or the default branch.
 
 ### Step 3: Analyze
 

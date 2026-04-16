@@ -9,7 +9,7 @@ description: >-
   Use for: "UI check", "browser test", "screen verify", "Playwright test", "UI verification", "verify with playwright", "SSO verification", "SSO test", "login flow verification".
 ---
 
-# Playwright UI Tester
+# Web UI Tester
 
 Web UI testing skill. Registers Playwright MCP via UTCP and performs browser automation.
 
@@ -80,8 +80,8 @@ npm ping 2>&1
 If Chrome only shows `about:blank` or exits immediately when launching Playwright:
 
 ```bash
-# 1. Kill existing mcp-chrome process
-cmd /c "taskkill /F /IM chrome.exe /FI \"COMMANDLINE like *mcp-chrome*\""
+# 1. Kill existing mcp-chrome process (via command-line match)
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.CommandLine -like '*mcp-chrome*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
 
 # 2. Delete profile lock files
 cmd /c "del /F /Q \"%LOCALAPPDATA%\\ms-playwright\\mcp-chrome\\SingletonLock\" 2>nul"

@@ -59,7 +59,7 @@ Present classified results to user via text summary. **Do NOT auto-fix anything.
 
 Present findings and ask user what to do:
 
-```
+```javascript
 AskUserQuestion({
   question: "How to handle these AI review findings?",
   options: [
@@ -82,7 +82,7 @@ Branch ownership check before fixing:
 | Others (dependabot, user branch) | Comment-only — no code changes |
 
 After fixing, commit with message referencing the review:
-```
+```text
 fix: address CodeRabbit review on PR #NUMBER
 ```
 

@@ -3,7 +3,7 @@ name: code-workflow
 metadata:
   author: es6kr
   version: "0.1.2"
-depends-on: [github-flow, skill-kit, tdd, ui-test]
+depends-on: [github-flow, tdd, web-ui-test]
 description: |
   4-stage workflow for code changes: research → plan → user review → implement (TDD). Applies to all tasks requiring code changes: issue implementation, fix_plan items, new feature additions. TDD (Red→Green→Refactor) is applied by default in the implementation stage; users can opt out with --no-tdd. After implementation, use github-flow/pr for PR creation and github-flow/plan-to-issue for issue registration.
   Use when: "coding workflow", "research plan implement", "research first", "write plan", "plan md", "user review", "review before implement", "code plan", "implementation process", "research md", "code changes".
@@ -17,7 +17,7 @@ Trivial tasks such as simple configuration changes or 1~2 line edits may skip th
 
 ## Topic Dependencies
 
-```
+```text
 code-workflow (steps 1-4)
   └─→ tdd/cycle (step 4: TDD implementation)
   └─→ tdd/run (step 4: test execution after implementation)
@@ -66,7 +66,15 @@ Items for the user to verify:
 - Is the modification scope within the issue/PR scope?
 - Does it match existing patterns/conventions?
 
-On user feedback → revise plan and re-review. On approval → proceed to step 4.
+On user feedback → revise plan and re-review. On approval → proceed to step 3b (if applicable) or step 4.
+
+### Step 3b: Branch Creation (github-flow issue only)
+
+When invoked with `github-flow issue #N`, create an issue branch after plan approval and before implementation:
+
+1. `gh issue develop <N> --checkout --name "<tag>/<N>-<english-description>"`
+2. Branch naming follows `git.md` rules (conventional commit tag + issue number + English description)
+3. If already on a feature branch for this issue, skip this step
 
 ### Step 4: Implement (TDD applied by default)
 
@@ -75,7 +83,11 @@ After implementation, run tests using the **tdd skill's run topic** and report r
 
 **TDD opt-out:** If the user specifies `--no-tdd`, implement without tests.
 
+**Monorepo build verification**: In monorepo projects, run `pnpm build` (full build) before committing — not just `tsc --noEmit` on the changed package. Cross-package issues (e.g., Node.js-only imports leaking into browser bundles) are only caught by building downstream consumers. If full build is too slow, at minimum build the changed package + its direct dependents.
+
 **Commit after implementation**: If build + tests pass, proceed to commit. Do not ask the user whether to commit. If a related existing commit exists, confirm whether to amend via `AskUserQuestion`.
+
+**Push + PR draft (issue branch only)**: If the current branch was created for an issue (Step 3b), push and create a draft PR immediately after commit — no AskUserQuestion needed. Invoke `Skill("github-flow", "pr --draft")` — do NOT call `gh pr create` directly. The branch exists solely for this PR, so there is no ambiguity about intent.
 
 Other:
 - Mark completed tasks/steps as `[x]` in fix_plan.md
@@ -102,9 +114,3 @@ Revise the plan and restart from step 3 (user review).
 | moderate (3~10 files, logic changes) | Start from step 2 (plan) |
 | complex (10+ files, new features, architecture changes) | Perform all steps from step 1 (research) |
 
-## Self-Improvement
-
-After this skill invocation completes, **self-improve based on the conversation**:
-
-1. Detect limitations, failures, and workaround patterns for this skill in the conversation
-2. If improvement candidates are found, run `/skill-kit upgrade code-workflow`
