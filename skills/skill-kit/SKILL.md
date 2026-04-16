@@ -2,7 +2,7 @@
 name: skill-kit
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.2"
 description: Claude Code skill management. writer - create new skills [writer.md], lint - validate and fix frontmatter [lint.md], merge - combine related skills [merge.md], dedup - find duplicate skills [dedup.md], convert - convert agents to skills [convert.md], architecture - multi-topic skill structure [architecture.md], upgrade - enhance existing skills, add topics [upgrade.md], route - recommend topic placement [route.md], trigger - declare SKILL.md triggers - auto-generate and register hooks [trigger.md]. Use when "skill writer", "skill lint", "skill merge", "skill dedup", "create skill", "frontmatter fix", "combine skills", "multi-topic skill", "agent to skill", "convert agent", "skill improve", "skill upgrade", "skill fix", "fix skill", "update skill", "add topic", "topic routing", "topic placement", "where to put", "topic route", "trigger compile", "compile triggers", "hook auto register", "trigger list".
 ---
 

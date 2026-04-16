@@ -2,9 +2,9 @@
 name: claudify
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.2"
 depends-on: [skill-kit]
-description: Convert functionality into Claude Code automation. Use when the user says "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", or wants to automate a workflow as an agent, skill, or plugin.
+description: Convert functionality into Claude Code automation. Includes interactive supervisor agent pattern (see resources/agent-templates.md §7). Use when the user says "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", "interactive agent", "supervisor pattern", or wants to automate a workflow as an agent, skill, or plugin.
 allowed-tools:
   - Read
   - Write

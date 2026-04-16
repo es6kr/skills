@@ -1,7 +1,7 @@
 ---
 metadata:
   author: es6kr
-  version: "0.1.3"
+  version: "0.1.4"
 name: fix
 description: >-
   User behavior correction skill. Triggered by "fix:" prefix feedback (e.g., "fix: why didn't you commit?").
@@ -21,19 +21,20 @@ Activated when user gives feedback with "fix:" prefix. Finds the root cause of t
 
 ## Procedure
 
-### Step 0. TaskCreate (MANDATORY — first action, no exceptions)
+### Step 0. TodoWrite (MANDATORY — first action, no exceptions)
 
-**Before any analysis or text output**, create tasks:
+**Before any analysis or text output**, register TODO items:
 
 ```
-TaskCreate: "fix: {user feedback summary}"          ← parent task
-TaskCreate: "1. Root cause analysis"
-TaskCreate: "2. Root cause fix"
-TaskCreate: "3. Fix current issue"
-TaskCreate: "4. Completion report"
+TodoWrite([
+  { id: "fix-0", content: "fix: {user feedback summary} — root cause analysis", status: "in_progress" },
+  { id: "fix-1", content: "Root cause fix", status: "pending" },
+  { id: "fix-2", content: "Fix current issue", status: "pending" },
+  { id: "fix-3", content: "Completion report + cleanup", status: "pending" },
+])
 ```
 
-Step 0 is **the first tool call** after /fix activation. Text output before TaskCreate = violation.
+Step 0 is **the first tool call** after /fix activation. Text output before TodoWrite = violation.
 
 ### 1. Root Cause Analysis (5-Why depth)
 
@@ -72,9 +73,9 @@ When fixing:
 - **If unsure what to execute, AskUserQuestion** — don't skip execution because you don't know the command
 - Verify fix results (build/test/run)
 - **Continue the originally intended work with the corrected approach** — don't just clean up wrong artifacts, complete the original task
-- Register the original task with TaskCreate and execute immediately
+- Resume the originally intended work with the corrected approach
 
-### 4. Completion Report
+### 4. Completion Report + Cleanup
 
 ```
 Fix complete:
@@ -83,10 +84,13 @@ Fix complete:
 - Current fix: {result of fixing the current issue}
 ```
 
+**After reporting, delete all TODO items created in Step 0** — fix TODOs are temporary session-level tracking only; must not persist after completion.
+
 ## Anti-patterns
 
 - Repeating "already fixed" without actually fixing the root cause
 - Patching only the current issue without improving skills/rules/hooks
-- Text response without TaskCreate after /fix activation
+- Text response without TodoWrite after /fix activation
 - Recording in failed-attempts.md when the root cause is a skill defect (skill fix is 1st priority)
 - **Stopping at Why 1** — fixing the symptom without asking Why 2-3 (structural cause)
+- **Not cleaning up TODO/Task after completion** — must delete all fix TODOs when done

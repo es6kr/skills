@@ -45,7 +45,30 @@ Each tool_result block must have a corresponding tool_use block in the previous 
 
 **Causes**: Message ordering issues, missing intermediate messages, or sync errors
 
-### 3. Duplicate UUIDs
+### 3. Invalid Thinking Block Signature
+
+A `thinking` block inside an assistant message has a corrupted or invalid `signature` field.
+
+**Symptoms**: API Error 400
+```
+messages.N.content.0: Invalid `signature` in `thinking` block
+```
+
+**Causes**: Syncthing sync corruption, interrupted writes, or session file manipulation
+
+**Fix**: Remove all thinking blocks from message content arrays:
+```bash
+jq -c --slurp '
+  .[] |
+  if (.message.content | type == "array") then
+    .message.content = [.message.content[] | select(type != "object" or .type != "thinking")]
+  else . end
+' session.jsonl > session.tmp && mv session.tmp session.jsonl
+```
+
+**Important**: Removing thinking blocks alone does NOT remove existing `isApiErrorMessage: true` lines — those must be removed separately. Always run both steps together.
+
+### 4. Duplicate UUIDs
 
 Multiple messages with the same `uuid`.
 
@@ -87,9 +110,13 @@ If session ID is not provided:
 ### 3. Detection Order (all must be run)
 
 1. **Detect duplicate message.id** (Syncthing conflict) — `grep -o '"id":"msg_[^"]*"' session.jsonl | sort | uniq -c | sort -rn | head -10`
-2. **Detect broken chains** — jq query
-3. **Detect orphan tool_results** — jq query
-4. **Detect duplicate UUIDs** — jq query
+2. **Detect API 400 error lines** — `grep -c '"isApiErrorMessage":true' session.jsonl`
+   - If found, check error message: `grep '"isApiErrorMessage":true' session.jsonl | jq -r '.message.content[0].text' | head -3`
+   - `Invalid signature in thinking block` → run thinking block removal first (see §3)
+   - `unexpected tool_use_id` → orphan tool_result issue
+3. **Detect broken chains** — jq query
+4. **Detect orphan tool_results** — jq query
+5. **Detect duplicate UUIDs** — jq query
 
 **Important**: If duplicate message.ids are found, **run dedup first** before the remaining checks. Other check results are unreliable while duplicates are present.
 

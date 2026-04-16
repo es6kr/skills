@@ -3,9 +3,9 @@ name: code-workflow
 metadata:
   author: es6kr
   version: "0.1.2"
-depends-on: [skill-kit, tdd]
+depends-on: [github-flow, skill-kit, tdd, ui-test]
 description: |
-  4-stage workflow for code changes: research → plan → user review → implement (TDD). Applies to all tasks requiring code changes: issue implementation, fix_plan items, new feature additions. TDD (Red→Green→Refactor) is applied by default in the implementation stage; users can opt out with --no-tdd.
+  4-stage workflow for code changes: research → plan → user review → implement (TDD). Applies to all tasks requiring code changes: issue implementation, fix_plan items, new feature additions. TDD (Red→Green→Refactor) is applied by default in the implementation stage; users can opt out with --no-tdd. After implementation, use github-flow/pr for PR creation and github-flow/plan-to-issue for issue registration.
   Use when: "coding workflow", "research plan implement", "research first", "write plan", "plan md", "user review", "review before implement", "code plan", "implementation process", "research md", "code changes".
 ---
 
@@ -14,6 +14,22 @@ description: |
 A **Research → Plan → User Review → Implement** 4-stage procedure for code change tasks.
 
 Trivial tasks such as simple configuration changes or 1~2 line edits may skip this workflow.
+
+## Topic Dependencies
+
+```
+code-workflow (steps 1-4)
+  └─→ tdd/cycle (step 4: TDD implementation)
+  └─→ tdd/run (step 4: test execution after implementation)
+  └─→ github-flow/plan-to-issue (optional: register plan as issue)
+  └─→ github-flow/pr (optional: create PR with visual attachments)
+        └─→ web-ui-test (capture via Playwright)
+```
+
+- Steps 1-4 are always executed (unless trivial)
+- `github-flow/plan-to-issue` (optional): converts plans to GitHub issues. Use when user requests issue registration
+- `github-flow/pr` (optional): creates PRs after implementation. Use when user requests PR creation
+- `tdd` is applied by default in step 4. Opt-out with `--no-tdd`
 
 ## Step-by-Step Procedure
 

@@ -93,7 +93,7 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
     # Pass 1: load all messages
     messages = []
 
-    with open(session_file, 'r') as f:
+    with open(session_file, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -240,7 +240,7 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
     if not dry_run:
         # Generate .dedup output filename correctly even for .jsonl.bak etc.
         output_file = Path(str(session_file) + '.dedup')
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', encoding='utf-8') as f:
             for line in final_lines:
                 f.write(line + '\n')
         result['output_file'] = str(output_file)

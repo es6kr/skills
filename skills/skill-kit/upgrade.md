@@ -58,6 +58,8 @@ When adding/modifying content in an existing skill, match the language of the ex
 
 **Do not** write Korean content in an English skill or vice versa.
 
+**This includes the `description` frontmatter field**: If the skill is English, all trigger keywords in description must also be English — no Korean keywords mixed in.
+
 ## Workflow
 
 ### 1. Identify Target Skill
@@ -122,6 +124,26 @@ AskUserQuestion {
 - [ ] Add row to Topics table in alphabetical order
 - [ ] Update Quick Reference section
 - [ ] Check `depends-on` field (see procedure below)
+- [ ] Update Topic Dependencies section if topics reference each other or external skills (see below)
+
+**Topic Dependencies section (multi-topic skills):**
+
+When the skill has topics that depend on each other or on external skill topics, add/update a **Topic Dependencies** section in SKILL.md after the Topics table:
+
+```markdown
+## Topic Dependencies
+
+\```
+skill-name (main workflow)
+  └─→ external-skill/topic (used in step N)
+  └─→ topic-b (optional: extends main workflow)
+\```
+
+- topic-a: always executed
+- topic-b: optional, opt-out with `--no-flag`
+```
+
+This makes cross-topic and cross-skill relationships explicit, preventing confusion about execution order and optional steps.
 
 **safe-delete rule when removing/replacing skills (⚠️ Required):**
 
@@ -135,6 +157,21 @@ mv ~/.claude/skills/{old-skill} ~/.claude/.bak/
 **Never**: Add `.bak` suffix in the same directory (`mv skill skill.bak`)
 - This causes Claude Code to still load the `.bak` folder as a skill
 - Must move to the `~/.claude/.bak/` root folder
+
+**Skill rename backward compatibility (⚠️ Required):**
+
+When renaming a skill (directory rename + `name` field update), create a **command alias** for the old name:
+
+```bash
+# ~/.claude/commands/{old-name}.md
+$ARGUMENTS
+
+Invoke skill: /{new-name} $ARGUMENTS
+```
+
+This allows `/old-name` to still work as a slash command. **Do not use symlinks** — Claude Code loads symlinked directories as duplicate skills.
+
+Also update all `depends-on` references in other skills from old name to new name.
 
 ### 4-1. Auto-detect depends-on ⚠️ Required
 
