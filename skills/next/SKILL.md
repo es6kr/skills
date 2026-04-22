@@ -1,12 +1,22 @@
 ---
-name: next-action
 metadata:
   author: es6kr
   version: "0.1.0"
-description: Suggest next actions after completing any task. Use automatically when a task is finished to recommend 2-3 logical follow-up actions the user might want to take.
+name: next
+depends-on: [fix]
+description: >-
+  Suggest next actions after completing any task. Use automatically when a task is finished to recommend 2-3 logical follow-up actions the user might want to take.
+  stall-detect - detect stalled follow-up steps after task completion and invoke /fix [stall-detect.md].
+  Use when "next action", "what next", "stall", "stuck", "not progressing", "follow-up missing" is mentioned.
 ---
 
 # Next Action Suggester
+
+## Topics
+
+| Topic | Description | Guide |
+|-------|-------------|-------|
+| stall-detect | Detect stalled follow-up steps and invoke /fix | [stall-detect.md](./stall-detect.md) |
 
 After task completion, use `AskUserQuestion` to suggest next steps and get user selection.
 
@@ -21,6 +31,12 @@ Automatically use after any task completion:
 - Bug fix complete
 
 ## Instructions
+
+### Step 0: Stall Detection (mandatory)
+
+Before suggesting next actions, run the [stall-detect](./stall-detect.md) topic.
+
+If stall detected → topic invokes `/fix`. If no stall → proceed to Step 1.
 
 ### Step 1: Identify completed task type
 
