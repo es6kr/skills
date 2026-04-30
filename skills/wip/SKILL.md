@@ -2,12 +2,13 @@
 name: wip
 description: >-
   Track in-session work progress. Register steps for 3+ step tasks, update status per step, handle completion/abort.
+  Compact 후 이전 작업 요약 표시 + AskUserQuestion(multiSelect)으로 복원 대상 선택 + TodoWrite 재등록.
   antigravity - task.md artifact-based checklist [antigravity.md],
-  claude - TodoWrite/TaskCreate API [claude.md].
-  "wip", "track progress", "register tasks", "task register", "step tracking" triggers.
+  claude - TodoWrite/TaskCreate API + compact 복원 [claude.md].
+  "wip", "track progress", "register tasks", "task register", "step tracking", "compact recovery", "작업 복원" triggers.
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.2"
 ---
 
 # WIP (Work In Progress)
@@ -39,6 +40,7 @@ See [detailed guide](./antigravity.md).
 ### Claude
 
 Use `TodoWrite` for sequential steps, `TaskCreate` for parallel tasks with dependencies.
+Compact 후 이전 작업 복원: 요약 표시 → multiSelect로 선택 → TodoWrite 재등록.
 
 See [detailed guide](./claude.md).
 
