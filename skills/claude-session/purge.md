@@ -20,7 +20,7 @@ Dead sessions are permanently deleted.
 bash scripts/purge-dead-sessions.sh <project_name>
 ```
 
-Example: c--Users-DAEGUNSOFT-Sync, -Users-david-Sync-AI
+Example: C--Users-es6kr-Sync, -Users-es6kr-Sync-AI
 
 ### 2. Actual execution
 

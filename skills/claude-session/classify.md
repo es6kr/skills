@@ -26,40 +26,29 @@ Analyzes all Claude sessions in a project and classifies them as delete/keep/ext
 
 ## Instructions
 
-### 1. List Project Sessions
+### 1. Run classify-sessions.py Script
 
+**Always use the script first** — do not inline grep/sed/jq for JSONL parsing:
+
+```bash
+python3 ~/.claude/skills/claude-session/scripts/classify-sessions.py <project-name>
 ```
-mcp__claude-sessions-mcp__list_sessions({
-  project_name: "<project-folder-name>"
-})
-```
+
+Output: TSV with columns `ID | Lines | UserMsgs | FirstDate | LastDate | Title | LastMessages`
 
 ### 2. Immediately Classify Empty Sessions
 
-Sessions with messageCount of 0 are immediately classified as **Delete Recommended**.
+Sessions with Lines <= 10 and UserMsgs = 0 are immediately classified as **Delete Recommended**.
 
 ### 3. Analyze Each Session
 
 #### --depth=fast (default)
 
-Read actual content of each session to identify title and classification basis:
-
-```bash
-# 1) Title extraction priority
-# a) Check custom-title
-grep '"type":"custom-title"' ~/.claude/projects/{project}/{session}.jsonl \
-  | tail -1 | jq -r '.customTitle // empty'
-
-# b) If not found, use first user message text (first 80 chars)
-grep -m1 '"type":"user"' ~/.claude/projects/{project}/{session}.jsonl \
-  | jq -r '.message.content[]? | select(.type=="text") | .text' \
-  | head -c 80
-
-# 2) Last 3 user messages (to determine completion status)
-grep '"type":"user"' ~/.claude/projects/{project}/{session}.jsonl \
-  | tail -3 | jq -r '.message.content[]? | select(.type=="text") | .text' \
-  | head -c 200
-```
+Use the script output directly. The script extracts:
+- Custom title (priority) or first user message (fallback)
+- Last 3 user messages for completion status
+- Message counts and date range
+- Command tag cleanup (e.g., `<command-name>/chezmoi</command-name>` → `/chezmoi`)
 
 #### --depth=medium
 
@@ -111,20 +100,20 @@ mcp__claude-sessions-mcp__summarize_session({
 ### A) Delete Recommended (N)
 | Session ID | Title | Reason |
 |------------|-------|--------|
-| abc123 | npm install openclaw failure analysis | Short Q&A completed, no need to reference again (8 messages) |
-| def456 | MCP server connection test | Test session, terminated without conclusion (3 messages) |
+| a1b2c3d4-e5f6-7890-abcd-ef1234567890 | npm install openclaw failure analysis | Short Q&A completed, no need to reference again (8 messages) |
+| d4e5f6a7-b8c9-0123-def0-123456789abc | MCP server connection test | Test session, terminated without conclusion (3 messages) |
 
 ### B) Keep (N)
 | Session ID | Title | Reason |
 |------------|-------|--------|
-| ghi789 | session classify skill description improvement | Skill refactoring in progress, current work session (1317 messages) |
-| jkl012 | k3s node re-join work | Successful infrastructure work record, worth referencing (420 messages) |
+| 12345678-abcd-ef01-2345-67890abcdef0 | session classify skill description improvement | Skill refactoring in progress, current work session (1317 messages) |
+| abcdef01-2345-6789-0abc-def012345678 | k3s node re-join work | Successful infrastructure work record, worth referencing (420 messages) |
 
 ### C) Extract then Delete (N)
 | Session ID | Title | Extract Target |
 |------------|-------|---------------|
-| mno345 | Helm chart deployment workflow | Repeatable pattern → Extract as Skill |
-| pqr678 | ArgoCD ignoreDifferences configuration | Configuration know-how → Save to Serena memory |
+| 98765432-fedc-ba09-8765-432fedcba098 | Helm chart deployment workflow | Repeatable pattern → Extract as Skill |
+| fedcba09-8765-4321-fedc-ba0987654321 | ArgoCD ignoreDifferences configuration | Configuration know-how → Save to Serena memory |
 ```
 
 ### 6. Execute (when --execute flag is provided)
