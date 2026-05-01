@@ -33,7 +33,7 @@ Derive from CWD automatically:
 pwd | sed 's|^/c/|C--| ; s|/|-|g'
 
 # WSL
-pwd | sed 's|/|-|g ; s|^-||'
+pwd | sed 's|/|-|g'
 ```
 
 ### 3. Compose URL

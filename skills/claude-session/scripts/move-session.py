@@ -46,7 +46,10 @@ def path_to_project_name(p: str) -> str:
     # Claude Code uses abs(crc32(path)).toString(36) for hash suffix
     import zlib
 
-    hash_suffix = _base36(abs(zlib.crc32(p.encode())))
+    raw = zlib.crc32(p.encode())
+    if raw >= (1 << 31):
+        raw -= (1 << 32)
+    hash_suffix = _base36(abs(raw))
     return f"{result[:200]}-{hash_suffix}"
 
 
@@ -64,6 +67,8 @@ def _base36(n: int) -> str:
 
 def find_session_file(session_id: str, projects_dir: Path) -> Path | None:
     """Find a session JSONL file across all project directories."""
+    if not projects_dir.is_dir():
+        return None
     filename = f"{session_id}.jsonl"
     for project_dir in projects_dir.iterdir():
         if not project_dir.is_dir():
@@ -80,22 +85,28 @@ def extract_cwd_values(content: str) -> list[str]:
     return sorted(set(re.findall(r'"cwd":"([^"]*)"', content)))
 
 
-def replace_cwd(content: str, old_suffix: str, new_path_json: str, mode: str) -> tuple[str, int]:
+def replace_cwd(content: str, old_suffix: str, mode: str) -> tuple[str, int]:
     """Replace cwd values in JSONL content.
 
     Args:
         content: Full file content
         old_suffix: The path suffix to remove (e.g., \\\\sub-project)
-        new_path_json: The new cwd value in JSON-escaped form
         mode: 'first' or 'all'
 
     Returns:
         (new_content, replacement_count)
     """
     if mode == "all":
-        count = content.count(old_suffix)
-        content = content.replace(old_suffix, "")
-        return content, count
+        lines = content.split("\n")
+        total = 0
+        new_lines = []
+        for line in lines:
+            if old_suffix in line and '"cwd"' in line:
+                count = line.count(old_suffix)
+                line = line.replace(old_suffix, "")
+                total += count
+            new_lines.append(line)
+        return "\n".join(new_lines), total
     else:
         # first mode: only replace in lines that contain "cwd"
         # Actually, replace the first occurrence of the full cwd pattern
@@ -172,7 +183,7 @@ def main():
             if cwd_normalized == target_normalized:
                 continue  # Already correct
 
-            if not cwd_normalized.startswith(target_normalized):
+            if not cwd_normalized.startswith(target_normalized + "/"):
                 # Check if target is a parent of cwd
                 if target_normalized.startswith(cwd_normalized):
                     continue  # cwd is parent of target, skip
@@ -181,14 +192,18 @@ def main():
 
             # Find the suffix to remove
             suffix_normalized = cwd_normalized[len(target_normalized):]
-            # Convert back to JSON-escaped backslash form
-            # In JSON, the actual bytes are \\ (two chars) for each path separator on Windows
-            suffix_json = suffix_normalized.replace("/", chr(92) + chr(92))
+            # Convert back to JSON-escaped form matching the original encoding
+            if "\\\\" in cwd_val:
+                # Windows JSON encoding: path separators stored as double-backslash
+                suffix_json = suffix_normalized.replace("/", chr(92) + chr(92))
+            else:
+                # macOS/Linux: path separators stored as-is
+                suffix_json = suffix_normalized
 
             print(f"  Removing suffix: {repr(suffix_json)} from cwd (mode={opts.cwd_mode})")
 
             if not opts.dry_run:
-                content, count = replace_cwd(content, suffix_json, "", opts.cwd_mode)
+                content, count = replace_cwd(content, suffix_json, opts.cwd_mode)
                 replaced_total += count
 
         if opts.dry_run:

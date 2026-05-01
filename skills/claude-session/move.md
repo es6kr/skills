@@ -28,11 +28,11 @@ Unlike `migrate` (bulk classify+move), `move` targets explicit session IDs.
 
 ### 2. AskUserQuestion: cwd Mode
 
-```
+```text
 AskUserQuestion {
   question: "How should cwd be changed?",
   options: [
-    { label: "all (Recommended)", description: "Change all cwd entries in the file to the target path" },
+    { label: "all (Recommended)", description: "Remove sub-path suffix from all cwd entries in the file" },
     { label: "first", description: "Change only the first cwd (special cases like subdirectory moves)" }
   ]
 }

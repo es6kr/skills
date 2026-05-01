@@ -4,7 +4,7 @@ Classify sessions - extract title, message count, timestamps, and last user mess
 for session classification.
 
 Usage:
-  classify-sessions.py <project_name> [--depth=fast|medium]
+  classify-sessions.py <project_name>
 
 Output: TSV format per session
   session_id | lines | user_msg_count | first_ts | last_ts | title | last_user_messages
@@ -26,7 +26,7 @@ def get_project_dir(project_name: str) -> Path:
     return Path.home() / ".claude" / "projects" / project_name
 
 
-def extract_session_info(session_file: Path, depth: str = "fast") -> dict:
+def extract_session_info(session_file: Path) -> dict:
     session_id = session_file.stem
     lines = 0
     first_user_msg = ""
@@ -122,14 +122,10 @@ def extract_session_info(session_file: Path, depth: str = "fast") -> dict:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: classify-sessions.py <project_name> [--depth=fast|medium]", file=sys.stderr)
+        print("Usage: classify-sessions.py <project_name>", file=sys.stderr)
         sys.exit(1)
 
     project_name = sys.argv[1]
-    depth = "fast"
-    for arg in sys.argv[2:]:
-        if arg.startswith("--depth="):
-            depth = arg.split("=", 1)[1]
 
     project_dir = get_project_dir(project_name)
     if not project_dir.exists():
@@ -146,7 +142,7 @@ def main():
     print("ID\tLines\tUserMsgs\tFirstDate\tLastDate\tTitle\tLastMessages")
 
     for session_file in sessions:
-        info = extract_session_info(session_file, depth)
+        info = extract_session_info(session_file)
         if "error" in info:
             print(f"{info['id']}\t0\t0\t\t\tERROR: {info['error']}\t", file=sys.stderr)
             continue

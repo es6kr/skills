@@ -38,7 +38,7 @@ Output: TSV with columns `ID | Lines | UserMsgs | FirstDate | LastDate | Title |
 
 ### 2. Immediately Classify Empty Sessions
 
-Sessions with Lines < 10 and UserMsgs = 0 are immediately classified as **Delete Recommended**.
+Sessions with Lines <= 10 and UserMsgs = 0 are immediately classified as **Delete Recommended**.
 
 ### 3. Analyze Each Session
 

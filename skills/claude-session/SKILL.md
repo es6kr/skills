@@ -85,7 +85,7 @@ Integrated skill for managing Claude Code sessions.
 ### Move (Move Specific Sessions by ID)
 
 ```bash
-/session move <session_id> <target_project_path>                   # default: AskUserQuestion for cwd mode
+/session move <session_id> <target_project_path>                   # default: --cwd-mode first
 /session move <session_id> <target_project_path> --cwd-mode all    # update all cwd occurrences
 /session move <session_id> <target_project_path> --cwd-mode first  # update only first cwd
 ```
@@ -192,7 +192,7 @@ bash scripts/rename-session.sh --list
 | `/Users/es6kr/works/.vscode` | `-Users-es6kr-works--vscode` |
 | `/Users/es6kr/Sync/AI` | `-Users-es6kr-Sync-AI` |
 
-Rule: `/` → `-`, remove leading `/` from path
+Rule: all non-alphanumeric characters → `-` (i.e., `replace(/[^a-zA-Z0-9]/g, '-')`)
 
 ## Requirements
 

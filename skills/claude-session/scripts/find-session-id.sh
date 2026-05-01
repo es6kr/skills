@@ -55,7 +55,9 @@ fi
 
 if [[ ! -d "$PROJECT_DIR" ]]; then
     echo "ERROR: Project directory not found: $PROJECT_DIR" >&2
-    echo "Searched from CWD upward to /" >&2
+    if [[ -z "${2:-}" ]]; then
+        echo "Searched from CWD upward to /" >&2
+    fi
     exit 1
 fi
 

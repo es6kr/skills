@@ -122,3 +122,4 @@ These are not script flags — they are implemented by the skill at invocation t
 /session id Makefile remove          # Search sessions by keyword "Makefile remove"
 /session id --today ansible/Makefile # Search only today's sessions by file path
 ```
+
