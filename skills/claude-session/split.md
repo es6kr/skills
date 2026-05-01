@@ -31,7 +31,7 @@ Read user messages in chronological order and identify **topic transition points
 |--------|---------|
 | Subject change | "Never mind that, moving on to..." |
 | New file/directory work starts | Before: `apps/dt/` → After: `.ralph/PROMPT.md` |
-| Slash command switch | `/deps-wbs-sync diff` → `/ralph prompt` |
+| Slash command switch | `/sync diff` → `/ralph prompt` |
 | Time gap | 30+ minute gap between messages |
 | Explicit task completion | "commit", "done", "next" |
 
@@ -54,10 +54,10 @@ Group by topic and output as a table:
 |---|-------|--------------|-------------|
 | 1 | WBS file management | 1~15 | WBS download path change, file rename |
 | 2 | Ralph PROMPT.md improvement | 16~25 | Commit split rules, BLOCKED skip added |
-| 3 | deps-wbs-sync diff | 26~30 | fetch-issues --state all bug fix |
+| 3 | sync diff | 26~30 | fetch-issues --state all bug fix |
 
 ### Recommendation
-- Topics 1, 3 are related to `deps-wbs-sync` → can keep as one session
+- Topics 1, 3 are related to `sync` → can keep as one session
 - Topic 2 is independent → recommend splitting
 
 ### Split Point
@@ -90,6 +90,7 @@ bash scripts/rename-session.sh <original_session_id> "topic title"
 ## Notes for Current Conversation Analysis
 
 Since the current conversation's JSONL is not yet finalized:
+- **Always look up and output the Session ID** — invoking the `/session id` topic is mandatory (no exception for the current conversation)
 - Identify topic transition points directly from conversation context
 - Recommend using **topic summary + boundary description** instead of message indices
 - `--execute` is not available for the current conversation (run after session ends)

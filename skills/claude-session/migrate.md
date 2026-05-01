@@ -29,9 +29,8 @@ Typical projects for a repo with a worktree:
 
 | Project | Path Pattern |
 |---------|-------------|
-| Main repo | `C--Users-{USER}-ghq-...-{repo}` |
-| Worktree | `C--Users-{USER}-ghq-...-{repo}--claude-worktrees-{name}` |
-| Vibe-kanban (temp) | `C--Users-...-Temp-vibe-kanban-worktrees-...-{repo}` |
+| Main repo | `C--Users-es6kr-ghq-...-{repo}` |
+| Worktree | `C--Users-es6kr-ghq-...-{repo}--claude-worktrees-{name}` |
 
 ### 2. Classify Sessions
 

@@ -111,20 +111,20 @@ mcp__claude-sessions-mcp__summarize_session({
 ### A) Delete Recommended (N)
 | Session ID | Title | Reason |
 |------------|-------|--------|
-| abc123 | npm install openclaw failure analysis | Short Q&A completed, no need to reference again (8 messages) |
-| def456 | MCP server connection test | Test session, terminated without conclusion (3 messages) |
+| a1b2c3d4-e5f6-7890-abcd-ef1234567890 | npm install openclaw failure analysis | Short Q&A completed, no need to reference again (8 messages) |
+| d4e5f6a7-b8c9-0123-def0-123456789abc | MCP server connection test | Test session, terminated without conclusion (3 messages) |
 
 ### B) Keep (N)
 | Session ID | Title | Reason |
 |------------|-------|--------|
-| ghi789 | session classify skill description improvement | Skill refactoring in progress, current work session (1317 messages) |
-| jkl012 | k3s node re-join work | Successful infrastructure work record, worth referencing (420 messages) |
+| 12345678-abcd-ef01-2345-67890abcdef0 | session classify skill description improvement | Skill refactoring in progress, current work session (1317 messages) |
+| abcdef01-2345-6789-0abc-def012345678 | k3s node re-join work | Successful infrastructure work record, worth referencing (420 messages) |
 
 ### C) Extract then Delete (N)
 | Session ID | Title | Extract Target |
 |------------|-------|---------------|
-| mno345 | Helm chart deployment workflow | Repeatable pattern → Extract as Skill |
-| pqr678 | ArgoCD ignoreDifferences configuration | Configuration know-how → Save to Serena memory |
+| 98765432-fedc-ba09-8765-432fedcba098 | Helm chart deployment workflow | Repeatable pattern → Extract as Skill |
+| fedcba09-8765-4321-fedc-ba0987654321 | ArgoCD ignoreDifferences configuration | Configuration know-how → Save to Serena memory |
 ```
 
 ### 6. Execute (when --execute flag is provided)
