@@ -27,10 +27,10 @@ Before using the marker method, check if the session ID is already visible in th
 **Procedure:**
 1. Check for hook injection ("Current session ID: ..." in context) — if present, return directly
 2. Otherwise, scan file paths in recent tool results for the UUID pattern
-3. If found, return it — **skip Steps 1-3 entirely**
+3. If found, return it — **skip the marker method (outer Steps 1-3) entirely**
 4. If not found, **AskUserQuestion**: "session-id hook is not installed. Install it?"
-   - "Install" → run `/claude-session install`, then inform "auto-injected from next session". Current session falls through to Step 1 (marker method)
-   - "Skip" → proceed to Step 1 (marker method)
+   - "Install" → run `/session install`, then inform "auto-injected from next session". Current session falls through to the marker method (outer Step 1)
+   - "Skip" → proceed to the marker method (outer Step 1)
 
 ### 1. Generate and Output Marker (only if Step 0 found nothing)
 

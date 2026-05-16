@@ -10,9 +10,9 @@ Register the `session-id-inject.sh` hook in `settings.json` so that every sessio
 
 ## Prerequisites
 
-- `session-id-inject.sh` must exist at `~/.claude/skills/claude-session/scripts/session-id-inject.sh`
-  - If installed via ClawHub: `~/.claude/skills/claude-session/scripts/session-id-inject.sh`
-  - Alternatively: `~/.claude/hooks/session-id-inject.sh` (legacy location)
+- `session-id-inject.sh` must exist at one of:
+  - `~/.claude/skills/claude-session/scripts/session-id-inject.sh` (ClawHub install — preferred)
+  - `~/.claude/hooks/session-id-inject.sh` (legacy location)
 - `jq` must be available in PATH
 
 ## Installation Steps

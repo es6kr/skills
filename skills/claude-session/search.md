@@ -30,8 +30,9 @@ For backward compatibility, `/session id <keyword>` is routed to this topic.
 PROJECT_DIR=~/.claude/projects/{project_name}
 
 # Keyword search (matches both user messages and file paths)
+# stat mtime: GNU `stat -c %Y` (Linux), BSD `stat -f %m` (macOS) — fall back across both
 grep -l "<keyword>" "$PROJECT_DIR"/*.jsonl | while read f; do
-  ts=$(stat -c %Y "$f")
+  ts=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
   sid=$(basename "$f" .jsonl)
   echo "$ts $sid"
 done | sort -rn | head -5
@@ -46,7 +47,7 @@ These are not script flags — they are implemented by the skill at invocation t
 
 ## Output Format
 
-```
+```text
 03-26 11:28 | a6aea9f3-3376-4cf3-be6f-33a7122ab283
 03-25 10:02 | e972a8b7-da04-4b9f-8d26-fad0350a2e09
 ```
