@@ -22,7 +22,7 @@ This topic runs as a **post-completion check** after `/next` suggests actions or
 After any task completion or skill execution:
 
 1. **Check pending tasks**: Are there uncompleted tasks in the task list?
-2. **Check workflow rules**: Does `workflow.md` mandate a follow-up step? (e.g., CI pass → Test plan 미체크 항목 검증)
+2. **Check workflow rules**: Does `workflow.md` mandate a follow-up step? (e.g., CI pass → verify unchecked Test Plan items)
 3. **Check PR/issue body**: Are there unchecked `- [ ]` items in the PR Test plan or issue checklist?
 4. **Check fix_plan.md**: Does the current item have incomplete sub-steps?
 5. **Check skill procedure**: Did the skill's documented steps complete fully?
@@ -54,7 +54,7 @@ Stall: sync.sh not run, es6kr/skills repo not updated
 ### Example 2: User selection ignored
 
 ```
-AskUserQuestion answer: "진행" (proceed with publish)
+AskUserQuestion answer: "proceed" (proceed with publish)
 Stall: No clawhub publish command executed after approval
 → Skill("fix", "stall detected: user approved publish but no action taken")
 ```
