@@ -2,8 +2,8 @@
 name: claude-session
 metadata:
   author: es6kr
-  version: "0.1.4"
-description: Integrated skill for Claude Code session management. id - look up current session ID + keyword session search, import - import session, summarize - summarize session, analyze - session stats/analysis, classify - classify/organize sessions, compress - compress session, destroy - delete current session, migrate - move sessions between projects (main repo to worktree), move - move specific sessions by ID to another project + update cwd [move.md], repair - restore session structure (chain, tool_result), rename - assign custom title to session, url - generate claude-sessions web URL from session ID, Use when: "session ID", "current session", "session id", "get session", "session analysis", "session classify", "session compress", "session delete", "session repair", "chain repair", "session name", "name session", "session search", "find session", "which session", "session import", "session analyze", "session classify", "session compress", "session migrate", "session move", "move session to project", "update session cwd", "worktree session", "move session", "worktree session move", "session repair", "session rename", "chain repair", "session url", "session web URL", "claude-sessions url", "session split", "split recommendations", "topic split", "session purge", "dead session", "clean dead sessions", "session cleanup"
+  version: "0.1.5"
+description: Integrated skill for Claude Code session management. id - look up current session ID, search - keyword session search with result validation, import - import session, summarize - summarize session, analyze - session stats/analysis, classify - classify/organize sessions, compress - compress session, destroy - delete current session, migrate - move sessions between projects (main repo to worktree), move - move specific sessions by ID to another project + update cwd [move.md], repair - restore session structure (chain, tool_result), rename - assign custom title to session, url - generate claude-sessions web URL from session ID, Use when: "session ID", "current session", "session id", "get session", "session analysis", "session classify", "session compress", "session delete", "session repair", "chain repair", "session name", "name session", "session search", "find session", "which session", "search sessions", "session keyword search", "session import", "session analyze", "session classify", "session compress", "session migrate", "session move", "move session to project", "update session cwd", "worktree session", "move session", "worktree session move", "session repair", "session rename", "chain repair", "session url", "session web URL", "claude-sessions url", "session split", "split recommendations", "topic split", "session purge", "dead session", "clean dead sessions", "session cleanup"
 ---
 
 # Session
@@ -21,11 +21,13 @@ Integrated skill for managing Claude Code sessions.
 | destroy | Delete current session and restart IDE | [destroy.md](./destroy.md) |
 | id | Look up current session ID (UUID) | [id.md](./id.md) |
 | import | Pipeline session data to other agents/skills | [import.md](./import.md) |
+| install | Register session-id-inject hook in settings.json | [install.md](./install.md) |
 | migrate | Move sessions between projects (main repo → worktree) | [migrate.md](./migrate.md) |
 | move | Move specific sessions by ID to another project + update cwd | [move.md](./move.md) |
 | purge | Delete dead sessions (hook-only, no assistant response) permanently | [purge.md](./purge.md) |
 | rename | Assign and look up custom title for session | [rename.md](./rename.md) |
 | repair | Restore session structure (chain, tool_result, UUID) | [repair.md](./repair.md) |
+| search | Keyword session search with result validation (verb/path/class checks) | [search.md](./search.md) |
 | summarize | View and summarize conversation content from other sessions | [summarize.md](./summarize.md) |
 | url | Generate claude-sessions web URL from session ID | [url.md](./url.md) |
 
@@ -117,18 +119,31 @@ Register claude-sessions-mcp with UTCP, then call via code-mode.
 
 [Detailed guide](./compress.md)
 
-### ID (Session ID Lookup + Keyword Search)
+### ID (Current Session ID Lookup)
 
 ```bash
 /session id                          # look up current session ID
-/session id Makefile remove          # search sessions by keyword
-/session id --today ansible/Makefile # search only today's sessions by file path
 ```
 
-Current session ID: output unique marker → search JSONL with `find-session-id.sh` → return UUID
-Keyword search: grep project JSONL → sort by modification time descending → return most recent matching session
+**Current session ID — fast path (handle here, do NOT read id.md):**
+
+1. **Hook injection (preferred)** — Look for `Current session ID: {uuid}` in conversation context. SessionStart hook `~/.claude/hooks/session-id-inject.sh` injects it as `additionalContext` at session start. If present, return the UUID immediately.
+2. **File path UUIDs** — Scan recent tool results for UUID pattern `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` in subagent/task/transcript paths. Return if found.
+3. **Marker fallback** — Only if 1 & 2 fail: read `id.md` for the marker→grep procedure.
 
 [Detailed guide](./id.md)
+
+### Search (Keyword Session Search)
+
+```bash
+/session search Makefile remove          # find sessions by keyword
+/session search --today ansible/Makefile # only sessions modified today
+/session id <keyword>                    # legacy alias — routed to search
+```
+
+Always run the result-validation gate (verb ambiguity, artifact location, action class) before reporting matches as the answer to "which session did X" — a misplaced artifact path is a "task orphaned" signal, not a successful match.
+
+[Detailed guide](./search.md)
 
 ### Destroy (Delete Session)
 

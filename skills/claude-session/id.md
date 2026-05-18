@@ -12,7 +12,10 @@ Claude's text output is recorded in session JSONL files. By leaving a unique mar
 
 Before using the marker method, check if the session ID is already visible in the current context.
 
-**Search these path patterns in recent tool results:**
+**Search order:**
+
+1. **SessionStart hook injection** — If `session-id-inject.sh` is registered in `settings.json` SessionStart hooks, the session ID is injected as `additionalContext` at session start. Look for "Current session ID: {uuid}" in early conversation context.
+2. **File path UUIDs** in recent Bash/Read tool results (UUID pattern `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`):
 
 | Source | Path pattern | Example |
 |--------|-------------|---------|
@@ -22,9 +25,12 @@ Before using the marker method, check if the session ID is already visible in th
 | Background task | `.../{session_id}/tasks/...` | output file paths from `run_in_background` |
 
 **Procedure:**
-1. Scan all file paths in recent Bash/Read tool results for UUID pattern `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
-2. If found, return it directly — **skip Steps 1-3 entirely**
-3. If not found, proceed to Step 1 (marker method)
+1. Check for hook injection ("Current session ID: ..." in context) — if present, return directly
+2. Otherwise, scan file paths in recent tool results for the UUID pattern
+3. If found, return it — **skip the marker method (outer Steps 1-3) entirely**
+4. If not found, **AskUserQuestion**: "session-id hook is not installed. Install it?"
+   - "Install" → run `/session install`, then inform "auto-injected from next session". Current session falls through to the marker method (outer Step 1)
+   - "Skip" → proceed to the marker method (outer Step 1)
 
 ### 1. Generate and Output Marker (only if Step 0 found nothing)
 
@@ -81,45 +87,11 @@ b5153827-a52c-4e83-b24a-8413e6aa418b
 
 ## Keyword Session Search
 
-When called as `/session id <keyword>`, searches for sessions containing that keyword and returns the session ID.
-
-### Search Procedure
-
-1. Determine project JSONL directory (`~/.claude/projects/{project_name}/`)
-2. Grep JSONL files for keyword — matches user messages (`"type":"user"`) + file paths
-3. Sort results by modification time descending and return the most recent matching session
-
-```bash
-# Project JSONL path
-PROJECT_DIR=~/.claude/projects/{project_name}
-
-# Keyword search (matches both user messages and file paths)
-grep -l "<keyword>" "$PROJECT_DIR"/*.jsonl | while read f; do
-  ts=$(stat -c %Y "$f")
-  sid=$(basename "$f" .jsonl)
-  echo "$ts $sid"
-done | sort -rn | head -5
-```
-
-### Restricting Search Scope (Skill Procedure)
-
-These are not script flags — they are implemented by the skill at invocation time:
-
-- `--today`: Filter results to sessions modified today (skill uses `find -newer`)
-- `--project <path>`: Specify a particular project path (skill overrides CWD-based detection)
-
-### Output Format
-
-```
-03-26 11:28 | a6aea9f3-3376-4cf3-be6f-33a7122ab283
-03-25 10:02 | e972a8b7-da04-4b9f-8d26-fad0350a2e09
-```
+> Moved to [search.md](./search.md). `/session id <keyword>` is still accepted as a backward-compatible alias and routes to `/session search`.
 
 ## Usage Examples
 
 ```bash
-/session id                          # Look up current session ID
-/session id Makefile remove          # Search sessions by keyword "Makefile remove"
-/session id --today ansible/Makefile # Search only today's sessions by file path
+/session id                          # look up current session ID
 ```
 
