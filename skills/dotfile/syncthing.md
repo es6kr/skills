@@ -337,6 +337,89 @@ Once running under user account, `config.xml` folder paths can use `~`:
 
 Syncthing will resolve `~` to `C:\Users\<USERNAME>` natively.
 
+### Troubleshooting: Garbage `encryptionPassword` (Antigravity / Gemini re-registration)
+
+**Symptom**: All folders report `Failed to verify encryption consistency` against connected devices, message:
+`remote expects to exchange plain data, but local data is encrypted (folder-type receive-encrypted)`.
+
+Folder type is `sendreceive` on both ends, yet Syncthing treats one side as `receive-encrypted`.
+
+**Cause**: When Antigravity (Gemini) re-registers Syncthing folders during config sync, it writes non-empty whitespace strings (commonly `&#xA;      ` — LF + 6 spaces) into every `<encryptionPassword>` element under each `<folder>/<device>` block and the `<defaults>/<folder>/<device>` template. Syncthing treats any non-empty string as a valid password and switches the folder into encryption mode, which then mismatches the remote's `sendreceive` configuration.
+
+The corrupted password is **invisible to the Web UI password field** (renders as empty) and to PowerShell `[xml]` access (auto-trimmed) — diagnosis requires reading the raw XML.
+
+#### Diagnosis (raw XML hex inspection)
+
+```powershell
+$cfg = "$env:LOCALAPPDATA\Syncthing\config.xml"
+$content = Get-Content $cfg -Raw
+$pattern = '<encryptionPassword>([^<]*)</encryptionPassword>'
+$mtchs = [regex]::Matches($content, $pattern)
+$empty = 0; $nonempty = 0
+foreach ($m in $mtchs) {
+    $pwd = $m.Groups[1].Value
+    if ($pwd.Length -eq 0) { $empty++ } else {
+        $nonempty++
+        $hex = ($pwd.ToCharArray() | ForEach-Object { "{0:X2}" -f [int]$_ }) -join " "
+        Write-Host "  hex='$hex' (len=$($pwd.Length))"
+    }
+}
+Write-Host "empty=$empty, non-empty=$nonempty"
+```
+
+A typical garbage value `hex='26 23 78 41 3B 20 20 20 20 20 20'` decodes to `&#xA;      ` (LF + 6 spaces). If `non-empty > 0`, the bug is present.
+
+#### Fix (API PUT — clears folders + defaults)
+
+```powershell
+$cfg = "$env:LOCALAPPDATA\Syncthing\config.xml"
+[xml]$xml = Get-Content $cfg
+$API_KEY = $xml.configuration.gui.apikey
+
+# 1. Clear all folder/device encryption passwords
+$folders = Invoke-RestMethod -Uri "http://localhost:8384/rest/config/folders" -Headers @{"X-API-Key"=$API_KEY}
+foreach ($f in $folders) {
+    foreach ($d in $f.devices) {
+        if ($d.encryptionPassword -and $d.encryptionPassword.Length -gt 0) { $d.encryptionPassword = "" }
+    }
+}
+$body = $folders | ConvertTo-Json -Depth 10 -Compress
+Invoke-RestMethod -Method Put -Uri "http://localhost:8384/rest/config/folders" `
+    -Headers @{"X-API-Key"=$API_KEY; "Content-Type"="application/json"} -Body $body | Out-Null
+
+# 2. Clear defaults/folder template (prevents recurrence on new folders)
+$defaults = Invoke-RestMethod -Uri "http://localhost:8384/rest/config/defaults/folder" -Headers @{"X-API-Key"=$API_KEY}
+foreach ($d in $defaults.devices) {
+    if ($d.encryptionPassword -and $d.encryptionPassword.Length -gt 0) { $d.encryptionPassword = "" }
+}
+$dbody = $defaults | ConvertTo-Json -Depth 10 -Compress
+Invoke-RestMethod -Method Put -Uri "http://localhost:8384/rest/config/defaults/folder" `
+    -Headers @{"X-API-Key"=$API_KEY; "Content-Type"="application/json"} -Body $dbody | Out-Null
+```
+
+No Syncthing restart required — the API PUT writes through to config.xml and the running daemon picks up the change. Encryption errors stop within seconds.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Trust the Web UI password field appearing empty | Read raw config.xml + hex-dump every `<encryptionPassword>` |
+| 2 | Restart / unpause / re-add folders to fix the symptom | The garbage password persists across all those operations — clear via API PUT |
+| 3 | Clear only folders, skip `<defaults>` | New folders will inherit the garbage password again — clear both |
+| 4 | Use PowerShell `[xml]` parsing to compare passwords | `[xml]` auto-trims whitespace, hiding the garbage. Use regex on raw text |
+| 5 | Assume "remote device has wrong type" and ask the user to reconfigure the peer | The peer is correct; the local non-empty password is what flips local-side to encrypted mode |
+
+#### Verification
+
+After the fix:
+```powershell
+$log = Invoke-RestMethod -Uri "http://localhost:8384/rest/system/log" -Headers @{"X-API-Key"=$API_KEY}
+$recent = $log.messages | Where-Object {
+    ($_.message -match "encryption") -and ([DateTime]$_.when -gt (Get-Date).AddMinutes(-2))
+}
+Write-Host "Encryption errors in last 2min: $($recent.Count)"  # expected: 0
+```
+
 ### Legacy: "Folder Path Missing" Workaround (LocalSystem only)
 
 **Use only if migrating to user account is not feasible.** Converts `~` to absolute paths in `config.xml`:
