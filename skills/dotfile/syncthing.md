@@ -232,17 +232,115 @@ Remove-Item $backupPath -Recurse -Force
 
 **Check index path**: `syncthing paths` or `syncthing.exe paths` -> "Database location" entry
 
-### Troubleshooting: "Folder Path Missing" on Windows
+### Windows Service Account: User vs LocalSystem (HARD STOP)
 
-**Symptom**: Syncthing v2.1.0+ service running under Windows `LocalSystem` account fails to start folder sync with the error:
-`Failed initial scan (error="folder path missing" folder.id=<id> ...)`
+**Recommended**: Run Syncthing as a Windows service under the **user account**, not `LocalSystem`. User-account service can expand `~` paths in `config.xml` and avoids the `.git/` corruption pattern seen with `LocalSystem`.
 
-**Cause**: Syncthing v2.1.0+ service running as `LocalSystem` or in non-interactive sessions cannot expand tilde (`~`) paths (e.g. `~\.claude`) in `config.xml` to a valid user profile directory.
+| Aspect | `LocalSystem` (avoid) | User account (recommended) |
+|--------|----------------------|---------------------------|
+| `~` path expansion | ❌ Fails — needs absolute path conversion | ✅ Native `~` resolution |
+| User profile access | ❌ Different `$HOME` (`C:\Windows\System32\config\systemprofile`) | ✅ Matches `C:\Users\<user>` |
+| `.git/` corruption | ⚠️ Higher risk (no user lock context) | Lower risk |
+| Survives reboot | ✅ Yes | ✅ Yes (with `Automatic` start type) |
+| Requires user login | ❌ No | ❌ No (service can run without login) |
 
-**Solution**:
-1. Stop the service.
-2. Replace all tilde (`~`) path prefixes in `config.xml` with absolute paths (`C:\Users\<username>\...`).
-3. Run the following PowerShell script to automate this conversion:
+#### Migrate LocalSystem → User Account (Task Scheduler with hidden VBS launcher)
+
+**Recommended approach**: Task Scheduler at user logon + VBS launcher for hidden execution. No password storage required. Run via `gsudo` (see `~/.agents/rules/windows.md` "Admin command = gsudo default").
+
+##### Step 1: Create VBS hidden launcher
+
+`syncthing.exe` is a console app — running it directly from Task Scheduler shows a console window that, **when closed, terminates the process**. Wrap it in VBS to launch hidden.
+
+```vbs
+' ~/.local/bin/syncthing-hidden.vbs
+Set objShell = CreateObject("WScript.Shell")
+objShell.Run """C:\ProgramData\chocolatey\bin\syncthing.exe"" --no-browser --home=""C:\Users\<USERNAME>\AppData\Local\Syncthing""", 0, False
+```
+
+The `0` argument = `vbHidden` (no window). The `False` = don't wait for completion (VBS exits, child syncthing.exe keeps running).
+
+##### Step 2: Migration script
+
+`~/.local/share/syncthing-migrate-to-user.ps1`:
+
+```powershell
+# Stop and delete existing LocalSystem service
+Stop-Service syncthing -Force -ErrorAction SilentlyContinue
+sc.exe delete syncthing
+
+# Register Task Scheduler entry
+$user = "$env:USERDOMAIN\$env:USERNAME"
+$vbs = "$env:USERPROFILE\.local\bin\syncthing-hidden.vbs"
+
+$action = New-ScheduledTaskAction `
+    -Execute "wscript.exe" `
+    -Argument "`"$vbs`"" `
+    -WorkingDirectory $env:USERPROFILE
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
+$principal = New-ScheduledTaskPrincipal `
+    -UserId $user `
+    -LogonType Interactive `
+    -RunLevel Highest
+$settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable `
+    -ExecutionTimeLimit (New-TimeSpan -Days 0) `
+    -RestartCount 3 `
+    -RestartInterval (New-TimeSpan -Minutes 1) `
+    -Hidden
+
+Register-ScheduledTask `
+    -TaskName "Syncthing" `
+    -Action $action `
+    -Trigger $trigger `
+    -Principal $principal `
+    -Settings $settings
+Start-ScheduledTask -TaskName "Syncthing"
+```
+
+##### Step 3: Run via gsudo
+
+```powershell
+gsudo powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.local\share\syncthing-migrate-to-user.ps1"
+```
+
+##### Step 4: Verify
+
+```powershell
+Get-Process syncthing | ForEach-Object {
+    $owner = (Get-WmiObject Win32_Process -Filter "ProcessId=$($_.Id)").GetOwner()
+    $hidden = if ([string]::IsNullOrEmpty($_.MainWindowTitle)) { "hidden" } else { "visible" }
+    Write-Host "PID $($_.Id) owner=$($owner.Domain)\$($owner.User) $hidden"
+}
+# Expected: owner=<DOMAIN>\<USER>, hidden
+```
+
+#### Alternative: Windows Service (user account) — requires password
+
+If you need Syncthing to start before user logon, register as a Windows Service under the user account. Service Control Manager will encrypt and store the password. This trade-off (password storage) is rarely worth it on personal machines — prefer Task Scheduler unless multi-user / server context.
+
+```powershell
+# Run as Admin (or via gsudo)
+sc.exe create syncthing binPath= "`"$shawl`" run --name syncthing -- `"$syncthing`" --no-browser --home=$home" start= auto obj= $user password= "<USER_PASSWORD>"
+# Plus: grant "Log on as a service" right via secpol.msc or ntrights.exe
+```
+
+#### After Migration: Use `~` Paths
+
+Once running under user account, `config.xml` folder paths can use `~`:
+
+```xml
+<folder id="..." path="~/.claude" ... />
+```
+
+Syncthing will resolve `~` to `C:\Users\<USERNAME>` natively.
+
+### Legacy: "Folder Path Missing" Workaround (LocalSystem only)
+
+**Use only if migrating to user account is not feasible.** Converts `~` to absolute paths in `config.xml`:
+
 ```powershell
 $configPath = "$env:LOCALAPPDATA\Syncthing\config.xml"
 [xml]$xml = Get-Content $configPath
@@ -262,7 +360,6 @@ if ($changed -gt 0) {
     Write-Host "Paths converted successfully."
 }
 ```
-4. Restart the Syncthing service (if using `LocalSystem`, migrate to `shawl` wrapper with `--home` configured for absolute stability).
 
 ## Conflict Prevention
 
