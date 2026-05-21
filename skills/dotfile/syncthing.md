@@ -133,8 +133,16 @@ Manage Syncthing defaults via chezmoi modify:
 
 ### Get API Key
 
+**macOS / Linux:**
 ```bash
 API_KEY=$(xmllint --xpath '//configuration/gui/apikey/text()' ~/Library/Application\ Support/Syncthing/config.xml)
+```
+
+**Windows (PowerShell):**
+```powershell
+$configPath = "$env:LOCALAPPDATA\Syncthing\config.xml"
+[xml]$xml = Get-Content $configPath
+$API_KEY = $xml.configuration.gui.apikey
 ```
 
 ### Check Folder Status
@@ -182,10 +190,11 @@ curl -s -X POST -H "X-API-Key: $API_KEY" "http://localhost:8384/rest/db/scan?fol
 
 ### DB Reset (Full Index Reset)
 
-Used when stale entries from offline devices remain. Settings/keys are preserved; only the index is rebuilt.
+Used when stale entries from offline devices remain or when encountering persistent transfer queue freezes. Settings/keys are preserved; only the index is rebuilt.
 
 > **Note**: `syncthing --reset-database` was removed in v2.0. Replaced by deleting the `index-v2` directory.
 
+**macOS / Linux:**
 ```bash
 # 1. Stop Syncthing
 brew services stop syncthing
@@ -201,7 +210,59 @@ brew services start syncthing
 rm -rf ~/Library/Application\ Support/Syncthing/index-v2.bak
 ```
 
-**Check index path**: `syncthing paths` -> "Database location" entry
+**Windows (PowerShell - Run as Admin if service-managed):**
+```powershell
+# 1. Stop Syncthing service
+Stop-Service syncthing
+# Force kill processes if locked
+Get-Process | Where-Object { $_.Name -like "*syncthing*" } | Stop-Process -Force
+
+# 2. Back up and delete index
+$dbPath = "$env:LOCALAPPDATA\Syncthing\index-v2"
+$backupPath = "$env:LOCALAPPDATA\Syncthing\index-v2.bak"
+if (Test-Path $backupPath) { Remove-Item $backupPath -Recurse -Force }
+Move-Item $dbPath $backupPath -Force
+
+# 3. Start service (index auto-rebuilt)
+Start-Service syncthing
+
+# 4. Verify and clean up backup later
+Remove-Item $backupPath -Recurse -Force
+```
+
+**Check index path**: `syncthing paths` or `syncthing.exe paths` -> "Database location" entry
+
+### Troubleshooting: "Folder Path Missing" on Windows
+
+**Symptom**: Syncthing v2.1.0+ service running under Windows `LocalSystem` account fails to start folder sync with the error:
+`Failed initial scan (error="folder path missing" folder.id=<id> ...)`
+
+**Cause**: Syncthing v2.1.0+ service running as `LocalSystem` or in non-interactive sessions cannot expand tilde (`~`) paths (e.g. `~\.claude`) in `config.xml` to a valid user profile directory.
+
+**Solution**:
+1. Stop the service.
+2. Replace all tilde (`~`) path prefixes in `config.xml` with absolute paths (`C:\Users\<username>\...`).
+3. Run the following PowerShell script to automate this conversion:
+```powershell
+$configPath = "$env:LOCALAPPDATA\Syncthing\config.xml"
+[xml]$xml = Get-Content $configPath
+$userHome = $env:USERPROFILE
+$changed = 0
+foreach ($folder in $xml.configuration.folder) {
+    $oldPath = $folder.path
+    if ($oldPath -match '^~[/\\]') {
+        $newPath = $oldPath -replace '^~[/\\]', "$userHome\"
+        $newPath = $newPath -replace '/', '\'
+        $folder.path = $newPath
+        $changed++
+    }
+}
+if ($changed -gt 0) {
+    $xml.Save($configPath)
+    Write-Host "Paths converted successfully."
+}
+```
+4. Restart the Syncthing service (if using `LocalSystem`, migrate to `shawl` wrapper with `--home` configured for absolute stability).
 
 ## Conflict Prevention
 
