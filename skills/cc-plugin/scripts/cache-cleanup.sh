@@ -16,15 +16,19 @@ usage() {
     echo "  -n, --dry-run    Show what would be deleted without actually deleting"
     echo "  -v, --verbose    Show detailed information"
     echo "  -h, --help       Show this help message"
-    exit 0
+}
+
+usage_exit() {
+    usage
+    exit "${1:-2}"
 }
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -n|--dry-run) DRY_RUN=true; shift ;;
         -v|--verbose) VERBOSE=true; shift ;;
-        -h|--help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage_exit 2 ;;
     esac
 done
 
@@ -36,7 +40,8 @@ log() {
 
 cleanup_marketplace() {
     local marketplace_dir="$1"
-    local marketplace_name=$(basename "$marketplace_dir")
+    local marketplace_name
+    marketplace_name=$(basename "$marketplace_dir")
 
     log "Processing marketplace: $marketplace_name"
 
@@ -69,8 +74,20 @@ cleanup_marketplace() {
             [[ -d "$version_dir" ]] || continue
             local version_name=$(basename "$version_dir")
 
-            # Get birthtime (creation time) on macOS
-            local birthtime=$(stat -f "%B" "$version_dir" 2>/dev/null || echo "0")
+            # Get a creation/modification time (portable best-effort).
+            # 1) macOS/BSD: birthtime via `stat -f "%B"`
+            # 2) Linux: birthtime via `stat -c "%W"` (returns 0 when filesystem doesn't track it)
+            # 3) Fallback (any platform): modification time via `stat -c "%Y"` so versions are still ordered
+            local birthtime
+            if birthtime=$(stat -f "%B" "$version_dir" 2>/dev/null); then
+                :
+            elif birthtime=$(stat -c "%W" "$version_dir" 2>/dev/null) && [[ "$birthtime" != "0" ]]; then
+                :
+            elif birthtime=$(stat -c "%Y" "$version_dir" 2>/dev/null); then
+                :
+            else
+                birthtime=0
+            fi
 
             versions+=("$version_name")
             times+=("$birthtime")

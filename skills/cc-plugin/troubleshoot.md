@@ -11,8 +11,8 @@ Diagnose and fix plugin installation failures, cache sync issues, and HUD errors
 **Diagnosis**:
 
 ```bash
-# Check marketplace exists
-ls ~/.claude/plugins/marketplaces/<plugin-name>/
+# Check marketplace exists (plugin lives under marketplaces/<marketplace>/plugins/<plugin-name>/)
+ls ~/.claude/plugins/marketplaces/<marketplace>/plugins/<plugin-name>/
 
 # Check cache exists
 ls ~/.claude/plugins/cache/<marketplace>/<plugin-name>/
@@ -24,7 +24,7 @@ ls ~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>/dist/hud/index.
 **Fix — Sync marketplace to cache**:
 
 ```bash
-MARKET=~/.claude/plugins/marketplaces/<plugin-name>
+MARKET=~/.claude/plugins/marketplaces/<marketplace>/plugins/<plugin-name>
 CACHE=~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>
 
 mkdir -p "$CACHE"
@@ -42,7 +42,7 @@ After syncing: **restart Claude Code** (cache loads at session start).
 **Cause**: `.claude-plugin/plugin.json` missing from cache.
 
 ```bash
-cp -r ~/.claude/plugins/marketplaces/<name>/.claude-plugin \
+cp -r ~/.claude/plugins/marketplaces/<marketplace>/plugins/<name>/.claude-plugin \
       ~/.claude/plugins/cache/<marketplace>/<name>/<version>/
 ```
 
@@ -60,7 +60,7 @@ npm install && npm run build
 **Cause**: `.mcp.json` not in cache.
 
 ```bash
-cp ~/.claude/plugins/marketplaces/<name>/.mcp.json \
+cp ~/.claude/plugins/marketplaces/<marketplace>/plugins/<name>/.mcp.json \
    ~/.claude/plugins/cache/<marketplace>/<name>/<version>/
 ```
 
