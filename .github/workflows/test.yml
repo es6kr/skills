@@ -27,3 +27,17 @@ jobs:
           python-version: "3.12"
       - run: pip install pytest
       - run: python -m pytest tests -v
+
+  hangul-check:
+    name: Korean Text Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-hangul.sh skills
+
+  frontmatter-lint:
+    name: SKILL.md Frontmatter Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/lint-frontmatter.sh
