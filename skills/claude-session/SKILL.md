@@ -24,6 +24,7 @@ Integrated skill for managing Claude Code sessions.
 | id | Look up current session ID (UUID) | [id.md](./id.md) |
 | import | Pipeline session data to other agents/skills | [import.md](./import.md) |
 | install | Register session-id-inject hook in settings.json | [install.md](./install.md) |
+| list | Enumerate current-project sessions (UUID + mtime + size) | [list.md](./list.md) |
 | migrate | Move sessions between projects (main repo → worktree) | [migrate.md](./migrate.md) |
 | move | Move specific sessions by ID to another project + update cwd | [move.md](./move.md) |
 | purge | Delete dead sessions (hook-only, no assistant response) permanently | [purge.md](./purge.md) |
@@ -134,6 +135,18 @@ Classifies sessions as CODE/INFRA/TINY/READ, then moves CODE sessions to worktre
 Register claude-sessions-mcp with UTCP, then call via code-mode.
 
 [Detailed guide](./compress.md)
+
+### List (Enumerate Current-Project Sessions)
+
+```bash
+/session list                       # list current-project sessions (UUID + mtime + size)
+/session list --all-projects        # summary across all projects
+/session list --limit 20            # top N by mtime
+```
+
+Non-destructive enumeration. For categorization or cleanup, use `classify` or `purge` instead.
+
+[Detailed guide](./list.md)
 
 ### ID (Current Session ID Lookup)
 

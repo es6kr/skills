@@ -9,8 +9,15 @@ Analyzes all Claude sessions in a project and classifies them as delete/keep/ext
 /session classify <project_name>         # classify sessions for a specific project
 /session classify --depth=medium         # also parse Todo items for analysis
 /session classify --depth=full           # apply full AI summarize to each session (slow)
-/session classify --execute              # execute immediately after classification
+/session classify --execute              # execute after classification (archive, not hard-delete)
+/session classify --rag                  # store RAG-worthy B/C sessions to RAG before archiving
 ```
+
+> **Archive, not delete**: `--execute` **archives** category A sessions via the
+> [`archive`](./archive.md) topic (moves the `.jsonl` to
+> `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` — recoverable) instead of
+> hard-deleting via `delete_session`. This follows the safe-delete principle. Add `--rag`
+> to store distilled knowledge from B/C sessions to a detected RAG MCP before archiving.
 
 ## Analysis Depth Options
 
@@ -85,9 +92,9 @@ mcp__claude-sessions-mcp__summarize_session({
 
 | Category | Criteria | Action |
 |----------|----------|--------|
-| **A) Delete Recommended** | Empty sessions, test sessions, simple Q&A (completed), sessions terminated with errors | `delete_session` |
+| **A) Delete Recommended** | Empty sessions, test sessions, simple Q&A (completed), sessions terminated with errors | Archive (§6-A) — empty sessions may use `clear_sessions` |
 | **B) Keep** | Important task records, ongoing work, decisions worth referencing | Keep as-is |
-| **C) Extract then Delete** | Contains knowledge/patterns but the session itself is not needed; agentify candidates | Save to Serena memory then delete |
+| **C) Extract then Delete** | Contains knowledge/patterns but the session itself is not needed; agentify candidates | Save to Serena memory (+ RAG if `--rag`) then archive |
 
 ### 5. Output Classification Results
 
@@ -130,15 +137,22 @@ mcp__claude-sessions-mcp__summarize_session({
 > So if you want to "split the latter half of a session into a new session" → the original session ID ends up with the new topic.
 > Think of the split point as "up to here is the original session", not "from here is the new session".
 
-#### A) Execute Delete
-```
-mcp__claude-sessions-mcp__delete_session({
-  project_name: "<project>",
-  session_id: "<id>"
-})
+#### A) Archive (recoverable — replaces hard delete)
+
+**Do not use `delete_session` (hard delete).** Archive each category A session via the
+[`archive`](./archive.md) topic, which moves the `.jsonl` to
+`~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (preserves the UUID, recoverable, not
+re-scanned by Claude Code):
+
+```bash
+bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>
 ```
 
-#### C) Extract then Delete
+- The session disappears from the session list (same UX as delete) but stays recoverable.
+- See [`archive`](./archive.md) for the destination convention, restoration, and ledger.
+- Empty (0-message) sessions may instead use `clear_sessions` (§7) — nothing to preserve.
+
+#### C) Extract → (RAG if `--rag`) → Archive
 
 1. Extract knowledge:
 ```
@@ -155,11 +169,15 @@ mcp__serena__write_memory({
 })
 ```
 
-3. Execute delete
+3. If `--rag` and a RAG MCP is detected (see Section 8), store the distilled knowledge
+   to RAG before archiving.
+
+4. Archive via the [`archive`](./archive.md) topic (same `archive-session.sh` as A — not hard delete)
 
 ### 7. Bulk Cleanup of Empty Sessions
 
-If there are many empty sessions, clean them up in bulk:
+`clear_sessions` is acceptable **only for truly empty sessions** (0 user messages / 0-byte
+hook-only files) — these have no content to preserve, so hard removal is fine:
 
 ```
 mcp__claude-sessions-mcp__clear_sessions({
@@ -168,6 +186,10 @@ mcp__claude-sessions-mcp__clear_sessions({
   clear_invalid: true
 })
 ```
+
+**Non-empty category A sessions** (short Q&A, test sessions with actual content) must be
+**archived** via the `mv` procedure in §6-A, not bulk-deleted — they may still hold
+recoverable context.
 
 ### 8. RAG Save Recommendation (when a RAG / vector store MCP is available)
 
@@ -211,7 +233,7 @@ If at least one RAG MCP is detected, evaluate every session classified as **B (K
 | <id> | <title> | <reason — 1 sentence> | <what to embed: full summary / per-decision excerpt / problem-fix pair> |
 ```
 
-RAG save is **additive** to the primary classification — it does not change the A/B/C action. A session marked C (Extract then Delete) still extracts to Serena memory and deletes after the RAG store call.
+RAG save is **additive** to the primary classification — it does not change the A/B/C action. A session marked C (Extract then Delete) still extracts to Serena memory and archives (§6-A, not hard delete) after the RAG store call.
 
 #### Execution (when `--execute` is provided + user approves)
 

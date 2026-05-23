@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # archive-session.sh — Move a session jsonl out of an active project key
-#                     to ~/.claude/.archive/<project-key>/<uuid>.jsonl
+#                     to ~/.claude/projects/.bak/<project-key>_<uuid>.jsonl
+#
+# Naming convention matches the existing ~/.claude/projects/.bak/ layout
+# (flat: <project-key>_<uuid>.jsonl). See claude-session/archive.md.
 #
 # Usage: archive-session.sh <session-uuid>
 #        archive-session.sh <session-uuid> --dry-run
@@ -26,8 +29,8 @@ if [[ -z "$SRC" ]]; then
 fi
 
 PROJECT_KEY=$(basename "$(dirname "$SRC")")
-DST_DIR="$HOME/.claude/.archive/$PROJECT_KEY"
-DST="$DST_DIR/${SESSION_ID}.jsonl"
+DST_DIR="$HOME/.claude/projects/.bak"
+DST="$DST_DIR/${PROJECT_KEY}_${SESSION_ID}.jsonl"
 
 # Safety checks
 if [[ ! -s "$SRC" ]]; then
@@ -75,12 +78,12 @@ else
 fi
 
 # Append to ledger
-LEDGER="$HOME/.claude/.archive/INDEX.md"
+LEDGER="$HOME/.claude/projects/.bak/INDEX.md"
 if [[ ! -f "$LEDGER" ]]; then
   cat > "$LEDGER" <<'EOF'
 # Claude Code Session Archive Index
 
-Each entry: `- YYYY-MM-DD <project-key>/<uuid> — <custom-title or empty>`
+Each entry: `- YYYY-MM-DD <project-key>_<uuid> — <custom-title or empty>`
 
 EOF
 fi
@@ -90,6 +93,6 @@ TITLE=""
 if command -v jq >/dev/null 2>&1; then
   TITLE=$(jq -r 'select(.type=="custom-title") | .customTitle // empty' "$DST" 2>/dev/null | head -1 || true)
 fi
-echo "- $(date +%Y-%m-%d) $PROJECT_KEY/$SESSION_ID — ${TITLE:-(no custom-title)}" >> "$LEDGER"
+echo "- $(date +%Y-%m-%d) ${PROJECT_KEY}_${SESSION_ID} — ${TITLE:-(no custom-title)}" >> "$LEDGER"
 
 echo "Ledger updated: $LEDGER"
