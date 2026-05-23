@@ -172,7 +172,7 @@ the same corruption again at the next invocation. Not a fix for symlink setups.
 | 4 | Trust a `grep '"name": "<plugin>"'` zero-match without trying broader patterns first (quote-escape pitfalls) | Use simpler `grep "<plugin>"` first to confirm the term exists anywhere, then narrow down |
 | 5 | Conclude "plugin removed from marketplace" without reading the manifest line that actually contains the plugin | Read the `marketplace.json` section around the matching line to confirm entry shape (e.g., `source: "url"` external plugins) |
 
-**Why naive fixes recur (failed-attempts.md "검색 안 하고 단정" pattern, 9th variant)**:
+**Why naive fixes recur (failed-attempts.md "asserting without searching" pattern, 9th variant)**:
 
 - `enabledPlugins: true` (settings flag) — represents intent, not runtime resolution
 - `cache/<name>/<plugin>/<ver>/` (filesystem) — represents past download success, not current lookup validity
