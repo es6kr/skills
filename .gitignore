@@ -9,4 +9,4 @@ __pycache__/
 *.bak
 *.pyc
 *.tmp
-skills/LICENSE
+skills/*/LICENSE
