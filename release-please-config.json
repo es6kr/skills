@@ -1,0 +1,123 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": true,
+  "tag-separator": "-",
+  "separate-pull-requests": false,
+  "pull-request-title-pattern": "chore: release skills",
+  "pull-request-header": "Combined release PR for all skills updated since the last release.",
+  "skip-github-release": false,
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactor" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "ci", "section": "CI/CD", "hidden": true },
+    { "type": "chore", "section": "Chore", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "style", "section": "Style", "hidden": true }
+  ],
+  "packages": {
+    "skills/cc-plugin": {
+      "package-name": "cc-plugin",
+      "component": "cc-plugin",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/chezmoi": {
+      "package-name": "chezmoi",
+      "component": "chezmoi",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/claude-session": {
+      "package-name": "claude-session",
+      "component": "claude-session",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/claudify": {
+      "package-name": "claudify",
+      "component": "claudify",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/code-workflow": {
+      "package-name": "code-workflow",
+      "component": "code-workflow",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/commit-tidy": {
+      "package-name": "commit-tidy",
+      "component": "commit-tidy",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/consolidate": {
+      "package-name": "consolidate",
+      "component": "consolidate",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/dotfile": {
+      "package-name": "dotfile",
+      "component": "dotfile",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/fix": {
+      "package-name": "fix",
+      "component": "fix",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/git-repo": {
+      "package-name": "git-repo",
+      "component": "git-repo",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/github-flow": {
+      "package-name": "github-flow",
+      "component": "github-flow",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/mcp-config": {
+      "package-name": "mcp-config",
+      "component": "mcp-config",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/next": {
+      "package-name": "next",
+      "component": "next",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/omz": {
+      "package-name": "omz",
+      "component": "omz",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/repo": {
+      "package-name": "repo",
+      "component": "repo",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/skill-kit": {
+      "package-name": "skill-kit",
+      "component": "skill-kit",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/tdd": {
+      "package-name": "tdd",
+      "component": "tdd",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/todowrite": {
+      "package-name": "todowrite",
+      "component": "todowrite",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/web-ui-test": {
+      "package-name": "web-ui-test",
+      "component": "web-ui-test",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
+    "skills/wip": {
+      "package-name": "wip",
+      "component": "wip",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    }
+  }
+}
