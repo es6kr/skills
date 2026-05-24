@@ -1,7 +1,7 @@
 ---
 metadata:
   author: es6kr
-  version: "0.1.0"
+  version: "0.1.0" # x-release-please-version
 name: cc-plugin
 description: >-
   Claude Code plugin lifecycle management.

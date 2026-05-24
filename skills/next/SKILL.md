@@ -1,7 +1,7 @@
 ---
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.1" # x-release-please-version
 name: next
 depends-on: [fix]
 description: >-

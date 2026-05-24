@@ -1,7 +1,7 @@
 ---
 metadata:
   author: es6kr
-  version: "0.1.5"
+  version: "0.1.5" # x-release-please-version
 name: fix
 description: >-
   User behavior correction skill. Triggered by "fix:" prefix feedback (e.g., "fix: why didn't you commit?").

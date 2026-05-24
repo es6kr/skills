@@ -45,11 +45,13 @@ extract_metadata_version() {
     in_fm == 1 && /^metadata:[[:space:]]*$/ { in_meta = 1; next }
     in_fm == 1 && in_meta == 1 && /^[^[:space:]]/ { in_meta = 0 }
     in_fm == 1 && in_meta == 1 {
-      # Match indented `version: "X.Y.Z"` (require double-quotes by project convention)
-      if (match($0, /^[[:space:]]+version:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"[[:space:]]*$/) > 0) {
+      # Match indented `version: "X.Y.Z"` (require double-quotes by project convention).
+      # An optional trailing YAML comment is allowed so release-please annotations
+      # like `# x-release-please-version` can sit on the same line.
+      if (match($0, /^[[:space:]]+version:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"[[:space:]]*(#.*)?$/) > 0) {
         line = $0
         sub(/^[[:space:]]+version:[[:space:]]*"/, "", line)
-        sub(/"[[:space:]]*$/, "", line)
+        sub(/"[[:space:]]*(#.*)?$/, "", line)
         print line
         exit
       }
