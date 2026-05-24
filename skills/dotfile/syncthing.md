@@ -133,9 +133,14 @@ Manage Syncthing defaults via chezmoi modify:
 
 ### Get API Key
 
-**macOS / Linux:**
+**macOS:**
 ```bash
 API_KEY=$(xmllint --xpath '//configuration/gui/apikey/text()' ~/Library/Application\ Support/Syncthing/config.xml)
+```
+
+**Linux:**
+```bash
+API_KEY=$(xmllint --xpath '//configuration/gui/apikey/text()' ~/.config/syncthing/config.xml)
 ```
 
 **Windows (PowerShell):**
@@ -226,8 +231,9 @@ Move-Item $dbPath $backupPath -Force
 # 3. Start service (index auto-rebuilt)
 Start-Service syncthing
 
-# 4. Verify and clean up backup later
-Remove-Item $backupPath -Recurse -Force
+# 4. After verifying Syncthing is healthy, manually delete the backup
+# (left intentionally commented — confirm sync works first, then run this)
+# Remove-Item $backupPath -Recurse -Force
 ```
 
 **Check index path**: `syncthing paths` or `syncthing.exe paths` -> "Database location" entry
@@ -241,12 +247,12 @@ Remove-Item $backupPath -Recurse -Force
 | `~` path expansion | ❌ Fails — needs absolute path conversion | ✅ Native `~` resolution |
 | User profile access | ❌ Different `$HOME` (`C:\Windows\System32\config\systemprofile`) | ✅ Matches `C:\Users\<user>` |
 | `.git/` corruption | ⚠️ Higher risk (no user lock context) | Lower risk |
-| Survives reboot | ✅ Yes | ✅ Yes (with `Automatic` start type) |
-| Requires user login | ❌ No | ❌ No (service can run without login) |
+| Starts at boot (no login) | ✅ Yes | Service: ✅ Yes (Automatic start). **Task Scheduler (AtLogOn): ❌ No — waits for first user login** |
+| Requires user login | ❌ No | Service: ❌ No. **Task Scheduler (AtLogOn): ✅ Yes (fires once at logon)** |
 
 #### Migrate LocalSystem → User Account (Task Scheduler with hidden VBS launcher)
 
-**Recommended approach**: Task Scheduler at user logon + VBS launcher for hidden execution. No password storage required. Run via `gsudo` (see `~/.agents/rules/windows.md` "Admin command = gsudo default").
+**Recommended approach**: Task Scheduler at user logon + VBS launcher for hidden execution. No password storage required. Run admin steps via `gsudo` (a Windows `sudo`-equivalent — installs via `winget install gerardog.gsudo`; if `gsudo` is unavailable, run an elevated PowerShell prompt manually for the `Register-ScheduledTask` step below).
 
 ##### Step 1: Create VBS hidden launcher
 
@@ -310,7 +316,9 @@ gsudo powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.loc
 
 ```powershell
 Get-Process syncthing | ForEach-Object {
-    $owner = (Get-WmiObject Win32_Process -Filter "ProcessId=$($_.Id)").GetOwner()
+    # Get-CimInstance is the PowerShell 7+ replacement for the deprecated Get-WmiObject
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)"
+    $owner = Invoke-CimMethod -InputObject $proc -MethodName GetOwner
     $hidden = if ([string]::IsNullOrEmpty($_.MainWindowTitle)) { "hidden" } else { "visible" }
     Write-Host "PID $($_.Id) owner=$($owner.Domain)\$($owner.User) $hidden"
 }
@@ -322,8 +330,13 @@ Get-Process syncthing | ForEach-Object {
 If you need Syncthing to start before user logon, register as a Windows Service under the user account. Service Control Manager will encrypt and store the password. This trade-off (password storage) is rarely worth it on personal machines — prefer Task Scheduler unless multi-user / server context.
 
 ```powershell
-# Run as Admin (or via gsudo)
-sc.exe create syncthing binPath= "`"$shawl`" run --name syncthing -- `"$syncthing`" --no-browser --home=$home" start= auto obj= $user password= "<USER_PASSWORD>"
+# Run as Admin (or via gsudo). Define the variables this command references before invoking sc.exe.
+$shawl    = "$env:USERPROFILE\.local\bin\shawl.exe"     # path to a shawl.exe wrapper (https://github.com/mtkennerly/shawl)
+$syncthing = "$env:USERPROFILE\.local\bin\syncthing.exe" # path to syncthing.exe
+$home     = "$env:USERPROFILE\.local\share\syncthing"    # Syncthing --home directory
+$user     = "$env:USERDOMAIN\$env:USERNAME"              # account to run the service as
+
+sc.exe create syncthing binPath= "`"$shawl`" run --name syncthing -- `"$syncthing`" --no-browser --home=`"$home`"" start= auto obj= $user password= "<USER_PASSWORD>"
 # Plus: grant "Log on as a service" right via secpol.msc or ntrights.exe
 ```
 
@@ -344,7 +357,7 @@ Syncthing will resolve `~` to `C:\Users\<USERNAME>` natively.
 
 Folder type is `sendreceive` on both ends, yet Syncthing treats one side as `receive-encrypted`.
 
-**Cause**: When Antigravity (Gemini) re-registers Syncthing folders during config sync, it writes non-empty whitespace strings (commonly `&#xA;      ` — LF + 6 spaces) into every `<encryptionPassword>` element under each `<folder>/<device>` block and the `<defaults>/<folder>/<device>` template. Syncthing treats any non-empty string as a valid password and switches the folder into encryption mode, which then mismatches the remote's `sendreceive` configuration.
+**Cause**: When Antigravity (Gemini) re-registers Syncthing folders during config sync, it writes non-empty whitespace strings (commonly `&#xA;` followed by 6 spaces — LF + 6 spaces) into every `<encryptionPassword>` element under each `<folder>/<device>` block and the `<defaults>/<folder>/<device>` template. Syncthing treats any non-empty string as a valid password and switches the folder into encryption mode, which then mismatches the remote's `sendreceive` configuration.
 
 The corrupted password is **invisible to the Web UI password field** (renders as empty) and to PowerShell `[xml]` access (auto-trimmed) — diagnosis requires reading the raw XML.
 
@@ -367,7 +380,7 @@ foreach ($m in $mtchs) {
 Write-Host "empty=$empty, non-empty=$nonempty"
 ```
 
-A typical garbage value `hex='26 23 78 41 3B 20 20 20 20 20 20'` decodes to `&#xA;      ` (LF + 6 spaces). If `non-empty > 0`, the bug is present.
+A typical garbage value `hex='26 23 78 41 3B 20 20 20 20 20 20'` decodes to `&#xA;` followed by 6 spaces (LF + 6 spaces). If `non-empty > 0`, the bug is present.
 
 #### Fix (API PUT — clears folders + defaults)
 
