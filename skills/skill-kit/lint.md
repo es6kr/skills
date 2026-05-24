@@ -43,7 +43,7 @@ echo "len: ${#DESC}"
 | # | Don't (overweight pattern) | Do (canonical compression) | Real violation case |
 |---|---------------------------|---------------------------|---------------------|
 | 1 | Append new topic description without measuring current length | `wc -c` or awk-length check before Edit; if `current + new > 1024`, compress first | claude-session: 1480 → 1547 over limit |
-| 2 | Locale-mix in description (English skill with non-English keywords, or vice versa) | Single locale only. **English skill = 0 non-English keywords** (no "core noun" exception). Non-English skill = native keywords primary, English allowed only for proper nouns/technical terms (Vault, ArgoCD, K3s, etc.). See `opensource.md` "Skill language = description language" HARD STOP | ralph: an English keyword paired with two transliterated synonyms (`"ralph update"+"ralph <update-localized>"+"ralph <latest-localized>"`) → If ralph is an English skill, keep only the English form. If localized, keep only one localized form. No mix. |
+| 2 | Locale-mix in description (English skill with non-English keywords, or vice versa) | Single locale only. **English skill = 0 non-English keywords**. Non-English skill = native keywords primary, English allowed only for proper nouns/technical terms (Vault, ArgoCD, K3s, etc.). See `opensource.md` "Skill language = description language" HARD STOP | ralph: an English keyword paired with two transliterated synonyms (`"ralph update"+"ralph <update-localized>"+"ralph <latest-localized>"`) → If ralph is an English skill, keep only the English form. If localized, keep only one localized form. No mix. |
 | 3 | Multiple English synonym variants for the same action | One canonical verb + one canonical noun. No `"X fix"+"fix X"+"update X"+"modify X"` chains | skill-kit: `"skill upgrade"+"skill fix"+"fix skill"+"update skill"` → `"skill upgrade"` only |
 | 4 | Topic description over 40 chars or with Step numbers / parenthetical context | Topic description = `<topic> - <one-liner ≤ 40 chars>`. Move Step numbers / nested context to topic .md | consolidate: `internal - Step 3.5 Internal Code Review fallback (CodeRabbit Free walkthrough only / Copilot failure) + Step 4.5 UI capture verification` → `internal - CodeRabbit fallback review` |
 | 5 | Append `[filename.md]` to topic descriptions | Topics table already has the file path. description has topic + one-liner only | github-flow: 8x `[xxx.md]` removed (~100 chars saved) |
@@ -58,12 +58,6 @@ echo "len: ${#DESC}"
 3. If `> 1024`, apply reduction strategies #1~4 + Don't/Do patterns #1~9 first
 4. Re-measure after Edit. Confirm ≤ 1024
 5. Verify Topics table is the authoritative source for `[filename.md]` references — description should NOT repeat them
-
-**Self-check (every time before Edit on `description:` field)**:
-1. Measure current length (`awk + tr -d '\n' + ${#}` pattern)
-2. Estimate new length after Edit
-3. If `> 1024`, apply reduction strategies #1~4 first
-4. Re-measure after Edit. Confirm ≤ 1024
 
 **Violation cases (cumulative — system-wide non-compliance)**:
 - 2026-05-23 (1st flagged): `claude-session` 1547 chars after `list` topic added → user pointed it out
@@ -177,9 +171,9 @@ If `uv` is missing:
 |----------|------------|
 | macOS | `brew install uv` |
 | Linux | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| Windows (PowerShell) | `irm https://astral.sh/uv/install.ps1 \| iex` |
+| Windows (PowerShell) | `irm https://astral.sh/uv/install.ps1 \| iex` — runs in user scope, no elevation needed |
 
-If neither `uv` nor a viable installer is available in the current environment, **skip Step 0 and proceed with Step 1** — the custom rules below cover the same baseline. Report the skip explicitly so the user knows the upstream layer was not exercised.
+If neither `uv` nor a viable installer is available in the current environment, **skip Step 0 and proceed with Step 1** — the custom rules below provide partial coverage only (description-length budget, depends-on order, hardlink scan), not the upstream spec enforcement. **Report the skip explicitly** with a risk statement naming which upstream checks were not exercised (e.g., "Step 0 skipped — `skills-ref` name-match and properties-JSON validation not run").
 
 #### 0d. Upgrade
 
@@ -191,7 +185,7 @@ uv tool upgrade skills-ref
 
 | Validator | Strengths |
 |-----------|-----------|
-| `skills-ref` (upstream) | Authoritative spec enforcement (name match, description shape, properties JSON read) — tracks Anthropic's reference implementation |
+| `skills-ref` (upstream) | Authoritative spec enforcement (name match, description shape, properties JSON read); tracks Anthropic's reference implementation |
 | Custom rules (Steps 1–4 below) | Description length budget (1024), depends-on alphabetical order, hardlink-aware scan, plugin/project skill paths |
 
 The two are complementary — run both. `skills-ref` failures must be fixed before the custom rules can be trusted.

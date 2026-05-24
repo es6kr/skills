@@ -62,6 +62,16 @@ Declare `triggers` in SKILL.md -> auto-generate hook scripts -> auto-register in
 
 [Detailed guide](./trigger.md)
 
+### Find (Discover via npx skills)
+
+```bash
+/skill-kit find <query>        # Search the open skills ecosystem via npx skills CLI
+```
+
+Searches the [skills.sh](https://skills.sh/) leaderboard and ecosystem for installable skills. Use when looking for an existing skill rather than building one from scratch.
+
+[Detailed guide](./find.md)
+
 ## Success Case
 
 **Scenario (2026-03-09)**:

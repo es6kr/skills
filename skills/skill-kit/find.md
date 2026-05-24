@@ -16,10 +16,10 @@ The Skills CLI (`npx skills`) is the package manager for the open agent skills e
 **Key commands:**
 
 ```bash
-npx skills find [query]    # Search for skills
-npx skills add <package>   # Install a skill
-npx skills check           # Check for updates
-npx skills update          # Update all installed skills
+npx skills find [query]              # Search for skills
+npx skills add <owner/repo@skill>    # Install a skill (-g for global, -y to skip confirm)
+npx skills check                     # Check for updates
+npx skills update                    # Update all installed skills
 ```
 
 **Browse skills at:** https://skills.sh/
@@ -72,7 +72,7 @@ Show the user:
 npx skills add <owner/repo@skill> -g -y
 ```
 
-`-g` installs globally (user-level), `-y` skips confirmation.
+`-g` installs globally (user-level), `-y` skips confirmation. **Note**: global install path may collide with ClawHub-installed skills under `~/.claude/skills/`. Prefer per-project install (`npx skills add ... ` without `-g`) when a same-named skill already exists from ClawHub.
 
 ## Common Skill Categories
 
