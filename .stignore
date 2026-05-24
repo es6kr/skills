@@ -1,5 +1,7 @@
 .git
 (?d).DS_Store
+(?d).omc/state
+(?d).pytest_cache
 (?d).system/
 *.bak
-worktrees/
+worktrees
