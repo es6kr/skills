@@ -96,6 +96,15 @@ AskUserQuestion {
 
 **Forbidden**: Immediately fixing upon discovery. Must only modify items selected after AskUserQuestion.
 
+### 3-1. Version Change Rule ⚠️ Required
+
+**Version bump rules** — note: Step 3's AskUserQuestion requirement always applies to **content modifications** before any version bump is considered. This rule governs the **version-bump act itself**, not the content edits that precede it.
+
+- **Patch** (0.1.1 → 0.1.2): the version-bump act may proceed without an additional AskUserQuestion (the Step 3 ask already approved the content change). Applies to topic content reinforcement, bug fixes, frontmatter tweaks.
+- **Minor** (0.1.x → 0.2.0): **AskUserQuestion required for the bump act** — new topic, feature change. The Step 3 ask covers the content; this second ask confirms the publish-worthy classification.
+- **Major** (0.x → 1.0): **AskUserQuestion required for the bump act** — compatibility break.
+- Local-only changes (not intended for publish) may keep the existing version regardless of change size.
+
 ### 4. Plan Improvements
 
 | Improvement Type | Task |
