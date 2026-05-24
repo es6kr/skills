@@ -3,7 +3,7 @@ name: consolidate
 depends-on: [superpowers]
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.1" # x-release-please-version
 description: >-
   Consolidate and respond to external feedback on PRs/issues. Topics —
   pr (workflow entrypoint + skip conditions),

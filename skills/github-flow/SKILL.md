@@ -2,7 +2,7 @@
 name: github-flow
 metadata:
   author: es6kr
-  version: "0.1.0"
+  version: "0.1.0" # x-release-please-version
 depends-on: [code-workflow, web-ui-test]
 description: |
   GitHub issue and PR workflow automation. plan-to-issue - convert plan/research MD to GitHub issue body/comments [plan-to-issue.md], pr - create PR with structured body and test plan [pr.md], review - review PR code and post structured comments [review.md].

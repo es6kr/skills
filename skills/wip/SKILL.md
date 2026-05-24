@@ -7,7 +7,7 @@ description: >-
   "wip", "track progress", "register tasks", "task register", "step tracking" triggers.
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.1" # x-release-please-version
 ---
 
 # WIP (Work In Progress)
