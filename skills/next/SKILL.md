@@ -3,7 +3,7 @@ metadata:
   author: es6kr
   version: "0.1.1"
 name: next
-depends-on: [fix, hook]
+depends-on: [fix]
 description: >-
   Suggest next actions after completing any task. **Auto-invocation currently broken**: Stop hook (`resources/next-trigger.sh`) outputs stdout marker but Claude Code Stop hook spec routes stdout to debug log only (LLM not notified) — see hook/SKILL.md "Output channel spec per event". Use this skill via explicit `/next` invocation or by manually calling Skill("next") after task completion until hook is migrated to JSON `decision:"block"` or stderr+exit2.
   stall-detect - detect stalled follow-up steps after task completion and invoke /fix [stall-detect.md].
@@ -269,13 +269,14 @@ TaskList   # use pending/in_progress entries as the source
 
 | Pending count | multiSelect | Option layout |
 |------------|-------------|----------|
-| 0 | — | Wrap-up pattern unnecessary → single "End session" option, or skip ask |
+| 0 | — | Wrap-up pattern unnecessary → **skip ask** (AskUserQuestion requires ≥2 options per Rule 1; a sole "End session" is not a valid call) |
 | 1 | false | `[Run now, Defer to next session, Hold]` — quote task subject |
 | 2~3 | false | `[Run-now option per task + End session (Recommended)]` — include all pending in options |
 | 4+ | false (max 4) | Top 3 by priority + "End session" — note "carryover N items" in description for the rest |
 
 **Option description format (subject keyword + trigger condition)**:
-```
+
+```typescript
 { label: "Run {task subject keyword} now", description: "{what to do} — {trigger: immediate / scheduled / external response}" }
 ```
 
@@ -286,7 +287,7 @@ TaskList   # use pending/in_progress entries as the source
 | 1 | Recommend only "1-2 immediately actionable" among pending | All pending as candidates. State trigger conditions in description |
 | 2 | Quote task names from summary memory | Call TaskList and quote real subjects |
 | 3 | Expose TaskList-internal `#NN` IDs in option descriptions | Per workflow.md "TaskList ID forbidden in conversation" — reference via subject keyword |
-| 4 | Omit "End session" option → user cannot choose wrap-up | Always include "End session" option (single option when multiSelect: false) |
+| 4 | Omit "End session" option → user cannot choose wrap-up | Always include "End session" as one of the options (paired with at least one Run-now option to satisfy Rule 1's ≥2 options) |
 | 5 | Skip TaskList Read before wrap-up ask | TaskList every time per Step 0.5 |
 
 #### Example (2 pending, right after asset cleanup)

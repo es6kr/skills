@@ -45,11 +45,12 @@ In sessions where TaskCreate is disconnected/unavailable, only TodoWrite is usab
 2. Did you **include all N existing tasks in this call's array**?
 3. Did you **append** the 4 fix-0/1/2/3 items after the existing N?
 
-**Correct pattern**:
+**Correct pattern** (pseudo-code; `...existing_8_tasks` is a placeholder for the actual array of existing tasks read from the prior TodoWrite/TaskList output — substitute the real entries verbatim):
+
 ```text
 # If 8 existing tasks exist, call with a 12-item array adding fix-* 4
 TodoWrite([
-  ...existing_8_tasks,
+  ...existing_8_tasks,    # ← replace with the actual 8 existing task objects, not a literal spread
   { content: "🔍 fix: {summary} — root cause analysis", status: "in_progress" },
   { content: "🔧 Root cause fix", status: "pending" },
   { content: "🔄 Resume original work: {one-line summary of original work}", status: "pending" },
@@ -128,7 +129,7 @@ Why 3: Why was that knowledge/rule missing? (structural — skill/rule gap)
 
 **Iterate over all Whys and explicitly enumerate the action for each.** All entries in this list must be executed in Step 2 before Step 3 can proceed.
 
-```
+```text
 | Why | Target file | Action |
 |-----|-------------|--------|
 | Why 1 | (current issue — resolved in Step 3) | Step 3 Resume |
@@ -207,7 +208,7 @@ When fixing:
 | Neither exists | Confirm path via AskUserQuestion | — |
 
 **Chat output format** (after saving artifact):
-```
+```text
 Plan saved: <absolute path>
 
 Key summary:
@@ -258,6 +259,7 @@ Example: `/fix start with Critical` + session shows code modified but not verifi
 6. **Recognize user dismissal signals (HARD STOP — do not re-raise secondary facts)**: items the user has explicitly dismissed must **not be re-raised** in fix Step 1 verification / Step 3 reporting. Focus on the core work only.
 
 **Dismissal trigger keywords**:
+
 | User expression | Interpretation |
 |-----------------|----------------|
 | "Just force push over there" | That remote/branch state is out of verification scope |
@@ -383,7 +385,7 @@ If /fix has been invoked 2+ times in this session, **before** marking fix-* task
 3. **Register outstanding work as new tasks** (without the fix-* prefix)
 4. Only after new tasks are registered, **bulk-delete all fix-* tasks**
 
-```
+```text
 Fix complete:
 - Root cause: {what was missing}
 - Improvement: {which file was modified and how}
@@ -437,7 +439,7 @@ If fix-2 (Resume Original Work) contains outstanding work, **separate by medium 
 **Correct flow** (PR #299 example):
 - Before marking fix-2 complete: register Track B (Playwright/ZAP) as a separate task → fix-2 completed → fix-* deleted
 
-**After reporting + outstanding-work separation verified, delete all fix-* TODO items created in Step 0** — fix TODOs are temporary session-level tracking only; outstanding work is preserved in separate tasks while only fix-* are cleaned up.
+**After reporting + outstanding-work separation verified, delete all `fix-*` TODO items created in Step 0** — fix TODOs are temporary session-level tracking only; outstanding work is preserved in separate tasks while only `fix-*` are cleaned up.
 
 ## Anti-patterns
 
