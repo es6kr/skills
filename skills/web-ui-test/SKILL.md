@@ -2,7 +2,7 @@
 name: web-ui-test
 metadata:
   author: es6kr
-  version: "0.1.0" # x-release-please-version
+  version: "0.2.0" # x-release-please-version
 description: >-
   Register Playwright MCP via UTCP and perform web UI testing and verification. Analyze browser snapshots, click elements, fill forms, and return summarized results.
   sso-verify - Verify Authentik SSO login flow, confirm redirect targets, detect Blueprint drift [sso-verify.md].
