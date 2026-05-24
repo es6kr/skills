@@ -1,22 +1,22 @@
 ---
 name: consolidate
+depends-on: [superpowers]
 metadata:
   author: es6kr
   version: "0.1.1"
 description: >-
-  Consolidate and respond to external feedback on PRs/issues.
-  pr - Workflow entrypoint (PR identify + skip conditions + Copilot sequential) [pr.md].
-  collect - Step 3 collect AI reviews + superpowers framework load [collect.md].
-  internal - Step 3.5 Internal Code Review fallback (CodeRabbit Free walkthrough only / Copilot failure) + Step 4.5 UI capture verification [internal.md].
-  classify - Step 4 analyze/classify with dual-label (Type | Severity) + PR diff scope cross-check [classify.md].
-  decide - Step 5 user decision (Axis A findings + Axis B Formal Review) + Step 6 fix or pushback [decide.md].
-  post - Step 7 post Summary + Formal Review (Mergeable unified POST) + Step 7.5 in-chat status + Step 7.6 deferred registration [post.md].
-  next - Step 8 post-summary next-action ask (next/wip routing) [next.md].
-  "review consolidate", "PR review", "AI review", "CodeRabbit review", "Copilot review",
+  Consolidate and respond to external feedback on PRs/issues. Topics —
+  pr (workflow entrypoint + skip conditions),
+  collect (gather AI reviews + superpowers load),
+  internal (Internal Code Review fallback + UI capture),
+  classify (dual-label Type|Severity + diff scope check),
+  decide (user decision: findings + Formal Review),
+  post (Summary + Formal Review + status + deferred),
+  next (post-summary next-action ask).
+  Use when: "review consolidate", "PR review", "AI review", "CodeRabbit review", "Copilot review",
   "review check", "review summary", "merge ready", "internal review", "code-reviewer",
-  "inline review", "line-level comment", "file:line annotation", "PR line review" triggers.
+  "inline review", "line-level comment", "PR line review".
 allowed-tools: [Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write]
-depends-on: [superpowers]
 ---
 
 # Consolidate
@@ -27,13 +27,13 @@ Consolidate and respond to external feedback on PRs and issues.
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
-| pr | Workflow entrypoint — PR identify, skip conditions, Copilot sequential, Rules | [pr.md](./pr.md) |
-| collect | Step 3 Collect AI Reviews + Step 3.6 superpowers framework load | [collect.md](./collect.md) |
-| internal | Step 3.5 Internal Code Review Fallback + Step 4.5 UI capture verification | [internal.md](./internal.md) |
 | classify | Step 4 Analyze and Classify (dual-label Type \| Severity, PR scope cross-check) | [classify.md](./classify.md) |
+| collect | Step 3 Collect AI Reviews + Step 3.6 superpowers framework load | [collect.md](./collect.md) |
 | decide | Step 5 User Decision (Axis A/B) + Step 6 Fix or Reject | [decide.md](./decide.md) |
-| post | Step 7 Post Summary + Formal Review (unified vs separate) + Step 7.5 Status + Step 7.6 Deferred registration | [post.md](./post.md) |
+| internal | Step 3.5 Internal Code Review Fallback + Step 4.5 UI capture verification | [internal.md](./internal.md) |
 | next | Step 8 Post-Summary Next-Action Ask | [next.md](./next.md) |
+| post | Step 7 Post Summary + Formal Review (unified vs separate) + Step 7.5 Status + Step 7.6 Deferred registration | [post.md](./post.md) |
+| pr | Workflow entrypoint — PR identify, skip conditions, Copilot sequential, Rules | [pr.md](./pr.md) |
 
 ## Quick Reference
 

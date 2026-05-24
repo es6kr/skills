@@ -72,13 +72,13 @@ When consolidating multiple PRs and Copilot review requests are needed:
 
 ## Rules
 
-- **PATCH existing comment first — never add a new comment (HARD STOP)**: If a previous session's Internal Review/AI Review Summary comment already exists on the same PR, update the existing comment body via `gh api PATCH`. **Never add a new comment and delete/minimize the previous one** — overwriting the previous comment's body permanently destroys the original
+- **PATCH the same comment when updating; never add a parallel comment + overwrite the old one (HARD STOP)**: If a previous session's Internal Review/AI Review Summary comment already exists on the same PR, update **that same comment** in place via `gh api PATCH` with the new same-kind content (Internal Review → Internal Review update; Summary → Summary update). PATCHing the same comment with same-kind content is the intended use — the prior content is replaced, but no other comment is touched. **What is forbidden**: adding a new comment AND then PATCHing the previous comment's body with placeholder/minimize text (e.g., `_(minimized)_`) to "hide" the old one — that permanently destroys the original content of the previous comment.
 
   | # | Don't | Do (correct alternative) |
   |---|-------|--------------------------|
-  | 1 | Adding a new `gh pr comment` when a Summary comment already exists | Update the existing comment with `gh api repos/{owner}/{repo}/issues/comments/{id} -X PATCH -f body=...` |
-  | 2 | Adding a new comment then PATCHing the previous comment body with minimize text | Do not touch the previous comment. If a new comment is needed, keep the previous one intact |
-  | 3 | Overwriting the previous comment body with `_(minimized)_` | Preserve the original previous comment. If cleanup is needed, use GraphQL `minimizeComment(classifier: OUTDATED)` |
+  | 1 | Adding a new `gh pr comment` when a same-kind comment already exists | Update the existing comment with `gh api repos/{owner}/{repo}/issues/comments/{id} -X PATCH -f body=...` (same-kind content) |
+  | 2 | Adding a new comment then PATCHing the previous comment body with placeholder/minimize text | Do not touch the previous comment. If a new comment is needed, keep the previous one intact |
+  | 3 | Overwriting the previous comment body with `_(minimized)_` to "hide" it | Preserve the original previous comment. If folding is needed, use GraphQL `minimizeComment(classifier: OUTDATED)` (which does not modify the body) |
 
 - **Never auto-fix without user approval** — always go through Step 5 ([`decide.md`](./decide.md))
 - **Never auto-commit/push without user approval** — fixing requires explicit consent

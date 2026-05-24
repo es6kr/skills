@@ -39,7 +39,7 @@ Before accepting any suggestion:
 
 **MANDATORY**: Before analyzing, invoke the review-receiving skill to load the verification framework:
 
-```
+```text
 Skill("superpowers:receiving-code-review")
 ```
 

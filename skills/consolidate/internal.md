@@ -12,7 +12,7 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 
 **Fallback procedure:**
 
-1. **Call `Skill("superpowers:requesting-code-review")` (MANDATORY)** — this skill loads the review framework and includes code-reviewer agent dispatch. When the skill returns the review result, proceed to Step 2.
+1. **Call `Skill("superpowers:requesting-code-review")` (MANDATORY)** — this skill loads the review framework and includes code-reviewer agent dispatch. When the skill returns the review result, proceed to the "Check existing review comment" and "Post/update review comment" sub-steps below (still within Step 3.5).
 
 | # | Don't | Do (correct alternative) |
 |---|-------|-------------------------|
@@ -100,7 +100,7 @@ If unmet, **immediately return to Step 3.5.3** and run `gh pr comment <N> -R <re
 
 ### Review comment ≠ AI Review Summary (HARD STOP — 5 recurrences 2026-05-22)
 
-The review comment is a Copilot substitute (detailed findings); the Summary is the overall reviewer consolidation (table). **Always post as 2 separate comments**. The unified single-comment pattern is deprecated.
+The review comment is a Copilot substitute (detailed findings); the Summary is the overall reviewer consolidation (table). **Always post as 2 separate posts** — the Internal Review is always an issue comment, while the Summary's medium (issue comment vs Formal Review body) is decided by `post.md` Step 7. The "single combined post" pattern (Internal Review inlined into the Summary body) is deprecated.
 
 **Why always 2 comments**: At the Step 5 AskUserQuestion moment, the user must see the review content to decide. The "inline integration when posting Summary" pattern leaves no review medium present at ask time, preventing user decisions. The Internal Review comment is always posted first, independent of the Summary decision.
 
@@ -172,7 +172,7 @@ If 0, capture is absent.
 
 Right after Step 4 Classify, before Step 5 Summary posting. If the classification result contains a "UI capture missing" actionable, include it in the Summary body so the author can follow up with attachment.
 
-Detailed rule: see `~/.claude/skills/github-flow/pr.md` Step 8 "UI Change PR — MANDATORY" section.
+Detailed rule: see `skills/github-flow/pr.md` Step 8 "UI Change PR — MANDATORY" section (in this repo; installed locally as `~/.claude/skills/github-flow/pr.md`).
 
 ## Next
 

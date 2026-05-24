@@ -129,7 +129,7 @@ Classify using **CodeRabbit-style dual-label** (category + severity combination)
 | 1 | "Change Important → Potential" (different axis) | "Downgrade Important → Minor" (within Severity axis) or "Reclassify Potential → Refactor" (within Type axis) |
 | 2 | In AskUserQuestion, presenting handling options bundled by only one axis label | Confirm the intent axis first, then ask: "Downgrade Severity?" vs "Reclassify Type?" |
 | 3 | User says "treat as Potential" → replacing Severity Important with Potential | "Treat as Potential" is a Type change request. Or if user intent is ambiguous, use AskUserQuestion to confirm which axis |
-| 4 | Changing only one axis and omitting the other axis notation | Keep both Type + Severity explicitly (e.g., `⚠️ Potential | 🟡 Important`) |
+| 4 | Changing only one axis and omitting the other axis notation | Keep both Type + Severity explicitly (e.g., `⚠️ Potential` + `🟡 Important`) |
 
 **Self-check (whenever the user instructs a change with category/severity keywords)**:
 

@@ -6,7 +6,7 @@ Entry: `Skill("consolidate", "next ...")` or `pr.md` Workflow Step 8.
 
 ## Step 8: Post-Summary Next-Action Ask (MANDATORY — immediately after Status line)
 
-Immediately after the Status line output, **ask the user for the PR handling direction**. Terminating without presenting options = procedural violation.
+Immediately after the Status line output, **ask the user for the PR handling direction**. Terminating without presenting options = procedural violation, **except** when the routing table below explicitly permits skipping (i.e., the only possible follow-up is "defer", so there is genuinely no actionable next step).
 
 ### Routing: next vs wip
 
@@ -75,7 +75,7 @@ If actionable items (Critical + Minor + Refactor) total 2 or more, do not create
 
 **Reinforced self-check** (immediately before option drafting — additional items):
 
-5. If actionable items total 2 or more, are all **3 branching options** included? (Critical only / All / Separate Issue)
+5. If actionable items total 2 or more, are all **3 branching options** included? (Critical only deferred / Minor only deferred / All deferred — matching the branching table above)
 6. Is "All deferred" always included as one of the recommended options regardless of the number of actionable items?
 
 **Don't / Do table**:

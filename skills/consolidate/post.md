@@ -19,7 +19,7 @@ Plain `## AI Review Summary` is forbidden. The link form above is required.
 
 ### Step 3.5.3 review comment ↔ Step 7 Summary paired pattern
 
-- Step 3.5.3 = Internal Code Review (`internal.md` line 121-123: `## Internal Code Review — [requesting-code-review](...)`) — code-reviewer subagent findings
+- Step 3.5.3 = Internal Code Review (`internal.md` `### Post/update review comment` section: `## Internal Code Review — [requesting-code-review](...)`) — code-reviewer subagent findings
 - Step 7 = AI Review Summary — overall reviewer aggregation + conclusion (use template above)
 
 The two comments' superpowers links form a pair (requesting ↔ receiving). When one is updated, verify the other for consistency. **Do not merge them into one or post only one** (omitting Step 3.5.3 = procedure incomplete).
@@ -68,7 +68,7 @@ Full conditions:
 2. **PR body Test plan `- [ ]` unchecked items = 0** — verify via the command above. Even one unchecked item forbids "Ready to merge"
 3. **All user-reported issues fixed** — verify that issues mentioned in the `/consolidate` arguments have been resolved
 
-**Resolving deployment-required verification items**: If the Test Plan has "post-deployment verification" items, pre-verify on the dev-36 legacy server using the feature branch image. Since this is verifiable without master merge, do not record "post-deployment verification required" as a merge-blocking reason.
+**Resolving deployment-required verification items**: If the Test Plan has "post-deployment verification" items, pre-verify on a legacy/staging environment using the feature branch image. Since this is verifiable without master merge, do not record "post-deployment verification required" as a merge-blocking reason.
 
 When unmet, write `Actionable Items PENDING fix.` in the Summary + state the unmet conditions. **Do not ask "shall we merge?"**
 
@@ -102,7 +102,7 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 ### Summary body example
 
 ```markdown
-## AI Review Summary — [Superpowers](https://github.com/obra/superpowers) [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
+## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
 
 | Reviewer | Finding | Status |
 |----------|---------|--------|
@@ -273,7 +273,7 @@ GH_TOKEN="$(gh auth token --user <account>)" \
 Write "/tmp/pr-formal-review.json" with:
 {
   "event": "APPROVE",
-  "body": "## AI Review Summary\n\n- **CodeRabbit**: walkthrough only (Free plan) — line-by-line review unavailable\n- **Internal Code Review** ([requesting-code-review](https://skills.sh/...)): Critical 0, Important 0, Minor N (deferred). Verification table + findings inline below.\n\n### Findings\n\n| # | Item | Type | Severity | Scope | Recommendation |\n|...|\n\n### Verdict\n\n🟢 **Critical 0, Important 0, Minor N (deferred OK). Merge OK.**"
+  "body": "## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)\n\n- **CodeRabbit**: walkthrough only (Free plan) — line-by-line review unavailable\n- **Internal Code Review** ([requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)): Critical 0, Important 0, Minor N (deferred). Verification table + findings inline below.\n\n### Findings\n\n| # | Item | Type | Severity | Scope | Recommendation |\n|...|\n\n### Verdict\n\n🟢 **Critical 0, Important 0, Minor N (deferred OK). Merge OK.**"
 }
 ```
 
@@ -481,7 +481,7 @@ After posting the Summary on GitHub, **state the headline status as a single lin
 
 **Format** (one line, no headers):
 
-```
+```text
 Status: <addressed>/<total> actionable addressed (<remaining> remaining). CI: <pass|fail|pending>. Test plan: <checked>/<total>. Mergeable: <yes|no|conflict>.
 ```
 
@@ -520,7 +520,7 @@ Among all actionable items from Step 4 classification:
 | `{workspace}/.ralph/fix_plan.md` exists | `.ralph/fix_plan.md` "On Hold" section | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action direction, location, PR #N}` |
 | `{workspace}/checklist.md` exists (Ralph not used) | `checklist.md` | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action, PR #N}` |
 | Neither exists + GitHub Issue collaboration | New GitHub Issue | `gh issue create` — title `deferred from PR #N: {summary}`, finding details in body |
-| Neither exists + no collaboration medium | AskUserQuestion | "Where to register?" options (new checklist.md / new checklist.md / Issue / skip registration) |
+| Neither exists + no collaboration medium | AskUserQuestion | "Where to register?" options (new `.ralph/fix_plan.md` / new `checklist.md` / Issue / skip registration) |
 
 **Environment detection is workspace (CWD) based** — Do not confuse the project-subdirectory `.ralph/` with the workspace `.ralph/`.
 

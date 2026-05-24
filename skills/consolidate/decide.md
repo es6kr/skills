@@ -92,13 +92,13 @@ Step 5 asks only "whether to post Summary" + "whether to proceed with fixes". **
 
 ## Step 6: Fix or Reject (if approved)
 
-**Only fix if user explicitly approved in Step 8 next-action ask.** No exceptions even for Critical.
+**Only fix if user explicitly approved in the Step 5 Axis A ask.** No exceptions even for Critical. **Critical items must be fully fixed and verified before Step 7 Summary posting** (see the "Fixing accepted items" subsection below) — this is consistent with Step 5 approval because the Axis A ask is the gate for any fix work; Step 8 is the post-Summary merge ask, not a separate fix gate.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | code-reviewer reports "Must Fix" → immediately execute Edit | Post Summary → status line → user approval in Step 8 ask → Edit |
-| 2 | Skip ask with "Critical, so of course fix it" reasoning | Even Critical requires user approval before fixing. Severity ≠ autonomous fix authority |
-| 3 | Receive code-reviewer result → skip posting review comment → fix immediately | Post Step 3.5.3 comment → Step 4 classification → Step 7 Summary post → Step 8 ask → Step 6 fix |
+| 1 | code-reviewer reports "Must Fix" → immediately execute Edit | Wait for Step 5 Axis A approval → Edit → Critical fully verified → Step 7 Summary post → Step 8 merge ask |
+| 2 | Skip ask with "Critical, so of course fix it" reasoning | Even Critical requires Step 5 user approval before fixing. Severity ≠ autonomous fix authority |
+| 3 | Receive code-reviewer result → skip posting review comment → fix immediately | Post Step 3.5.3 comment → Step 4 classification → Step 5 Axis A approval → Step 6 fix → Step 7 Summary → Step 8 merge ask |
 
 ### Branch ownership check before fixing
 
@@ -116,7 +116,7 @@ When a suggestion is technically incorrect, YAGNI, or conflicts with architectur
 3. Record in checklist as `[REJECTED]` with reason
 
 Example pushback:
-```
+```text
 Suggestion: "Add retry logic for this API call"
 Rejection: "Caller already handles retries (see middleware.ts:45). Adding here creates double-retry. YAGNI."
 ```
