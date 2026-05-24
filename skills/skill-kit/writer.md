@@ -74,7 +74,7 @@ description: Brief description of what this does and when to use it
 **Field requirements**:
 
 - **name**: lowercase, hyphens only, max 64 chars, must match directory name
-- **description**: max 1024 chars, include "what" AND "when to use"
+- **description**: **max 1024 chars (HARD STOP — Claude Code truncates excess with `…`, dropping tail trigger keywords).** Include "what" AND "when to use". Measure before saving: `awk '/^description:/,/^---$/' SKILL.md | sed -E 's/^description: //; /^---$/d' | tr -d '\n' | wc -c`. See `lint.md` "Description Length Budget" for reduction strategies if approaching limit.
 
 **Optional fields**:
 ```yaml
@@ -103,6 +103,80 @@ description: Helps with documents
 - Include specific file extensions (.pdf, .xlsx, .json)
 - Mention common user phrases ("analyze", "extract", "generate")
 - Add context clues ("Use when...", "For...")
+
+### Step 5.4: Skill body tone — no profanity or slang in always-loaded content (HARD STOP)
+
+Skill files (`SKILL.md`, topic `.md`, rule files in `~/.agents/rules/`) are always loaded into Claude's context. Their tone must remain professional and durable.
+
+**Forbidden in skill/rule body**:
+- Direct quotation of user profanity (Korean: 씨발/병신/지랄/장난하냐 etc.; English: f*ck/sh*t/etc.)
+- User-facing slang reflecting frustration ("did I just get scammed?", "낚였냐" etc.)
+- Quotation of user anger as "evidence" of a violation case
+
+**Allowed locations for user verbatim text**:
+- `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT) — on-demand load, evidence preservation
+- `~/.claude/skills/cleanup/data/archive/*.md` — cold storage
+- chat messages and one-time analysis artifacts (`.ralph/docs/generated/plan-fix-*.md`)
+
+**Required transformation when adding a violation case to skill body**:
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Quote user profanity verbatim in a Rules / Anti-pattern bullet | Describe the violation **outcome neutrally**: "user found the option choice produced no actual change" instead of quoting their reaction |
+| 2 | Add the user's anger expression as parenthetical "evidence" of severity | Use a numbered case ID (e.g., `(2026-05-24, 2nd recurrence)`) + 1-line factual summary. The verbatim quote lives in failed-attempts.md |
+| 3 | Conclude that emotional emphasis belongs in the skill body because "it shows the user really cared" | Severity is conveyed through HARD STOP markers, recurrence count, and self-check enforcement — not through quoting frustration |
+
+**Self-check** (every time before adding a violation case to skill/rule body):
+
+1. Does the case description contain user-quoted profanity or slang? → If yes, remove and replace with a neutral outcome description
+2. Does it cite the user's emotional state (frustrated, angry, suspicious)? → If yes, replace with the factual outcome the user observed
+3. Is the case ID present (`YYYY-MM-DD, Nth recurrence`)? → Required for traceability
+4. If the verbatim quote is essential for forensic context, move it to `failed-attempts.md` and reference it by date from the skill body
+
+**Violation case (2026-05-24)**: A 2nd-recurrence anti-pattern was added to `fix/SKILL.md` quoting user profanity (`"이제까지 뭐했냐 씨발새끼야"`) and slang (`"did I just get scammed?"`) directly in the bullet text. User pointed out: "skill에 욕 섞지 마". Replaced with a neutral outcome description in the same fix. This Step 5.4 was added to prevent recurrence.
+
+### Step 5.5: Do & Don't Tables for Behavioral Rules
+
+When the skill contains behavioral constraints (forbidden patterns + correct alternatives), use **Do & Don't table** format instead of prose:
+
+```markdown
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|------------------------|
+| 1 | `Bash("cmd1 && cmd2")` | `Bash("cmd1")` then `Bash("cmd2")` |
+```
+
+- Pairs of "don't do X / do Y instead" → always table
+- 2+ times violated rules → table mandatory
+- Simple principle declarations → prose OK
+
+### Step 5.6: Configuration & Portability (distribution skills)
+
+**For skills intended for distribution** (ClawHub, plugins, shared across projects), extract project-specific values into a Configuration section:
+
+| Hardcoded (bad) | Configurable (good) |
+|----------------|-------------------|
+| `.ralph/docs/generated/` | `{output-dir}` option (default: `docs/generated/`) |
+| `pnpm test` | `{test-command}` option (default: auto-detect) |
+| `http://localhost:3000` | `{base-url}` option |
+| `fix_plan.md` | `{task-tracker}` option |
+
+**Portability checklist** (must pass before publishing):
+- [ ] No absolute paths to user directories (`~/.ralph/`, `~/Sync/`)
+- [ ] No project-specific tool names (Ralph, fix_plan, Semaphore) without opt-in
+- [ ] No hardcoded server URLs or ports
+- [ ] All environment-specific values have defaults + override options
+- [ ] Topic files use `{option-name}` placeholders, not literal paths
+
+**SKILL.md Configuration section template**:
+```markdown
+## Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `output-dir` | `docs/generated/` | Directory for generated artifacts |
+```
+
+**Personal-only skills may skip this step.**
 
 ### Step 6: Structure Content
 

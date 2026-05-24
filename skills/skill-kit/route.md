@@ -72,11 +72,22 @@ Reason: Too small to separate as an independent topic; it's part of health check
 
 #### C. Create New Skill
 
-When it doesn't fit anywhere in existing skills.
+When it doesn't fit anywhere in existing skills. **Before creating, check slug availability via Skill tool (3rd recurrence — HARD STOP):**
+
+```
+Skill("clawhub", "slug <slug-name>")
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Check slug occupancy via `npx skills search` | Call `Skill("clawhub", "slug <name>")` |
+| 2 | Run `curl -sI clawhub.ai/skills/<name>` directly | Call `Skill("clawhub", "slug <name>")` |
+| 3 | Read slug.md and run curl commands manually | Call `Skill("clawhub", "slug <name>")` |
+| 4 | Assume "no slug-occupancy concept" | clawhub.ai uses slug occupancy (307 = occupied, 200 = available) |
 
 ```
 Recommendation: Create new skill "docker-compose"
-Reason: No existing docker-related skill exists, and it's an independent area from k3s/helm
+Reason: no existing docker-related skill; /clawhub slug "docker-compose" = available
 ```
 
 ### 5. Present Results via AskUserQuestion
@@ -92,15 +103,20 @@ AskUserQuestion {
 }
 ```
 
-### 6. Follow-up Action Chaining
+### 6. Follow-up Action Chaining (HARD STOP — Skill tool call required)
 
-Automatically chain based on selection:
+Automatically chain based on selection. **Always call via `Skill("skill-kit", "upgrade/writer ...")` tool** — directly editing SKILL.md with Edit/Write bypasses upgrade/writer's verification procedures (version bump AskUserQuestion, etc.).
 
-| Selection | Chained Topic |
-|-----------|---------------|
-| Add topic to existing skill | → Execute `upgrade` topic |
-| Add section to existing topic | → Direct Edit |
-| Create new skill | → Execute `writer` topic |
+| Selection | Chained Action |
+|-----------|----------------|
+| Add topic to existing skill | `Skill("skill-kit", "upgrade <skill-name> - <topic description>")` |
+| Add section to existing topic | Direct Edit (modify within topic file only) |
+| Create new skill | `Skill("skill-kit", "writer")` |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write/Edit SKILL.md + topic files directly after route result | Call `Skill("skill-kit", "upgrade ...")` → upgrade procedure verifies version bump |
+| 2 | "I know the upgrade procedure, just do it manually" thinking | Skill tool call enforces procedure compliance. Manual = bypass |
 
 ## Example
 

@@ -155,6 +155,42 @@ clawhub/
     └── check-slugs.sh
 ```
 
+### Example: next skill (hook locale pattern)
+
+When a hook script needs locale-specific match patterns (Korean, Japanese, etc.) but must stay language-neutral when published, separate the patterns into `data/*.regex` files and load them at runtime:
+
+```
+next/
+├── SKILL.md
+├── stall-detect.md
+├── resources/
+│   └── next-trigger.sh        # 100% English; loads data/*.regex at runtime
+├── data/                      # git-ignored AND publish-ignored
+│   ├── en.regex
+│   └── ko.regex
+├── .gitignore                 # data/
+└── .clawhubignore             # .gitignore, data/, *.tmp
+```
+
+Hook script loader pattern:
+
+```bash
+DATA_DIR="$(dirname "$0")/../data"
+if compgen -G "$DATA_DIR/*.regex" > /dev/null 2>&1; then
+  PATTERN=$(cat "$DATA_DIR"/*.regex | sed 's/#.*$//' | awk 'NF' | paste -sd'|' -)
+else
+  PATTERN='Fix complete:|✅|all done|task complete'   # built-in English fallback
+fi
+echo "$LAST_TEXT" | grep -qiE "$PATTERN" && ...
+```
+
+Each `*.regex` file uses `#` for comments, one alternation entry per line. Users can add their own locale file (e.g., `ja.regex`, `zh.regex`) without forking the script. The fallback ensures the hook works on fresh installs without a `data/` directory.
+
+| Pattern Type | When to Use |
+|--------------|-------------|
+| State cache (clawhub) | Persistent JSON state that scripts/topics read/write |
+| Locale data (next) | Functional input data that should not be distributed but should remain extensible by end users |
+
 ### Integration with Other Topics
 
 When creating/upgrading skills with a data store:
