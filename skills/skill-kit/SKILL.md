@@ -2,7 +2,7 @@
 name: skill-kit
 metadata:
   author: es6kr
-  version: "0.1.2" # x-release-please-version
+  version: "0.2.0" # x-release-please-version
 description: |
   Claude Code skill management. Topics — writer (create), lint (validate + fix frontmatter), merge (combine related), dedup (find duplicates), convert (agent → skill), architecture (multi-topic structure), upgrade (enhance + add topics), route (topic placement), trigger (declare + auto-register hooks), find (discover via npx skills CLI). Use when: "skill writer", "skill lint", "skill merge", "skill dedup", "create skill", "frontmatter fix", "multi-topic skill", "convert agent", "skill upgrade", "add topic", "topic route", "trigger compile", "hook auto register", "find skill", "discover skill", "npx skills", "skills.sh", "install skill".
 ---
