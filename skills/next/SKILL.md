@@ -5,7 +5,7 @@ metadata:
 name: next
 depends-on: [fix]
 description: >-
-  Suggest next actions after completing any task. **Auto-invocation currently broken**: Stop hook (`resources/next-trigger.sh`) outputs stdout marker but Claude Code Stop hook spec routes stdout to debug log only (LLM not notified) — see hook/SKILL.md "Output channel spec per event". Use this skill via explicit `/next` invocation or by manually calling Skill("next") after task completion until hook is migrated to JSON `decision:"block"` or stderr+exit2.
+  Suggest next actions after completing any task. Stop hook (`resources/next-trigger.sh`) emits a JSON `{"decision":"block"}` payload with an embedded `<skill-trigger>` marker so the LLM invokes this skill automatically. Also invokable explicitly via `/next`.
   stall-detect - detect stalled follow-up steps after task completion and invoke /fix [stall-detect.md].
   Use when "next action", "what next", "stall", "stuck", "not progressing", "follow-up missing" is mentioned.
 ---
@@ -270,7 +270,7 @@ TaskList   # use pending/in_progress entries as the source
 | Pending count | multiSelect | Option layout |
 |------------|-------------|----------|
 | 0 | — | Wrap-up pattern unnecessary → **skip ask** (AskUserQuestion requires ≥2 options per Rule 1; a sole "End session" is not a valid call) |
-| 1 | false | `[Run now, Defer to next session, Hold]` — quote task subject |
+| 1 | false | `[Run now, End session]` (≥2 options to satisfy Rule 1; pair Run-now with End session) — quote task subject |
 | 2~3 | false | `[Run-now option per task + End session (Recommended)]` — include all pending in options |
 | 4+ | false (max 4) | Top 3 by priority + "End session" — note "carryover N items" in description for the rest |
 

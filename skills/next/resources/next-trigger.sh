@@ -2,8 +2,8 @@
 # next-trigger.sh — Stop hook for next skill
 #
 # Detects task completion keywords in the last assistant message and emits
-# a skill-trigger marker so that the LLM invokes the `next` skill in its
-# follow-up response.
+# a JSON `decision:"block"` payload (with embedded `<skill-trigger>` marker)
+# so the LLM invokes the `next` skill in its follow-up response.
 #
 # Trigger condition: Stop hook fires when Claude finishes a response.
 # Input (stdin): JSON { session_id, transcript_path, stop_hook_active }
