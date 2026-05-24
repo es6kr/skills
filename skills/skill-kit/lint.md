@@ -15,7 +15,59 @@ Validate and fix SKILL.md frontmatter issues automatically.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name:` | **Yes** | Skill name (must match directory) |
-| `description:` | **Yes** | Description + trigger keywords |
+| `description:` | **Yes** | Description + trigger keywords. **Length ≤ 1024 chars** (see below) |
+
+### Description Length Budget (HARD STOP)
+
+**`description` field must be ≤ 1024 characters.** Claude Code's system reminder truncates descriptions beyond the limit, dropping trigger keywords at the tail — which causes skill discovery failures.
+
+**Measure**:
+
+```bash
+DESC=$(awk '/^description:/,/^---$/' SKILL.md | sed -E 's/^description: //; /^---$/d' | tr -d '\n')
+echo "len: ${#DESC}"
+# Expected: ≤ 1024. If over → truncate or split topics.
+```
+
+**Reduction strategies (in priority order)**:
+
+| # | Strategy | Example |
+|---|----------|---------|
+| 1 | Compress `Use when` keyword list | Remove redundant synonyms (e.g., "session ID", "current session", "session id" → keep one) |
+| 2 | Shorten topic descriptions to ≤ 40 chars each | `list - enumerate current-project sessions (UUID + mtime + size)` → `list - enumerate sessions` |
+| 3 | Drop locale-duplicate keywords | If English and Korean keywords overlap meaning, keep one per concept |
+| 4 | Move detail to topic .md files | Topic .md files are unbounded — push verbose explanations there, keep description terse |
+
+**Don't / Do table (HARD STOP — derived from 5 cumulative violators 2026-05-23)**:
+
+| # | Don't (overweight pattern) | Do (canonical compression) | Real violation case |
+|---|---------------------------|---------------------------|---------------------|
+| 1 | Append new topic description without measuring current length | `wc -c` or awk-length check before Edit; if `current + new > 1024`, compress first | claude-session: 1480 → 1547 over limit |
+| 2 | Locale-mix in description (English skill with non-English keywords, or vice versa) | Single locale only. **English skill = 0 non-English keywords** (no "core noun" exception). Non-English skill = native keywords primary, English allowed only for proper nouns/technical terms (Vault, ArgoCD, K3s, etc.). See `opensource.md` "Skill language = description language" HARD STOP | ralph: an English keyword paired with two transliterated synonyms (`"ralph update"+"ralph <update-localized>"+"ralph <latest-localized>"`) → If ralph is an English skill, keep only the English form. If localized, keep only one localized form. No mix. |
+| 3 | Multiple English synonym variants for the same action | One canonical verb + one canonical noun. No `"X fix"+"fix X"+"update X"+"modify X"` chains | skill-kit: `"skill upgrade"+"skill fix"+"fix skill"+"update skill"` → `"skill upgrade"` only |
+| 4 | Topic description over 40 chars or with Step numbers / parenthetical context | Topic description = `<topic> - <one-liner ≤ 40 chars>`. Move Step numbers / nested context to topic .md | consolidate: `internal - Step 3.5 Internal Code Review fallback (CodeRabbit Free walkthrough only / Copilot failure) + Step 4.5 UI capture verification` → `internal - CodeRabbit fallback review` |
+| 5 | Append `[filename.md]` to topic descriptions | Topics table already has the file path. description has topic + one-liner only | github-flow: 8x `[xxx.md]` removed (~100 chars saved) |
+| 6 | Verbose prose context inside description (full sentences, "Applies to..." paragraphs) | description = one-line skill purpose + topic enumeration + Use when. Prose belongs in topic .md or SKILL.md body | code-workflow: `Applies to all tasks requiring code changes... TDD (Red→Green→Refactor) is applied by default... For GitHub repos, github-flow is the default companion...` → removed (~300 chars saved) |
+| 7 | Localized keyword conjugation variants (multiple inflections of the same concept, e.g. "tidy"+"sync"+"items" all referring to the same fix_plan operation) | One canonical conjugation per concept (usually `noun + verb-stem` or a single verb) | ralph: 5 conjugated variants of "fix_plan tidy/sync/items/done-move/Completed-move" → keep only `"fix_plan tidy"` (one canonical form). The unused variants were inflectional duplicates of the same intent |
+| 8 | Mix other frontmatter fields (`allowed-tools:`, `depends-on:`) into description text | Each YAML field on its own line. description ends before next field | consolidate: `triggers.allowed-tools: [Agent...]depends-on: [superpowers]` mixed into description tail — separate to own fields |
+| 9 | Trust system reminder display ("looks fine to me") | System reminder truncates with `…`. Always measure with `wc` or awk every Edit | claude-session: `"sess…"` truncate confirmed in system reminder |
+
+**Self-check (every time before Edit on `description:` field)**:
+1. Measure current length (`awk + tr -d '\n' + ${#}` pattern)
+2. Estimate new length after Edit
+3. If `> 1024`, apply reduction strategies #1~4 + Don't/Do patterns #1~9 first
+4. Re-measure after Edit. Confirm ≤ 1024
+5. Verify Topics table is the authoritative source for `[filename.md]` references — description should NOT repeat them
+
+**Self-check (every time before Edit on `description:` field)**:
+1. Measure current length (`awk + tr -d '\n' + ${#}` pattern)
+2. Estimate new length after Edit
+3. If `> 1024`, apply reduction strategies #1~4 first
+4. Re-measure after Edit. Confirm ≤ 1024
+
+**Violation cases (cumulative — system-wide non-compliance)**:
+- 2026-05-23 (1st flagged): `claude-session` 1547 chars after `list` topic added → user pointed it out
+- Pre-existing violations (cumulative): `github-flow` 2116, `ralph` 1506, `code-workflow` 1269, `consolidate` 1187, `skill-kit` 1091 — all over 1024. Strengthen this rule + run `/skill-kit lint --fix` across skills to bring under limit
 
 ### Invalid Fields
 
@@ -71,6 +123,78 @@ user-invocable: true       # User can invoke directly
 - Natural trigger keywords
 
 ## Workflow
+
+### Step 0: External Validation (skills-ref CLI — Anthropic official)
+
+Before applying the custom rules below, run Anthropic's official reference validator `skills-ref` if available. It enforces the upstream Agent Skills spec (name / description / frontmatter shape) — independent of the custom checks in this file.
+
+#### 0a. Check availability
+
+```bash
+if command -v skills-ref >/dev/null 2>&1; then
+  skills-ref --version
+  SKILLS_REF_AVAILABLE=1
+else
+  SKILLS_REF_AVAILABLE=0
+fi
+```
+
+#### 0b. Available — run validate
+
+```bash
+# Single skill
+skills-ref validate ~/.claude/skills/<skill-name>
+
+# All personal skills
+for d in ~/.claude/skills/*/; do
+  [ -f "$d/SKILL.md" ] || continue
+  echo "=== $(basename "$d") ==="
+  skills-ref validate "$d"
+done
+```
+
+Treat any reported problem as a blocking issue. Re-run until the output is empty before proceeding to Step 1.
+
+Properties readout (useful for cross-referencing the Topics table):
+
+```bash
+skills-ref read-properties ~/.claude/skills/<skill-name>   # JSON: name, description, ...
+```
+
+#### 0c. Not available — install
+
+If `command -v uv` succeeds:
+
+```bash
+uv tool install "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref"
+```
+
+After install, `skills-ref` is on PATH (`~/.local/bin/skills-ref`) — no alias needed. Re-run Step 0a to confirm, then 0b.
+
+If `uv` is missing:
+
+| Platform | Install uv |
+|----------|------------|
+| macOS | `brew install uv` |
+| Linux | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| Windows (PowerShell) | `irm https://astral.sh/uv/install.ps1 \| iex` |
+
+If neither `uv` nor a viable installer is available in the current environment, **skip Step 0 and proceed with Step 1** — the custom rules below cover the same baseline. Report the skip explicitly so the user knows the upstream layer was not exercised.
+
+#### 0d. Upgrade
+
+```bash
+uv tool upgrade skills-ref
+```
+
+#### Why both layers
+
+| Validator | Strengths |
+|-----------|-----------|
+| `skills-ref` (upstream) | Authoritative spec enforcement (name match, description shape, properties JSON read) — tracks Anthropic's reference implementation |
+| Custom rules (Steps 1–4 below) | Description length budget (1024), depends-on alphabetical order, hardlink-aware scan, plugin/project skill paths |
+
+The two are complementary — run both. `skills-ref` failures must be fixed before the custom rules can be trusted.
 
 ### Step 1: Scan for Issues
 

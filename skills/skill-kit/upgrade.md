@@ -96,6 +96,15 @@ AskUserQuestion {
 
 **Forbidden**: Immediately fixing upon discovery. Must only modify items selected after AskUserQuestion.
 
+### 3-1. Version Change Rule ⚠️ Required
+
+**Version bump rules:**
+
+- **Patch** (0.1.1 → 0.1.2): allowed without AskUserQuestion — topic content reinforcement, bug fixes, frontmatter tweaks
+- **Minor** (0.1.x → 0.2.0): **AskUserQuestion required** — new topic, feature change
+- **Major** (0.x → 1.0): **AskUserQuestion required** — compatibility break
+- Local-only changes (not intended for publish) may keep the existing version
+
 ### 4. Plan Improvements
 
 | Improvement Type | Task |
