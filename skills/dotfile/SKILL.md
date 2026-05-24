@@ -2,8 +2,8 @@
 name: dotfile
 metadata:
   author: es6kr
-  version: "0.1.0"
-description: Synchronization management with external tools. chezmoi - dotfile template management [chezmoi.md], knowledge - session knowledge → Serena memory [knowledge.md], mcp - MCP server synchronization [mcp.md], syncthing - chezmoi Syncthing sync and diagnostics [syncthing.md]. Use when "knowledge sync", "chezmoi add", "dotfile management", "syncthing", "MCP server add", "MCP sync", "external sync", "(?d)", ".stignore", "ignored files", "stignore settings", "sync incomplete", "sync status", "DB reset", "stale cache", "syncthing diagnostics", "index reset", "rescan". For ClawHub-related tasks → delegate to /clawhub skill.
+  version: "0.1.2"
+description: Synchronization management with external tools. chezmoi - dotfile template management [chezmoi.md], knowledge - session knowledge → Serena memory [knowledge.md], mcp - MCP server synchronization [mcp.md], syncthing - chezmoi Syncthing sync and diagnostics [syncthing.md]. Use when "knowledge sync", "chezmoi add", "dotfile management", "syncthing", "MCP server add", "MCP sync", "external sync", "(?d)", ".stignore", "ignored files", "stignore settings", "sync incomplete", "sync status", "DB reset", "stale cache", "syncthing diagnostics", "index reset", "rescan", "encryption consistency", "Failed to verify encryption", "receive-encrypted mismatch", "garbage encryptionPassword", "Antigravity Syncthing", "Gemini Syncthing re-register". For ClawHub-related tasks → delegate to /clawhub skill.
 depends-on: [chezmoi]
 ---
 
@@ -57,6 +57,7 @@ Manages data synchronization with external tools (Serena, chezmoi, Syncthing, et
 "syncthing setup"       → chezmoi source sync configuration
 ".stignore"             → Ignore pattern configuration
 "sync incomplete"       → Per-folder status/need item diagnostics
+"encryption consistency"→ Garbage encryptionPassword diagnosis & API PUT cleanup
 "DB reset"              → Stale index reset (delete index-v2)
 ```
 
