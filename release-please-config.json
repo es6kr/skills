@@ -8,267 +8,136 @@
   "pull-request-header": "Combined release PR for all skills updated since the last release.",
   "skip-github-release": false,
   "changelog-sections": [
-    {
-      "type": "feat",
-      "section": "Features"
-    },
-    {
-      "type": "fix",
-      "section": "Bug Fixes"
-    },
-    {
-      "type": "perf",
-      "section": "Performance"
-    },
-    {
-      "type": "refactor",
-      "section": "Refactor"
-    },
-    {
-      "type": "docs",
-      "section": "Documentation"
-    },
-    {
-      "type": "ci",
-      "section": "CI/CD",
-      "hidden": true
-    },
-    {
-      "type": "chore",
-      "section": "Chore",
-      "hidden": true
-    },
-    {
-      "type": "test",
-      "section": "Tests",
-      "hidden": true
-    },
-    {
-      "type": "style",
-      "section": "Style",
-      "hidden": true
-    }
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "refactor", "section": "Refactor" },
+    { "type": "docs", "section": "Documentation" },
+    { "type": "ci", "section": "CI/CD", "hidden": true },
+    { "type": "chore", "section": "Chore", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "style", "section": "Style", "hidden": true }
   ],
   "packages": {
     "skills/cc-plugin": {
       "package-name": "cc-plugin",
       "component": "cc-plugin",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "9658945df431f9a743d7855eab91919d80e58fb6"
     },
     "skills/chezmoi": {
       "package-name": "chezmoi",
       "component": "chezmoi",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/claude-session": {
       "package-name": "claude-session",
       "component": "claude-session",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "4a9812401a962825e71667be02abf4204283c40d"
     },
     "skills/claudify": {
       "package-name": "claudify",
       "component": "claudify",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "cc9859ddbb2fa87e978a0f34c2ec6d18b9573995"
     },
     "skills/code-workflow": {
       "package-name": "code-workflow",
       "component": "code-workflow",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/commit-tidy": {
       "package-name": "commit-tidy",
       "component": "commit-tidy",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/consolidate": {
       "package-name": "consolidate",
       "component": "consolidate",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "77caf0bef5e96ff0281e886f34e0863f8036f505"
     },
     "skills/dotfile": {
       "package-name": "dotfile",
       "component": "dotfile",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "b3f4b7a63013ecbcd753fe62a53fbeb685a7a91a"
     },
     "skills/fix": {
       "package-name": "fix",
       "component": "fix",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "d426d2b7dfec9f82a3106d1df055763324220bba"
     },
     "skills/git-repo": {
       "package-name": "git-repo",
       "component": "git-repo",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "316c85f186ef94bbb5acae86d26dd6ac7fb027e9"
     },
     "skills/github-flow": {
       "package-name": "github-flow",
       "component": "github-flow",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "2fbeb47a9f2dd519b7d35e12fb787d93163b157d"
     },
     "skills/mcp-config": {
       "package-name": "mcp-config",
       "component": "mcp-config",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "cc9859ddbb2fa87e978a0f34c2ec6d18b9573995"
     },
     "skills/next": {
       "package-name": "next",
       "component": "next",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "d426d2b7dfec9f82a3106d1df055763324220bba"
     },
     "skills/omz": {
       "package-name": "omz",
       "component": "omz",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/repo": {
       "package-name": "repo",
       "component": "repo",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/skill-kit": {
       "package-name": "skill-kit",
       "component": "skill-kit",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "cc9859ddbb2fa87e978a0f34c2ec6d18b9573995"
     },
     "skills/tdd": {
       "package-name": "tdd",
       "component": "tdd",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/todowrite": {
       "package-name": "todowrite",
       "component": "todowrite",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "a36d9a5f029b595847220c3cc867370c7ff30a21"
     },
     "skills/web-ui-test": {
       "package-name": "web-ui-test",
       "component": "web-ui-test",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "cc9859ddbb2fa87e978a0f34c2ec6d18b9573995"
     },
     "skills/wip": {
       "package-name": "wip",
       "component": "wip",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ],
-      "bootstrap-sha": "0d2f73dd2df25a42f71290b50c4635e488eb6dc7"
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }],
+      "last-release-sha": "cf0bdbf2b2d236fed6dd8af18860936c29adb70d"
     }
   }
 }
