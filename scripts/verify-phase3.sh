@@ -19,7 +19,7 @@ else
 fi
 
 echo "2. CLAWHUB_TOKEN secret present"
-if gh secret list -R "$REPO" 2>/dev/null | grep -q '^CLAWHUB_TOKEN'; then
+if gh secret list -R "$REPO" 2>/dev/null | awk '{print $1}' | grep -qFx 'CLAWHUB_TOKEN'; then
   pass "CLAWHUB_TOKEN secret registered"
 else
   warn "CLAWHUB_TOKEN missing — run: gh secret set CLAWHUB_TOKEN -R $REPO --body <token>"

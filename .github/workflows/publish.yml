@@ -12,7 +12,7 @@ jobs:
     name: Publish to ClawHub
     runs-on: ubuntu-latest
     # Phase 3 staged-rollout gate — remove after 2 successful publish runs.
-    # See plan-7-phase3-auto-publish.md "Staged rollout".
+    # See the Phase 3 plan posted on issue #7.
     environment: clawhub-publish
     steps:
       - name: Parse tag
@@ -25,20 +25,25 @@ jobs:
             echo "::error::Tag '$TAG' does not match '<slug>-v<version>' pattern"
             exit 1
           fi
-          if [ ! -d "skills/$SLUG" ]; then
-            echo "::error::skills/$SLUG directory not found — skipping non-skill release tag"
-            exit 1
-          fi
           echo "slug=$SLUG"       >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.event.release.tag_name }}
 
+      - name: Verify skill directory
+        env:
+          SLUG: ${{ steps.parse.outputs.slug }}
+        run: |
+          if [ ! -d "skills/$SLUG" ]; then
+            echo "::error::skills/$SLUG directory not found — skipping non-skill release tag"
+            exit 1
+          fi
+
       - name: Install ClawHub CLI
-        run: npm install -g clawhub
+        run: npm install -g clawhub@0.17.0
 
       - name: Authenticate
         env:
