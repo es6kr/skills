@@ -42,6 +42,23 @@ jobs:
             exit 1
           fi
 
+      - name: Ensure LICENSE present in skill directory
+        env:
+          SLUG: ${{ steps.parse.outputs.slug }}
+        run: |
+          # opensource.md "LICENSE 위치 정책": LICENSE is a publish-time artifact and
+          # is not git-tracked under skills/<slug>/. Guarantee its presence here so
+          # `clawhub publish` always ships LICENSE alongside SKILL.md and topics.
+          if [ -f "skills/$SLUG/LICENSE" ]; then
+            echo "skills/$SLUG/LICENSE already present"
+          elif [ -f LICENSE ]; then
+            cp LICENSE "skills/$SLUG/LICENSE"
+            echo "Copied repo-root LICENSE into skills/$SLUG/"
+          else
+            echo "::error::No LICENSE found in skills/$SLUG/ or repo root — publish would ship without a license"
+            exit 1
+          fi
+
       - name: Install ClawHub CLI
         run: npm install -g clawhub@0.17.0
 
