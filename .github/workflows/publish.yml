@@ -1,0 +1,66 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to ClawHub
+    runs-on: ubuntu-latest
+    # Phase 3 staged-rollout gate — remove after 2 successful publish runs.
+    # See plan-7-phase3-auto-publish.md "Staged rollout".
+    environment: clawhub-publish
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          SLUG="${TAG%-v*}"
+          VERSION="${TAG##*-v}"
+          if [ -z "$SLUG" ] || [ -z "$VERSION" ] || [ "$SLUG" = "$TAG" ]; then
+            echo "::error::Tag '$TAG' does not match '<slug>-v<version>' pattern"
+            exit 1
+          fi
+          if [ ! -d "skills/$SLUG" ]; then
+            echo "::error::skills/$SLUG directory not found — skipping non-skill release tag"
+            exit 1
+          fi
+          echo "slug=$SLUG"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub
+
+      - name: Authenticate
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
+
+      - name: Publish
+        env:
+          SLUG: ${{ steps.parse.outputs.slug }}
+          VERSION: ${{ steps.parse.outputs.version }}
+          BODY: ${{ github.event.release.body }}
+        run: |
+          clawhub publish "skills/$SLUG" \
+            --slug "$SLUG" \
+            --version "$VERSION" \
+            --changelog "$BODY" \
+            --tags latest
+
+      - name: Verify
+        env:
+          SLUG: ${{ steps.parse.outputs.slug }}
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          # `clawhub inspect` returns the metadata page; grep for the version we just pushed.
+          clawhub inspect "$SLUG" | grep -F "Latest: $VERSION"
