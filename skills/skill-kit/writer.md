@@ -109,8 +109,8 @@ description: Helps with documents
 Skill files (`SKILL.md`, topic `.md`, rule files in `~/.agents/rules/`) are always loaded into Claude's context. Their tone must remain professional and durable.
 
 **Forbidden in skill/rule body**:
-- Direct quotation of user profanity (Korean: 씨발/병신/지랄/장난하냐 etc.; English: f*ck/sh*t/etc.)
-- User-facing slang reflecting frustration ("did I just get scammed?", "낚였냐" etc.)
+- Direct quotation of user profanity in any language (transliterated explicits, f-word equivalents, etc.)
+- User-facing slang reflecting frustration ("did I just get scammed?", "are you serious right now?", etc.)
 - Quotation of user anger as "evidence" of a violation case
 
 **Allowed locations for user verbatim text**:
@@ -133,7 +133,7 @@ Skill files (`SKILL.md`, topic `.md`, rule files in `~/.agents/rules/`) are alwa
 3. Is the case ID present (`YYYY-MM-DD, Nth recurrence`)? → Required for traceability
 4. If the verbatim quote is essential for forensic context, move it to `failed-attempts.md` and reference it by date from the skill body
 
-**Violation case (2026-05-24)**: A 2nd-recurrence anti-pattern was added to `fix/SKILL.md` quoting user profanity (`"이제까지 뭐했냐 씨발새끼야"`) and slang (`"did I just get scammed?"`) directly in the bullet text. User pointed out: "skill에 욕 섞지 마". Replaced with a neutral outcome description in the same fix. This Step 5.4 was added to prevent recurrence.
+**Violation case (2026-05-24, 2nd recurrence)**: A skill body bullet quoted user profanity and frustration slang verbatim as "evidence" of a violation. The user pointed out that skill/rule bodies (always-loaded into context) must not carry profanity in any language. The bullet was rewritten with a neutral outcome description in the same fix. This Step 5.4 was added to prevent recurrence; the verbatim quotes are preserved in `failed-attempts.md` for forensic context.
 
 ### Step 5.5: Do & Don't Tables for Behavioral Rules
 
