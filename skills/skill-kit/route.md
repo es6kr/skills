@@ -103,15 +103,17 @@ AskUserQuestion {
 }
 ```
 
-### 6. Follow-up Action Chaining (HARD STOP — Skill tool call required)
+### 6. Follow-up Action Chaining (HARD STOP — Skill tool call required when SKILL.md is touched)
 
-Automatically chain based on selection. **Always call via `Skill("skill-kit", "upgrade/writer ...")` tool** — directly editing SKILL.md with Edit/Write bypasses upgrade/writer's verification procedures (version bump AskUserQuestion, etc.).
+Automatically chain based on selection. **Any flow that modifies `SKILL.md` (frontmatter, Topics table, depends-on, version) MUST be routed through `Skill("skill-kit", "upgrade/writer ...")`** so the upgrade/writer verification procedures (Language Check, depends-on auto-detect, description length budget, version-bump AskUserQuestion, lint) run. Direct `Edit`/`Write` on `SKILL.md` bypasses these gates and is forbidden.
 
-| Selection | Chained Action |
-|-----------|----------------|
-| Add topic to existing skill | `Skill("skill-kit", "upgrade <skill-name> - <topic description>")` |
-| Add section to existing topic | Direct Edit (modify within topic file only) |
-| Create new skill | `Skill("skill-kit", "writer")` |
+In-topic-only changes (touching one topic `.md` file, no `SKILL.md` change) are exempt: direct `Edit` is allowed because the routed upgrade/writer flow has nothing additional to verify in that case.
+
+| Selection | Chained Action | Touches `SKILL.md`? |
+|-----------|----------------|---------------------|
+| Add topic to existing skill | `Skill("skill-kit", "upgrade <skill-name> - <topic description>")` | Yes (Topics table + description) |
+| Add section inside an existing topic file (no `SKILL.md` change) | Direct `Edit` allowed (in-topic-only exemption) | No |
+| Create new skill | `Skill("skill-kit", "writer")` | Yes (new SKILL.md) |
 
 | # | Don't | Do |
 |---|-------|-----|

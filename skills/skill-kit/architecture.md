@@ -118,7 +118,7 @@ Skills that maintain persistent state use a `data/` directory for JSON/cache fil
 
 ### Structure
 
-```
+```text
 ~/.claude/skills/{skill-name}/
 ├── SKILL.md
 ├── {topic}.md          # Read/write logic for data files
@@ -144,7 +144,7 @@ Skills that maintain persistent state use a `data/` directory for JSON/cache fil
 
 ### Example: clawhub skill
 
-```
+```text
 clawhub/
 ├── SKILL.md
 ├── deploy.md         # Writes to data/published.json after publish
@@ -159,7 +159,7 @@ clawhub/
 
 When a hook script needs locale-specific match patterns (Korean, Japanese, etc.) but must stay language-neutral when published, separate the patterns into `data/*.regex` files and load them at runtime:
 
-```
+```text
 next/
 ├── SKILL.md
 ├── stall-detect.md

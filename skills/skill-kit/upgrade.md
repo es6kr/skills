@@ -203,7 +203,7 @@ If any answer is "no," rewrite before saving the file.
 ```
 
 **SKILL.md update checklist:**
-- [ ] **Measure current `description:` length** — `awk + tr -d '\n' + ${#}` (see `lint.md` "Description Length Budget"). If `current + new content > 1024`, **compress first** using reduction strategies #1~4 before adding new topic info
+- [ ] **Measure current `description:` length** — `DESC=$(awk '/^description:/,/^---$/' SKILL.md | sed -E 's/^description: //; /^---$/d' | tr -d '\n'); echo "len: ${#DESC}"` (see `lint.md` "Description Length Budget"). If `current + new content > 1024`, **compress first** using reduction strategies #1~4 before adding new topic info
 - [ ] Add new topic name and trigger keywords to `description:` frontmatter
 - [ ] Add row to Topics table in alphabetical order
 - [ ] Update Quick Reference section
@@ -351,7 +351,7 @@ git -C ~/.agents ls-tree origin/main skills/<skill-name>/ 2>/dev/null | head -1
 
 User asked to upgrade `es6kr` skill's `deploy-skill` topic. The proposed flow created a new worktree, branched off main, and prepared a PR. The user objected because `es6kr` is a private operator skill — not in `published.json` and untracked in the monorepo (`?? skills/es6kr/` under `git status`). Root cause: the upgrade procedure assumed every directory under `skills/` in `~/.agents` was publishable and would benefit from a PR. Fix: this Step 5.5 was added so `published.json` is consulted as the 1st-class signal before any commit / PR flow is offered.
 
-### 6. Commit Changes (MANDATORY — after every skill modification, **public scope only**)
+### 6. Commit Changes (MANDATORY — after every skill modification, **Public or Repo-internal scope**)
 
 **Gate**: Step 5.5 must have classified the skill as **Public** or **Repo-internal**. If classified as **Local-only**, this entire Step 6 is skipped — the file edit is the final deliverable.
 
