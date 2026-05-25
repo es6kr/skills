@@ -72,11 +72,22 @@ Reason: Too small to separate as an independent topic; it's part of health check
 
 #### C. Create New Skill
 
-When it doesn't fit anywhere in existing skills.
+When it doesn't fit anywhere in existing skills. **Before creating, check slug availability via Skill tool (3rd recurrence — HARD STOP):**
+
+```
+Skill("clawhub", "slug <slug-name>")
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Check slug occupancy via `npx skills search` | Call `Skill("clawhub", "slug <name>")` |
+| 2 | Run `curl -sI clawhub.ai/skills/<name>` directly | Call `Skill("clawhub", "slug <name>")` |
+| 3 | Read slug.md and run curl commands manually | Call `Skill("clawhub", "slug <name>")` |
+| 4 | Assume "no slug-occupancy concept" | clawhub.ai uses slug occupancy (307 = occupied, 200 = available) |
 
 ```
 Recommendation: Create new skill "docker-compose"
-Reason: No existing docker-related skill exists, and it's an independent area from k3s/helm
+Reason: no existing docker-related skill; /clawhub slug "docker-compose" = available
 ```
 
 ### 5. Present Results via AskUserQuestion
@@ -92,15 +103,22 @@ AskUserQuestion {
 }
 ```
 
-### 6. Follow-up Action Chaining
+### 6. Follow-up Action Chaining (HARD STOP — Skill tool call required when SKILL.md is touched)
 
-Automatically chain based on selection:
+Automatically chain based on selection. **Any flow that modifies `SKILL.md` (frontmatter, Topics table, depends-on, version) MUST be routed through `Skill("skill-kit", "upgrade/writer ...")`** so the upgrade/writer verification procedures (Language Check, depends-on auto-detect, description length budget, version-bump AskUserQuestion, lint) run. Direct `Edit`/`Write` on `SKILL.md` bypasses these gates and is forbidden.
 
-| Selection | Chained Topic |
-|-----------|---------------|
-| Add topic to existing skill | → Execute `upgrade` topic |
-| Add section to existing topic | → Direct Edit |
-| Create new skill | → Execute `writer` topic |
+In-topic-only changes (touching one topic `.md` file, no `SKILL.md` change) are exempt: direct `Edit` is allowed because the routed upgrade/writer flow has nothing additional to verify in that case.
+
+| Selection | Chained Action | Touches `SKILL.md`? |
+|-----------|----------------|---------------------|
+| Add topic to existing skill | `Skill("skill-kit", "upgrade <skill-name> - <topic description>")` | Yes (Topics table + description) |
+| Add section inside an existing topic file (no `SKILL.md` change) | Direct `Edit` allowed (in-topic-only exemption) | No |
+| Create new skill | `Skill("skill-kit", "writer")` | Yes (new SKILL.md) |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write/Edit SKILL.md + topic files directly after route result | Call `Skill("skill-kit", "upgrade ...")` → upgrade procedure verifies version bump |
+| 2 | "I know the upgrade procedure, just do it manually" thinking | Skill tool call enforces procedure compliance. Manual = bypass |
 
 ## Example
 
