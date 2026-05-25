@@ -96,6 +96,8 @@ Preserves the UUID filename + original project key as a subdirectory under `~/.c
 
 > ⚠️ **--depth=medium or higher required before split** — fast only reads the last 3 messages, so it may miss different topics at the end of the session.
 
+> 🔍 **RAG MCP auto-detection** — If a vector store MCP (Qdrant / Chroma / Weaviate / Pinecone / etc.) is registered in the current context, classify additionally recommends sessions worth saving to RAG. Vendor-agnostic — uses whichever store tool is detected. See Section 8 of classify.md.
+
 [Detailed guide](./classify.md)
 
 ### Move (Move Specific Sessions by ID)
