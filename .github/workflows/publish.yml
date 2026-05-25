@@ -3,6 +3,12 @@ name: publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g., skill-kit-v0.3.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,8 +23,13 @@ jobs:
     steps:
       - name: Parse tag
         id: parse
+        env:
+          # release event ships the tag in github.event.release.tag_name.
+          # workflow_dispatch ships it in github.event.inputs.tag_name.
+          # release-please.yml dispatches us with the latter when GITHUB_TOKEN
+          # creates the release (recursive-workflow restriction).
+          TAG: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
         run: |
-          TAG="${{ github.event.release.tag_name }}"
           SLUG="${TAG%-v*}"
           VERSION="${TAG##*-v}"
           if [ -z "$SLUG" ] || [ -z "$VERSION" ] || [ "$SLUG" = "$TAG" ]; then
@@ -31,7 +42,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || github.event.inputs.tag_name }}
 
       - name: Verify skill directory
         env:
