@@ -32,6 +32,8 @@ The Summary body and the Formal Review body carry the **same verdict information
 2. Current user is a requested reviewer (`reviewRequests` includes current account)
 3. Step 5 Axis B answer = `APPROVE` / `COMMENT` / `REQUEST_CHANGES` (not `Skip formal review`)
 
+> **Precondition (HARD STOP — 2026-05-26)**: When the current user is a requested reviewer, **this medium table must NOT be consulted until the Step 5 Axis B ask has been answered** (see `decide.md` "Axis B ask precedes Summary medium decision/posting"). The `Non-Mergeable → issue comment only, Formal Review skipped` row is an auto-skip that applies **only after** the Axis B ask — it does not authorize posting an issue comment Summary before asking. For a requested reviewer, `mergeable: CONFLICTING` does NOT permit auto-posting the Summary; ask Axis B first, then the answer (incl. `Skip`) decides the medium.
+
 | PR state | Medium | Posting |
 |----------|--------|---------|
 | **Mergeable + Formal Review action (APPROVE/COMMENT/REQUEST_CHANGES)** | **Unified** | Summary body → Formal Review POST only. **No issue comment Summary** |
@@ -53,6 +55,21 @@ The Summary body and the Formal Review body carry the **same verdict information
 3. Step 5 Axis B = APPROVE/COMMENT/REQUEST_CHANGES (not Skip)?
 4. All 3 yes → **Unified POST** (go to 7-B with Summary body). Skip 7-A
 5. Any no → **Separate**. Post 7-A issue comment; conditionally POST 7-B if Axis B = APPROVE/COMMENT/REQUEST_CHANGES
+
+#### Damage control — Summary already posted in wrong medium (HARD STOP — 2026-05-26)
+
+**If the AI Review Summary was already posted as an issue comment (e.g., medium auto-decided before the Axis B ask) and a Formal Review action is then chosen, do NOT create additional garbage.** Reuse the existing issue comment Summary as the review content and submit the Formal Review with an **empty body** (`gh pr review <N> --approve` / `--comment` / `--request-changes` with no `--body`).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Embed the full Summary into a new Formal Review body (duplicating the already-posted issue comment) | `gh pr review <N> --approve` with **no body** — the existing issue comment Summary is the review content |
+| 2 | Add another issue comment ("Update" / "Formal Review note") | No new comment. Empty-body Formal Review only |
+| 3 | Delete the already-posted issue comment Summary then re-post in the "correct" medium | Leaving it is cleaner than churning. Deleting + re-posting = more noise than an empty-body approve |
+| 4 | Dismiss a duplicate empty review to "clean up" | An empty-body review has no content; dismissing adds a dismiss-trail = more garbage. Leave benign duplicates |
+
+**Why empty body**: Formal Review is PATCH-impossible and the issue comment Summary already carries the verdict. A bodied Formal Review would duplicate that content. The empty-body review only supplies the missing review **state** (APPROVED/etc.) without content duplication. This is the recovery path when the Axis B-ask-first gate (see `decide.md`) was missed.
+
+**User instruction precedent (2026-05-26)**: the user directed that when the medium was already mis-posted, do not create more garbage with an additional message — submit an empty-body approve instead. The recovery is an empty-body approve, not a new bodied review/comment.
 
 ### Merge recommendation preconditions (Mandatory check — run before drafting Summary)
 

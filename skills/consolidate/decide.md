@@ -1,38 +1,60 @@
-# User Decision + Fix
+# User Decision (Formal Review) + Fix
 
-Present classification results to the user from Step 4 and decide on two axes (Findings handling + Formal Review action). fix when approved + Pushback procedure (Rejected).
+Present classification results to the user from Step 4 and decide on Axis B (Formal Review action) only. AI Review Summary posting and Findings deferred registration are **procedure** (Step 7 / 7.6), not user decisions. fix is only executed when the user explicitly instructs (typically via Step 8 next-action or follow-up turn).
 
 Entry: `Skill("consolidate", "decide ...")` or `pr.md` Workflow Step 5 / Step 6.
 
-## Step 5: User Decision
+## Step 5: Formal Review Decision (Axis B only)
 
-Present findings and ask user what to do. **Branch on two axes**: (a) findings handling, (b) Formal Review action (when you are a requested reviewer).
+**Axis A (Findings handling) ask is forbidden (HARD STOP — 3 recurrences 2026-05-24)**.
 
-### Axis A: Findings handling
+The AI review handling flow is procedure:
+- Condition (a): CodeRabbit walkthrough + Copilot review both posted normally → Step 7 auto-post AI Review Summary
+- Condition (b): CodeRabbit walkthrough only OR Copilot error → Step 3.5 Internal Review Fallback → Step 7 auto-post AI Review Summary
+- Actionable findings → Step 7.6 auto-register to fix_plan.md `[REVIEW_FEEDBACK]` (defer by default)
+- fix is a **separate step only on explicit user instruction** (Step 8 next-action or a follow-up turn like "apply the review")
 
-**Option description must reflect the medium decided in Step 7 medium selection** (Mergeable + Formal Review action → unified POST). When unified POST applies, "post summary" means "post Summary body as Formal Review body" (single POST). Otherwise it means "post Summary as issue comment".
+**Step 5 is Axis B (Formal Review action) only**. Ask only when you are a requested reviewer. Otherwise skip Step 5 and proceed directly to Step 7.
 
-```javascript
-// Mergeable + Formal Review action (unified POST will apply)
-AskUserQuestion({
-  question: "How to handle these AI review findings?",
-  options: [
-    { label: "Fix actionable items", description: "Fix N items, then post Summary as Formal Review body (single POST)" },
-    { label: "Post summary as-is", description: "No fixes needed. Summary body → Formal Review POST (no separate issue comment)" },
-    { label: "Skip", description: "Don't post anything" }
-  ]
-})
+### Axis B ask precedes Summary medium decision/posting (HARD STOP — added 2026-05-26)
 
-// Non-Mergeable or Skip formal review (separate POST)
-AskUserQuestion({
-  question: "How to handle these AI review findings?",
-  options: [
-    { label: "Fix actionable items", description: "Fix N items, then post summary as issue comment" },
-    { label: "Post summary as-is", description: "No fixes needed, post Summary as issue comment" },
-    { label: "Skip", description: "Don't post anything" }
-  ]
-})
-```
+**When you are a requested reviewer, the Step 5 Axis B ask MUST precede the Step 7 Summary posting (whether issue comment or Formal Review body).** "Summary = procedure (automatic)" applies only to **Axis A (findings handling / whether to post)**, **not to the medium decision**. The Summary's medium (issue comment vs Formal Review body) is **dependent on the Axis B answer**, so posting the Summary in any medium before the Axis B answer strips the user of their Formal Review decision authority.
+
+#### Don't / Do table
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | As a requested reviewer, post the Summary as an issue comment without the Axis B ask | Axis B ask **first** → decide the medium per the answer (APPROVE/COMMENT/REQUEST_CHANGES/Skip) → then post |
+| 2 | Execute post.md's "Non-Mergeable → issue comment only, Formal Review skipped" auto-rule without asking when `mergeable: CONFLICTING` | Even when CONFLICTING, a requested reviewer asks Axis B first. The medium auto-skip applies **only after** the ask answer |
+| 3 | "Summary is automatic procedure, so post it now and handle Axis B later" | "Summary auto-post" is limited to Axis A (whether to post). The medium depends on Axis B → ask first |
+| 4 | Evaluate post.md's medium table before the Axis B ask to fix the medium | The medium table takes **both** the Axis B answer + mergeable. Do not finalize the medium while Axis B is unanswered |
+
+#### Self-check (every time before posting the Summary — HARD STOP)
+
+1. Are you a requested reviewer? (`gh pr view --json reviewRequests` + cross-check active account) → If No, this gate does not apply (auto-post issue comment OK)
+2. If Yes, **has the Axis B ask already been answered?** → If No, **posting the Summary is forbidden**. Call the Axis B ask first
+3. Only after the Axis B answer, decide the medium (feed the Axis B answer + mergeable into the post.md Step 7 medium table)
+4. If the thought "it's CONFLICTING so it's an issue comment anyway" arises = violation signal. Even CONFLICTING requires the Axis B ask first
+
+#### Violation case (2026-05-26, 1st occurrence)
+
+In a consolidate run on a PR where the operator was a requested reviewer, after confirming `mergeable: CONFLICTING`, post.md's "Non-Mergeable → issue comment only" rule was executed without the Axis B ask → the AI Review Summary was auto-posted as an issue comment. The user pointed it out (the Summary was posted in a non-Formal-Review medium without asking). The Axis B ask should have preceded the medium decision. Resolved with a manual APPROVE + this gate added.
+
+### Don't / Do — Axis A ask forbidden (HARD STOP)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Call an Axis A ask ("Post summary as-is / Fix actionable items / Skip") | Proceed automatically to Step 7. Posting the Summary is procedure, not a user decision |
+| 2 | Ask the user about Findings handling | Findings are auto-registered to fix_plan.md `[REVIEW_FEEDBACK]` in Step 7.6 (defer by default) |
+| 3 | "fix is more natural, so Recommended" / "it's Critical/Important, so recommend fix" thinking | fix only on explicit user instruction. No auto-recommendation |
+| 4 | Apply the archive rule "no auto-application" to Summary posting too | "No auto-application" applies only to fix (code changes). Summary posting is procedure (separate domain) |
+| 5 | Bundle Summary posting + Findings handling into one ask | Summary = procedure (automatic), Findings = auto deferred registration. fix is a separate step (Step 8 or explicit instruction) |
+
+### Self-check (before entering Step 5)
+
+1. Are you a requested reviewer? (`gh pr view --json reviewRequests`) → If Yes, ask Axis B only. If No, skip Step 5 → Step 7
+2. Are you building an Axis A option? → Don't. Proceed automatically to Step 7
+3. If a "Fix actionable items" or "Whether to post the Summary" option appears = violation
 
 ### Axis B: Formal Review action (HARD STOP — required when you are a requested reviewer)
 

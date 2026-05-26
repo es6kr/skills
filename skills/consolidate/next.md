@@ -93,6 +93,62 @@ If actionable items (Critical + Minor + Refactor) total 2 or more, do not create
 2. Has the tracking medium been determined per environment (whether `.ralph/` exists)?
 3. Does the option description include all of (a) AI Review Summary URL (b) tracking location (c) form?
 4. Is the post-merge tracking-medium registration bundled as a separate executable task?
+5. **Reject findings axis check (HARD STOP — 2026-05-24)**: are there 1+ findings auto-classified as Reject in Step 4? → If yes, **Reject findings must appear as a user-override option** in this Step 8 ask. See "Reject finding option mandate" below
+
+### Reject finding option mandate (HARD STOP — added 2026-05-24)
+
+**A Reject decision must also be user-overridable.** Even if Step 4 auto-classified a finding as Reject via the `superpowers:receiving-code-review` "Push back when wrong" procedure, the Step 8 next-action ask must **expose that Reject decision to the user**. If Reject disappears from the options, the user cannot choose "apply it anyway" / "keep it Rejected" → Resume scope shrinks.
+
+#### Don't / Do table
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | After auto-classifying Reject in Step 4, fully exclude the Reject finding from the Step 8 ask options | Expose the Reject finding to the user as a separate option or axis. The user can decide to override Reject |
+| 2 | "The Reject rationale (repo convention, etc.) is clear, so omitting the option is OK" thinking | Even with a clear rationale, the user decision step is separate. Reject = AI judgment, override = user authority |
+| 3 | Assume "Accept/Defer options alone are enough" | Present all three to the user: Accept option / Defer option / **Reject override option** |
+| 4 | Assume "the Push back when wrong procedure has no user-confirmation step, so auto-Reject is OK" | superpowers is an evaluate→respond framework. The Step 8 ask is the final decision gate. Two separate domains |
+
+#### Option design pattern (when a Reject finding exists)
+
+```typescript
+[
+  {
+    label: "Apply Accept findings + Reject as-is (Recommended)",
+    description: "AI Review Summary posted (URL) | Accept N items applied + Reject M items kept (reason: <repo convention etc.>)"
+  },
+  {
+    label: "Apply ALL findings (override Reject)",
+    description: "AI Review Summary posted (URL) | Accept N + Reject M (override — user decided to apply despite the pushback reason)"
+  },
+  {
+    label: "Defer all findings",
+    description: "AI Review Summary posted (URL) | fix_plan [BLOCKED] [REVIEW_FEEDBACK] for Accept N + Reject M (override option preserved)"
+  },
+  {
+    label: "Hold",
+    description: "Decision pending"
+  }
+]
+```
+
+A **Reject-only application option** is also possible (e.g., Accept defer + Reject override):
+```typescript
+{
+  label: "Override Reject only (defer Accept)",
+  description: "AI Review Summary posted (URL) | Reject M applied (user override) + Accept N deferred to fix_plan"
+}
+```
+
+#### Self-check (every time before option drafting)
+
+1. Are there 1+ Reject findings in the Step 4 classification?
+2. If yes, did you include a Reject override option in the Step 8 options?
+3. Did you state the Reject rationale in the option description? (gives the user info to judge "is that rationale enough? override?")
+4. If only "Accept only" / "Defer only" options are presented = violation (Reject override omitted)
+
+#### Violation case (2026-05-24, 1st occurrence)
+
+In the PR #13 consolidate next-action ask, the Track A options were presented only as "apply 3 deferred Minor" / "keep Defer" / "hold". CodeRabbit Finding 1 (release-please.yml SHA pin) Major was auto-classified as Reject on repo-convention grounds and excluded from the options entirely. The user signaled Reject-override intent with "fix them all together". **The Reject finding was not exposed as a separate option, stripping the user's decision authority.**
 
 ### Invocation pattern
 

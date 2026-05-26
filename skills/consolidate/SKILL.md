@@ -1,9 +1,9 @@
 ---
 name: consolidate
-depends-on: [superpowers]
+depends-on: [superpowers, git-repo]
 metadata:
   author: es6kr
-  version: "0.1.1"
+  version: "0.1.1" # x-release-please-version
 description: >-
   Consolidate and respond to external feedback on PRs/issues. Topics —
   pr (workflow entrypoint + skip conditions),
@@ -33,7 +33,17 @@ Consolidate and respond to external feedback on PRs and issues.
 | internal | Step 3.5 Internal Code Review Fallback + Step 4.5 UI capture verification | [internal.md](./internal.md) |
 | next | Step 8 Post-Summary Next-Action Ask | [next.md](./next.md) |
 | post | Step 7 Post Summary + Formal Review (unified vs separate) + Step 7.5 Status + Step 7.6 Deferred registration | [post.md](./post.md) |
-| pr | Workflow entrypoint — PR identify, skip conditions, Copilot sequential, Rules | [pr.md](./pr.md) |
+| pr | Workflow entrypoint — PR identify, skip conditions, Copilot sequential, worktree checkout, Rules | [pr.md](./pr.md) |
+
+## Topic Dependencies
+
+```
+pr (entry: identify → skip → worktree checkout)
+  └─→ git-repo/worktree (Step 2.7: check out PR branch into a worktree — all review runs against real files)
+collect → internal (code-reviewer dispatch operates in the Step 2.7 worktree)
+```
+
+- Step 2.7 worktree checkout runs on every review (after skip conditions) so the code-reviewer reads real files, CONFLICTING is detected locally, and inline line numbers match HEAD.
 
 ## Quick Reference
 
@@ -44,7 +54,7 @@ Review CodeRabbit/Copilot feedback on a PR, decide what to act on, and post an A
 Entry: [`pr.md`](./pr.md) (Workflow index + Step 1, 2, 2.5 + Rules)
 
 Step execution order:
-1. **`pr.md`** Step 1 (Identify PR) + Step 2 (Skip Conditions) + Step 2.5 (Copilot sequential, multi-PR only)
+1. **`pr.md`** Step 1 (Identify PR) + Step 2 (Skip Conditions) + Step 2.5 (Copilot sequential, multi-PR only) + Step 2.7 (checkout PR branch into a worktree — MANDATORY, all reviews)
 2. **`collect.md`** Step 3 (Collect AI Reviews) + Step 3.6 (superpowers framework)
 3. **`internal.md`** Step 3.5 (Internal Review Fallback, walkthrough only / on failure) + Step 4.5 (UI capture verification)
 4. **`classify.md`** Step 4 (Analyze and Classify)
