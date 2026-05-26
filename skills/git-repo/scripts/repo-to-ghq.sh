@@ -1,7 +1,7 @@
 #!/bin/bash
 # repo-to-ghq.sh - Move Git repository to ghq directory structure
 # Moves entire repo to ~/ghq/host/group/repo/ with regular .git directory
-# Supports nested groups (e.g., willkomo/devops/repo)
+# Supports nested groups (e.g., myorg/devops/repo)
 # Handles bare+worktree structure conversion
 #
 # Options:
@@ -29,7 +29,7 @@ ghq_path() {
 
   local host group repo_name
 
-  # Remove user@ from HTTP URLs (e.g., http://young@host/...)
+  # Remove user@ from HTTP URLs (e.g., http://user@host/...)
   origin_url=$(echo "$origin_url" | sed -E 's|^(https?://)[^@]*@|\1|')
 
   # HTTPS/HTTP: https://host/group/repo.git or http://host/group/repo
