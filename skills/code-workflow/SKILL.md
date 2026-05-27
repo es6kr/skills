@@ -5,104 +5,86 @@ metadata:
   version: "0.1.2"
 depends-on: [github-flow, tdd, web-ui-test]
 description: |
-  4-stage workflow for code changes: research → plan → user review → implement (TDD). Applies to all tasks requiring code changes: issue implementation, fix_plan items, new feature additions. TDD (Red→Green→Refactor) is applied by default in the implementation stage; users can opt out with --no-tdd. After implementation, use github-flow/pr for PR creation and github-flow/plan-to-issue for issue registration.
-  Use when: "coding workflow", "research plan implement", "research first", "write plan", "plan md", "user review", "review before implement", "code plan", "implementation process", "research md", "code changes".
+  4-stage workflow for code changes: research → plan → user review → implement (TDD). Topics — steps (Step 0-3: resume check + research + plan + user review + branch), implement (Step 4: TDD cycle + test level + build verify + commit), pr (capture + PR creation with image/WebP/GIF/video). Applies to issue implementation, tracked task items, new feature additions. TDD default in implement (opt out --no-tdd). github-flow auto-companion for GitHub repos (plan-to-issue / dependencies / pr / merge). Use when: "coding workflow", "research plan implement", "write plan", "plan md", "user review", "code plan", "implementation process", "code changes", "PR with screenshots", "pull request", "capture and PR".
 ---
 
 # Coding Workflow
 
 A **Research → Plan → User Review → Implement** 4-stage procedure for code change tasks.
 
+## Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `output-dir` | `docs/generated/` | Directory for research/plan files. Set per project (e.g., `.ralph/docs/generated/`) |
+
+Set via project CLAUDE.md or skill invocation argument:
+
+```text
+/code-workflow --output-dir docs/generated/
+```
+
 Trivial tasks such as simple configuration changes or 1~2 line edits may skip this workflow.
+
+## Topics
+
+| Topic | Description | Guide |
+|-------|-------------|-------|
+| implement | Step 4: TDD cycle, test level selection, build & commit | [implement.md](./implement.md) |
+| pr | Capture + PR creation with visual attachments | [pr.md](./pr.md) |
+| steps | Steps 0-3: resume check, research, plan, user review, branch | [steps.md](./steps.md) |
 
 ## Topic Dependencies
 
 ```text
-code-workflow (steps 1-4)
-  └─→ tdd/cycle (step 4: TDD implementation)
-  └─→ tdd/run (step 4: test execution after implementation)
-  └─→ github-flow/plan-to-issue (optional: register plan as issue)
-  └─→ github-flow/pr (optional: create PR with visual attachments)
-        └─→ web-ui-test (capture via Playwright)
+code-workflow (steps 0-4)
+  ├─→ steps Step 0: GitHub repo detection → loads github-flow as default companion
+  ├─→ steps Step 0: github-flow/dependencies (blockedBy precondition check on linked issue)
+  ├─→ tdd/cycle (step 4: TDD implementation)
+  ├─→ tdd/run (step 4: test execution after implementation)
+  ├─→ github-flow/plan-to-issue (auto-trigger when task has linked issue number)
+  ├─→ github-flow/dependencies (auto-trigger when plan frontmatter has `chain:`)
+  ├─→ github-flow/pr (optional: create PR with visual attachments)
+  │     └─→ web-ui-test (capture via Playwright)
+  └─→ github-flow/merge (after PR ready: gates CI/Review/Test Plan/blockedBy)
 ```
 
-- Steps 1-4 are always executed (unless trivial)
-- `github-flow/plan-to-issue` (optional): converts plans to GitHub issues. Use when user requests issue registration
-- `github-flow/pr` (optional): creates PRs after implementation. Use when user requests PR creation
+- Steps 0-4 are always executed (unless trivial)
+- **GitHub repo auto-load** (Step 0): When `git remote get-url origin` contains `github.com`, `github-flow` becomes the default companion — issue/PR/merge ops route through its topics. Non-GitHub remotes fall back to manual `gh`/`git`
+- **blockedBy precondition** (Step 0): Linked issue's `blockedBy` is queried. OPEN predecessors → switch task or BLOCKED report
+- `github-flow/plan-to-issue`: converts plans to GitHub issues. **Auto-trigger when the task has a linked issue number** (e.g., Issue #176). Manual trigger when user explicitly requests issue registration
+- `github-flow/dependencies`: applies `chain:` frontmatter as native Issue Dependencies. **Auto-trigger when plan has `chain:` array**. Skipped for single-issue plans
+- `github-flow/pr` (optional, **opt-in only**): creates PRs. Invoke ONLY when the user explicitly requests PR creation (e.g., "create PR", "open PR"). Never auto-trigger from Step 4 completion
+- `github-flow/merge` (after PR ready): pre-merge gates include `blockedBy` open-predecessors check (see `dependencies.md` and `merge.md` step 3.5)
 - `tdd` is applied by default in step 4. Opt-out with `--no-tdd`
 
-## Step-by-Step Procedure
+## Quick Reference
 
-### Step 1: Research (Read the Codebase)
+### Steps (Research → Plan → Review → Branch)
 
-Read and understand the relevant code **deeply**, then write findings to `.ralph/docs/generated/research-<task>.md`.
+1. **Step 0**: Resume check — read existing research/plan files before starting
+2. **Step 1**: Research — deep codebase reading, write to `research-<N>-<slug>.md`
+3. **Step 2**: Plan — detailed plan with 6 mandatory sections (including human review questions)
+4. **Step 3**: User review — report BLOCKED, wait for approval, then create branch/worktree
 
-- Do not skim a file and move on at the signature level
-- Understand existing layers, ORM relationships, and duplicate API presence
-- **Mandatory exploration of existing test files**: Find related `*.test.*`, `*.spec.*` files and understand what cases are already covered
-- Do not summarize in chat — **always write to a file**
+See [steps.md](./steps.md).
 
-### Step 2: Plan (Write Plan MD)
+### Implement (TDD)
 
-Write a detailed implementation plan in `.ralph/docs/generated/plan-<task>.md`.
+- Select test level (unit/integration/E2E) based on change type
+- TDD Red commit (test only) → Green commit (implementation) → Refactor
+- Monorepo full build verification before commit
+- After completion: **report only** — do NOT auto-trigger push or PR. `push` and `github-flow/pr` require **explicit user instruction** (e.g., "push", "create PR"). PR creation is publish to GitHub and cannot be silently undone; reporting completion does not authorize it (HARD STOP).
 
-Include:
-- Detailed description of the approach
-- Code snippets showing actual changes
-- List of file paths to be modified
-- Considerations / trade-offs
-- **Verification plan** (required): For each change group, specify verification procedure, command/URL, and expected result
+See [implement.md](./implement.md).
 
-### Step 3: User Review
+### PR (with Visual Evidence)
 
-After writing the plan MD, report **STATUS: BLOCKED** and wait for user review.
+- Capture screenshots/GIF/video after implementation
+- Attach to PR body (before/after comparison)
+- Opt-out with `--no-capture`
 
-Report content:
-- Plan file path: `.ralph/docs/generated/plan-<task>.md`
-- Number of changed files, summary of modification scope
-
-Items for the user to verify:
-- Is the approach appropriate?
-- Is the modification scope within the issue/PR scope?
-- Does it match existing patterns/conventions?
-
-On user feedback → revise plan and re-review. On approval → proceed to step 3b (if applicable) or step 4.
-
-### Step 3b: Branch Creation (github-flow issue only)
-
-When invoked with `github-flow issue #N`, create an issue branch after plan approval and before implementation:
-
-1. `gh issue develop <N> --checkout --name "<tag>/<N>-<english-description>"`
-2. Branch naming follows `git.md` rules (conventional commit tag + issue number + English description)
-3. If already on a feature branch for this issue, skip this step
-
-### Step 4: Implement (TDD applied by default)
-
-Once the plan is approved, implement using the **tdd skill's cycle topic** (Red→Green→Refactor).
-After implementation, run tests using the **tdd skill's run topic** and report results.
-
-**TDD opt-out:** If the user specifies `--no-tdd`, implement without tests.
-
-**Monorepo build verification**: In monorepo projects, run `pnpm build` (full build) before committing — not just `tsc --noEmit` on the changed package. Cross-package issues (e.g., Node.js-only imports leaking into browser bundles) are only caught by building downstream consumers. If full build is too slow, at minimum build the changed package + its direct dependents.
-
-**Commit after implementation**: If build + tests pass, proceed to commit. Do not ask the user whether to commit. If a related existing commit exists, confirm whether to amend via `AskUserQuestion`.
-
-Other:
-- Mark completed tasks/steps as `[x]` in fix_plan.md
-- Do not stop until all steps are complete
-- Do not use `unknown` types
-- Continuously run type checks during implementation (`pnpm typecheck` or `tsc --noEmit`)
-- Do not introduce new type errors
-
-## When Going in the Wrong Direction
-
-Do not patch over a bad approach — revert and restart with a narrower scope.
-
-```bash
-cmd /c git checkout -- <files>   # revert changes
-```
-
-Revise the plan and restart from step 3 (user review).
+See [pr.md](./pr.md).
 
 ## Applicability by Task Complexity
 
@@ -112,3 +94,9 @@ Revise the plan and restart from step 3 (user review).
 | moderate (3~10 files, logic changes) | Start from step 2 (plan) |
 | complex (10+ files, new features, architecture changes) | Perform all steps from step 1 (research) |
 
+**Cases where skipping is prohibited even if the line count is small (HARD STOP)**:
+- **Regression issues** — when something that previously worked is broken. **Executable test code (no manual curl/ssh)** must be included in the Plan and the issue.
+- **Primary Branch Integrity (HARD STOP)** — every working branch must be cut from the project's **latest primary branch (origin/master, origin/main, or origin/develop)**. `git fetch origin` and primary-branch confirmation are required before branch creation.
+- **External system integration changes** (Authentik, OAuth, external APIs) — Plan + integration tests are mandatory regardless of line count.
+- **Authentication/security-related changes** — Mandatory to specify test strategy (unit/integration/E2E level) in the plan.
+- **proxy.ts/middleware branching changes** — Affects multiple cases. Mandatory to specify impact scope + GUARD comment strategy in the plan.
