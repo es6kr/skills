@@ -3,7 +3,7 @@ name: wip
 description: >-
   Track in-session work progress. Register steps for 3+ step tasks, update status per step, handle completion/abort.
   On /wip invocation, when remaining tasks exist, AskUserQuestion is required for the per-item direction (proceed / split / merge / hold / delete) — asking only about start priority is forbidden.
-  After compact: show prior-work summary, AskUserQuestion(multiSelect) for restore selection, then re-register via TodoWrite.
+  After a compact, show prior-work summary then AskUserQuestion(multiSelect) for restore selection and re-register via TodoWrite.
   antigravity - task.md artifact-based checklist (Antigravity environment) [antigravity.md],
   claude - TodoWrite/TaskCreate API guide (Claude Code environment) [claude.md],
   resume - environment-agnostic task cleanup + remaining-work workflow [resume.md].
