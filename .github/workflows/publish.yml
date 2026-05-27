@@ -17,9 +17,6 @@ jobs:
   publish:
     name: Publish to ClawHub
     runs-on: ubuntu-latest
-    # Phase 3 staged-rollout gate — remove after 2 successful publish runs.
-    # See the Phase 3 plan posted on issue #7.
-    environment: clawhub-publish
     steps:
       - name: Parse tag
         id: parse
