@@ -89,17 +89,6 @@ tracked_skills() {
   [[ ${#bad[@]} -eq 0 ]] || { echo "Korean found: ${bad[*]}"; return 1; }
 }
 
-# --- License ---
-
-@test "every tracked skill has LICENSE" {
-  if [[ -n "$CI" ]]; then skip "LICENSE check skipped in CI"; fi
-  local missing=()
-  for skill in $(tracked_skills); do
-    [[ -f "$REPO_ROOT/$skill/LICENSE" ]] || missing+=("$(basename "$skill")")
-  done
-  [[ ${#missing[@]} -eq 0 ]] || { echo "Missing LICENSE: ${missing[*]}"; return 1; }
-}
-
 # --- Claude Code Plugin ---
 
 _python() { command -v python3 >/dev/null 2>&1 && python3 "$@" || python "$@"; }

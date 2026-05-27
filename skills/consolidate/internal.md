@@ -10,6 +10,8 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 - **CodeRabbit is walkthrough only** (Free plan — provides only summary without line-by-line review)
 - **Reviewer failure/error** — review is impossible such as Copilot "encountered an error"
 
+**Worktree (from Step 2.7)**: the PR branch is already checked out into a worktree by `pr.md` Step 2.7. Dispatch the code-reviewer **against that worktree path** so it reads real files (not just `gh pr diff`) and can run tests/build locally. Pass the worktree path in the agent prompt (`Repository: <worktree-path>`). The reviewer should still use `gh pr diff <N>` for the canonical PR diff, but reads file bodies + runs verification in the worktree.
+
 **Fallback procedure:**
 
 1. **Call `Skill("superpowers:requesting-code-review")` (MANDATORY)** — this skill loads the review framework and includes code-reviewer agent dispatch. When the skill returns the review result, proceed to the "Check existing review comment" and "Post/update review comment" sub-steps below (still within Step 3.5).
@@ -20,15 +22,21 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 | 2 | Classify review based on code-reviewer result alone | Apply both the requesting-code-review skill framework + receiving-code-review verify→evaluate→respond |
 | 3 | **Analyze 18 files directly from chat text and jump to Step 7** (Step 3.5.3 comment posting omitted) | **`## Internal Code Review — [requesting-code-review](...)` comment must exist on GitHub** to enter Step 4. Chat analysis is auxiliary; comment posting is the primary medium |
 | 4 | "Trigger satisfied but superpowers skill not installed, so substitute with self-analysis" | Internal Code Review comment posting is mandatory even without the skill — if the superpowers skill call fails, post the self-analyzed result as a comment using the same title template (skill bypass allowed, comment bypass forbidden) |
+| 5 | "CodeRabbit findings are detailed enough — verify them myself and skip the Internal Review skill call" | Trigger condition is satisfied **independent of CodeRabbit's quality**. The Internal Review's purpose is to add a *second independent perspective*, not to compensate for missing detail. Detail quality of an existing reviewer does not dismiss the trigger. Always invoke `Skill("superpowers:requesting-code-review")` when the trigger condition matches |
+| 6 | User says "fall back to internal-review on Copilot rate-limit" → interpret as "I verify CodeRabbit findings personally" | "Internal-review" = the **superpowers code-reviewer skill**, not self-verification. User's args reinforce the trigger; they do not authorize self-substitution |
 
-### Self-check (always before entering Step 7 — HARD STOP)
+### Self-check (always before entering Step 5 AND Step 7 — HARD STOP)
 
-Before posting `## AI Review Summary`, run the following self-check:
+Two gates: Step 5 (User Decision ask) and Step 7 (Summary post). Both forbid entry without the Internal Review comment when the trigger matches.
+
+Before posting **either** the Step 5 AskUserQuestion **or** the Step 7 `## AI Review Summary`, run the following self-check:
 
 1. Was the state CodeRabbit walkthrough only (Free plan) or reviewer error? → If Yes, Step 3.5 trigger is satisfied
 2. If trigger was satisfied, was a `## Internal Code Review` comment posted on the GitHub PR? → `gh api .../issues/{N}/comments | jq '.[] | select(.body | startswith("## Internal Code Review"))'`
-3. If the comment is absent → **forbid entering Step 7**. Return to the Step 3.5.3 procedure and post the comment first
+3. If the comment is absent → **forbid entering Step 5 or Step 7**. Return to the Step 3.5 procedure and post the comment first
 4. Does the comment body contain dual-label findings (Type | Severity) or their equivalent?
+
+**Why Step 5 also gated**: the user's decision options must reflect both reviewer streams (CodeRabbit + Internal). Posting Step 5 ask with only CodeRabbit findings + self-verified Reject/Accept classifications leaves the user without the second independent perspective that justified the consolidate flow. Re-call Step 5 ask after the Internal Review comment exists.
 
 ### Check existing review comment (MANDATORY — required before posting)
 

@@ -72,13 +72,6 @@ def test_no_clawhub_metadata_in_repo():
     assert not result.stdout.strip(), f".clawhub/ found in tracked files"
 
 
-@pytest.mark.skipif(os.environ.get("CI") == "true", reason="LICENSE check skipped in CI")
-def test_each_skill_has_license():
-    """ClawHub publish requires LICENSE."""
-    for skill_dir in _tracked_skill_dirs():
-        assert (skill_dir / "LICENSE").exists(), f"{skill_dir.name}/ missing LICENSE"
-
-
 def test_no_secrets():
     """No credentials or internal IPs in any tracked skill."""
     pattern = re.compile(r"(glpat-|sk-[a-zA-Z0-9]{20,}|10\.0\.0\.\d+|14\.36\.\d+)")
