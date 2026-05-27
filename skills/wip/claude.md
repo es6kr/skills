@@ -279,7 +279,7 @@ After a compact, restore the prior work state (a precursor to resume.md Step 1).
 
 ### Example
 
-```
+```text
 # 1. Summary output
 "Work in progress before compact:"
 - [x] Implement API endpoint

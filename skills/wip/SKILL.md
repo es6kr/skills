@@ -27,7 +27,7 @@ Track current session work as a checklist.
 
 ## Topic Dependencies
 
-```
+```text
 wip (entry — /wip or "task cleanup + remaining work")
   └─→ resume (environment-agnostic workflow)
         ├─→ claude (Claude Code: TaskList/TaskCreate/TaskUpdate/AskUserQuestion)
