@@ -5,7 +5,7 @@
   "skills/claudify": "0.2.0",
   "skills/code-workflow": "0.2.0",
   "skills/commit-tidy": "0.2.0",
-  "skills/consolidate": "0.2.0",
+  "skills/consolidate": "0.2.1",
   "skills/dotfile": "0.2.0",
   "skills/fix": "0.2.0",
   "skills/git-repo": "0.3.0",

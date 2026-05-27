@@ -3,7 +3,7 @@ name: consolidate
 depends-on: [superpowers, git-repo]
 metadata:
   author: es6kr
-  version: "0.1.1" # x-release-please-version
+  version: "0.2.1" # x-release-please-version
 description: >-
   Consolidate and respond to external feedback on PRs/issues. Topics —
   pr (workflow entrypoint + skip conditions),
