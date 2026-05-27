@@ -76,25 +76,30 @@ After skip conditions pass, check out the PR's head branch into a local worktree
 
 ### Procedure
 
-1. **Resolve PR head branch + repo**:
+1. **Resolve PR head branch + base + cross-repo flag**:
    ```bash
-   gh pr view <N> -R <owner>/<repo> --json headRefName,headRefOid,mergeable \
-     --jq '{branch: .headRefName, head: .headRefOid, mergeable}'
+   gh pr view <N> -R <owner>/<repo> \
+     --json headRefName,headRefOid,baseRefName,mergeable,isCrossRepository,headRepositoryOwner \
+     --jq '{branch: .headRefName, head: .headRefOid, base: .baseRefName, mergeable, fork: .isCrossRepository, headOwner: .headRepositoryOwner.login}'
    ```
-2. **Fetch the branch**: `git -C <repo> fetch origin <headRefName>`
+   - `base` (`baseRefName`) is the merge target — needed for the CONFLICTING detection step below.
+   - `fork` (`isCrossRepository`) flips the fetch strategy in step 2.
+2. **Fetch head + base**:
+   - **Same-repo PR** (`fork == false`): `git -C <repo> fetch origin <headRefName> <baseRefName>` — both refs live on `origin`.
+   - **Fork PR** (`fork == true`): `origin` does not carry the fork's head. Use `gh pr checkout <N> -R <owner>/<repo> --recurse-submodules=no --force` *inside the worktree from step 3*, which creates a local tracking branch from the fork via the API. Then `git -C <worktree> fetch origin <baseRefName>` for the base.
 3. **Acquire a worktree via the `git-repo` `worktree` topic** — do NOT `git worktree add` blindly. Follow git-repo's decision tree: reuse an inactive / merged-PR worktree first (rename to this PR's branch), else create at `.claude/worktrees/<branch>`. (`git-repo` is a `depends-on` of this skill.)
 4. **Record the worktree path.** All subsequent steps operate there: the code-reviewer dispatch (Step 3.5) gets the worktree path, local verification runs in it, and Step 7 inline line lookups read files from it.
 
 ### CONFLICTING detection (report, do not resolve)
 
-If `mergeable` is `CONFLICTING`, the worktree lets you confirm the conflicting files locally:
+If `mergeable` is `CONFLICTING`, the worktree lets you confirm the conflicting files locally (uses `baseRefName` resolved in step 1):
 
 ```bash
 git -C <worktree> merge --no-commit --no-ff origin/<baseRefName> 2>&1 | grep -i conflict
 git -C <worktree> merge --abort   # always abort — do not commit a merge into the PR branch
 ```
 
-Report the conflicting files in the Summary so the author can rebase. **Do not resolve another author's conflict** (branch ownership: only the PR author resolves — see `git.md`).
+Report the conflicting files in the Summary so the author can rebase. **Do not resolve another author's conflict** (branch ownership: only the PR author resolves — see [`~/.agents/rules/git.md`](~/.agents/rules/git.md) "Branch ownership" rule).
 
 ### Don't / Do
 

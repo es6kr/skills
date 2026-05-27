@@ -66,7 +66,7 @@ GH_TOKEN="$(gh auth token --user <account>)" \
 # Match against current `gh auth status` active account
 ```
 
-If the current account appears in `reviewRequests`, present a second ask (in addition to Axis A):
+If the current account appears in `reviewRequests`, present the Axis B ask (the only ask in Step 5 — Axis A has been removed per the HARD STOP above):
 
 ```javascript
 AskUserQuestion({
@@ -80,7 +80,7 @@ AskUserQuestion({
 })
 ```
 
-**Why both axes are required**: Findings handling (A) decides whether to fix code + post an issue comment. Formal Review (B) is a separate medium — GitHub PR review state (APPROVE / CHANGES_REQUESTED / COMMENTED) that gates merge. A "post summary as-is" (A) without an APPROVE (B) leaves the PR blocked by an unfulfilled review request even if all CI/tests pass.
+**Why Axis B matters even though Axis A is removed**: Posting the Summary as an issue comment (Step 7 procedure) is *not* the same medium as a GitHub Formal Review. Formal Review (B) is a separate medium — GitHub PR review state (APPROVE / CHANGES_REQUESTED / COMMENTED) that gates merge. Posting the Summary issue comment without an APPROVE (B) leaves the PR blocked by an unfulfilled review request even if all CI/tests pass.
 
 #### Conditional gate: merge-recommendation verdict → no Skip option (HARD STOP)
 
@@ -102,7 +102,7 @@ If the Summary verdict is non-merge (Critical findings exist, Test Plan incomple
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Decide only Axis A and post issue comment, then end | Decide both Axis A and Axis B before entering Step 6/7. Axis B is mandatory when you are a requested reviewer |
+| 1 | Post issue comment Summary and end, when you are a requested reviewer | Axis B is mandatory when you are a requested reviewer — answer Axis B before entering Step 6/7 |
 | 2 | Assume "Summary comment counts as APPROVE" | Issue comment ≠ Formal Review. GitHub merge gates check the `reviews` array, not issue comments |
 | 3 | Skip Axis B because findings are clean | Clean findings + requested reviewer = APPROVE (default), still requires the explicit POST |
 | 4 | Present Skip option when Summary verdict is merge-recommendation | Remove Skip option for merge-recommendation verdicts. Skip + merge-OK verdict = contradiction (reviewDecision unresolved) |
@@ -110,17 +110,17 @@ If the Summary verdict is non-merge (Critical findings exist, Test Plan incomple
 
 ### Step 5 AskUserQuestion option drift forbidden
 
-Step 5 asks only "whether to post Summary" + "whether to proceed with fixes". **Detailed fix-scope options like "which Critical to apply" belong in Step 6**. If the Step 5 question drifts into a "fix-scope multiSelect", it's a signal that both Step 3.5.3 and Step 7 (posting) are being forgotten.
+Step 5 asks only Axis B (Formal Review action). **Detailed fix-scope options like "which Critical to apply" belong in Step 6 and only on explicit user instruction**. If the Step 5 question drifts into a "fix-scope multiSelect" or reintroduces an Axis A "whether to fix" option, it's a signal that both Step 3.5.3 and Step 7 (posting) are being forgotten.
 
-## Step 6: Fix or Reject (if approved)
+## Step 6: Fix or Reject (only on explicit user instruction)
 
-**Only fix if user explicitly approved in the Step 5 Axis A ask.** No exceptions even for Critical. **Critical items must be fully fixed and verified before Step 7 Summary posting** (see the "Fixing accepted items" subsection below) — this is consistent with Step 5 approval because the Axis A ask is the gate for any fix work; Step 8 is the post-Summary merge ask, not a separate fix gate.
+**Fix is executed only on explicit user instruction** — typically from the Step 8 next-action ask after Summary posting, or from a follow-up user turn such as "apply the review". There is no Step 5 fix-approval gate (Axis A has been removed). **Critical items, if the user instructs a fix, must be fully fixed and verified before re-posting the updated Summary** so the Summary verdict reflects the actual code state.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | code-reviewer reports "Must Fix" → immediately execute Edit | Wait for Step 5 Axis A approval → Edit → Critical fully verified → Step 7 Summary post → Step 8 merge ask |
-| 2 | Skip ask with "Critical, so of course fix it" reasoning | Even Critical requires Step 5 user approval before fixing. Severity ≠ autonomous fix authority |
-| 3 | Receive code-reviewer result → skip posting review comment → fix immediately | Post Step 3.5.3 comment → Step 4 classification → Step 5 Axis A approval → Step 6 fix → Step 7 Summary → Step 8 merge ask |
+| 1 | code-reviewer reports "Must Fix" → immediately execute Edit | Wait for explicit user fix instruction (Step 8 or follow-up turn) → Edit → Critical fully verified → re-post or update Summary → Step 8 merge ask |
+| 2 | Skip ask with "Critical, so of course fix it" reasoning | Even Critical requires an explicit user fix instruction. Severity ≠ autonomous fix authority |
+| 3 | Receive code-reviewer result → skip posting review comment → fix immediately | Post Step 3.5.3 comment → Step 4 classification → Step 5 Axis B (if requested reviewer) → Step 7 Summary post → Step 8 next-action ask (fix lands here only if user instructs) |
 
 ### Branch ownership check before fixing
 
