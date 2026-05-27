@@ -3,7 +3,7 @@
   "skills/chezmoi": "0.2.0",
   "skills/claude-session": "0.2.0",
   "skills/claudify": "0.2.0",
-  "skills/code-workflow": "0.2.0",
+  "skills/code-workflow": "0.3.0",
   "skills/commit-tidy": "0.2.0",
   "skills/consolidate": "0.2.1",
   "skills/dotfile": "0.2.0",
@@ -18,5 +18,5 @@
   "skills/tdd": "0.2.0",
   "skills/todowrite": "0.2.0",
   "skills/web-ui-test": "0.2.0",
-  "skills/wip": "0.3.0"
+  "skills/wip": "0.3.1"
 }
