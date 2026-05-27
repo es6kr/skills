@@ -27,7 +27,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 
 | Step | Topic file | Responsibility |
 |------|-----------|----------------|
-| 1 (Identify PR) + 2 (Skip Conditions) + 2.5 (Copilot sequential) + 2.7 (worktree checkout) | (inline in this file) | PR identification + skip judgment + Copilot sequential execution + check out PR branch into a worktree |
+| 1 (Identify PR) + 2 (Skip Conditions) + 2.5 (Copilot sequential) + 2.6 (re-review trigger policy) + 2.7 (worktree checkout) | (inline in this file) | PR identification + skip judgment + Copilot sequential execution + first-vs-re-review classification + check out PR branch into a worktree |
 | 3 (Collect AI Reviews) + 3.6 (superpowers:receiving-code-review) | [`collect.md`](./collect.md) | AI review collection + load verify→evaluate→respond framework |
 | 3.5 (Internal Review Fallback) + 4.5 (UI capture verification) | [`internal.md`](./internal.md) | Post Internal Code Review comment on walkthrough only/Copilot failure + verify captures on UI-change PRs |
 | 4 (Analyze and Classify) | [`classify.md`](./classify.md) | dual-label (Type \| Severity) classification + PR diff scope cross-check + option grouping |
@@ -35,7 +35,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 | 7 (Auto-Post AI Review Summary + Formal Review) + 7.5 (Status line) + 7.6 (Auto-register Deferred Findings) | [`post.md`](./post.md) | Auto-post the Summary (no user decision) + auto-register Findings to fix_plan `[REVIEW_FEEDBACK]` (defer by default) |
 | 8 (Post-Summary Next-Action Ask) | [`next.md`](./next.md) | Merge/fix-deferred/hold option ask (fix only on explicit user instruction at this step) |
 
-Entry order: Step 1 → 2 → (2.5 multi-PR only) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
+Entry order: Step 1 → 2 → (2.5 multi-PR only) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
 ## Step 1: Identify PR
 
@@ -70,6 +70,57 @@ When consolidating multiple PRs and Copilot review requests are needed:
 
 > **History of repeated failures**: 2026-04-27 batch invocation of 7 reviews all failed; 2026-04-28 parallel review depleted quota
 
+## Step 2.6: Re-review trigger policy (HARD STOP — first review vs re-review)
+
+**Applies to every PR consolidate flow, single-PR or multi-PR.** Distinguishes first AI bot review (triggered by PR creation) from re-review (triggered by a fix commit on an already-reviewed PR).
+
+| Scenario | Bot trigger autonomy |
+|----------|---------------------|
+| First review (no prior review from this bot exists on the PR) | Autonomous — PR creation itself is the user trigger |
+| **Re-review** (≥1 prior review from this bot exists; new commit pushed) | **AskUserQuestion required** before any bot trigger |
+
+"Bot trigger" includes:
+
+- `gh api repos/<o>/<r>/pulls/<N>/requested_reviewers -X POST -f reviewers[]=<bot>`
+- `gh pr edit <N> --add-reviewer <bot>`
+- `gh pr comment <N> --body "/review"` or `@coderabbitai review` (slash command)
+
+### Pre-trigger self-check (every time before issuing a re-review trigger)
+
+> **Placeholder note**: throughout this section, `<bot>` is a substitution token — replace it with the bot login substring (e.g., `coderabbit` for CodeRabbit, `copilot` for Copilot). Without substitution the `test("<bot>"; "i")` filter matches nothing.
+
+1. **First-vs-re-review classification** — count prior reviews from the target bot:
+   ```bash
+   gh pr view <N> -R <owner>/<repo> --json reviews \
+     --jq '[.reviews[] | select(.author.login | test("<bot>"; "i"))] | length'
+   ```
+   `0` = first review case (autonomy OK). `>0` = re-review case (ask required).
+
+2. **In-progress review check (mandatory in re-review case)** — confirm the bot is not already working:
+   ```bash
+   # CodeRabbit: status check entry signals in-progress
+   gh pr checks <N> -R <owner>/<repo> | grep -E "CodeRabbit|copilot" || true
+   # Bot status comments / draft reviews
+   gh pr view <N> -R <owner>/<repo> --json comments \
+     --jq '[.comments[] | select(.author.login | test("<bot>"; "i")) | select(.createdAt >= (now - 600 | strftime("%Y-%m-%dT%H:%M:%SZ"))) | .body[:120]]'
+   ```
+   In-progress signal present (status text such as "Review in progress", or recent activity within ~10 min) → **do not trigger**. Wait — autonomous poll is allowed, autonomous trigger is not.
+
+3. **AskUserQuestion before trigger** — options must include:
+   - Re-request bot review (only if no in-progress signal)
+   - Skip bot — proceed with prior review + apply-evidence
+   - Hold
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat a user instruction to "wait for re-review" as license to trigger the bot autonomously so the review arrives | "Wait" means poll, not trigger. Bot trigger requires AskUserQuestion regardless of the user's polling intent |
+| 2 | One missed poll → re-request → another /review comment → another POST (cascading triggers) | Single AskUserQuestion at the first missing-arrival decision point. No cascade |
+| 3 | Skip the in-progress check before re-requesting | In-progress check is mandatory. Active reviewer must not be re-triggered |
+| 4 | Re-trigger because the first review found N findings and all were fixed — re-review will be quick | Volume/quality of fix is irrelevant. Re-trigger autonomy is determined by user ask, not by perceived cost |
+| 5 | Treat slash commands (`/review`, `@coderabbitai review`) as not-a-trigger because they look conversational | Slash commands trigger the bot identically. Same ask rule applies |
+
 ## Step 2.7: Checkout PR branch into a worktree (MANDATORY — all reviews)
 
 After skip conditions pass, check out the PR's head branch into a local worktree **before** collecting reviews. Every review runs against real local files, not just `gh pr diff`. Benefits: the code-reviewer (Step 3.5) reads actual files + can run tests/build, `mergeable: CONFLICTING` is confirmed locally, and inline review line numbers (Step 7) match HEAD exactly.
@@ -83,12 +134,12 @@ After skip conditions pass, check out the PR's head branch into a local worktree
      --jq '{branch: .headRefName, head: .headRefOid, base: .baseRefName, mergeable, fork: .isCrossRepository, headOwner: .headRepositoryOwner.login}'
    ```
    - `base` (`baseRefName`) is the merge target — needed for the CONFLICTING detection step below.
-   - `fork` (`isCrossRepository`) flips the fetch strategy in step 2.
-2. **Fetch head + base**:
-   - **Same-repo PR** (`fork == false`): `git -C <repo> fetch origin <headRefName> <baseRefName>` — both refs live on `origin`.
-   - **Fork PR** (`fork == true`): `origin` does not carry the fork's head. Use `gh pr checkout <N> -R <owner>/<repo> --recurse-submodules=no --force` *inside the worktree from step 3*, which creates a local tracking branch from the fork via the API. Then `git -C <worktree> fetch origin <baseRefName>` for the base.
-3. **Acquire a worktree via the `git-repo` `worktree` topic** — do NOT `git worktree add` blindly. Follow git-repo's decision tree: reuse an inactive / merged-PR worktree first (rename to this PR's branch), else create at `.claude/worktrees/<branch>`. (`git-repo` is a `depends-on` of this skill.)
-4. **Record the worktree path.** All subsequent steps operate there: the code-reviewer dispatch (Step 3.5) gets the worktree path, local verification runs in it, and Step 7 inline line lookups read files from it.
+   - `fork` (`isCrossRepository`) flips the fetch strategy in step 3.
+2. **Acquire a worktree via the `git-repo` `worktree` topic** — do NOT `git worktree add` blindly. Follow git-repo's decision tree: reuse an inactive / merged-PR worktree first (rename to this PR's branch), else create at `.claude/worktrees/<branch>`. (`git-repo` is a `depends-on` of this skill.) Record the worktree path; all subsequent steps operate there.
+3. **Fetch head + base** (inside the worktree from step 2):
+   - **Same-repo PR** (`fork == false`): `git -C <worktree> fetch origin <headRefName> <baseRefName>` — both refs live on `origin`.
+   - **Fork PR** (`fork == true`): `origin` does not carry the fork's head. From inside the worktree, `gh pr checkout <N> -R <owner>/<repo> --force` creates a local tracking branch from the fork via the API. Then `git -C <worktree> fetch origin <baseRefName>` for the base. (`gh pr checkout` does not recurse submodules by default — no extra flag needed.)
+4. **The worktree path is now the operating directory for the rest of the workflow**: the code-reviewer dispatch (Step 3.5) gets this path, local verification runs in it, and Step 7 inline line lookups read files from it.
 
 ### CONFLICTING detection (report, do not resolve)
 
@@ -99,7 +150,7 @@ git -C <worktree> merge --no-commit --no-ff origin/<baseRefName> 2>&1 | grep -i 
 git -C <worktree> merge --abort   # always abort — do not commit a merge into the PR branch
 ```
 
-Report the conflicting files in the Summary so the author can rebase. **Do not resolve another author's conflict** (branch ownership: only the PR author resolves — see [`~/.agents/rules/git.md`](~/.agents/rules/git.md) "Branch ownership" rule).
+Report the conflicting files in the Summary so the author can rebase. **Do not resolve another author's conflict** (branch ownership: only the PR author resolves — see `~/.agents/rules/git.md` "Branch ownership" rule).
 
 ### Don't / Do
 
