@@ -6,9 +6,9 @@ After plan approval and branch creation (Steps 0-3 in [steps.md](./steps.md)), i
 
 Before the first Edit/Write/commit in Step 4, verify all 4 items:
 
-1. **Plan exists**: a `plan-*.md` artifact is present in `.ralph/docs/generated/` or `.omc/plans/`
+1. **Plan exists**: a `plan-*.md` artifact is present in the configured `output-dir` (see [SKILL.md](./SKILL.md) Configuration — default `docs/generated/`)
 2. **Plan posted (when linked to a GitHub issue/PR)**: the plan body has been posted via `github-flow/plan-to-issue` and the comment URL is recorded
-3. **Explicit user approval recorded**: the user verbally, via AskUserQuestion option, or via a signed-off plan acceptance checklist signaled "approve / proceed / implement". A short prompt such as "keep going" / "continue task" / "next" / "go" does **not** satisfy this item alone — it triggers the ambiguous-verb table in `ask-user-question.md` and an AskUserQuestion is required first
+3. **Explicit user approval recorded**: the user verbally, via AskUserQuestion option, or via a signed-off plan acceptance checklist signaled "approve / proceed / implement". A short prompt such as "keep going" / "continue task" / "next" / "go" does **not** satisfy this item alone — these are ambiguous verbs whose intent could be plan-acceptance, implement-entry, PR-creation, or resuming a pending task. An AskUserQuestion enumerating those branches is required first
 4. **Plan acceptance checklist (when present in plan body)**: every `Plan acceptance checklist` / `Step 3 review items` line in the plan body is reviewed with the user
 
 If any of 1-4 is unmet, **STOP**. Do not Edit/Write/commit. Issue an AskUserQuestion presenting the plan acceptance checklist items to the user. Only on explicit approval (item 3) may Step 4 proceed.

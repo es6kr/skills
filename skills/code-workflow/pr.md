@@ -12,7 +12,7 @@ Extends the standard code-workflow with **capture and attachment** steps for PRs
 
 The standard 4-stage workflow is extended with two additional steps:
 
-```
+```text
 1. Research       (standard code-workflow step 1)
 2. Plan           (standard code-workflow step 2, with verification plan)
 3. User Review    (standard code-workflow step 3)
@@ -31,7 +31,7 @@ After implementation is complete and tests pass, capture visual evidence.
 
 | Method | When to Use | Tool |
 |--------|------------|------|
-| Browser screenshot | Web UI changes | Playwright MCP `browser_take_screenshot` |
+| Browser screenshot | Web UI changes | Playwright MCP `playwright.playwright_browser_take_screenshot` (see [`skills/web-ui-test`](../web-ui-test/SKILL.md)) |
 | Terminal output | CLI/API changes | Copy relevant output |
 | Before/after comparison | Visual regressions, layout fixes | Screenshot both states |
 
@@ -55,7 +55,7 @@ After implementation is complete and tests pass, capture visual evidence.
 
 ### Capture Naming
 
-```
+```text
 pr-assets/<issue-number>-<description>-before.webp
 pr-assets/<issue-number>-<description>-after.webp
 ```
@@ -95,7 +95,6 @@ If the code depends on env-var / infra changes in another repo:
 # Example — bottom of PR body
 ## Dependencies
 - Depends on: example-org/infra-provisioning#26 (inventory variable additions)
-```
 ```
 
 ### Attachment Methods

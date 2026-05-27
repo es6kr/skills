@@ -19,8 +19,9 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 | `output-dir` | `docs/generated/` | Directory for research/plan files. Set per project (e.g., `.ralph/docs/generated/`) |
 
 Set via project CLAUDE.md or skill invocation argument:
-```
-/code-workflow --output-dir .ralph/docs/generated/
+
+```text
+/code-workflow --output-dir docs/generated/
 ```
 
 Trivial tasks such as simple configuration changes or 1~2 line edits may skip this workflow.
@@ -73,7 +74,7 @@ See [steps.md](./steps.md).
 - Select test level (unit/integration/E2E) based on change type
 - TDD Red commit (test only) → Green commit (implementation) → Refactor
 - Monorepo full build verification before commit
-- After completion: **report only** — do NOT auto-trigger push or PR. `push` and `github-flow/pr` require explicit user instruction (e.g., "push", "create PR"). See `ask-user-question.md` rule on explicit PR-creation instruction (HARD STOP).
+- After completion: **report only** — do NOT auto-trigger push or PR. `push` and `github-flow/pr` require **explicit user instruction** (e.g., "push", "create PR"). PR creation is publish to GitHub and cannot be silently undone; reporting completion does not authorize it (HARD STOP).
 
 See [implement.md](./implement.md).
 

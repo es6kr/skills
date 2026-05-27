@@ -116,7 +116,7 @@ Receivers consult vendor-side documentation for accepted metadata keys, chunking
 | 3 | Defer dispatch to Step 1 completion when the flag is supplied | When `--rag` is set, dispatch after every Write/Edit. Receiver's idempotency keeps it cheap |
 | 4 | Enumerate compatible receivers inside this skill | Caller knows which receivers are available; this skill declares only the abstract surface |
 
-**Why abstract**: research recall paths vary by environment (different RAG vendors, context7 cache, project memory, etc.). Hardcoding a vendor in this generic skill couples it to one stack. The flag keeps coupling at the call site — see `skill-usage.md` rule on forbidding vendor-specific references in generic skills, and the caller-side auto-supply rule.
+**Why abstract**: research recall paths vary by environment (different RAG vendors, context7 cache, project memory, etc.). Hardcoding a vendor in this generic skill couples it to one stack. The flag keeps coupling at the call site — the caller specifies the receiver vendor at invocation time, and the receiver skill implements the actual storage / index protocol.
 
 ## Step 2: Plan (Write Plan MD)
 
@@ -258,8 +258,7 @@ After writing or updating `plan-*.md`, **AI must actively scan the plan for unde
    git checkout -b [new-feature-branch] origin/[primary-branch]
    ```
    - If the branch already exists, `rebase` it onto the latest primary branch.
-5. **Report Branch Status**: "Branch created from origin/[primary-branch]: [branch-name]"
-worktree. Example: `feat/256-session-expired-dialog` (worktree isolation)
+5. **Report Branch Status**: "Branch created from origin/[primary-branch]: [branch-name]". Example: `feat/256-session-expired-dialog` (created in an isolated worktree per Step 3c).
 
 Items for the user to verify:
 - Is the approach appropriate?
