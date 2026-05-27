@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/es6kr/skills/compare/consolidate-v0.2.0...consolidate-v0.2.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **consolidate:** Step 2.7 worktree checkout + Axis B-before-medium gate + Step 2.6 re-review trigger policy ([1e11ee3](https://github.com/es6kr/skills/commit/1e11ee36d78f4ab64a9f8f8800f51108d3012b14))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/consolidate-v0.1.0...consolidate-v0.2.0) (2026-05-24)
 
 
