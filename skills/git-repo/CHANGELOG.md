@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/git-repo-v0.2.0...git-repo-v0.3.0) (2026-05-27)
+
+
+### Features
+
+* **git-repo:** add worktree management + multi-account SSH topics ([#26](https://github.com/es6kr/skills/issues/26)) ([3486eba](https://github.com/es6kr/skills/commit/3486eba3e1a670e57a672303b4d89ee20b0a7831))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/git-repo-v0.1.2...git-repo-v0.2.0) (2026-05-24)
 
 
