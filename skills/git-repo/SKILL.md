@@ -46,7 +46,7 @@ worktree (entry point — inventory + decision)
 
 ## Worktree decision tree (HARD STOP — every time a worktree is needed)
 
-**Whenever a worktree is needed (plan/build/test without switching branches, PR verification, isolated work environment, **new commit while main branch has another in-flight task**), check for inactive worktree reuse before creating a new one.**
+**Whenever a worktree is needed (plan/build/test without switching branches, PR verification, isolated work environment, new commit while main branch has another in-flight task), check for inactive worktree reuse before creating a new one.**
 
 ### Flow
 
@@ -84,7 +84,7 @@ git status (check for other changes)
 
 1. Leave the new work's diff in place — do NOT stash (preserve the working directory)
 2. `git -C <repo> worktree list` to inspect inactive worktrees (per the decision tree above)
-3. Inactive candidate present → reuse via `rename-worktree`; otherwise `worktree add ../worktrees/<branch>`
+3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .claude/worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
 4. cd into the new worktree, then `git checkout -b <new-branch>` (or use the existing inactive branch)
 5. **Re-apply the same diff in the new worktree via Edit** (the original main changes stay on main)
 6. add → commit → push → PR inside the new worktree

@@ -104,8 +104,9 @@ If branch mismatch → do NOT proceed with Write/Edit. Fix first (checkout or re
 |-------------|--------------|
 | Claude Code (any) | `<repo>/.claude/worktrees/<name>` |
 | vibe-kanban | Managed by vibe-kanban (do not override) |
+| Other plugins / agents | Honor the path declared in their context (project `CLAUDE.md`, plugin settings, env var) |
 
-**Prohibited**: `<repo>/.worktrees/` — per CLAUDE.md. Always use `.claude/worktrees/`.
+**Default**: this skill standardizes on `<repo>/.claude/worktrees/<name>`. If the active environment context (project `CLAUDE.md`, plugin settings such as vibe-kanban, or environment variables) pins a different worktree path, honor that path instead. Creating `<repo>/.worktrees/` ad hoc — without any environment context declaring it — is discouraged because it splinters the worktree root across tools.
 
 ## Don't / Do
 

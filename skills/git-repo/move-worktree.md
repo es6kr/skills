@@ -31,19 +31,30 @@ git worktree add .claude/worktrees/<new-name> <branch-name>
 rm -rf .claude/worktrees/<old-name>.tmp  # AskUserQuestion required (safe-delete)
 ```
 
-### Scenario B: Move from `.worktrees/` to `.claude/worktrees/`
+### Scenario B: Move from `.worktrees/` (or any non-default location) to the configured worktree path
 
-When a worktree was created in the wrong location:
+When a worktree exists outside the path defined by the active environment context (default: `.claude/worktrees/`):
 
 ```bash
 cd /path/to/main-repo
 
-# 1. If it's a registered worktree, use git worktree move
+# 1. If it's a registered worktree, prefer `git worktree move`.
+#    NOTE: `git worktree move` is known to be unreliable on Windows
+#    (see rename-worktree.md). On Windows, delegate to the rename-worktree
+#    script/procedure instead of running `git worktree move` directly.
 git worktree move .worktrees/<name> .claude/worktrees/<name>
 
-# 2. If it's just a directory (not registered), treat as Scenario A
-mv .worktrees/<name> .claude/worktrees/<name>
+# 2. If it's just a directory (not registered), do NOT pre-mv and then
+#    `git worktree add` to the same path — `git worktree add` rejects an
+#    existing directory. Instead either:
+#    (a) Stage at a sibling path, then `git worktree add` to the final path
+#        and remove the staged directory (AskUserQuestion via safe-delete):
+mv .worktrees/<name> .claude/worktrees/<name>.staged
 git worktree add .claude/worktrees/<name> <branch>
+# rm -rf .claude/worktrees/<name>.staged   # safe-delete approval required
+
+#    OR (b) Treat as orphaned and follow Scenario A (rename the source first,
+#    then `git worktree add` to the clean target path).
 ```
 
 ### Scenario C: Reclaim a merged PR worktree for a new branch
@@ -76,7 +87,7 @@ git status --short                   # confirm clean state
 
 ## Key Principles
 
-- **`.claude/worktrees/` is the only valid location** — `.worktrees/` is prohibited per CLAUDE.md
+- **Use the worktree path defined by the active environment context** — this skill's default is `.claude/worktrees/`, but other plugins/environments (e.g., vibe-kanban) may pin a different path via their own CLAUDE.md / settings / env vars. If such context exists, honor it. `<repo>/.worktrees/` is *not* the default in any environment and should not be created ad hoc
 - **Always verify with `git worktree list`** before and after operations
 - **Use `git worktree prune`** to clean up stale entries from deleted directories
 - **For registered worktrees needing rename**: delegate to [rename-worktree](./rename-worktree.md)

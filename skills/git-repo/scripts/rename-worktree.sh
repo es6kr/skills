@@ -44,18 +44,38 @@ if [[ -d "$NEW_PATH" ]]; then
   echo "ERROR: $NEW_PATH already exists" >&2; exit 1
 fi
 
+# 0. Resolve the actual metadata directory name from the worktree's .git file.
+# Git may use a suffixed directory name (e.g., "<name>_1") when collisions exist,
+# so we must not assume the metadata dir is named exactly $OLD.
+ACTUAL_OLD_META="$OLD"
+if [[ -f "$OLD_PATH/.git" ]]; then
+  GITDIR_LINE=$(grep -E '^gitdir:' "$OLD_PATH/.git" || true)
+  if [[ -n "$GITDIR_LINE" ]]; then
+    META_PATH=$(echo "$GITDIR_LINE" | sed -E 's/^gitdir:[[:space:]]+//')
+    ACTUAL_OLD_META=$(basename "$META_PATH")
+  fi
+fi
+if [[ ! -d "$GIT_WT_BASE/$ACTUAL_OLD_META" ]]; then
+  echo "ERROR: metadata directory not found at $GIT_WT_BASE/$ACTUAL_OLD_META" >&2
+  echo "       (resolved from $OLD_PATH/.git; check 'git worktree list --porcelain')" >&2
+  exit 1
+fi
+
 # 1. Rename worktree directory
 mv "$OLD_PATH" "$NEW_PATH"
 
-# 2. Rename .git/worktrees metadata
-if [[ -d "$GIT_WT_BASE/$OLD" ]]; then
-  mv "$GIT_WT_BASE/$OLD" "$GIT_WT_BASE/$NEW"
-fi
+# 2. Rename .git/worktrees metadata (using the actual directory name)
+mv "$GIT_WT_BASE/$ACTUAL_OLD_META" "$GIT_WT_BASE/$NEW"
 
 # 3. Update .git file in worktree → point to new metadata (Windows-style path)
 echo "gitdir: $GIT_WT_BASE_WIN/$NEW" > "$NEW_PATH/.git"
 
-# 4. Update gitdir in metadata → point to new worktree (Windows-style path)
+# 4. Update gitdir in metadata → point to new worktree (Windows-style path).
+# Guard: the metadata dir must exist (Step 2 succeeded) before writing into it.
+if [[ ! -d "$GIT_WT_BASE/$NEW" ]]; then
+  echo "ERROR: metadata directory $GIT_WT_BASE/$NEW missing after rename — aborting to avoid broken state" >&2
+  exit 1
+fi
 echo "$NEW_PATH_WIN/.git" > "$GIT_WT_BASE/$NEW/gitdir"
 
 # 5. Verify
@@ -77,7 +97,13 @@ fi
 # 7. Report
 cd "$REPO"
 echo "✓ Renamed: $OLD → $NEW"
-git worktree list | grep "$NEW"
+# Use --porcelain + exact path match to avoid false negatives and to keep
+# set -euo pipefail from aborting on grep no-match.
+if git worktree list --porcelain | grep -qE "^worktree[[:space:]]+${NEW_PATH}$"; then
+  git worktree list | grep -F "$NEW_PATH" || true
+else
+  echo "(worktree not listed yet — 'git worktree repair' may be needed)"
+fi
 if [[ -n "$BRANCH" ]]; then
   echo "✓ Branch: $BRANCH"
 fi
