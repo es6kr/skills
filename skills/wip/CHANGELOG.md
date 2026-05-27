@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/wip-v0.3.0...wip-v0.3.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **wip:** rephrase "After compact:" to avoid YAML key-collision parser risk ([932f6cb](https://github.com/es6kr/skills/commit/932f6cb2b7697efc31f5f914bb03f456aab8f4fc))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/wip-v0.2.0...wip-v0.3.0) (2026-05-27)
 
 

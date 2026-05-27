@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/code-workflow-v0.2.0...code-workflow-v0.3.0) (2026-05-27)
+
+
+### Features
+
+* **skill-code-workflow:** multi-topic structure + abstract RAG dispatch ([#33](https://github.com/es6kr/skills/issues/33)) ([49e5fff](https://github.com/es6kr/skills/commit/49e5fff724e5e98c152aa799bd79253f42121a13))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/code-workflow-v0.1.2...code-workflow-v0.2.0) (2026-05-24)
 
 
