@@ -57,7 +57,7 @@ fix_repo() {
 }
 
 main() {
-  local ghq_root="${GHQ_ROOT:-$(ghq root 2>/dev/null || echo "$HOME/.ghq")}"
+  local ghq_root="${GHQ_ROOT:-$(ghq root 2>/dev/null || echo "$HOME/ghq")}"
 
   if [[ -z "$ghq_root" || ! -d "$ghq_root" ]]; then
     echo "Error: ghq root not found: $ghq_root" >&2
