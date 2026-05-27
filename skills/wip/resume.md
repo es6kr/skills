@@ -74,12 +74,12 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 
 | Environment | Ask method |
 |-------------|-----------|
-| Claude Code | `AskUserQuestion` — one question per task in the `questions` array, max 4 (details: [claude.md](./claude.md) Step A) |
-| Antigravity | `ask.md` emulation (`ArtifactType: "other"`, `RequestFeedback: true`) — per-item options + Pros/Cons (details: [antigravity.md](./antigravity.md) Workflow Step 1) |
+| Claude Code | `AskUserQuestion` — one question per task in the `questions` array, max 4 (details: [claude.md](./claude.md) → "AskUserQuestion — per-item direction ask") |
+| Antigravity | `ask.md` emulation (`ArtifactType: "other"`, `RequestFeedback: true`) — per-item options + Pros/Cons (details: [antigravity.md](./antigravity.md) → "Workflow → 1. Interactive Task Selection") |
 
 ### Auto-proceed exception (Claude Code)
 
-If a task subject contains only simple **lookup/check keywords**, execute it immediately without asking and reflect the result (see `claude.md` Step A.1).
+If a task subject contains only simple **lookup/check keywords**, execute it immediately without asking and reflect the result (see [claude.md](./claude.md) → "Auto-proceed — verification/lookup tasks need no ask").
 
 | Example keyword | Auto-run command |
 |-----------------|------------------|
