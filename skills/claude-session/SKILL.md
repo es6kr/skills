@@ -213,12 +213,23 @@ Repair targets:
 
 ### Rename (Naming a Session)
 
+**Current session** → output a copyable `/rename` list (NO script, NO AskUserQuestion):
+
+```
+Session name suggestions:
+
+1. `/rename Candidate 1`
+2. `/rename Candidate 2`
+3. `/rename Candidate 3`
+```
+
+`/rename` is a Claude Code built-in command — it **cannot** be invoked via Bash or the Skill tool. The user copies and pastes the desired line. **Do NOT call `rename-session.sh` for the current session** (it is reserved for other sessions by ID).
+
+**Other session** (session ID specified) → apply via script:
+
 ```bash
 # Assign a name to a specific session
 bash scripts/rename-session.sh <session_id> "name"
-
-# Assign a name to the latest session in the current project
-bash scripts/rename-session.sh "name"
 
 # Check current title
 bash scripts/rename-session.sh --show <session_id>
