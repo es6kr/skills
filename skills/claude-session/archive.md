@@ -150,7 +150,7 @@ After restore, Claude Code's session list will pick it up on next refresh.
 |---|-------|-----|
 | 1 | Use `rm` after `cp` ("safe-copy-first") | `mv` — atomic, mv failure preserves source |
 | 2 | Rename the file (UUID prefix, date suffix, etc.) | Keep `<uuid>.jsonl` — chain links + `/session url` rely on the UUID |
-| 3 | Flatten into a single archive root without project subfolder | Preserve `<project-key>/<uuid>.jsonl` — source context is recoverable |
+| 3 | Use a project subdirectory (e.g., `<project-key>/<uuid>.jsonl`) — splits storage across `.archive/` and `.bak/` | Use flat naming `<project-key>_<uuid>.jsonl` under `.bak/` — single backup root; source context is recoverable from the filename prefix |
 | 4 | Archive the **currently active** session | Wait until the session is closed; harness can rewrite an open file |
 | 5 | Archive multiple sessions in a `find ... -exec` loop without preview | Single-session at a time; archive script reports each result |
 | 6 | Hardcode a specific RAG vendor (URL, skill name, MCP tool name) in this generic skill | Use `--rag=<skill>:<topic>` flag at the call site; vendor skill implements the receiver protocol |

@@ -15,7 +15,7 @@ Use for quick inspection before running `classify`, `purge`, `search`, or `compr
 | Topic | Scope | Difference |
 |-------|-------|------------|
 | `list` | All sessions in project | No filter, no classification — raw enumeration |
-| `classify` | Same scope | Adds CODE/INFRA/TINY/READ category + recommendation |
+| `classify` | Same scope | Adds A/B/C category (A=Delete Recommended, B=Keep, C=Extract then Delete) + recommendation |
 | `purge` (dry-run) | Dead sessions only | Filters to `<=10 lines + no assistant response` |
 | `rename --list` | Named sessions only | Filters to sessions with custom titles |
 | `search` | Keyword match | Filters by keyword presence |

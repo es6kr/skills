@@ -1,7 +1,7 @@
 ---
 name: claude-session
 description: |
-  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/.archive/), classify, split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "worktree session", "session cleanup"
+  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "worktree session", "session cleanup"
 metadata:
   author: es6kr
   version: "0.1.5"
@@ -16,7 +16,7 @@ Integrated skill for managing Claude Code sessions.
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | analyze | Session statistics, tool usage patterns, optimization insights | [analyze.md](./analyze.md) |
-| archive | Move a completed session out of the active project key to `~/.claude/.archive/` (preserves UUID + project subdir) | [archive.md](./archive.md) |
+| archive | Move a completed session out of the active project key to `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (flat naming, single backup root) | [archive.md](./archive.md) |
 | classify | Classify project sessions (delete/keep/extract) | [classify.md](./classify.md) |
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
 | compress | AI-compress sessions via UTCP/code-mode | [compress.md](./compress.md) |
@@ -68,12 +68,12 @@ Integrated skill for managing Claude Code sessions.
 ### Archive (Move Session Out of Active Project)
 
 ```bash
-/session archive <session_id>                                     # move to ~/.claude/.archive/<project-key>/
+/session archive <session_id>                                     # move to ~/.claude/projects/.bak/<project-key>_<uuid>.jsonl
 bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>           # direct script call
 bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id> --dry-run # preview only
 ```
 
-Preserves the UUID filename + original project key as a subdirectory under `~/.claude/.archive/`. Updates `INDEX.md` ledger.
+Moves to `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (flat naming, single backup root shared with transient backups). UUID portion preserved unchanged. Updates `INDEX.md` ledger.
 
 [Detailed guide](./archive.md)
 
