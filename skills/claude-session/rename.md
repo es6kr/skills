@@ -6,8 +6,10 @@ Suggests and applies a name to a session.
 
 ### 0. Check Whether a Name Was Specified
 
-- If the user specified a name directly → **skip to step 3** (skip suggestions)
-- If no name was specified (e.g. `/session rename`, `suggest a name`) → **start from step 1**
+- If the user specified a name directly → **skip to step 2** (skip suggestions)
+- If no name was specified (e.g. `/session rename`, `/session name`, `suggest a name`) → **start from step 1**
+
+> ⚠️ A topic alias such as the literal word `name` in `/session name` is **not** a title — treat it as "no name specified" and start from step 1.
 
 ### 1. Generate Name Candidates
 
@@ -33,6 +35,14 @@ Session name suggestions:
 
 `/rename` is a Claude Code built-in command — cannot be invoked via Bash or Skill tool.
 The user copies and pastes the desired `/rename ...` line.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Call `rename-session.sh <current-id> "title"` for the current session | Output the copyable `/rename` list and let the user apply it |
+| 2 | Trust the SessionStart hint (`To rename this session: bash ...rename-session.sh`) as the current-session method | The hook hint is for **other**-session tooling. Current session = `/rename` built-in only |
+| 3 | Pick and apply a title yourself for the current session | Suggest 2–4 candidates; the user chooses via `/rename` |
+
+The script (`rename-session.sh`) appends `custom-title`/`agent-name` records, which is correct only for a **different** session's JSONL — for the live current session, the built-in `/rename` is the supported path.
 
 **Other session** (session ID specified) → AskUserQuestion to select, then apply via script:
 

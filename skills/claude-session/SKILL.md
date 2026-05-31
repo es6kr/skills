@@ -1,9 +1,10 @@
 ---
 name: claude-session
+description: |
+  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "worktree session", "session cleanup"
 metadata:
   author: es6kr
   version: "0.1.5"
-description: Integrated skill for Claude Code session management. id - look up current session ID, search - keyword session search with result validation, import - import session, summarize - summarize session, analyze - session stats/analysis, classify - classify/organize sessions, compress - compress session, destroy - delete current session, migrate - move sessions between projects (main repo to worktree), move - move specific sessions by ID to another project + update cwd [move.md], repair - restore session structure (chain, tool_result), rename - assign custom title to session, url - generate claude-sessions web URL from session ID, Use when: "session ID", "current session", "session id", "get session", "session analysis", "session classify", "session compress", "session delete", "session repair", "chain repair", "session name", "name session", "session search", "find session", "which session", "search sessions", "session keyword search", "session import", "session analyze", "session classify", "session compress", "session migrate", "session move", "move session to project", "update session cwd", "worktree session", "move session", "worktree session move", "session repair", "session rename", "chain repair", "session url", "session web URL", "claude-sessions url", "session split", "split recommendations", "topic split", "session purge", "dead session", "clean dead sessions", "session cleanup"
 ---
 
 # Session
@@ -15,6 +16,7 @@ Integrated skill for managing Claude Code sessions.
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | analyze | Session statistics, tool usage patterns, optimization insights | [analyze.md](./analyze.md) |
+| archive | Move a completed session out of the active project key to `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (flat naming, single backup root) | [archive.md](./archive.md) |
 | classify | Classify project sessions (delete/keep/extract) | [classify.md](./classify.md) |
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
 | compress | AI-compress sessions via UTCP/code-mode | [compress.md](./compress.md) |
@@ -22,6 +24,7 @@ Integrated skill for managing Claude Code sessions.
 | id | Look up current session ID (UUID) | [id.md](./id.md) |
 | import | Pipeline session data to other agents/skills | [import.md](./import.md) |
 | install | Register session-id-inject hook in settings.json | [install.md](./install.md) |
+| list | Enumerate current-project sessions (UUID + mtime + size) | [list.md](./list.md) |
 | migrate | Move sessions between projects (main repo → worktree) | [migrate.md](./migrate.md) |
 | move | Move specific sessions by ID to another project + update cwd | [move.md](./move.md) |
 | purge | Delete dead sessions (hook-only, no assistant response) permanently | [purge.md](./purge.md) |
@@ -62,6 +65,18 @@ Integrated skill for managing Claude Code sessions.
 
 [Detailed guide](./analyze.md)
 
+### Archive (Move Session Out of Active Project)
+
+```bash
+/session archive <session_id>                                     # move to ~/.claude/projects/.bak/<project-key>_<uuid>.jsonl
+bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>           # direct script call
+bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id> --dry-run # preview only
+```
+
+Moves to `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (flat naming, single backup root shared with transient backups). UUID portion preserved unchanged. Updates `INDEX.md` ledger.
+
+[Detailed guide](./archive.md)
+
 ### Split (Topic Split Recommendation)
 
 ```bash
@@ -81,6 +96,8 @@ Integrated skill for managing Claude Code sessions.
 ```
 
 > ⚠️ **--depth=medium or higher required before split** — fast only reads the last 3 messages, so it may miss different topics at the end of the session.
+
+> 🔍 **RAG MCP auto-detection** — If a vector store MCP (Qdrant / Chroma / Weaviate / Pinecone / etc.) is registered in the current context, classify additionally recommends sessions worth saving to RAG. Vendor-agnostic — uses whichever store tool is detected. See Section 8 of classify.md.
 
 [Detailed guide](./classify.md)
 
@@ -118,6 +135,18 @@ Classifies sessions as CODE/INFRA/TINY/READ, then moves CODE sessions to worktre
 Register claude-sessions-mcp with UTCP, then call via code-mode.
 
 [Detailed guide](./compress.md)
+
+### List (Enumerate Current-Project Sessions)
+
+```bash
+/session list                       # list current-project sessions (UUID + mtime + size)
+/session list --all-projects        # summary across all projects
+/session list --limit 20            # top N by mtime
+```
+
+Non-destructive enumeration. For categorization or cleanup, use `classify` or `purge` instead.
+
+[Detailed guide](./list.md)
 
 ### ID (Current Session ID Lookup)
 
@@ -184,12 +213,23 @@ Repair targets:
 
 ### Rename (Naming a Session)
 
+**Current session** → output a copyable `/rename` list (NO script, NO AskUserQuestion):
+
+```
+Session name suggestions:
+
+1. `/rename Candidate 1`
+2. `/rename Candidate 2`
+3. `/rename Candidate 3`
+```
+
+`/rename` is a Claude Code built-in command — it **cannot** be invoked via Bash or the Skill tool. The user copies and pastes the desired line. **Do NOT call `rename-session.sh` for the current session** (it is reserved for other sessions by ID).
+
+**Other session** (session ID specified) → apply via script:
+
 ```bash
 # Assign a name to a specific session
 bash scripts/rename-session.sh <session_id> "name"
-
-# Assign a name to the latest session in the current project
-bash scripts/rename-session.sh "name"
 
 # Check current title
 bash scripts/rename-session.sh --show <session_id>
@@ -213,3 +253,4 @@ Rule: all non-alphanumeric characters → `-` (i.e., `replace(/[^a-zA-Z0-9]/g, '
 
 - claude-sessions-mcp MCP server required
 - Serena MCP server (when using analyze --sync)
+

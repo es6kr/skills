@@ -9,8 +9,15 @@ Analyzes all Claude sessions in a project and classifies them as delete/keep/ext
 /session classify <project_name>         # classify sessions for a specific project
 /session classify --depth=medium         # also parse Todo items for analysis
 /session classify --depth=full           # apply full AI summarize to each session (slow)
-/session classify --execute              # execute immediately after classification
+/session classify --execute              # execute after classification (archive, not hard-delete)
+/session classify --rag                  # store RAG-worthy B/C sessions to RAG before archiving
 ```
+
+> **Archive, not delete**: `--execute` **archives** category A sessions via the
+> [`archive`](./archive.md) topic (moves the `.jsonl` to
+> `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` — recoverable) instead of
+> hard-deleting via `delete_session`. This follows the safe-delete principle. Add `--rag`
+> to store distilled knowledge from B/C sessions to a detected RAG MCP before archiving.
 
 ## Analysis Depth Options
 
@@ -85,9 +92,9 @@ mcp__claude-sessions-mcp__summarize_session({
 
 | Category | Criteria | Action |
 |----------|----------|--------|
-| **A) Delete Recommended** | Empty sessions, test sessions, simple Q&A (completed), sessions terminated with errors | `delete_session` |
+| **A) Delete Recommended** | Empty sessions, test sessions, simple Q&A (completed), sessions terminated with errors | Archive (§6-A) — empty sessions may use `clear_sessions` |
 | **B) Keep** | Important task records, ongoing work, decisions worth referencing | Keep as-is |
-| **C) Extract then Delete** | Contains knowledge/patterns but the session itself is not needed; agentify candidates | Save to Serena memory then delete |
+| **C) Extract then Delete** | Contains knowledge/patterns but the session itself is not needed; agentify candidates | Save to Serena memory (+ RAG if `--rag`) then archive |
 
 ### 5. Output Classification Results
 
@@ -130,15 +137,22 @@ mcp__claude-sessions-mcp__summarize_session({
 > So if you want to "split the latter half of a session into a new session" → the original session ID ends up with the new topic.
 > Think of the split point as "up to here is the original session", not "from here is the new session".
 
-#### A) Execute Delete
-```
-mcp__claude-sessions-mcp__delete_session({
-  project_name: "<project>",
-  session_id: "<id>"
-})
+#### A) Archive (recoverable — replaces hard delete)
+
+**Do not use `delete_session` (hard delete).** Archive each category A session via the
+[`archive`](./archive.md) topic, which moves the `.jsonl` to
+`~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (preserves the UUID, recoverable, not
+re-scanned by Claude Code):
+
+```bash
+bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>
 ```
 
-#### C) Extract then Delete
+- The session disappears from the session list (same UX as delete) but stays recoverable.
+- See [`archive`](./archive.md) for the destination convention, restoration, and ledger.
+- Empty (0-message) sessions may instead use `clear_sessions` (§7) — nothing to preserve.
+
+#### C) Extract → (RAG if `--rag`) → Archive
 
 1. Extract knowledge:
 ```
@@ -155,11 +169,15 @@ mcp__serena__write_memory({
 })
 ```
 
-3. Execute delete
+3. If `--rag` and a RAG MCP is detected (see Section 8), store the distilled knowledge
+   to RAG before archiving.
+
+4. Archive via the [`archive`](./archive.md) topic (same `archive-session.sh` as A — not hard delete)
 
 ### 7. Bulk Cleanup of Empty Sessions
 
-If there are many empty sessions, clean them up in bulk:
+`clear_sessions` is acceptable **only for truly empty sessions** (0 user messages / 0-byte
+hook-only files) — these have no content to preserve, so hard removal is fine:
 
 ```
 mcp__claude-sessions-mcp__clear_sessions({
@@ -168,6 +186,83 @@ mcp__claude-sessions-mcp__clear_sessions({
   clear_invalid: true
 })
 ```
+
+**Non-empty category A sessions** (short Q&A, test sessions with actual content) must be
+**archived** via the `mv` procedure in §6-A, not bulk-deleted — they may still hold
+recoverable context.
+
+### 8. RAG Save Recommendation (when a RAG / vector store MCP is available)
+
+**Trigger detection** — Skip this entire section if no RAG / vector store MCP is registered in the current context. Do not hard-wire to a specific vendor.
+
+Detection patterns (any match qualifies — scan deferred tool list or system reminders):
+
+| Vendor | Tool name pattern |
+|--------|-------------------|
+| Qdrant | `mcp__qdrant__qdrant-store`, `mcp__qdrant__qdrant-find` |
+| Chroma | `mcp__chroma__*-add`, `mcp__chroma__*-query` |
+| Weaviate | `mcp__weaviate__*-store`, `mcp__weaviate__*-search` |
+| Pinecone | `mcp__pinecone__*-upsert`, `mcp__pinecone__*-query` |
+| Generic | Any MCP tool whose name matches `*-(store|add|upsert|index)` paired with `*-(find|query|search)` against a vector index |
+
+If at least one RAG MCP is detected, evaluate every session classified as **B (Keep)** or **C (Extract then Delete)** for semantic-search value and emit an additional table. Sessions in category A (Delete Recommended) are excluded.
+
+#### Criteria — sessions worth saving to RAG
+
+| Criterion | Rationale |
+|-----------|-----------|
+| Problem-solving narrative with concrete diagnosis → fix flow | Future similar problems benefit from semantic match |
+| Decision rationale (why X over Y, with discarded alternatives) | Decisions are hard to re-derive; semantic recall avoids re-litigation |
+| Successful troubleshooting with root cause + remediation | High recall value when symptoms recur |
+| Domain-specific knowledge accumulation (infra finding, vendor quirk, undocumented behavior) | RAG preserves the explanation, not just the action |
+| Anti-pattern + correct alternative pair | Future drift detection benefits from semantic comparison |
+
+**Exclude**:
+- Pure routine work (deployment commands, scripted operations already covered by skills)
+- Sessions already covered by an existing skill / rule (the skill is the canonical reference)
+- Time-bound state snapshots (CI run status, ephemeral debugging logs)
+- Sessions classified A (Delete Recommended) — no semantic value worth retaining
+
+#### Output
+
+```markdown
+### D-RAG) Save to RAG (N) — vendor: <detected-tool>
+
+| Session ID | Title | RAG Value | Suggested chunk |
+|------------|-------|-----------|-----------------|
+| <id> | <title> | <reason — 1 sentence> | <what to embed: full summary / per-decision excerpt / problem-fix pair> |
+```
+
+RAG save is **additive** to the primary classification — it does not change the A/B/C action. A session marked C (Extract then Delete) still extracts to Serena memory and archives (§6-A, not hard delete) after the RAG store call.
+
+#### Execution (when `--execute` is provided + user approves)
+
+For each approved row, call the detected RAG store tool. Use a stable metadata schema so cross-session queries remain filterable:
+
+```
+<rag-store-tool>(
+  information: "<chunk content — 1~3 paragraphs of the distilled knowledge>",
+  metadata: {
+    type: "session-summary" | "decision" | "troubleshooting" | "infra-finding" | "anti-pattern",
+    project: "<project-name>",
+    session_id: "<uuid>",
+    date: "YYYY-MM-DD",
+    category: "<domain — infrastructure | security | networking | build | ...>"
+  }
+)
+```
+
+**Tool selection**:
+- One RAG MCP detected → use it directly
+- Multiple RAG MCPs detected → present an AskUserQuestion to choose the destination
+- Zero RAG MCPs → skip Section 8 entirely (do not prompt the user, do not record placeholder rows)
+
+**Chunking**:
+- One `store` call per logical chunk. Long sessions may split into multiple chunks (e.g., one per decision, one per troubleshooting episode).
+- Keep each chunk self-contained — the retriever returns chunks in isolation, so context that would normally come from the surrounding session must be inlined.
+
+**Idempotency**:
+- Before storing, query the RAG with the proposed `session_id` to detect prior stores from earlier classify runs. If a chunk for the same `session_id` + `type` already exists, ask the user whether to overwrite or skip.
 
 ## Classification Hints
 

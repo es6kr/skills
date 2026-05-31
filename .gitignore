@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 .stfolder/
 .stversions/
+.tmp/
 *.bak
 *.pyc
 *.tmp
