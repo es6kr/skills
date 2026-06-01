@@ -74,7 +74,22 @@ Priority levels:
 - **Major** — should fix (performance, architecture)
 - **Minor** — nice to have (style, readability)
 
-### Step 5: Post Comment
+### Step 5: Check Milestone
+
+Verify the PR has a milestone assigned:
+
+```bash
+gh pr view <NUMBER> --json milestone --jq '.milestone.title // "none"'
+```
+
+- **No milestone** → query open milestones and suggest one based on the PR's change scope:
+  ```bash
+  gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.state=="open") | "\(.title)\t\(.description)"'
+  ```
+  Include the recommendation in the review comment (e.g., "Milestone unassigned — suggest assigning `v0.5.0`").
+- **Has milestone** → no action needed
+
+### Step 6: Post Comment
 
 Write body to a temp file, then post:
 
@@ -85,7 +100,7 @@ gh pr comment <NUMBER> --body-file /tmp/pr-review.md
 
 **Do NOT use `--body` with multiline content** — use `--body-file` always.
 
-### Step 6: Update fix_plan (if applicable)
+### Step 7: Update fix_plan (if applicable)
 
 Mark the review item as `[x]` with review summary.
 
