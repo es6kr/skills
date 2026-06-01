@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/claude-session-v0.2.0...claude-session-v0.3.0) (2026-06-01)
+
+
+### Features
+
+* **skill-claude-session:** add archive topic ([0c14d88](https://github.com/es6kr/skills/commit/0c14d883a6c55b61e3fa1b4a21a23b84dacb8777))
+* **skill-claude-session:** add RAG save recommendation to classify topic ([1321798](https://github.com/es6kr/skills/commit/132179866c9801e1b40cc9633fc38c64d14b916e))
+* **skill-claude-session:** unify archive layout + add list topic + classify --rag ([398cd4b](https://github.com/es6kr/skills/commit/398cd4bb73849f89e2f0c4803ff087ccea0c6400))
+* **skill-claude-session:** unify archive layout + add list topic + classify --rag/--execute archive semantics + rename guards ([#34](https://github.com/es6kr/skills/issues/34)) ([ce47de3](https://github.com/es6kr/skills/commit/ce47de3bbab9b174a088d7f528c10553fd0f913b))
+
+
+### Bug Fixes
+
+* **skill-claude-session:** apply PR [#34](https://github.com/es6kr/skills/issues/34) review feedback (F1-F5) ([dfe3af5](https://github.com/es6kr/skills/commit/dfe3af5b94fff1392c2d6c33af01b2be1add7c26))
+* **skill-claude-session:** forbid rename-session.sh for current session; force /rename built-in ([501bf7b](https://github.com/es6kr/skills/commit/501bf7b4a829ed0289225f8b3eccdf76ce485d54))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/claude-session-v0.1.5...claude-session-v0.2.0) (2026-05-24)
 
 

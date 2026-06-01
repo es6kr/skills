@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/github-flow-v0.2.0...github-flow-v0.3.0) (2026-06-01)
+
+
+### Features
+
+* **github-flow:** multi-topic structure + English body + internal-id sanitization ([#39](https://github.com/es6kr/skills/issues/39)) ([881aaf3](https://github.com/es6kr/skills/commit/881aaf3be5cd57edf3173e88f40273ccd3640330))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/github-flow-v0.1.0...github-flow-v0.2.0) (2026-05-24)
 
 
