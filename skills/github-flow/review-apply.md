@@ -15,10 +15,11 @@ This is the **dedicated follow-up entry point** for items that were not applied 
 
 ### Step 1: Collect deferred items
 
-Collect every unchecked (`[ ]`) item tagged `[REVIEW_FEEDBACK]` from `fix_plan.md` or `checklist.md`.
+Collect every unchecked (`[ ]`) item tagged `[REVIEW_FEEDBACK]` from `fix_plan.md` or `checklist.md` (whichever is present in the workspace — collect from both if both exist):
 
 ```bash
 Grep("[REVIEW_FEEDBACK]", path="{workspace}/.ralph/fix_plan.md")
+Grep("[REVIEW_FEEDBACK]", path="{workspace}/checklist.md")
 ```
 
 **Information to collect** (per item):
@@ -69,7 +70,7 @@ Process the approved items sequentially:
 1. **Edit code**: change the code to address the review point
 2. **Verify**: confirm the build/tests pass after the change (`pnpm typecheck`, `pnpm test`, etc.)
 3. **Commit**: review-application commit
-   ```
+   ```text
    fix: address [REVIEW_FEEDBACK] — {summary}
    ```
 4. **Update fix_plan**: check `[ ]` → `[x]` for completed items

@@ -29,7 +29,7 @@ GH_TOKEN="$(gh auth token --user <account>)" gh search issues --repo <owner>/<re
 
 Write the issue draft to the artifacts folder:
 
-```
+```text
 .ralph/docs/generated/issue-draft-upstream-<repo>-<slug>.md
 ```
 

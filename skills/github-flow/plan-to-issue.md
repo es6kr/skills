@@ -154,7 +154,7 @@ If no milestone fits, skip — do not create new milestones without user instruc
 
 **After every issue update is complete, emit a reconciliation table to prove that every source item was allocated:**
 
-```
+```markdown
 | ID | Scenario | Issue | Status |
 |----|----------|-------|--------|
 | A1 | ... | #222 | ✅ |
@@ -220,7 +220,7 @@ Both commands must match for Step 8 to be complete. If only one matches, it is i
 - Updating only the draft file while leaving fix_plan unchanged (or vice versa).
 - "I'll do it later, it's minor" — the mapping is already lost by the next session.
 
-### Step 8: Update fix_plan
+### Step 9: Update fix_plan
 
 After posting, update the corresponding fix_plan entry:
 - Add issue number reference

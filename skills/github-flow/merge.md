@@ -203,9 +203,9 @@ When marking an unchecked Test Plan item as `[x] (post-merge verification — tr
 - The "merge with unchecked items after user consent" path is closed. Even if the user says "go ahead", do not run `gh pr merge` while any `- [ ]` remains
 - "Record and proceed" = "record this fact" + "proceed to the next step (verification / deploy)", NOT "approval to merge unchecked"
 
-#### HARD STOP — Self-check for the merge-option AskUserQuestion (four conditions)
+#### HARD STOP — Self-check for the merge-option AskUserQuestion (five conditions)
 
-Before recommending merge (AskUserQuestion option includes "proceed merge" / "squash merge"), **self-check all four conditions**:
+Before recommending merge (AskUserQuestion option includes "proceed merge" / "squash merge"), **self-check all five conditions**:
 
 | # | Condition | How to verify | If not satisfied |
 |---|-----------|---------------|------------------|
@@ -318,17 +318,17 @@ The following expressions mean "inspect / review / check" — NOT permission to 
 | "run it through to the end" + workflow names merge | Approval | ✅ |
 
 **Correct flow** (non-approval pattern + conditions satisfied):
-1. Report the four-condition self-check result as text ("CI ✅, AI Review ✅, Test Plan ✅, Mergeable ✅")
+1. Report the five-condition self-check result as text ("CI ✅, AI Review ✅, Test Plan ✅, Mergeable ✅")
 2. Use AskUserQuestion to **confirm merge intent separately** — "All conditions satisfied. Proceed with merge?" (options: "merge now" / "defer" / "additional review")
 3. Run `gh pr merge --squash` only when the user picks "merge now"
 
 **Auto-merge procedure**:
-1. Self-check the four conditions (CI / Test Plan / AI Review Summary / Mergeable)
+1. Self-check the five conditions (CI / Test Plan / AI Review Summary / Mergeable)
 2. If all satisfied → skip AskUserQuestion, run `gh pr merge --squash`
 3. If any unsatisfied → AskUserQuestion explaining the blocker + suggesting how to clear it (independent of pre-approval)
 
 **Forbidden patterns**:
-- "Wait for the predecessor PR to merge" answer → after the PR is created + four conditions satisfied → asking "shall I merge?" again (redundant)
+- "Wait for the predecessor PR to merge" answer → after the PR is created + five conditions satisfied → asking "shall I merge?" again (redundant)
 - Mis-interpreting a pre-approval answer as "inspect intent" instead of "merge intent"
 
 ### 4. Mergeable status
@@ -346,7 +346,7 @@ gh pr view <PR_NUMBER> --json mergeable
 | Solo-maintained infra repo | Allowed (solo) | Replaced by AI Review APPROVE |
 
 - For an org-protected app repository where self-approve is not allowed, the formal-review condition is skipped.
-- If all four conditions above pass, the PR can be merged.
+- If all five conditions above pass, the PR can be merged.
 
 ## Merge Execution
 
@@ -357,12 +357,12 @@ Most feature work / bug fixes use squash merge. Clean up the commit message per 
 1. **Subject**: start from the PR title with redundant tags (e.g. `[WIP]`, `[DRAFT]`) removed.
 2. **Body**:
    - Distill the key content from the PR body's "Changes" or "Key changes" section.
-   - Record the session ID(s) that contributed (e.g. `Session: xxxx1234`).
    - Include `Closes #issue` or `Fixes #issue`.
+   - On a PRIVATE repo you MAY add a non-sensitive trace reference (e.g. a short workspace identifier) if your team relies on one. On a PUBLIC repo, **do not embed session identifiers / personal handles / internal IDs** — they survive in `git log` forever and violate the sanitize HARD STOP introduced elsewhere in this skill.
 
 ```bash
-# Example
-gh pr merge <PR_NUMBER> --squash --subject "feat: add user session countdown UI" --body "- JWT-exp-based countdown hook and header UI\n- Closes #253\n- Session: 3ad153f6"
+# Example (PUBLIC repo — no internal identifiers in the squash body)
+gh pr merge <PR_NUMBER> --squash --subject "feat: add user session countdown UI" --body "- JWT-exp-based countdown hook and header UI\n- Closes #253"
 ```
 
 ### Regular Merge (merge commit)
@@ -384,12 +384,12 @@ gh pr merge <PR_NUMBER> --merge
   - **Cross-repo issues apply equally**: if the PR references another repository's issue, update that repository's issue body too (e.g. when an app-repo PR includes work tracked in the infra repo, update both issue bodies)
   - Consequence of skipping: the epic body stays stale; on the next planning pass, "already implemented items" appear unfinished and cause duplicate work / confusion
 - **Deploy follow-up**: after merge, confirm with the user whether to run the related deploy workflow (infra automation, ArgoCD sync, etc.).
-- **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the four conditions to the user is a procedural violation.
+- **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the five conditions to the user is a procedural violation.
 - **Post-hoc review for PRs merged without review** — run `/consolidate pr-review` for a post-hoc review, and if actionable items appear, ask via AskUserQuestion whether to register them in a follow-up PR or an existing issue.
 
 ## Recording evidence of merge-condition satisfaction (CRITICAL)
 
-**When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all four conditions.**
+**When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all five conditions.**
 
 A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Format:
 
@@ -407,7 +407,7 @@ A bare `✅` leaves no basis to verify "the conditions were really satisfied" af
 
 ## Merge-recommendation AskUserQuestion format (CRITICAL — HARD STOP)
 
-**When recommending PR merge via AskUserQuestion, every option's description must include evidence for the four conditions.**
+**When recommending PR merge via AskUserQuestion, every option's description must include evidence for the five conditions.**
 
 ```typescript
 {
@@ -423,7 +423,7 @@ A bare `✅` leaves no basis to verify "the conditions were really satisfied" af
 
 **Verification procedure (HARD STOP)**:
 
-Right before authoring the merge-recommendation AskUserQuestion, verify all four conditions:
+Right before authoring the merge-recommendation AskUserQuestion, verify all five conditions:
 
 ```bash
 # 1. CI status

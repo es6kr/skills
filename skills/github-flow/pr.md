@@ -96,22 +96,22 @@ If `.github/pull_request_template.md` exists, use that template. Otherwise use t
 | ![before](url) | ![after](url) |
 
 ## Test plan
-- [ ] Local build passes
-- [ ] No type errors
-- [ ] ...
+- [ ] `[general]` Local build passes
+- [ ] `[general]` No type errors
+- [ ] `[general]` ...
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
-**Checklist inclusion criteria** — only include items relevant to the change:
+**Checklist inclusion criteria** — only include items relevant to the change. Every item carries the `[general]` / `[UI]` / `[post-merge]` prefix per the "Test Plan category classification" HARD STOP below.
 
-| Item | Include when |
-|------|-------------|
-| Local build passes | Always |
-| No type errors | Always |
-| Route/sidebar navigation works | UI page add/change |
-| Core feature works | Functional changes |
-| DB/API integration verified | DB/API changes |
+| Item | Prefix | Include when |
+|------|--------|-------------|
+| Local build passes | `[general]` | Always |
+| No type errors | `[general]` | Always |
+| Route/sidebar navigation works | `[UI]` | UI page add/change |
+| Core feature works | `[general]` or `[UI]` | Functional changes |
+| DB/API integration verified | `[general]` | DB/API changes |
 
 For chore/docs/config changes, only build + type check items.
 
@@ -428,7 +428,7 @@ gh pr view <N> -R <owner>/<repo> --json reviews --jq \
 1. Compute reset timestamp: take the run's `createdAt` (or the failing log line's timestamp), add the parsed `N hours M minutes`, in UTC. **Immediately write this reset time to the shared global cache file `~/.claude/copilot-rate-limit.json`** in the format `{"reset_at": "ISO_TIMESTAMP_IN_UTC"}` (e.g. `{"reset_at": "2026-05-31T08:08:29Z"}`) to share the rate limit status across all sessions.
 2. Do **not** re-register Copilot reviewer. The bot self-removes from `requested_reviewers` after the failed attempt, so no manual removal needed.
 3. Update the consolidate follow-up task with the reset time so the next session can act on the deadline:
-   ```
+   ```text
    TaskUpdate <consolidate-task-id> description:
      "PR #<N> — Copilot rate-limit until <ISO timestamp>.
       After reset, re-run Step 0 (Copilot reviewer) then proceed to Step 1."
