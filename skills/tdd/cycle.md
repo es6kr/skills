@@ -103,11 +103,24 @@ const filePath = path.join(a, b)    // NOT manual string concatenation
 
 **Red→Green→Refactor is ONE atomic unit. Do not commit or push between stages.**
 
-- Red only (test written, no implementation) → **commit forbidden**
+- Red only (test written, no implementation) → **commit forbidden by default**
 - Red + Green (test passes) → commit allowed
 - Red + Green + Refactor → ideal commit point
 
-If the test cannot run locally (environment constraint), the Green stage must still be attempted before committing. "Can't run locally" is not grounds for skipping Green — find an alternative (different test runner, mock, CI-only verification plan documented in commit message).
+### Exception: `[CI-VERIFY]` Red-only commit
+
+The "Red only forbidden" rule has **one narrow exception**, scoped to the "Exceptions (Red authored but cannot be executed)" cases above:
+
+- Test environment cannot run locally **and** CI is the only available execution surface
+- Or the test infrastructure itself is being built
+
+In those cases, committing Red authoring **is allowed** with `[CI-VERIFY]` in the commit message. The exception is gated on:
+
+1. The commit message tags `[CI-VERIFY]` so the Red-only state is auditable in `git log`
+2. Green is treated as **incomplete** until CI confirms the test failed-then-passed cycle — do not declare TDD done on the basis of the Red-only commit alone
+3. A follow-up commit lands the implementation + closes the `[CI-VERIFY]` thread once CI reports the passing run
+
+If the test simply "can't run on my machine" but a different runner / mock / container could execute it, the exception does **not** apply — pick the alternative runner and complete Green locally before committing.
 
 ### TodoWrite/TaskCreate for TDD tracking
 
