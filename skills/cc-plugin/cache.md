@@ -2,6 +2,9 @@
 
 Clean old plugin cache versions and temporary git directories.
 
+> **⚠️ This topic is cleanup-only.**
+> If the user says "cache miss", "cache error", "load error", or any plugin diagnostic phrase — **stop and route to [troubleshoot.md](./troubleshoot.md) instead**. cache.md does not diagnose anything; it only deletes stale versions.
+
 ## Usage
 
 ```bash

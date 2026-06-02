@@ -182,6 +182,39 @@ These are **all indirect evidence**. The primary source is the actual Skill/CLI 
 When facing a "plugin not found" error, do not assume layered evidence proves runtime health — call
 the tool and read what happens.
 
+### Primary source order (HARD STOP — diagnostic entry point)
+
+When the user reports any plugin failure, **stop before running any diagnostic and pick the
+primary source in this order**:
+
+| Order | Source | How to read |
+|-------|--------|-------------|
+| 1 | The user's quoted error message | Quote the exact string back to the user — do not paraphrase |
+| 2 | `/reload-plugins` output ("N errors during load") | Already in conversation if the user invoked it; do not require re-run |
+| 3 | `/doctor` output | Run if no error log is visible; report each error verbatim |
+| 4 | Plugin runtime invocation result | Try the failing `Skill("X")` or `/<command>` and read the error |
+| 5 | `settings.json` `enabledPlugins` flag | Only proves intent, never proves runtime health |
+| 6 | `~/.claude/plugins/cache/<name>/<plugin>/<ver>/` directory existence | Only proves a past download, never proves current lookup validity |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Iterate `enabledPlugins` × `cache/` directory existence and report "cache miss: 0 cases" | Re-read the user's quoted error + `/reload-plugins` "N errors" lines first. Filesystem checks come AFTER the primary source confirms which plugin is failing |
+| 2 | Ignore "4 errors during load" already visible in the conversation | Treat any visible error count > 0 as the entry point — even if filesystem looks healthy, those errors are the actual failure |
+| 3 | Conclude "no problem found" while the user still sees the symptom | If the user's symptom contradicts your finding, the finding is wrong. Run `/doctor` or reproduce the failing invocation before any conclusion |
+
+### Violation case (2026-05-28)
+
+User ran `/cc-plugin cache miss` after `/reload-plugins` reported `4 errors during load`. Assistant
+iterated `settings.json` `enabledPlugins` against `cache/` directories, found all 7 cache
+directories existed, and reported "zero cache misses" — without ever opening `/doctor`, without
+re-reading the visible "4 errors during load" line, and despite this very file's table #3 listing
+that exact mistake as the 9th variant of "asserting without searching". The user pointed it out
+with: "the cache miss error hasn't gone away — what evidence did you use to assert otherwise?" (1st recurrence).
+
+Recurrence after this rule → escalate to a `PreToolUse:Skill` hook that blocks `cc-plugin cache`
+invocation when `/reload-plugins` or `/doctor` output in the recent conversation shows non-zero
+errors, forcing routing to `troubleshoot.md`.
+
 ## Cache Structure Reference
 
 ```
