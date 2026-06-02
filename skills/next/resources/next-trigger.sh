@@ -2,15 +2,12 @@
 # next-trigger.sh — Stop hook for next skill
 #
 # Detects task completion keywords in the last assistant message and emits
-# a JSON `decision:"block"` payload (with embedded `<skill-trigger>` marker)
-# so the LLM invokes the `next` skill in its follow-up response.
+# a skill-trigger marker so that the LLM invokes the `next` skill in its
+# follow-up response.
 #
 # Trigger condition: Stop hook fires when Claude finishes a response.
 # Input (stdin): JSON { session_id, transcript_path, stop_hook_active }
-# Output (stdout): on match, emits a JSON object
-#   {"decision":"block","reason":"<skill-trigger name=\"next\">…</skill-trigger>"}
-#   per Stop hook spec — `decision:"block"` prevents the stop and passes the
-#   reason back to Claude as a follow-up signal. Empty stdout on no match.
+# Output (stdout): <skill-trigger name="next"> marker on match, else empty.
 #
 # Responsibility: next skill (per automation.md "Hook responsibility policy").
 # Install: copy to ~/.claude/hooks/next-trigger.sh and register in
@@ -101,17 +98,10 @@ fi
 # so each user adds their own locale patterns (en.regex, ko.regex, ja.regex…).
 # If no data files exist, fall back to a built-in English default.
 DATA_DIR="$(dirname "$0")/../data"
-DEFAULT_PATTERN='Fix complete:|✅|all done|^[[:space:]]*done\.|task (complete|completed|finished)|completed[\.\!\)\*,[:space:]]|finished[\.\!\)\*,[:space:]]|wrapped up'
 if compgen -G "$DATA_DIR/*.regex" > /dev/null 2>&1; then
   PATTERN=$(cat "$DATA_DIR"/*.regex | sed 's/#.*$//' | awk 'NF' | paste -sd'|' -)
 else
-  PATTERN="$DEFAULT_PATTERN"
-fi
-
-# Guard: empty PATTERN (e.g. all regex files contain only comments) would make
-# grep match every line and unintentionally trigger decision:"block".
-if [[ -z "$PATTERN" ]]; then
-  PATTERN="$DEFAULT_PATTERN"
+  PATTERN='Fix complete:|✅|all done|^[[:space:]]*done\.|task (complete|completed|finished)|completed[\.\!\)\*,[:space:]]|finished[\.\!\)\*,[:space:]]|wrapped up'
 fi
 
 if echo "$LAST_TEXT" | grep -qiE "$PATTERN"; then
