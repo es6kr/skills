@@ -34,7 +34,7 @@ Automatically verify the Authentik SSO login flow using Playwright.
 | 1 | Treat "dashboard eventually reachable after manually clicking a source button (e.g. 'Continue with …')" as a re-login pass | A re-login that lands on `default-authentication-flow` is a FAIL even if a manual source-button click later reaches the dashboard. Manual interaction = not auto-complete = duplicate login |
 | 2 | Evaluate only the END state ("did it reach the dashboard?") | Evaluate the FULL path: re-login must reach dashboard/`if/user/` **without** an intermediate Authentik login form |
 | 3 | Offer "pass / mark test plan [x]" when the re-login showed the login form | The intermediate `default-authentication-flow` is the regression. Do not offer "pass" — report it as FAIL |
-| 4 | `default-authentication-flow` URL == "dashboard" or "valid endpoint" | `default-authentication-flow` = Authentik login form (duplicate-login screen). Success endpoints are dt dashboard (`intergrated-dashboard`) or Authentik `/if/user/` |
+| 4 | `default-authentication-flow` URL == "dashboard" or "valid endpoint" | `default-authentication-flow` = Authentik login form (duplicate-login screen). Success endpoints are dt dashboard (`integrated-dashboard`) or Authentik `/if/user/` |
 
 ### Self-check (every time before reporting a re-login verdict)
 

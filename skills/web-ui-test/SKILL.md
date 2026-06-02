@@ -62,20 +62,20 @@ echo $CMUX_SESSION
 
 When `$WMUX` is set, use these instead of Playwright MCP.
 
-**IMPORTANT**: `wmux` is NOT in PATH. Always invoke via `node "$WMUX_CLI" <subcommand>`:
+**Invocation form**: the rest of this document uses the bare `wmux browser …` form, which is what runs when `wmux` is on `PATH` (the common case). If `wmux` is **not** on `PATH` in the current environment, substitute `node "$WMUX_CLI"` for `wmux` in every command below — `$WMUX_CLI` points to the same entry point. The two forms are interchangeable; pick whichever resolves on the current shell and use it consistently.
 
 ```bash
-node "$WMUX_CLI" browser open <url>          # navigate (= playwright navigate)
-node "$WMUX_CLI" browser snapshot            # get accessibility tree with @eN refs
-node "$WMUX_CLI" browser click @eN           # click element
-node "$WMUX_CLI" browser type @eN <text>     # type into element
-node "$WMUX_CLI" browser fill @eN <value>    # set input value
-node "$WMUX_CLI" browser get-text            # get page text
-node "$WMUX_CLI" browser screenshot          # capture screenshot
-node "$WMUX_CLI" browser eval <js>           # run JavaScript
-node "$WMUX_CLI" browser back                # go back
-node "$WMUX_CLI" browser forward             # go forward
-node "$WMUX_CLI" browser reload              # reload page
+wmux browser open <url>          # navigate (= playwright navigate)
+wmux browser snapshot            # get accessibility tree with @eN refs
+wmux browser click @eN           # click element
+wmux browser type @eN <text>     # type into element
+wmux browser fill @eN <value>    # set input value
+wmux browser get-text            # get page text
+wmux browser screenshot          # capture screenshot
+wmux browser eval <js>           # run JavaScript
+wmux browser back                # go back
+wmux browser forward             # go forward
+wmux browser reload              # reload page
 ```
 
 **Workflow**: `browser open <url>` → `browser snapshot` → read tree → `browser click/type @eN` → `browser snapshot` again.
