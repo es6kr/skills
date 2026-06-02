@@ -77,6 +77,8 @@ Scan conversation for mistake signals and record to feedback memory + failed-att
 
 ## Ralph Mode
 
+**Detection**: see SKILL.md "Ralph Mode" — `.ralph/` directory + `RALPH_LOOP=1` env var, both required.
+
 A-C: detect + record to `.ralph/improvements.md` only. No direct modifications.
 
 ## Phase 2 Integration
