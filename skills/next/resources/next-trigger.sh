@@ -7,7 +7,13 @@
 #
 # Trigger condition: Stop hook fires when Claude finishes a response.
 # Input (stdin): JSON { session_id, transcript_path, stop_hook_active }
-# Output (stdout): <skill-trigger name="next"> marker on match, else empty.
+# Output (stdout): on match, a JSON Stop-hook decision object of the form
+#   {"decision":"block","reason":"<skill-trigger name=\"next\">…</skill-trigger>"}
+# (the skill-trigger marker is embedded inside the JSON `reason` field — it is
+# NOT emitted as a bare standalone marker, because Stop hooks deliver stdout to
+# the debug log only; the `decision:"block"` envelope is what surfaces the
+# `reason` text to the LLM. See ~/.claude/skills/hook/SKILL.md "Output channel
+# spec per event"). On no match, output is empty.
 #
 # Responsibility: next skill (per automation.md "Hook responsibility policy").
 # Install: copy to ~/.claude/hooks/next-trigger.sh and register in
