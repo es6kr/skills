@@ -21,7 +21,9 @@ cd <repo>/.tmp && npm init -y && npm install playwright@latest
 npx playwright install chromium
 
 # 2. Run cdp-trace.js (user-visible browser)
-node scripts/cdp-trace.js --url http://<target>/<path> --part "app-group,card-wrapper"
+# --parts (canonical, plural) and --part (legacy singular) are both accepted;
+# the script tolerates either form to match the historical Quick Reference example.
+node scripts/cdp-trace.js --url http://<target>/<path> --parts "app-group,card-wrapper"
 ```
 
 ## Script pattern

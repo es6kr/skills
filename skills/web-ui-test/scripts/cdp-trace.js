@@ -13,13 +13,29 @@ const { chromium } = require('playwright');
 function parseArgs() {
   const args = { parts: [], url: null, login: null };
   const argv = process.argv.slice(2);
+  function takeValue(flag, i) {
+    if (i + 1 >= argv.length) {
+      console.error(`ERROR: ${flag} requires a value (e.g. ${flag} <value>)`);
+      process.exit(2);
+    }
+    return argv[i + 1];
+  }
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--url') args.url = argv[++i];
-    else if (argv[i] === '--parts') args.parts = argv[++i].split(',').map(s => s.trim());
-    else if (argv[i] === '--login') args.login = argv[++i];
-    else if (argv[i] === '--help') {
+    if (argv[i] === '--url') { args.url = takeValue('--url', i); i++; }
+    // Accept both --parts (canonical, plural) and --part (legacy/singular) so the
+    // Quick Reference example in cdp-trace.md does not silently fall through.
+    else if (argv[i] === '--parts' || argv[i] === '--part') {
+      args.parts = takeValue(argv[i], i).split(',').map(s => s.trim()).filter(Boolean);
+      i++;
+    }
+    else if (argv[i] === '--login') { args.login = takeValue('--login', i); i++; }
+    else if (argv[i] === '--help' || argv[i] === '-h') {
       console.log('Usage: node cdp-trace.js --url <URL> --parts "name1,name2,..." [--login user:pass]');
       process.exit(0);
+    }
+    else {
+      console.error(`ERROR: unknown argument: ${argv[i]}`);
+      process.exit(2);
     }
   }
   if (!args.url) { console.error('ERROR: --url required'); process.exit(1); }
@@ -28,7 +44,15 @@ function parseArgs() {
 
 async function loginIfNeeded(page, login) {
   if (!login) return;
-  const [user, pass] = login.split(':');
+  // Use the first ':' as the separator only — split(':') loses everything
+  // after the second ':' if the password itself contains ':'.
+  const sep = login.indexOf(':');
+  if (sep < 0) {
+    console.error('ERROR: --login must be in user:pass form');
+    process.exit(2);
+  }
+  const user = login.slice(0, sep);
+  const pass = login.slice(sep + 1);
   await page.waitForTimeout(3000);
 
   async function fillAndSubmit(value, fieldType) {
