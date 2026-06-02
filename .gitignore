@@ -10,4 +10,5 @@ __pycache__/
 *.bak
 *.pyc
 *.tmp
+docs/generated/
 skills/*/LICENSE
