@@ -1,9 +1,10 @@
 ---
 name: claudify
+description: |
+  Agentic AI lifecycle: create + improve + persist. create - convert functionality into Claude Code automation (agent/skill/rule/hook/command) [SKILL.md], improve - self-improving loop: retrospect + hook/skill review + pattern detect [improve.md], persist - knowledge persistence: documentation + memory save [persist.md]. Use when "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", "self-improve", "claudify improve", "claudify persist".
 metadata:
   author: es6kr
   version: "0.1.2"
-description: Convert functionality into Claude Code automation. Includes interactive supervisor agent pattern (see resources/agent-templates.md §7). Use when the user says "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", "interactive agent", "supervisor pattern", or wants to automate a workflow as an agent, skill, or plugin.
 allowed-tools:
   - Read
   - Write
@@ -44,6 +45,11 @@ Full comparison: [automation-decision-guide.md](./resources/automation-decision-
    - Use `/skill-dedup` command to find overlaps
 2. If not found locally, search remote: `WebFetch https://claudemarketplaces.com/?search=[keyword]`
 3. If found, recommend existing or extend. If not, proceed to create
+
+**Step 1 Guards (HARD STOP)**:
+
+- **No immediate-execution options**: AskUserQuestion options must all be automation types (Skill/Agent/Rule/Hook/Command). "Just execute now" or "Execute without automation" options are forbidden — claudify's purpose is creating/extending automation, not executing the underlying task.
+- **Scope check when extending existing skills**: Before proposing to extend a global skill (`~/.claude/skills/`), verify the change is project-agnostic. Project-specific variables, hostnames, or environment values must NOT be added to global skills. If the automation is project-specific, recommend a project-level skill (`.claude/skills/`) or a project rule (`.claude/rules/`) instead.
 
 ### Step 1.5: Merge logic / Grouping / AskUserQuestion
 
@@ -162,7 +168,11 @@ Keep responses concise:
 
 ## Ralph Mode (AskUserQuestion bypass)
 
-If `.ralph/` directory exists, operate in Ralph Mode.
+**Detection condition**: do not judge by `.ralph/` presence alone. Ralph mode requires **all** of:
+1. `.ralph/` directory exists AND
+2. Environment variable `RALPH_LOOP=1` is set (Ralph autonomous loop sets this)
+
+**Even when `.ralph/` exists, an interactive user session is normal mode** — AskUserQuestion works as usual.
 
 **Workflow Change**:
 
