@@ -20,6 +20,10 @@ Test-Driven Development: define expected behavior first, then make it pass with 
 
 ## Quick Reference
 
+### Trigger entry (HARD STOP — first action)
+
+When this skill is invoked, the FIRST tool call must be TaskCreate (Red/Green/Refactor/Verify) + Red test authoring. Diagnosis, planning, option asks, and medium decisions are forbidden before Red is authored + executed + failure confirmed. See [cycle.md "Trigger entry"](./cycle.md).
+
 ### TDD Cycle
 Define expected behavior → natural failure → implement → pass → refactor.
 See [cycle.md](./cycle.md).

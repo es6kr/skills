@@ -102,3 +102,23 @@ Test result: Failed
 - Bypassing failed tests with skip/disable
 - Reporting completion with only related tests without full suite (moderate and above)
 - Reporting "tests failed" without analyzing the failure cause
+
+## CI Failure Triage (CRITICAL)
+
+Recommendation priority when a test fails in CI:
+
+| Priority | Action | When |
+|----------|--------|------|
+| 1st | **Fix the test code** | Test assertion/pattern does not match actual behavior |
+| 2nd | **Add environment branching** | Behavior differs by environment — CI vs local, OS differences (`process.env`, `test.runIf`, conditional URL patterns, etc.) |
+| 3rd | **Fix the app code** | The app logic itself has a bug, so the test fails legitimately |
+| 4th | **Investigate infrastructure** | An external service (DB, SSO, API server) is unhealthy |
+
+### `test.skip` / `test.fixme` recommendation limits (CRITICAL)
+
+**Do not recommend `test.skip` except for environment branching (`test.runIf`, `process.env`-based conditional execution).**
+
+- ❌ "Flaky due to infra — let's skip" — fix the infra, or make the test detect the environment and branch
+- ❌ "Unrelated to this PR — let's skip" — if it is unrelated, there is no reason to skip either. Pre-existing test issues are fixed separately
+- ✅ "CI runner cannot reach the staging cluster" → branch with `test.runIf(process.env.TEST_AUTHENTIK_URL)`
+- ✅ "Test only runs on macOS" → branch with `test.runIf(process.platform === 'darwin')`
