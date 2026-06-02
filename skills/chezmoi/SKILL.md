@@ -3,7 +3,7 @@ name: chezmoi
 metadata:
   author: es6kr
   version: "0.1.1"
-description: chezmoi dotfile management. consolidate - merge duplicate templates [consolidate.md], cross-platform - Windows/macOS compatibility [cross-platform.md], doctor - check required files and copy if missing [doctor.md], mcp-sync - MCP server synchronization [mcp-sync.md]. For commit splitting → commit-splitter. Use when "chezmoi consolidate", "duplicate templates", "MCP sync", "chezmoi Windows", "cross platform", "utcp to mcp", "move to global mcp", "chezmoi mcp migration", "chezmoi doctor", "missing script", "SourceGit".
+description: chezmoi dotfile management. apply - interactive diff review per file [apply.md], consolidate - merge duplicate templates [consolidate.md], cross-platform - Windows/macOS compatibility [cross-platform.md], doctor - check required files and copy if missing [doctor.md], mcp-sync - MCP server synchronization [mcp-sync.md]. For commit splitting → commit-splitter. Use when "chezmoi apply", "chezmoi diff", "diff review", "per-file apply", "chezmoi consolidate", "duplicate templates", "MCP sync", "chezmoi Windows", "cross platform", "utcp to mcp", "move to global mcp", "chezmoi mcp migration", "chezmoi doctor", "missing script", "SourceGit".
 ---
 
 # chezmoi
@@ -14,6 +14,7 @@ chezmoi dotfile template management and workflow automation.
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| apply | Interactive diff review — per-file AskUserQuestion approval + commit-tidy | [apply.md](./apply.md) |
 | consolidate | Detect duplicate modify templates and generate shared scripts | [consolidate.md](./consolidate.md) |
 | cross-platform | macOS/Windows compatibility diagnostics and fixes | [cross-platform.md](./cross-platform.md) |
 | doctor | Check required files and auto-copy if missing | [doctor.md](./doctor.md) |
@@ -26,6 +27,13 @@ chezmoi dotfile template management and workflow automation.
 | Commit splitting | `commit-splitter` |
 
 ## Quick Reference
+
+### Apply (Interactive Diff Review)
+
+```
+"chezmoi apply"             → Per-file diff review + AskUserQuestion approval
+"chezmoi diff"              → Show all changes, decide per file
+```
 
 ### Consolidate (Template Merging)
 
