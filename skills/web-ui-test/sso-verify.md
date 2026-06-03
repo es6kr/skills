@@ -15,16 +15,55 @@ Automatically verify the Authentik SSO login flow using Playwright.
 | 1 | Authentik accessibility | Login page loads (heading "Login" or form element present) | "authentik starting", blank page |
 | 2 | Redirect target | URL navigates to the intended server | Redirect to different server IP/port (Blueprint drift) |
 | 3 | OAuth authorize | dt app's authorize endpoint responds normally | `unauthorized_client`, 404, 405 |
-| 4 | Login complete | Dashboard redirect after login | Infinite redirect, error page |
+| 4 | Login complete (initial) | Dashboard redirect after login | Infinite redirect, error page |
+| 5 | **Re-login (post-logout)** | **Auto-completes to dt dashboard OR Authentik `/if/user/` WITHOUT re-showing the Authentik login form** | **`/if/flow/default-authentication-flow/` (Authentik login form) re-appears = duplicate-login regression** |
+
+## Re-login (post-logout) success criterion (HARD STOP — do not conflate with initial login)
+
+**Initial login and re-login have DIFFERENT success criteria.** During **initial** login the Authentik login form (`default-authentication-flow`) is the normal entry point (Step 4 below). During **re-login** (the user already authenticated once, logged out, and logs in again while a valid dt session can be re-established), the SSO source flow MUST auto-complete — re-showing the Authentik login form is a **duplicate-login regression**, NOT a dashboard.
+
+| State | `default-authentication-flow` (Authentik login form) | Verdict |
+|-------|------------------------------------------------------|---------|
+| Initial login (no prior auth) | Expected entry point — enter credentials | ✅ Normal |
+| **Re-login** (logout → log in again) | **Re-appears = the user is asked to log in AGAIN after already logging in = duplicate-login screen** | ❌ **Regression (FAIL)** |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat "dashboard eventually reachable after manually clicking a source button (e.g. 'Continue with …')" as a re-login pass | A re-login that lands on `default-authentication-flow` is a FAIL even if a manual source-button click later reaches the dashboard. Manual interaction = not auto-complete = duplicate login |
+| 2 | Evaluate only the END state ("did it reach the dashboard?") | Evaluate the FULL path: re-login must reach dashboard/`if/user/` **without** an intermediate Authentik login form |
+| 3 | Offer "pass / mark test plan [x]" when the re-login showed the login form | The intermediate `default-authentication-flow` is the regression. Do not offer "pass" — report it as FAIL |
+| 4 | `default-authentication-flow` URL == "dashboard" or "valid endpoint" | `default-authentication-flow` = Authentik login form (duplicate-login screen). Success endpoints are dt dashboard (`integrated-dashboard`) or Authentik `/if/user/` |
+
+### Self-check (every time before reporting a re-login verdict)
+
+1. Is this an **initial** login or a **re-login** (post-logout)? — different criteria
+2. For re-login: did the URL pass through `/if/flow/default-authentication-flow/` (Authentik login form) at any point requiring user interaction? → If yes, **FAIL** (duplicate login)
+3. Did the flow auto-complete to `intergrated-dashboard` or `/if/user/` **without** a manual auth-form/source-button click? → Only then is it a PASS
+4. Do not offer "pass" / "mark test plan [x]" to the user when (2) is yes
 
 ## Procedure
 
-### Step 1: Register Playwright
+### Step 1: Environment Detection + Setup
 
-See "Required Setup" in SKILL.md.
+Run **SKILL.md Step 0** first to detect `$WMUX` / `$CMUX_SESSION`.
+
+| Environment | Setup | Commands below use |
+|-------------|-------|-------------------|
+| wmux/cmux (`$WMUX` or `$CMUX_SESSION` set) | Ready immediately | `wmux browser open/snapshot/click/type` via Bash |
+| Plain / tmux | Register Playwright (SKILL.md Step 1-2) | `mcp__playwright__*` or `code-mode call_tool_chain` |
 
 ### Step 2: Navigate to Authentik Login Page
 
+**wmux:**
+```bash
+wmux browser open "http://<host>:9000/if/flow/default-authentication-flow/"
+# wait a few seconds for page load
+wmux browser snapshot
+```
+
+**Playwright:**
 ```typescript
 playwright.playwright_browser_navigate({ url: 'http://<host>:9000/if/flow/default-authentication-flow/' });
 playwright.playwright_browser_wait_for({ time: 5 });
@@ -57,12 +96,19 @@ Detect errors from the snapshot of the redirected page:
 
 If a login form is displayed:
 
+**wmux:**
+```bash
+wmux browser snapshot                          # find @eN refs for username/password fields
+wmux browser type @eN akadmin                  # enter username
+wmux browser type @eM <PASSWORD>               # enter password
+wmux browser click @eK                         # click submit button
+wmux browser snapshot                          # verify result
+```
+
+**Playwright:**
 ```typescript
-// Enter username
 playwright.playwright_browser_type({ ref: '<username_ref>', text: 'akadmin' });
-// Enter password
 playwright.playwright_browser_type({ ref: '<password_ref>', text: '<PASSWORD>', submit: true });
-// Check result
 playwright.playwright_browser_wait_for({ time: 3 });
 playwright.playwright_browser_snapshot();
 ```

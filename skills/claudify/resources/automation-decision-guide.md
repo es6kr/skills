@@ -61,6 +61,12 @@
 
 **Hook Events**: PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStop, SessionStart, SessionEnd, Notification, PreCompact
 
+**HARD STOP — every hook must have an owning skill**:
+- Hook scripts must be installed from some skill's `resources/` directory (orphan hooks forbidden)
+- Domain hooks (openclaw, semaphore, ralph, etc.) → store at `resources/<hook>.sh` in the matching domain skill, install via the skill's install procedure
+- Shared/system hooks (Bash guards, session handling, etc.) → **the `hook` skill is the default installer** (`~/.claude/skills/hook/resources/`)
+- Never create a hook in isolation — decide its owning skill at the same time it is added (see `~/.agents/rules/automation.md`)
+
 ### Choose **Distribution Level**
 
 | Level | Location | Target | Characteristics |

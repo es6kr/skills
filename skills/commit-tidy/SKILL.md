@@ -3,10 +3,25 @@ metadata:
   author: es6kr
   version: "0.1.1"
 name: commit-tidy
-description: Analyze staged/committed changes and recommend splitting or squashing strategy. Use when the user says "commit split", "split commits", "should I split this commit", "squash commits", "tidy commits", or when reviewing large changesets before committing.
+depends-on: [git-repo]
+description: >-
+  Analyze staged/committed changes and recommend splitting or squashing strategy.
+  interactive-amend - worktree-based amend+rebase loop for commits ahead of HEAD or multiple amend targets [interactive-amend.md].
+  soft-reset-amend - soft-reset top N commits and selectively re-commit, simpler alternative to worktree rebase [soft-reset-amend.md].
+  Use when the user says "commit split", "split commits", "should I split this commit",
+  "squash commits", "tidy commits", "amend earlier commit", "amend multiple commits",
+  "interactive amend", "soft reset", "reset --soft amend", "earlier commit amend", "rewrite commits",
+  or when reviewing large changesets before committing.
 ---
 
 # Commit Tidy
+
+## Topics
+
+| Topic | Description | Guide |
+|-------|-------------|-------|
+| interactive-amend | Worktree-based amend+rebase loop for earlier/multiple commits | [interactive-amend.md](./interactive-amend.md) |
+| soft-reset-amend | Soft-reset top N commits and selectively re-commit (simpler than worktree rebase) | [soft-reset-amend.md](./soft-reset-amend.md) |
 
 Analyze staged/unstaged changes and recommend whether to split into multiple commits.
 
@@ -95,6 +110,21 @@ When analyzing multiple commits, **recommend squashing as well as splitting**.
 ```
 
 ## Instructions
+
+### Step 0: Determine scope
+
+When ARGUMENTS specify a range (e.g., "since main", "last 3 commits", "PR #N"), analyze **all changes in that range** — both committed and uncommitted.
+
+```bash
+# Range specified (e.g., "X changes since main")
+git log --oneline <base>..HEAD -- <path>     # committed changes
+git diff <base>..HEAD --stat -- <path>        # committed diff
+git diff HEAD --stat -- <path>                # uncommitted diff
+```
+
+The analysis must cover **committed commits (squash/split candidates) + uncommitted changes (new commit candidates)** as a single unified view. Do not analyze only uncommitted changes when a range is specified.
+
+When no range is specified, default to staged + unstaged changes only.
 
 ### Step 1: Analyze changes
 
