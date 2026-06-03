@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/fix-v0.2.0...fix-v0.3.0) (2026-06-03)
+
+
+### Features
+
+* add metadata block (author, version) to all skills ([a36d9a5](https://github.com/es6kr/skills/commit/a36d9a5f029b595847220c3cc867370c7ff30a21))
+* **ci:** add lint jobs and untrack LICENSE ([#7](https://github.com/es6kr/skills/issues/7) Phase 1) ([03a8587](https://github.com/es6kr/skills/commit/03a85872c575c6ffdf72f5ca2bdb353fdc947a73))
+* **claude-session,fix:** version bump with improvements ([f4dc817](https://github.com/es6kr/skills/commit/f4dc8171c051474f1d454c4211ca26b1b16e91bf))
+* publish 7 new skills, update 4 existing skills ([dce016d](https://github.com/es6kr/skills/commit/dce016da291f4c9da03746f8be668fa5db04e578))
+* update 4 skills — session move, mcp diagnostics, git-repo worktree, fix improvements ([316c85f](https://github.com/es6kr/skills/commit/316c85f186ef94bbb5acae86d26dd6ac7fb027e9))
+
+
+### Bug Fixes
+
+* address CodeRabbit review findings on PR [#4](https://github.com/es6kr/skills/issues/4) ([bbaefdc](https://github.com/es6kr/skills/commit/bbaefdc8a88f26b0b072e115d0696e732ac52e0c))
+* **skills:** address PR [#9](https://github.com/es6kr/skills/issues/9) deferred review feedback ([9268a83](https://github.com/es6kr/skills/commit/9268a83ec98a32a8bf731398503c46e60328b1a3))
+* **skills:** translate fix/next to English + data-architecture locale patterns ([#9](https://github.com/es6kr/skills/issues/9)) ([d426d2b](https://github.com/es6kr/skills/commit/d426d2b7dfec9f82a3106d1df055763324220bba))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/fix-v0.1.5...fix-v0.2.0) (2026-05-24)
 
 

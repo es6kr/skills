@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/git-repo-v0.3.0...git-repo-v0.3.1) (2026-06-03)
+
+
+### Documentation
+
+* **git-repo:** expand ssh-key HTTPS credential helper guidance ([07b189c](https://github.com/es6kr/skills/commit/07b189ce33b0f4c06c4275483bb1fd7041c65084))
+* **git-repo:** qualify Full Disk Access guidance as macOS-specific ([cfcc250](https://github.com/es6kr/skills/commit/cfcc2508092bb5d7609e8fea891572b094d6a916))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/git-repo-v0.2.0...git-repo-v0.3.0) (2026-05-27)
 
 
