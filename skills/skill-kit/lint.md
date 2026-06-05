@@ -63,6 +63,65 @@ echo "len: ${#DESC}"
 - 2026-05-23 (1st flagged): `claude-session` 1547 chars after `list` topic added → user pointed it out
 - Pre-existing violations (cumulative): `github-flow` 2116, `ralph` 1506, `code-workflow` 1269, `consolidate` 1187, `skill-kit` 1091 — all over 1024. Strengthen this rule + run `/skill-kit lint --fix` across skills to bring under limit
 
+### `description:` value must use `|` block scalar when it contains a colon (HARD STOP)
+
+The strict YAML parser used downstream (e.g. `skills-ref validate`) treats an unquoted `:` followed by whitespace as the start of a new mapping. When this appears inside the `description:` value — most commonly via phrases like `Use when: "..."`, `workflow: inventory, ...`, or any localized variant such as a topic-list prefix followed by `:` — the parser raises:
+
+```
+invalid YAML: mapping values are not allowed in this context at line N column M
+```
+
+The skill is then silently skipped from registration ("Skipped loading N skill(s) due to invalid SKILL.md files"), even though Claude Code's lenient parser would have accepted the same file.
+
+**The rule**: whenever `description:` contains a `:` followed by whitespace (i.e. anything that *looks* like a YAML mapping start), wrap the value in a `|` block scalar so the parser treats every following line as multi-line literal text.
+
+#### Don't / Do
+
+> **Notation note**: `\|` in the table cells below is **markdown table-cell escaping** for the literal YAML pipe character. In actual YAML frontmatter, type the unescaped `|` (see the Canonical form snippet below for a copy-pasteable example).
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|--------------------------|
+| 1 | `description: ... Use when: "keyword 1", "keyword 2" ...` (inline scalar with unquoted `:`) | `description: \|` on its own line, then the description body indented two spaces. The body may keep its `:` characters verbatim |
+| 2 | "Claude Code parses it fine, so it must be valid YAML" | Claude Code's parser is lenient; strict parsers like `strictyaml` (used by `skills-ref validate`) are stricter. Validate against the strict parser, not the lenient one |
+| 3 | Quote the whole value with `"..."` to dodge the parser error | Escaping nested quotes inside an already quote-heavy description (`"Use when: \"keyword\""`) is fragile. The `\|` block scalar form has no escaping requirement |
+| 4 | Strip the `:` (rewrite `Use when:` as `Use when`) to silence the parser | Information loss. Use `\|` block scalar instead and keep the colon |
+| 5 | Apply `\|` only when the lint already failed | Apply preemptively whenever the description contains `: ` (colon-space). Avoids the "fail → fix → re-validate" cycle |
+
+#### Canonical form
+
+```yaml
+---
+name: <skill>
+description: |
+  One-line skill purpose. Topics — a (foo), b (bar). Use when: "trigger 1", "trigger 2" triggers.
+metadata:
+  author: <author>
+  version: "0.1.0"
+---
+```
+
+The `|` literal block scalar starts on the same line as `description:`; the body lives on the following indented lines (2 spaces is conventional). `metadata:` follows the description block scalar at the same top-level indent — `description: |` plus its indented body ends cleanly when the next non-indented key (`metadata:`) starts. `metadata:` is included here because the host loader's allowlist accepts it and 20/20 published skills use it — omitting it from the canonical example causes new skills to be written without it.
+
+#### Self-check (every time before Edit on `description:` field)
+
+1. Does the new `description:` value contain `: ` (colon followed by whitespace) anywhere in the body? — grep for `: ` inside the staged value
+2. If yes, is the value already on a `|` block scalar? — verify the line containing `description:` ends with `|` and the body is indented
+3. If not, convert to `|` block scalar before saving
+4. After saving, run `skills-ref validate <SKILL.md>` (or equivalent strict-YAML check) — confirm the file parses
+
+#### Violation cases (2026-06-04)
+
+Three skills failed `skills-ref validate` simultaneously, with **two distinct strictyaml error families** at play. The lint rule above addresses the **colon-in-scalar** family. `git-repo` also exhibited a separate **flow-mapping** family — listed below for completeness so a future diagnosis does not collapse the two into one cause.
+
+| Skill | strictyaml error column | Error family | Offending text |
+|-------|-------------------------|--------------|----------------|
+| `ralph` | line 3, col 687 | colon-in-scalar | `description:` body contained `Use when: "ralph update", ...` |
+| `git-repo` (cause A) | line 6, col 810 | colon-in-scalar | `description:` body contained `worktree - unified worktree acquisition workflow: inventory, reuse inactive, or create new ...` |
+| `git-repo` (cause B) | line 4 (frontmatter) | flow-mapping (separate family) | `depends-on: [commit-tidy]` — strictyaml rejects JSON-flavored flow mappings in frontmatter. Fixed by converting to block-style list (`depends-on:` then `  - commit-tidy` on the next indented line) |
+| `rule-kit` | line 2, col 170 | colon-in-scalar | `description:` body contained a Korean topic-list label (a single Korean word) immediately followed by `: a (...), b (...), c (...), d (...)` — same `<label>: <comma-list>` parser shape as the cases above, just with a non-ASCII label |
+
+The colon-in-scalar family was fixed by converting `description:` to `description: \|` and leaving the body's colons untouched. The flow-mapping family is orthogonal and is fixed by converting `[...]` and `{...}` shorthands to block style. The lint rule above codifies the colon-in-scalar family so the same break does not have to be diagnosed three more times for three more skills; the flow-mapping family is a separate scope-expansion candidate.
+
 ### Invalid Fields
 
 | Invalid | Correct | Action |
@@ -78,23 +137,27 @@ Frontmatter fields follow this order for readability. lint --fix will reorder au
 
 ```yaml
 ---
-name:                      # 1. Required
-depends-on:                # 2. Dependencies
-triggers:                  # 3. Hook triggers
-description:               # 4. Required (last among required - longest)
-allowed-tools:             # 5. Optional
-agent:                     # 6. Optional
-context:                   # 7. Optional
-hooks:                     # 8. Optional
-model:                     # 9. Optional
-user-invocable:            # 10. Optional
+name:                      # 1. Required (skill identifier)
+description:               # 2. Required (block scalar `|` when body contains `:`)
+metadata:                  # 3. Author/version metadata (20/20 published skills use it)
+depends-on:                # 4. Dependencies
+triggers:                  # 5. Hook triggers
+allowed-tools:             # 6. Optional
+agent:                     # 7. Optional
+context:                   # 8. Optional
+hooks:                     # 9. Optional
+model:                     # 10. Optional
+user-invocable:            # 11. Optional
 ---
 ```
 
+**Rationale**: required fields (`name`, `description`) come first because every skill has them and they are scanned first by the loader; `metadata` follows because it is structural-but-optional (almost universally used). Hook-mechanism fields (`depends-on`, `triggers`) follow; tool/agent/runtime config trails.
+
 **Order validation rules:**
-- Warn if required fields (name, description) appear between optional fields
-- depends-on must follow immediately after name
-- triggers must follow immediately after description
+- Required fields (`name`, `description`) must precede all optional fields
+- `metadata` follows `description` (4 skills currently use `metadata → name → description` — `cc-plugin`, `commit-tidy`, `fix`, `next`; `lint --fix` normalizes to `name → description → metadata`)
+- `depends-on` follows `metadata` (or `description` directly when `metadata` is absent)
+- `triggers` follows `depends-on`
 - Optional fields should be in alphabetical order among themselves
 
 ### Valid Optional Fields

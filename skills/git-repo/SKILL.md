@@ -3,8 +3,10 @@ name: git-repo
 metadata:
   author: es6kr
   version: "0.1.2"
-depends-on: [commit-tidy]
-description: Git repository and SourceGit integration management. clone - ghq get with automatic SourceGit registration [clone.md], fix-worktree - bare repo worktree configuration recovery [fix-worktree.md], merge-duplicate - merge duplicate repositories with the same origin [merge-duplicate.md], migrate - migrate repositories to ghq structure [migrate.md], patrol - batch inspection of ghq repositories [patrol.md], move-worktree - move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees [move-worktree.md], rename-worktree - rename worktree directory and metadata [rename-worktree.md], sourcegit - SourceGit preference.json management [sourcegit.md], ssh-key - per-repo SSH key mapping for multi-account GitHub [ssh-key.md], worktree - unified worktree acquisition workflow: inventory, reuse inactive, or create new [worktree.md]. "ghq get", "ghq clone", "sourcegit", "ghq migrate", "repo migrate", "folder rename", "repo patrol", "ghq inspect", "check all repos", "git batch inspect", "duplicate repo", "repo merge", "worktree fix", "worktree rename", "rename worktree", "reuse worktree", "move worktree", "relocate worktree", "reclaim worktree", ".worktrees to .claude", "bare convert", "multi-account clone", "ssh key", "core.sshCommand", "Repository not found", "wrong account", "IdentityAgent", "worktree needed", "worktree create", "worktree list", "verify worktree" triggers
+depends-on:
+  - commit-tidy
+description: |
+  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), migrate (Git → ghq), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "bare convert", "multi-account clone", "core.sshCommand", "Repository not found", "worktree create" triggers.
 allowed-tools:
   - Read
   - Edit
