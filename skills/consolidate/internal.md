@@ -9,6 +9,7 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 **Trigger conditions** (run fallback if any of these apply):
 - **CodeRabbit is walkthrough only** (Free plan — provides only summary without line-by-line review)
 - **Reviewer failure/error** — review is impossible such as Copilot "encountered an error"
+- **Copilot subscription unavailable** — `pr.md` Step 2.4 availability pre-check returned not-available (free account / no org seat / 404 on `/user/copilot_billing` and `/orgs/<org>/copilot/billing`). **This is the auto-fallback path — no AskUserQuestion required.** Record the substitution in the Summary's reviewer matrix (e.g., "Copilot unavailable on the acting account/org — auto-fallback per Step 2.4")
 
 **Worktree (from Step 2.7)**: the PR branch is already checked out into a worktree by `pr.md` Step 2.7. Dispatch the code-reviewer **against that worktree path** so it reads real files (not just `gh pr diff`) and can run tests/build locally. Pass the worktree path in the agent prompt (`Repository: <worktree-path>`). The reviewer should still use `gh pr diff <N>` for the canonical PR diff, but reads file bodies + runs verification in the worktree.
 
