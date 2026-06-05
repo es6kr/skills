@@ -77,6 +77,8 @@ The skill is then silently skipped from registration ("Skipped loading N skill(s
 
 #### Don't / Do
 
+> **Notation note**: `\|` in the table cells below is **markdown table-cell escaping** for the literal YAML pipe character. In actual YAML frontmatter, type the unescaped `|` (see the Canonical form snippet below for a copy-pasteable example).
+
 | # | Don't (forbidden) | Do (correct alternative) |
 |---|-------------------|--------------------------|
 | 1 | `description: ... Use when: "keyword 1", "keyword 2" ...` (inline scalar with unquoted `:`) | `description: \|` on its own line, then the description body indented two spaces. The body may keep its `:` characters verbatim |
@@ -90,12 +92,15 @@ The skill is then silently skipped from registration ("Skipped loading N skill(s
 ```yaml
 ---
 name: <skill>
+metadata:
+  author: <author>
+  version: "0.1.0"
 description: |
   One-line skill purpose. Topics — a (foo), b (bar). Use when: "trigger 1", "trigger 2" triggers.
 ---
 ```
 
-The `|` literal block scalar starts on the same line as `description:`, then the body lives on the following indented lines. The indentation must be consistent (2 spaces is conventional).
+The `|` literal block scalar starts on the same line as `description:`, then the body lives on the following indented lines. The indentation must be consistent (2 spaces is conventional). `metadata:` is included here because the host loader's allowlist accepts it and 20/20 published skills use it — omitting it from the canonical example causes new skills to be written without it.
 
 #### Self-check (every time before Edit on `description:` field)
 
@@ -106,15 +111,16 @@ The `|` literal block scalar starts on the same line as `description:`, then the
 
 #### Violation cases (2026-06-04)
 
-Three skills failed `skills-ref validate` simultaneously with the same root cause:
+Three skills failed `skills-ref validate` simultaneously, with **two distinct strictyaml error families** at play. The lint rule above addresses the **colon-in-scalar** family. `git-repo` also exhibited a separate **flow-mapping** family — listed below for completeness so a future diagnosis does not collapse the two into one cause.
 
-| Skill | strictyaml error column | Offending text inside `description:` |
-|-------|-------------------------|--------------------------------------|
-| `ralph` | line 3, col 687 | `Use when: "ralph update", ...` |
-| `git-repo` | line 6, col 810 | `worktree - unified worktree acquisition workflow: inventory, reuse inactive, or create new ...` |
-| `rule-kit` | line 2, col 170 | A topic-list prefix (`<topic-label-word>:`) followed by a comma-separated enumeration — same parser shape as the two cases above |
+| Skill | strictyaml error column | Error family | Offending text |
+|-------|-------------------------|--------------|----------------|
+| `ralph` | line 3, col 687 | colon-in-scalar | `description:` body contained `Use when: "ralph update", ...` |
+| `git-repo` (cause A) | line 6, col 810 | colon-in-scalar | `description:` body contained `worktree - unified worktree acquisition workflow: inventory, reuse inactive, or create new ...` |
+| `git-repo` (cause B) | line 4 (frontmatter) | flow-mapping (separate family) | `depends-on: [commit-tidy]` — strictyaml rejects JSON-flavored flow mappings in frontmatter. Fixed by converting to block-style list (`depends-on:` then `  - commit-tidy` on the next indented line) |
+| `rule-kit` | line 2, col 170 | colon-in-scalar | `description:` body contained a Korean topic-list label (a single Korean word) immediately followed by `: a (...), b (...), c (...), d (...)` — same `<label>: <comma-list>` parser shape as the cases above, just with a non-ASCII label |
 
-All three were fixed by converting `description:` to `description: \|` and leaving the body's colons untouched. The lint rule above captures this pattern so the same break does not have to be diagnosed three more times for three more skills.
+The colon-in-scalar family was fixed by converting `description:` to `description: \|` and leaving the body's colons untouched. The flow-mapping family is orthogonal and is fixed by converting `[...]` and `{...}` shorthands to block style. The lint rule above codifies the colon-in-scalar family so the same break does not have to be diagnosed three more times for three more skills; the flow-mapping family is a separate scope-expansion candidate.
 
 ### Invalid Fields
 
@@ -132,21 +138,23 @@ Frontmatter fields follow this order for readability. lint --fix will reorder au
 ```yaml
 ---
 name:                      # 1. Required
-depends-on:                # 2. Dependencies
-triggers:                  # 3. Hook triggers
-description:               # 4. Required (last among required - longest)
-allowed-tools:             # 5. Optional
-agent:                     # 6. Optional
-context:                   # 7. Optional
-hooks:                     # 8. Optional
-model:                     # 9. Optional
-user-invocable:            # 10. Optional
+metadata:                  # 2. Author/version metadata (20/20 published skills use it)
+depends-on:                # 3. Dependencies
+triggers:                  # 4. Hook triggers
+description:               # 5. Required (last among required - longest)
+allowed-tools:             # 6. Optional
+agent:                     # 7. Optional
+context:                   # 8. Optional
+hooks:                     # 9. Optional
+model:                     # 10. Optional
+user-invocable:            # 11. Optional
 ---
 ```
 
 **Order validation rules:**
 - Warn if required fields (name, description) appear between optional fields
-- depends-on must follow immediately after name
+- metadata must follow immediately after name (4 skills currently violate: `cc-plugin`, `commit-tidy`, `fix`, `next` use `metadata → name`; `lint --fix` normalizes to `name → metadata`)
+- depends-on must follow metadata (immediately after name when metadata is absent)
 - triggers must follow immediately after description
 - Optional fields should be in alphabetical order among themselves
 
