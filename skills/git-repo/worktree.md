@@ -155,6 +155,45 @@ Reuse via rename is the default for inactive worktrees (Don't/Do rule #5). Howev
 
 User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktree (8 total worktrees, 5 inactive after cleanup — at the limit, B chosen). Rule extracted from the trade-off between "rename is cheaper than delete+create" (existing Don't/Do #5) and "unbounded accumulation pollutes the worktree list".
 
+## Pre-commit worktree matrix check (HARD STOP)
+
+**Before starting any new commit (in any worktree, including the main repo), inspect the entire worktree matrix to confirm no other worktree has active in-flight work the user is still arranging.** Failing this check leads to "the user was reorganizing another worktree and I committed without noticing" — a high-cost recovery (sometimes amend/rebase, sometimes user objection).
+
+**Why**:
+- `git worktree list` shows commit hash per worktree but not staged/dirty state. A worktree may have active commits the user just authored or is staging
+- The user may be mid-cleanup across multiple worktrees in parallel (e.g., reorganizing inactive worktrees while you commit in the main). Your commit collides with their intent
+- Worktree commit hash equal to a merge commit on a published branch does NOT mean inactive — it could be a freshly checked-out reuse target the user is preparing
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `git worktree list` only checks commit hash, skip per-worktree state inspection | For each worktree, run `git -C <path> log -3 --oneline` + `git -C <path> status --short` before commit |
+| 2 | Trust "worktree branch is not my work branch, so it's safe" | Other worktree's branch may carry user's WIP. Read its recent commits + dirty state |
+| 3 | Skip the matrix check when committing on main/master/develop | Especially required on shared branches — multiple worktrees may share dependent state |
+| 4 | "User said the main is clean, so all worktrees are clean" | User may be focused on one worktree. Matrix check covers all worktrees regardless |
+| 5 | After the check, commit without noting unfamiliar worktrees | If a worktree's branch/commits are unfamiliar, ask the user about that worktree's purpose before committing in another worktree |
+
+### Procedure (before EVERY commit)
+
+1. `git worktree list` — enumerate paths + branches + commit hashes
+2. For each worktree path `<W>` other than the current commit target:
+   - `git -C <W> log -3 --oneline` — recent commits in that worktree's branch
+   - `git -C <W> status --short` — dirty / staged state
+3. Classify each worktree:
+   - **Active**: recent commits look like user's WIP or branch is unfamiliar → halt, report to user
+   - **Stale**: branch matches a known merged PR or matches a known stale pattern → safe to ignore
+4. If 1+ active worktree found → halt commit, ask the user about that worktree's recent activity
+5. Only after all other worktrees classified as Stale → proceed with commit in the target worktree
+
+### Self-check (commit-time, every time)
+
+1. Did you run `git worktree list`?
+2. Did you run `git -C <W> log -3` + `status --short` for EACH worktree other than the commit target?
+3. Did any other worktree show unfamiliar commits or dirty state?
+4. If Yes to #3, did you halt and ask before committing?
+5. Failing any of items 1 through 4 = matrix check skipped = rule violation
+
 ## Topic Dependencies
 
 ```
