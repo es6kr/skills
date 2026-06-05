@@ -63,6 +63,59 @@ echo "len: ${#DESC}"
 - 2026-05-23 (1st flagged): `claude-session` 1547 chars after `list` topic added → user pointed it out
 - Pre-existing violations (cumulative): `github-flow` 2116, `ralph` 1506, `code-workflow` 1269, `consolidate` 1187, `skill-kit` 1091 — all over 1024. Strengthen this rule + run `/skill-kit lint --fix` across skills to bring under limit
 
+### `description:` value must use `|` block scalar when it contains a colon (HARD STOP)
+
+The strict YAML parser used downstream (e.g. `skills-ref validate`) treats an unquoted `:` followed by whitespace as the start of a new mapping. When this appears inside the `description:` value — most commonly via phrases like `Use when: "..."`, `workflow: inventory, ...`, or any localized variant such as a topic-list prefix followed by `:` — the parser raises:
+
+```
+invalid YAML: mapping values are not allowed in this context at line N column M
+```
+
+The skill is then silently skipped from registration ("Skipped loading N skill(s) due to invalid SKILL.md files"), even though Claude Code's lenient parser would have accepted the same file.
+
+**The rule**: whenever `description:` contains a `:` followed by whitespace (i.e. anything that *looks* like a YAML mapping start), wrap the value in a `|` block scalar so the parser treats every following line as multi-line literal text.
+
+#### Don't / Do
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|--------------------------|
+| 1 | `description: ... Use when: "keyword 1", "keyword 2" ...` (inline scalar with unquoted `:`) | `description: \|` on its own line, then the description body indented two spaces. The body may keep its `:` characters verbatim |
+| 2 | "Claude Code parses it fine, so it must be valid YAML" | Claude Code's parser is lenient; strict parsers like `strictyaml` (used by `skills-ref validate`) are stricter. Validate against the strict parser, not the lenient one |
+| 3 | Quote the whole value with `"..."` to dodge the parser error | Escaping nested quotes inside an already quote-heavy description (`"Use when: \"keyword\""`) is fragile. The `\|` block scalar form has no escaping requirement |
+| 4 | Strip the `:` (rewrite `Use when:` as `Use when`) to silence the parser | Information loss. Use `\|` block scalar instead and keep the colon |
+| 5 | Apply `\|` only when the lint already failed | Apply preemptively whenever the description contains `: ` (colon-space). Avoids the "fail → fix → re-validate" cycle |
+
+#### Canonical form
+
+```yaml
+---
+name: <skill>
+description: |
+  One-line skill purpose. Topics — a (foo), b (bar). Use when: "trigger 1", "trigger 2" triggers.
+---
+```
+
+The `|` literal block scalar starts on the same line as `description:`, then the body lives on the following indented lines. The indentation must be consistent (2 spaces is conventional).
+
+#### Self-check (every time before Edit on `description:` field)
+
+1. Does the new `description:` value contain `: ` (colon followed by whitespace) anywhere in the body? — grep for `: ` inside the staged value
+2. If yes, is the value already on a `|` block scalar? — verify the line containing `description:` ends with `|` and the body is indented
+3. If not, convert to `|` block scalar before saving
+4. After saving, run `skills-ref validate <SKILL.md>` (or equivalent strict-YAML check) — confirm the file parses
+
+#### Violation cases (2026-06-04)
+
+Three skills failed `skills-ref validate` simultaneously with the same root cause:
+
+| Skill | strictyaml error column | Offending text inside `description:` |
+|-------|-------------------------|--------------------------------------|
+| `ralph` | line 3, col 687 | `Use when: "ralph update", ...` |
+| `git-repo` | line 6, col 810 | `worktree - unified worktree acquisition workflow: inventory, reuse inactive, or create new ...` |
+| `rule-kit` | line 2, col 170 | A topic-list prefix (`<topic-label-word>:`) followed by a comma-separated enumeration — same parser shape as the two cases above |
+
+All three were fixed by converting `description:` to `description: \|` and leaving the body's colons untouched. The lint rule above captures this pattern so the same break does not have to be diagnosed three more times for three more skills.
+
 ### Invalid Fields
 
 | Invalid | Correct | Action |
