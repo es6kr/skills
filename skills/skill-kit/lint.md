@@ -92,15 +92,15 @@ The skill is then silently skipped from registration ("Skipped loading N skill(s
 ```yaml
 ---
 name: <skill>
+description: |
+  One-line skill purpose. Topics — a (foo), b (bar). Use when: "trigger 1", "trigger 2" triggers.
 metadata:
   author: <author>
   version: "0.1.0"
-description: |
-  One-line skill purpose. Topics — a (foo), b (bar). Use when: "trigger 1", "trigger 2" triggers.
 ---
 ```
 
-The `|` literal block scalar starts on the same line as `description:`, then the body lives on the following indented lines. The indentation must be consistent (2 spaces is conventional). `metadata:` is included here because the host loader's allowlist accepts it and 20/20 published skills use it — omitting it from the canonical example causes new skills to be written without it.
+The `|` literal block scalar starts on the same line as `description:`; the body lives on the following indented lines (2 spaces is conventional). `metadata:` follows the description block scalar at the same top-level indent — `description: |` plus its indented body ends cleanly when the next non-indented key (`metadata:`) starts. `metadata:` is included here because the host loader's allowlist accepts it and 20/20 published skills use it — omitting it from the canonical example causes new skills to be written without it.
 
 #### Self-check (every time before Edit on `description:` field)
 
@@ -137,11 +137,11 @@ Frontmatter fields follow this order for readability. lint --fix will reorder au
 
 ```yaml
 ---
-name:                      # 1. Required
-metadata:                  # 2. Author/version metadata (20/20 published skills use it)
-depends-on:                # 3. Dependencies
-triggers:                  # 4. Hook triggers
-description:               # 5. Required (last among required - longest)
+name:                      # 1. Required (skill identifier)
+description:               # 2. Required (block scalar `|` when body contains `:`)
+metadata:                  # 3. Author/version metadata (20/20 published skills use it)
+depends-on:                # 4. Dependencies
+triggers:                  # 5. Hook triggers
 allowed-tools:             # 6. Optional
 agent:                     # 7. Optional
 context:                   # 8. Optional
@@ -151,11 +151,13 @@ user-invocable:            # 11. Optional
 ---
 ```
 
+**Rationale**: required fields (`name`, `description`) come first because every skill has them and they are scanned first by the loader; `metadata` follows because it is structural-but-optional (almost universally used). Hook-mechanism fields (`depends-on`, `triggers`) follow; tool/agent/runtime config trails.
+
 **Order validation rules:**
-- Warn if required fields (name, description) appear between optional fields
-- metadata must follow immediately after name (4 skills currently violate: `cc-plugin`, `commit-tidy`, `fix`, `next` use `metadata → name`; `lint --fix` normalizes to `name → metadata`)
-- depends-on must follow metadata (immediately after name when metadata is absent)
-- triggers must follow immediately after description
+- Required fields (`name`, `description`) must precede all optional fields
+- `metadata` follows `description` (4 skills currently use `metadata → name → description` — `cc-plugin`, `commit-tidy`, `fix`, `next`; `lint --fix` normalizes to `name → description → metadata`)
+- `depends-on` follows `metadata` (or `description` directly when `metadata` is absent)
+- `triggers` follows `depends-on`
 - Optional fields should be in alphabetical order among themselves
 
 ### Valid Optional Fields
