@@ -69,6 +69,43 @@ Every upgrade operation must detect and match the existing skill's language.
 
 After every Edit/Write on a skill file, read back the modified section and confirm it matches `skill_language`. If a mismatch is found, fix immediately before proceeding.
 
+## External-system Structure Check (MANDATORY — before any Edit/Write)
+
+When the upgrade introduces content describing **external systems the skill does not own** (user environment layout, infrastructure topology, cross-tool symlink/hardlink wiring, host-to-host sync mechanism, on-disk path conventions outside the skill itself), the structure must be confirmed via `AskUserQuestion` **before drafting** — not after. Drafting from assumption produces a "draft → user correction → redraft" cycle that wastes ask budget and pollutes the skill with stale guesses.
+
+### Trigger conditions (any one)
+
+- Topic body describes paths outside the skill's own directory (e.g., `~/.agents/`, `~/.claude/plugins/`, `/etc/`, `/mnt/c/...`)
+- Topic body asserts sync/share/separation policy between hosts or OS environments
+- Topic body documents wiring (symlink, hardlink, bind mount, junction) between paths
+- Topic body claims a specific tool (Syncthing, chezmoi, rsync) is used for a specific purpose
+
+### Don't / Do table
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write a draft assuming a topology, then ask for corrections | Ask the structural questions first (share mechanism / separation rationale / topic scope) → write the draft from the answers |
+| 2 | Assume "Windows source → WSL symlink (unidirectional)" or any other plausible topology | Confirm direction (which side is SoT, which is mirror) and mechanism (symlink vs hardlink vs Syncthing) via AskUserQuestion |
+| 3 | Map common patterns (e.g., "this is like the chezmoi pattern") without confirming | Each environment has its own conventions. Pattern similarity ≠ structural identity |
+| 4 | Defer ask until the user objects | Ask before the first Write/Edit. Post-Write corrections cost more (rewrite + re-verify) |
+| 5 | Bundle 4+ structural questions into a single Edit and hope they're right | Break structural axes into separate `questions` array entries (max 4). Get each axis confirmed |
+
+### Self-check (before the first Write/Edit producing the new topic body)
+
+1. Does the topic describe paths/systems outside the skill's own directory? → If yes, this rule applies
+2. List the structural axes the topic asserts (direction, mechanism, scope, related tools)
+3. For each axis where you would write a specific claim (e.g., "symlink", "Windows source"), did the user explicitly confirm that claim in this session? → If no, ask before Write
+4. Only after all structural axes are confirmed → proceed to Step 1 (Identify Target Skill)
+
+### Example mapping
+
+| Topic body claim | Structural axis | Required confirmation |
+|------------------|----------------|----------------------|
+| "~/.agents is shared via symlink" | share mechanism | AskUserQuestion: symlink / Syncthing / chezmoi / other |
+| "WSL ~/.agents symlinks to /mnt/c/.../.agents" | direction (which side hosts the storage) | AskUserQuestion: Windows-hosted / WSL-hosted / both SoT (per-host) |
+| "~/.claude/plugins/ is separated to avoid marketplace cache races" | separation rationale | AskUserQuestion: OS binary incompatibility / cache race / other |
+| "Bootstrap script lives in ~/.agents/ root" | script ownership | AskUserQuestion: script location and owner |
+
 ## Workflow
 
 ### 1. Identify Target Skill
@@ -113,6 +150,18 @@ AskUserQuestion {
 - **Minor** (0.1.x → 0.2.0): **AskUserQuestion required for the bump act** — new topic, feature change. The Step 3 ask covers the content; this second ask confirms the publish-worthy classification.
 - **Major** (0.x → 1.0): **AskUserQuestion required for the bump act** — compatibility break.
 - Local-only changes (not intended for publish) may keep the existing version regardless of change size.
+
+**HARD STOP enforcement mechanism**:
+
+1. **Before any Edit call that modifies the frontmatter `version:` field, self-ask**: "Is this change a new topic addition / feature change / compatibility break?" — If yes, run `AskUserQuestion` first
+2. **Performing a Minor/Major bump without `AskUserQuestion` = this step incomplete** — if the user discovers it, re-enter Step 4 to revert and re-ask
+3. **Forbidden thinking: "new topic added = auto 0.1.x → 0.2.0"** — a new topic is one instance of minor, but the bump requires **explicit publish intent from the user**. Local-only changes keep the version
+4. **Default recommendation = "keep"** — unless the user explicitly says "I'm going to publish", keep the version
+5. **`AskUserQuestion` option format** (Recommended marker):
+   - `Keep version (no publish planned) (Recommended)` — default
+   - `Patch (0.1.x → 0.1.x+1)` — reinforcement / fix
+   - `Minor (0.1.x → 0.2.0)` — new topic / feature
+   - `Decide at publish time` — defer the decision
 
 ### 3-2. Do & Don't Table Format (Recommended)
 
@@ -187,6 +236,41 @@ Every key carries a `//` comment with the field's purpose and (when known) the d
 6. For cross-reference between blocks (e.g., "same enum as method A"), re-emit the full enum in each block — DRY does not apply to reader-facing references.
 
 If any answer is "no," rewrite before saving the file.
+
+### 3-4. Case-history meta detection (MANDATORY — before every Edit/Write on a skill file)
+
+**Before saving any topic body or SKILL.md section, scan `new_string` for case-history meta keywords.** Match → move that text to `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT) and replace with a one-line pointer (`see failed-attempts.md "<keyword>"`) or remove entirely.
+
+This duplicates `fix/SKILL.md` Step 2 Don't/Do #8 inside the upgrade flow so the rule fires at the moment of Edit, not only when `/fix` is triggered after the fact.
+
+#### Forbidden patterns (any match = move to failed-attempts.md HOT)
+
+| Pattern | Example |
+|---------|---------|
+| Explicit dated event line | `YYYY-MM-DD (1st occurrence):`, `YYYY-MM-DD session:`, `(YYYY-MM-DD, Nth recurrence)` |
+| "Violation case" / equivalent in any language + date | `Violation case (YYYY-MM-DD, 1st)` |
+| "Skill content history" / "case history meta" | `## Skill content history` |
+| "verified YYYY-MM-DD" / "prior versions claimed X" | inline meta about prior skill versions |
+| "Nth recurrence" / "Nth occurrence" / equivalents in any language | recurrence count baked into body |
+| Session UUID or short session id reference | `session 5bfda407`, `(session abc1234)` |
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Include dated event meta or violation-case section inside the topic body to justify the rule | Keep topic body abstract (Don't/Do + self-check + procedure only). Move case context to failed-attempts.md HOT |
+| 2 | "Author motivation makes the rule traceable, so embed the session context" | Motivation lives in commit message + failed-attempts.md entry. Topic body stays evergreen |
+| 3 | Add `### Origin` / `### Example YYYY-MM-DD <event>` section to the topic | Either remove the section, or replace with one-line pointer `(see failed-attempts.md "<keyword>")` |
+| 4 | Mention a specific past event in the body to strengthen the rule's emotional weight | The rule's strength comes from clarity (Don't/Do table + self-check), not from inline case anchoring |
+
+#### Self-check (before EVERY Edit/Write on a skill file in this upgrade)
+
+1. Scan `new_string` for any of the forbidden patterns above
+2. If 1+ match → halt Edit, extract the matching text
+3. Append the extracted text to `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT) as a new section, or merge into an existing matching section
+4. Replace the topic-body text with one-line pointer if a reference is essential, or omit entirely
+5. Re-scan `new_string` post-extraction — confirm zero remaining matches
+6. Only then proceed with the Edit/Write
 
 ### 4. Execute
 
@@ -347,15 +431,27 @@ git -C ~/.agents ls-tree origin/main skills/<skill-name>/ 2>/dev/null | head -1
 4. If **Local-only**, skip Step 6 entirely. Report to the user: "Local-only skill detected (not in published.json, untracked). Edit applied directly; no commit."
 5. If **Public**, proceed to Step 6
 
-#### Violation case (2026-05-25)
-
-User asked to upgrade `es6kr` skill's `deploy-skill` topic. The proposed flow created a new worktree, branched off main, and prepared a PR. The user objected because `es6kr` is a private operator skill — not in `published.json` and untracked in the monorepo (`?? skills/es6kr/` under `git status`). Root cause: the upgrade procedure assumed every directory under `skills/` in `~/.agents` was publishable and would benefit from a PR. Fix: this Step 5.5 was added so `published.json` is consulted as the 1st-class signal before any commit / PR flow is offered.
-
 ### 6. Commit Changes (MANDATORY — after every skill modification, **Public or Repo-internal scope**)
 
 **Gate**: Step 5.5 must have classified the skill as **Public** or **Repo-internal**. If classified as **Local-only**, this entire Step 6 is skipped — the file edit is the final deliverable.
 
 After upgrade Edit/Write is complete, **commit the changed skill files in the `~/.agents` repo**. Skill changes left uncommitted accumulate and become hard to attribute later.
+
+#### Branch guard (HARD STOP): PUBLIC skill → feat/fix branch, never develop/main direct
+
+**For a PUBLIC skill (in `published.json`), the commit MUST land on a dedicated `feat/<slug>-...` or `fix/<slug>-...` branch (worktree-isolated), never directly on `develop`/`master`/`main`.** The es6kr/skills repo flow is feat/fix branch → PR → main (release-please runs on main). `develop` is NOT a change-accumulation branch for published skills. This mirrors `es6kr` `deploy-skill.md` §6 Branch strategy — keep the two consistent.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Offer "commit directly on develop" as an option for a PUBLIC skill change | Create/use a `fix/<slug>-...` or `feat/<slug>-...` branch (reuse-first via git-repo worktree) → commit there → PR |
+| 2 | Treat the current branch (e.g., `develop`) as the commit target without checking | Check `git branch --show-current`. If develop/master/main + PUBLIC skill → switch to a feat/fix branch first |
+| 3 | Commit on develop "because other uncommitted changes already sit there" | Other branches' dirty state is not a reason to add a published-skill commit to develop. Isolate on a feat/fix branch (worktree) |
+| 4 | `git worktree add` a fresh worktree blindly | Follow git-repo worktree decision tree — reuse an inactive worktree first |
+
+**Self-check (before the commit procedure below)**:
+1. Is the skill PUBLIC (Step 5.5 result)? → If yes, this guard applies
+2. `git branch --show-current` — is it develop/master/main? → If yes, **do not commit here**. Acquire a `fix/<slug>-...` branch via the git-repo `worktree` topic (reuse-first) and commit there
+3. Only Repo-internal (rare) or Local-only skills may commit on the current working branch without a feat/fix branch
 
 #### Procedure
 
