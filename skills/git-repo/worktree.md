@@ -180,7 +180,7 @@ User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktre
 2. For each worktree path `<W>` other than the current commit target:
    - `git -C <W> log -3 --oneline` — recent commits in that worktree's branch
    - `git -C <W> status --short` — dirty / staged state
-3. Classify each worktree:
+3. Classify each worktree using the same inactive criteria as the **Inactive Worktree Count Limit** section above:
    - **Active**: recent commits look like user's WIP or branch is unfamiliar → halt, report to user
    - **Stale**: branch matches a known merged PR or matches a known stale pattern → safe to ignore
 4. If 1+ active worktree found → halt commit, ask the user about that worktree's recent activity
@@ -192,7 +192,8 @@ User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktre
 2. Did you run `git -C <W> log -3` + `status --short` for EACH worktree other than the commit target?
 3. Did any other worktree show unfamiliar commits or dirty state?
 4. If Yes to #3, did you halt and ask before committing?
-5. Failing any of items 1 through 4 = matrix check skipped = rule violation
+
+**Verdict**: Failing any of items 1-4 = matrix check skipped = rule violation
 
 ## Topic Dependencies
 

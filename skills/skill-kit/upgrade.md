@@ -106,10 +106,6 @@ When the upgrade introduces content describing **external systems the skill does
 | "~/.claude/plugins/ is separated to avoid marketplace cache races" | separation rationale | AskUserQuestion: OS binary incompatibility / cache race / other |
 | "Bootstrap script lives in ~/.agents/ root" | script ownership | AskUserQuestion: script location and owner |
 
-### Origin
-
-2026-06-02 cleanup retrospect after adding `dotfile/agents` topic. Initial draft assumed unidirectional Windows → WSL symlink and hardlink (not symlink) for `~/.claude/skills/`. User corrections required 3 redraft rounds. Rule extracted to prevent the same pattern in future external-system topic additions.
-
 ## Workflow
 
 ### 1. Identify Target Skill
@@ -159,12 +155,12 @@ AskUserQuestion {
 
 1. **Before any Edit call that modifies the frontmatter `version:` field, self-ask**: "Is this change a new topic addition / feature change / compatibility break?" — If yes, run `AskUserQuestion` first
 2. **Performing a Minor/Major bump without `AskUserQuestion` = this step incomplete** — if the user discovers it, re-enter Step 4 to revert and re-ask
-3. **Forbidden thinking: "new topic added = auto 0.x → 0.x+1.0"** — a new topic is one instance of minor, but the bump requires **explicit publish intent from the user**. Local-only changes keep the version
+3. **Forbidden thinking: "new topic added = auto 0.1.x → 0.2.0"** — a new topic is one instance of minor, but the bump requires **explicit publish intent from the user**. Local-only changes keep the version
 4. **Default recommendation = "keep"** — unless the user explicitly says "I'm going to publish", keep the version
 5. **`AskUserQuestion` option format** (Recommended marker):
    - `Keep version (no publish planned) (Recommended)` — default
    - `Patch (0.1.x → 0.1.x+1)` — reinforcement / fix
-   - `Minor (0.1.x → 0.x+1.0)` — new topic / feature
+   - `Minor (0.1.x → 0.2.0)` — new topic / feature
    - `Decide at publish time` — defer the decision
 
 ### 3-2. Do & Don't Table Format (Recommended)
@@ -435,17 +431,13 @@ git -C ~/.agents ls-tree origin/main skills/<skill-name>/ 2>/dev/null | head -1
 4. If **Local-only**, skip Step 6 entirely. Report to the user: "Local-only skill detected (not in published.json, untracked). Edit applied directly; no commit."
 5. If **Public**, proceed to Step 6
 
-#### Violation case (2026-05-25)
-
-User asked to upgrade `es6kr` skill's `deploy-skill` topic. The proposed flow created a new worktree, branched off main, and prepared a PR. The user objected because `es6kr` is a private operator skill — not in `published.json` and untracked in the monorepo (`?? skills/es6kr/` under `git status`). Root cause: the upgrade procedure assumed every directory under `skills/` in `~/.agents` was publishable and would benefit from a PR. Fix: this Step 5.5 was added so `published.json` is consulted as the 1st-class signal before any commit / PR flow is offered.
-
 ### 6. Commit Changes (MANDATORY — after every skill modification, **Public or Repo-internal scope**)
 
 **Gate**: Step 5.5 must have classified the skill as **Public** or **Repo-internal**. If classified as **Local-only**, this entire Step 6 is skipped — the file edit is the final deliverable.
 
 After upgrade Edit/Write is complete, **commit the changed skill files in the `~/.agents` repo**. Skill changes left uncommitted accumulate and become hard to attribute later.
 
-#### Branch guard (HARD STOP — added 2026-05-26): PUBLIC skill → feat/fix branch, never develop/main direct
+#### Branch guard (HARD STOP): PUBLIC skill → feat/fix branch, never develop/main direct
 
 **For a PUBLIC skill (in `published.json`), the commit MUST land on a dedicated `feat/<slug>-...` or `fix/<slug>-...` branch (worktree-isolated), never directly on `develop`/`master`/`main`.** The es6kr/skills repo flow is feat/fix branch → PR → main (release-please runs on main). `develop` is NOT a change-accumulation branch for published skills. This mirrors `es6kr` `deploy-skill.md` §6 Branch strategy — keep the two consistent.
 
@@ -460,8 +452,6 @@ After upgrade Edit/Write is complete, **commit the changed skill files in the `~
 1. Is the skill PUBLIC (Step 5.5 result)? → If yes, this guard applies
 2. `git branch --show-current` — is it develop/master/main? → If yes, **do not commit here**. Acquire a `fix/<slug>-...` branch via the git-repo `worktree` topic (reuse-first) and commit there
 3. Only Repo-internal (rare) or Local-only skills may commit on the current working branch without a feat/fix branch
-
-#### Procedure
 
 #### Procedure
 
