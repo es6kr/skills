@@ -43,7 +43,7 @@ Top-level sections:
 | `- [x]` | Completed (pending move to Completed) | `## Progress` |
 | `- [BLOCKED]` | Skipped by Ralph autonomous loop (human resolution needed) | `## Progress`, `## Hold` |
 | `- [BLOCKED:P0-P3:reason]` | Priority-annotated BLOCKED (see [priority.md](./priority.md)) | `## Progress`, `## Hold` |
-| `- ` (no checkbox) | Already-summarised historical line | `## Completed` only |
+| `-` followed by space, no checkbox | Already-summarised historical line | `## Completed` only |
 | `- [REPEAT]` | Persistent recurring item (Ralph-specific — see ralph/periodic.md) | `## REPEAT` section only (out of scope for this skill) |
 
 ## Item state changes
@@ -63,7 +63,7 @@ When editing a fix_plan item, the post-edit state must match the section's meani
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | In-place edit a BLOCKED item in the Hold section into an active item without moving it back to Progress | When BLOCKED is resolved, **delete** the item from Hold and **insert** it into Progress as an active `- [ ]` (or `[x]` if already done) |
-| 2 | Change item content without checking which section it's in | Before Edit, grep for `^## ` to identify the item's parent section; verify the new content matches that section's semantics |
+| 2 | Change item content without checking which section it's in | Before Edit, grep for `^##` to identify the item's parent section; verify the new content matches that section's semantics |
 
 Self-check before Edit:
 
@@ -75,7 +75,7 @@ Self-check before Edit:
 
 When this skill's main entry point is invoked, run these four steps in order:
 
-1. **Sync** — call [sync](./sync.md) to poll GitHub state for `[ ]` items containing `PR #N` / `#N` and auto-`[x]` any MERGED/CLOSED entries
+1. **Sync** — call [sync](./sync.md) to poll GitHub state for `[ ]` items containing `PR #N` / `#N`: auto-`[x]` on MERGED PRs and CLOSED issues; PRs CLOSED-without-merge convert to `[BLOCKED:P2:external]` per the sync contract
 2. **Move completed** — apply [move](./move.md) to relocate `[x]` items with no follow-up notes into the Completed section as one-line summaries
 3. **External RAG dispatch (optional)** — if the caller supplied `--rag=<skill>:<topic>`, dispatch Completed entries to the receiver for semantic indexing
 4. **Add new items** — if the user instructed new work, append `- [ ]` items per [add](./add.md) authoring rules

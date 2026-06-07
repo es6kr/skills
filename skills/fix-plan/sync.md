@@ -47,7 +47,7 @@ Items just synced to `[x]` are immediate candidates for the next [move](./move.m
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Auto-`[x]` an `OPEN` PR / Issue | Only act on MERGED / CLOSED state |
-| 2 | On GitHub API error, mark the item BLOCKED | Skip the item silently and report the API error to the user. Do not change state on uncertain input |
+| 2 | On GitHub API error, mark the item BLOCKED | Do not change the item's state on uncertain input; include the API error as a separate line in the sync report so the user can see what failed |
 | 3 | Run sync without reporting how many items changed | Report changed-item count to the user. Zero changes → "no changes" |
 | 4 | Re-sync items already `[x]` | Sync only operates on `[ ]` entries |
 

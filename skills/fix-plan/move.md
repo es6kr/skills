@@ -30,8 +30,8 @@ Compress the verbose Progress entry to a single chronological line, then move to
 | Deduplicate | If a similar entry already exists in Completed, update it instead of adding a duplicate |
 | Sort order | Completed is **chronological ascending**. Insert at sort position — the new entry may not be at the end |
 | Timestamp | `YYYY-MM-DD HH:mm —` prefix required. **`HH:mm` mandatory** — extract from the original `[x]` line. If absent, use `git log --format=%ci` for the commit time; if still unknown, ask the user (do **not** silently use `00:00`) |
-| Reference | Merged: `(PR #N, Session xxxxxxxx)`. Unmerged: `(commit hash, PR #N, Session xxxxxxxx)`. No PR: `(commit hash, Session xxxxxxxx)` |
-| No `[x]` marker | Completed uses `- ` (no checkbox) since the section already implies completion |
+| Reference | Always include the commit hash. With a PR: `(PR #N, commit <hash>)` — PR number first, then commit. Without a PR: `(commit <hash>)` only. Append `, Session xxxxxxxx` when the entry was completed by an autonomous loop (Ralph) and the session ID is known; omit otherwise |
+| No `[x]` marker | Completed uses `-` followed by a space (no checkbox) since the section already implies completion |
 
 ## PR-level item
 
