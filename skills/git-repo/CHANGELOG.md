@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/es6kr/skills/compare/git-repo-v0.3.1...git-repo-v0.3.2) (2026-06-07)
+
+
+### Bug Fixes
+
+* **git-repo,skill-kit:** pre-commit worktree matrix + external-system structure check ([7f05819](https://github.com/es6kr/skills/commit/7f058194fcf568b7cac57fd79788b20caf217ae5))
+* **git-repo,skill-kit:** strictyaml description block scalar ([#44](https://github.com/es6kr/skills/issues/44)) ([fe0da66](https://github.com/es6kr/skills/commit/fe0da66e80ee06e2e30190a4afc4c12363f0d51f))
+* **skill-git-repo:** add Pre-commit worktree matrix check section ([98b3f0f](https://github.com/es6kr/skills/commit/98b3f0f37dd2c92022ab8d739aacffbd5846589c))
+* **skill-kit,git-repo:** address PR [#46](https://github.com/es6kr/skills/issues/46) review findings 1-6 ([ba4592c](https://github.com/es6kr/skills/commit/ba4592c9209718bab7ba2af82f060f82a529f1e6))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/git-repo-v0.3.0...git-repo-v0.3.1) (2026-06-03)
 
 
