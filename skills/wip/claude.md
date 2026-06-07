@@ -258,6 +258,17 @@ date -u +"%Y-%m-%dT%H:%M:%SZ"
 | Waiting (long — 30+ min) | `"rate limit clears at: HH:MM UTC (in N hours). Prefer other work first"` |
 | No timing in the body | `"walkthrough pending (unlock time unknown — body parsing failed)"` (explicit) |
 
+## Copilot Rate Limit Sharing (HARD STOP)
+
+When a Copilot rate limit is detected (e.g. from GitHub Actions run failures containing "limit to reset in N hours M minutes"), the reset timestamp must be written to the shared cache to prevent other sessions from running blocked Copilot requests:
+
+1. **Calculate the reset timestamp** in ISO 8601 UTC format.
+2. **Write the reset timestamp** to `~/.claude/copilot-rate-limit.json`:
+   ```bash
+   echo '{"reset_at": "YYYY-MM-DDTHH:MM:SSZ"}' > ~/.claude/copilot-rate-limit.json
+   ```
+3. The `PreToolUse: Bash` hook (`~/.claude/hooks/block-copilot-rate-limit.sh`) will automatically intercept and block `copilot-pull-request-reviewer` commands when the rate limit is active.
+
 ## Compact recovery
 
 After a compact, restore the prior work state (a precursor to resume.md Step 1).
