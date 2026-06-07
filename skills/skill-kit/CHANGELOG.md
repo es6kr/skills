@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/skill-kit-v0.3.0...skill-kit-v0.3.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* **git-repo,skill-kit:** pre-commit worktree matrix + external-system structure check ([7f05819](https://github.com/es6kr/skills/commit/7f058194fcf568b7cac57fd79788b20caf217ae5))
+* **git-repo,skill-kit:** strictyaml description block scalar ([#44](https://github.com/es6kr/skills/issues/44)) ([fe0da66](https://github.com/es6kr/skills/commit/fe0da66e80ee06e2e30190a4afc4c12363f0d51f))
+* **skill-kit,git-repo:** address PR [#46](https://github.com/es6kr/skills/issues/46) review findings 1-6 ([ba4592c](https://github.com/es6kr/skills/commit/ba4592c9209718bab7ba2af82f060f82a529f1e6))
+
+
+### Documentation
+
+* **skill-kit:** add External-system Structure Check + translate HARD STOP bullets ([8decdc1](https://github.com/es6kr/skills/commit/8decdc18731239fee5c9150d5ffca94e5c7c6a29))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/skill-kit-v0.2.0...skill-kit-v0.3.0) (2026-05-25)
 
 
