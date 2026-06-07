@@ -54,7 +54,7 @@ fix-plan (schema + lifecycle)
 | Option | Default | Description |
 |--------|---------|-------------|
 | `task-tracker` | `fix_plan.md` | Tracker filename. Use `checklist.md` for non-Ralph workspaces |
-| `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing |
+| `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing — set via the `--rag=<skill>:<topic>` CLI flag on the `move` topic (see [move.md](./move.md)). No env var or config file is consumed by this skill; the caller routes |
 
 ## Quick Reference
 
@@ -113,7 +113,7 @@ gh pr view <N> --json state,mergedAt   # PR
 gh issue view <N> --json state,closedAt # Issue
 ```
 
-MERGED/CLOSED → auto `[x]`. See [sync.md](./sync.md).
+MERGED PR or CLOSED issue → auto `[x]`. PR CLOSED-without-merge → `[BLOCKED:P2:external]`. See [sync.md](./sync.md).
 
 ### Issue Drafts lifecycle
 
@@ -122,4 +122,4 @@ MERGED/CLOSED → auto `[x]`. See [sync.md](./sync.md).
 ## See Also
 
 - `github-flow` (depends-on) — `gh` CLI conventions for sync + register
-- Ralph wrapper integration: see `ralph/fix-plan.md` for Ralph-specific concerns (REPEAT section, autonomous loop skip semantics, RAG dispatch caller-side)
+- Ralph integration is a separate workstream maintained outside this published skill. A Ralph wrapper, when present, owns Ralph-specific concerns: the `## REPEAT` persistent-item section, autonomous-loop `[BLOCKED]` skip semantics, and the caller-side `--rag=<skill>:<topic>` dispatch (this skill exposes only the abstract flag contract). See the Ralph project's documentation for wrapper details

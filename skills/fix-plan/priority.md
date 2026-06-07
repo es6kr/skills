@@ -89,4 +89,4 @@ Ralph's autonomous loop continues to skip `[BLOCKED]` regardless of suffix — t
 
 - [format.md](./format.md) — marker syntax and section semantics
 - [add.md](./add.md) — authoring schema
-- Ralph integration: `ralph/fix-plan.md` describes BLOCKED skip semantics in the autonomous loop
+- Ralph autonomous-loop integration (when a Ralph wrapper is in use): the wrapper skips `[BLOCKED]` items regardless of the `:P*:reason` suffix — the suffix is for human triage, not loop control

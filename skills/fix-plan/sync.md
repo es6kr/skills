@@ -1,6 +1,6 @@
 # Sync
 
-GitHub PR/Issue state polling. Reads `[ ]` items in fix_plan, finds PR/Issue number references, queries GitHub, and auto-checks `[x]` on MERGED/CLOSED.
+GitHub PR/Issue state polling. Reads `[ ]` items in fix_plan, finds PR/Issue number references, queries GitHub, and auto-checks `[x]` on MERGED PRs and CLOSED issues. PRs CLOSED-without-merge convert to `[BLOCKED:P2:external]` — see the rules table below.
 
 ## When to use
 

@@ -89,7 +89,7 @@ A top-level item may stay `[ ]` while a completed sub-tree under it moves to Com
   - [ ] Spring Boot SSO sample redirect bug
 
 ## Completed
-- 2026-04-27 05:39 — PR #10 MERGED: nginx root redirect + Jinja2 template migration + integration server verified
+- 2026-04-27 05:39 — nginx root redirect + Jinja2 template migration + integration server verified (PR #10, commit `abc1234`)
 ```
 
 ### Cleanup rule
