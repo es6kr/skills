@@ -8,6 +8,7 @@
   "skills/consolidate": "0.2.1",
   "skills/dotfile": "0.3.0",
   "skills/fix": "0.3.0",
+  "skills/fix-plan": "0.1.0",
   "skills/git-repo": "0.3.2",
   "skills/github-flow": "0.3.0",
   "skills/mcp-config": "0.3.0",

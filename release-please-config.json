@@ -64,6 +64,11 @@
       "component": "fix",
       "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
     },
+    "skills/fix-plan": {
+      "package-name": "fix-plan",
+      "component": "fix-plan",
+      "extra-files": [{ "type": "generic", "path": "SKILL.md" }]
+    },
     "skills/git-repo": {
       "package-name": "git-repo",
       "component": "git-repo",
