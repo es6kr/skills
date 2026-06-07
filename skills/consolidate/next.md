@@ -8,6 +8,35 @@ Entry: `Skill("consolidate", "next ...")` or `pr.md` Workflow Step 8.
 
 Immediately after the Status line output, **ask the user for the PR handling direction**. Terminating without presenting options = procedural violation, **except** when the routing table below explicitly permits skipping (i.e., the only possible follow-up is "defer", so there is genuinely no actionable next step).
 
+### Finding-first ordering (HARD STOP — finding decision precedes merge)
+
+**When the PR has actionable findings, the finding-handling decision is a SEPARATE axis that PRECEDES the merge decision.** Do not lead with the merge question, and do not present finding-handling + merge as a `questions` array in a single turn — they form a dependency chain (`ask-user-question.md` "dependency axis → sequential ask"), not parallel tracks.
+
+| Precedent axis (ask FIRST) | Dependent axis (ask AFTER the finding answer) |
+|----------------------------|-----------------------------------------------|
+| Finding handling (which findings to apply / defer) | Merge (merge content/timing depends on whether findings are applied first) |
+
+**Why finding-first**: applying a finding changes what gets merged (fix → reflected in branch → then merge) vs defer (merge as-is). The merge option's meaning is undetermined until the finding decision is made — leading with merge inverts the dependency.
+
+**Post-hoc review PR (HARD STOP)**: when the PR exists specifically to retrospectively review already-merged/deployed commits (see MEMORY "사후 리뷰 PR" workflow), **finding resolution IS the PR's purpose**. Merge (e.g., develop alignment) is strictly secondary — ask the finding-handling axis first; never lead with the merge question.
+
+**Post-hoc review PR finding options exclude "defer" (HARD STOP)**: since finding resolution is the very reason the PR exists, the finding-handling ask must NOT offer a "defer all (track only)" option — deferring the findings contradicts the PR's purpose ("pulled it in to review, why defer the review?"). The finding axis is a **scope decision only** (which findings to fix — e.g., "essential mismatches only" vs "all C+I"), and the chosen scope is **applied immediately**, not deferred. A "defer all" option belongs to normal PRs where merge is the goal; on a post-hoc review PR it is forbidden.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Put the merge question as Q1 and finding-handling as Q2 | Finding-handling axis is asked FIRST; merge is a follow-up after the finding answer |
+| 2 | Present merge + finding-handling as a `questions` array in one turn | Dependency axis → sequential: 1st finding-handling, then (after the answer) merge |
+| 3 | On a post-hoc review PR, lead with "merge to develop?" | Post-hoc review PR purpose = finding resolution. Lead with finding handling; merge secondary |
+| 4 | Treat finding-handling and merge as parallel tracks (병행) | They are a dependency chain — the finding result determines the merge content |
+| 5 | Offer "defer all (track only)" as a finding option on a post-hoc review PR | Post-hoc review PR = finding resolution is the purpose. Finding options are scope-only (which to fix), applied immediately. No defer-all option |
+
+**Self-check (Step 8 entry, before any AskUserQuestion)**:
+1. Does the PR have 1+ actionable findings? → If yes, finding-handling is a precedent axis
+2. Is this a post-hoc review PR (PR exists to review already-merged commits)? → If yes, finding-first is mandatory
+3. Am I about to present merge + finding-handling in one `questions` array? → STOP. Split: finding-handling first, merge as a sequential follow-up
+4. Is the merge question leading (Q1)? → If findings exist, invert: finding-handling leads
+5. Is this a post-hoc review PR? → finding options must NOT include "defer all" (deferring contradicts the PR's purpose). Offer scope choices only (which findings), applied immediately
+
 ### Routing: next vs wip
 
 | Situation | Skill to use | Reason |
@@ -145,10 +174,6 @@ A **Reject-only application option** is also possible (e.g., Accept defer + Reje
 2. If yes, did you include a Reject override option in the Step 8 options?
 3. Did you state the Reject rationale in the option description? (gives the user info to judge "is that rationale enough? override?")
 4. If only "Accept only" / "Defer only" options are presented = violation (Reject override omitted)
-
-#### Violation case (2026-05-24, 1st occurrence)
-
-In the PR #13 consolidate next-action ask, the Track A options were presented only as "apply 3 deferred Minor" / "keep Defer" / "hold". CodeRabbit Finding 1 (release-please.yml SHA pin) Major was auto-classified as Reject on repo-convention grounds and excluded from the options entirely. The user signaled Reject-override intent with "fix them all together". **The Reject finding was not exposed as a separate option, stripping the user's decision authority.**
 
 ### Invocation pattern
 

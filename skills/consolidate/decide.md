@@ -36,10 +36,6 @@ The AI review handling flow is procedure:
 3. Only after the Axis B answer, decide the medium (feed the Axis B answer + mergeable into the post.md Step 7 medium table)
 4. If the thought "it's CONFLICTING so it's an issue comment anyway" arises = violation signal. Even CONFLICTING requires the Axis B ask first
 
-#### Violation case (2026-05-26, 1st occurrence)
-
-In a consolidate run on a PR where the operator was a requested reviewer, after confirming `mergeable: CONFLICTING`, post.md's "Non-Mergeable → issue comment only" rule was executed without the Axis B ask → the AI Review Summary was auto-posted as an issue comment. The user pointed it out (the Summary was posted in a non-Formal-Review medium without asking). The Axis B ask should have preceded the medium decision. Resolved with a manual APPROVE + this gate added.
-
 ### Don't / Do — Axis A ask forbidden (HARD STOP)
 
 | # | Don't | Do |
@@ -55,6 +51,13 @@ In a consolidate run on a PR where the operator was a requested reviewer, after 
 1. Are you a requested reviewer? (`gh pr view --json reviewRequests`) → If Yes, ask Axis B only. If No, skip Step 5 → Step 7
 2. Are you building an Axis A option? → Don't. Proceed automatically to Step 7
 3. If a "Fix actionable items" or "Whether to post the Summary" option appears = violation
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Place "Fix actionable items" as the first option + mark it Recommended | Place "Post summary as-is" as the first option. Fix goes second-or-later (Recommended marking forbidden) |
+| 2 | "Fix is more efficient, so mark it Recommended" / "Critical/Important findings → recommend fix" thinking | Independent of efficiency or severity. Acting on the AI review is the user's autonomous decision. Recommended marking itself is forbidden |
+| 3 | Auto-place "Fix actionable" as the first option when severity is Critical/Important | Severity belongs in the option description. Order prioritizes "decision preservation" |
+| 4 | "User decides on fix anyway, so first-position is fine" thinking | First option = implicit Recommended. Order itself is a statement of intent |
 
 ### Axis B: Formal Review action (HARD STOP — required when you are a requested reviewer)
 
