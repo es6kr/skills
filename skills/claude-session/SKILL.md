@@ -11,6 +11,10 @@ metadata:
 
 Integrated skill for managing Claude Code sessions.
 
+## Topic Dispatch
+
+**When this skill is invoked with a topic specifier (e.g., `/claude-session id` or `Skill("claude-session", "id")`), load and follow only the matching topic file (`id.md`). Do not echo the Topics table or summarize other topics in the response.** The Topics table below is an index for invocations without a topic specifier — it is not user-facing output when a topic is named.
+
 ## Topics
 
 | Topic | Description | Guide |

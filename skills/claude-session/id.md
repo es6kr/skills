@@ -14,8 +14,9 @@ Before using the marker method, check if the session ID is already visible in th
 
 **Search order:**
 
-1. **SessionStart hook injection** — If `session-id-inject.sh` is registered in `settings.json` SessionStart hooks, the session ID is injected as `additionalContext` at session start. Look for "Current session ID: {uuid}" in early conversation context.
-2. **File path UUIDs** in recent Bash/Read tool results (UUID pattern `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`):
+1. **`session-id-inject.sh` hook output** — If installed and registered (`SessionStart` and/or `UserPromptSubmit` matcher in `~/.claude/settings.json`), look for "Current session ID: {uuid}" in conversation system-reminders. The `UserPromptSubmit` variant auto-fires on slash commands (`/session id`, `/cleanup`, or any namespace import command) AND on **keyword-triggered fallback** (prompt body contains `qdrant`, `rag`, or `session` as a bare word).
+2. **`CLAUDE_CODE_SESSION_ID` env var** — Run `echo "$CLAUDE_CODE_SESSION_ID"` in a Bash tool call. Claude Code sets this on shell startup. Caveat: env may be set once per Bash subprocess; if the value contradicts other sources, prefer #1 (hook) or #4 (marker).
+3. **File path UUIDs** in recent Bash/Read tool results (UUID pattern `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`):
 
 | Source | Path pattern | Example |
 |--------|-------------|---------|
@@ -26,11 +27,20 @@ Before using the marker method, check if the session ID is already visible in th
 
 **Procedure:**
 1. Check for hook injection ("Current session ID: ..." in context) — if present, return directly
-2. Otherwise, scan file paths in recent tool results for the UUID pattern
-3. If found, return it — **skip the marker method (outer Steps 1-3) entirely**
-4. If not found, **AskUserQuestion**: "session-id hook is not installed. Install it?"
+2. If absent, Bash `echo "$CLAUDE_CODE_SESSION_ID"` — if non-empty, return that
+3. Otherwise, scan file paths in recent tool results for the UUID pattern
+4. If found, return it — **skip the marker method (outer Steps 1-3) entirely**
+5. If not found, **AskUserQuestion**: "session-id hook is not installed. Install it?"
    - "Install" → run `/session install`, then inform "auto-injected from next session". Current session falls through to the marker method (outer Step 1)
    - "Skip" → proceed to the marker method (outer Step 1)
+
+### Forbidden heuristics (HARD STOP)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `ls -lt ~/.claude/projects/<key>/*.jsonl \| head -1` mtime "가장 최근 = 현재 세션" | Use hook output → env var → file-path UUID → marker (the 4 ordered sources above) |
+| 2 | "Most recently modified JSONL is the active session" assumption | After `/compact` and `/session split`, multiple JSONLs in the same project key can be modified within seconds of each other. mtime races are common — mtime can show a non-active JSONL as newer than the active one. Always confirm against the hook output or env var |
+| 3 | Single-source conclusion (env var alone, or hook alone) when sources disagree | Cross-verify at least 2 sources. If hook says A and env says B, run a marker probe (outer Step 1-2) to break the tie |
 
 ### 1. Generate and Output Marker (only if Step 0 found nothing)
 
