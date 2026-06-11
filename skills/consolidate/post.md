@@ -164,11 +164,12 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 ```markdown
 ## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
 
-| Reviewer | Finding | Status |
-|----------|---------|--------|
-| Copilot | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
-| CodeRabbit | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
-| code-reviewer | 📝 Unused import | 🟡 Minor |
+| # | Source | Severity | Finding | Status |
+|---|--------|----------|---------|--------|
+| 1 | `copilot` | 📝 Minor | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
+| 2 | `coderabbitai` | 🟡 Important | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
+| 3 | Internal Code Review | 📝 Minor | 📝 Unused import | 🟡 Minor |
+| 4 | @reviewer-login | 🟡 Important | 🛠️ DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
 
 [✅ All AI reviews passed. Ready to merge.
 
@@ -187,6 +188,30 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | Critical unresolved | 🔴 | ✅ (looks like no problem) |
 
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
+
+### Source attribution column is MANDATORY (HARD STOP)
+
+**The findings table MUST include a `Source` (or `Reviewer`) column attributing every row to the exact reviewer login it came from** — coderabbitai, copilot, @human-login (e.g., @reviewer-login), Internal Code Review, etc. Composing a findings table with only `# | Severity | Type | Location | Summary` columns strips the audit trail and conflates findings from multiple reviewers into an anonymous pool.
+
+**Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Findings table columns: `# | Severity | Type | Location | Summary` (no source) | Add a `Source` column: `# | Source | Severity | Type | Location | Summary`. Every row's `Source` cell names the exact reviewer login (or `Internal Code Review`) the finding originated from |
+| 2 | Collapse multiple distinct human MEMBER reviewers into a single "Internal Code Review" entry | Each human reviewer login is a separate `Source` value. Internal Code Review is the subagent-generated review only; human collaborator reviews carry the reviewer's GitHub login |
+| 3 | Omit the header reviewer matrix line when one of the sources is a non-bot MEMBER review | The opening `> Reviewer matrix:` line enumerates every source enumerated in `collect.md` Step 3 — bots + human MEMBER/OWNER reviews. Missing any source there = missing it in the table too |
+| 4 | Merge two findings from different sources into one row "to deduplicate" | Keep one row per (source × finding). If two reviewers raised the same finding, write two rows with the same `Location` + `Summary` but distinct `Source`. Deduplication belongs in the chat narrative, not in the table |
+| 5 | Wrap @mentions / SHAs / URLs in backticks in the Source cell or anywhere in the Summary body (e.g., `` `@octocat` ``, `` `de59590` ``, `` `https://...` ``) | Write them bare so GitHub autolinks fire: `@octocat`, `de59590`, `https://github.com/...`. Bot logins (coderabbitai, copilot) are bot identifiers, not human mentions — write them bare without the `@` prefix |
+| 6 | Append role/qualifier parentheses to the Source cell (e.g., `@octocat (MEMBER review)`, `@octocat (OWNER)`) | The `@id` already identifies the reviewer — no role qualifier needed. Source cell carries only the bare identifier: `@octocat`, `coderabbitai`, `Internal Code Review` |
+
+**Self-check (every time before POSTing the Summary)**:
+
+1. Did `collect.md` Step 3 enumerate every reviewer (bot + human MEMBER/OWNER/COLLABORATOR)? Re-run the query if uncertain
+2. Does the Summary's `> Reviewer matrix:` opening line list every enumerated source by name?
+3. Does the findings table have a `Source` column?
+4. Is every row's `Source` cell populated with the exact reviewer login (not blank, not "AI", not "external")?
+5. If a finding was raised by two reviewers independently, are both rows present?
+6. Scan the entire body — does any `@username`, 7+ hex SHA, or full URL sit inside backticks? If yes, unwrap to bare so GitHub autolink fires (per the `git.md` autolink rule)
 
 ## 7-A. Issue comment Summary (when unified POST does NOT apply)
 
