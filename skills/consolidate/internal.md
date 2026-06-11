@@ -9,6 +9,7 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 **Trigger conditions** (run fallback if any of these apply):
 - **CodeRabbit is walkthrough only** (Free plan — provides only summary without line-by-line review)
 - **Reviewer failure/error** — review is impossible such as Copilot "encountered an error"
+- **Copilot subscription unavailable** — `pr.md` Step 2.4 availability pre-check returned not-available (free account / no org seat / 404 on `/user/copilot_billing` and `/orgs/<org>/copilot/billing`). **This is the auto-fallback path — no AskUserQuestion required.** Record the substitution in the Summary's reviewer matrix (e.g., "Copilot unavailable on the acting account/org — auto-fallback per Step 2.4")
 
 **Worktree (from Step 2.7)**: the PR branch is already checked out into a worktree by `pr.md` Step 2.7. Dispatch the code-reviewer **against that worktree path** so it reads real files (not just `gh pr diff`) and can run tests/build locally. Pass the worktree path in the agent prompt (`Repository: <worktree-path>`). The reviewer should still use `gh pr diff <N>` for the canonical PR diff, but reads file bodies + runs verification in the worktree.
 
@@ -38,25 +39,38 @@ Before posting **either** the Step 5 AskUserQuestion **or** the Step 7 `## AI Re
 
 **Why Step 5 also gated**: the user's decision options must reflect both reviewer streams (CodeRabbit + Internal). Posting Step 5 ask with only CodeRabbit findings + self-verified Reject/Accept classifications leaves the user without the second independent perspective that justified the consolidate flow. Re-call Step 5 ask after the Internal Review comment exists.
 
-### Check existing review comment (MANDATORY — required before posting)
+### Medium decision (MANDATORY — inline targets decide the posting medium)
+
+The Internal Review's posting medium branches on whether **inline targets** exist (auto-fire policy below: line-specific 🔴 Critical + 🟡 Important findings by default; ALL line-specific findings with the `--inline` flag):
+
+| Inline targets | Medium | First post (no prior Internal Review) | Re-review (prior Internal Review exists) |
+|----------------|--------|----------------------------------------|------------------------------------------|
+| **1+ exist** | **Single reviews API POST** — `gh api POST .../pulls/{N}/reviews`: `body` = full Internal Review findings, `comments[]` = inline annotations | First `gh api POST .../reviews` — no PATCH target exists yet | **New review POST every time** (no PATCH/PUT of the prior review — each re-review is a fresh time-ordered review, like external bots) |
+| **None** | Issue comment (`gh pr comment`) | First `gh pr comment <N>` — no PATCH target exists yet | **PATCH the existing comment** (`gh api repos/{owner}/{repo}/issues/comments/{id} --method PATCH --input <file>`) — forbid a parallel new comment |
+
+**Merge state does not change the medium (HARD STOP).** A merged or closed PR still takes the reviews API POST with `comments[]` inline when inline targets exist — the auto-fire policy (line-specific 🔴 Critical + 🟡 Important → review POST) applies **regardless of merge state**. The reviews API accepts inline comments on a merged PR against its head SHA. A post-merge review is still a review POST, not an issue comment. Do NOT downgrade to `gh pr comment` because the PR is merged.
+
+**Existing-artifact check before posting** (per medium):
 
 ```bash
+# Issue-comment medium: find prior Internal Review comment (PATCH target)
 gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | test("Internal Code Review")) | "\(.id) \(.updated_at)"'
+# Review medium: prior reviews are left as-is (time-ordered records) — no check needed beyond counting for the re-review note
 ```
-
-- Existing comment present → use `gh api repos/{owner}/{repo}/issues/comments/{id} --method PATCH --input <file>` to **PATCH update** (forbid new posting)
-- Existing comment absent → post new via `gh pr comment`
 
 | # | Don't | Do (correct alternative) |
 |---|-------|-------------------------|
-| 1 | Run `gh pr comment` directly without checking existing comments | Query `gh api .../comments` first, then branch to PATCH/new |
-| 2 | Add a new comment when a previous session's comment exists | Update the existing comment via PATCH |
+| 1 | Post the full findings as an issue comment AND a stub-body inline review (2 artifacts, body pointing at the comment) | One reviews API POST carrying both: full findings in `body` + line annotations in `comments[]` |
+| 2 | PATCH/PUT a prior review's body on re-review | Re-review with inline targets = new review POST every time |
+| 3 | Add a parallel issue comment when a prior Internal Review comment exists (no-inline medium) | PATCH the existing comment |
+| 4 | Ask the user which medium to use at runtime | The inline-target count decides the medium deterministically |
+| 5 | Downgrade to an issue comment because the PR is merged/closed (post-merge review) | Merge state is irrelevant — reviews API POST + `comments[]` works on merged PRs (against head SHA). Apply the auto-fire policy regardless of merge state |
 
-### Post/update review comment (MANDATORY — must complete before entering Step 4)
+### Post the Internal Review (MANDATORY — must complete before entering Step 4)
 
-Post the code-reviewer result **as a PR comment first** (`gh pr comment`) or PATCH the existing comment. **This comment must exist on the PR before proceeding to Step 4** — substitution with a text report is forbidden.
+Post the code-reviewer result via the medium decided above. **The review (or comment) must exist on the PR before proceeding to Step 4** — substitution with a text report is forbidden.
 
-**Review comment title template (MANDATORY)**:
+**Title template (MANDATORY — first line of the review body / comment body)**:
 ```markdown
 ## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
 ```
@@ -92,14 +106,37 @@ GH_TOKEN="$(gh auth token --user <account>)" gh pr list -R <owner>/<repo> --stat
 
 **Forbidden pattern**: Copy-pasting subagent English output directly into a Korean default repository. Do not bypass with "technical reviews feel natural in English" reasoning.
 
+### Inline auto-fire policy (no runtime ask)
+
+When inline targets exist, the single reviews API POST carries them in `comments[]` so the author sees each finding on the exact line in the GitHub UI. **This fires automatically by the policy below — do NOT ask the user at runtime.**
+
+**Auto-fire policy** (this decides the medium — see "Medium decision" above):
+
+| Invocation | Inline targets |
+|------------|----------------|
+| Default (no flag) | Line-specific 🔴 Critical + 🟡 Important findings only |
+| `--inline` flag on the consolidate call | ALL line-specific findings (Minor/Refactor included) |
+| No line-specific finding matches the policy | No review POST — issue-comment medium |
+
+**Fallback (diff-scope / line verification)**: a finding whose file is not in the PR diff, or whose line cannot be verified against PR head (`git show <head>:<path>`), is **demoted to review-body text only** — never force an inline comment for it (422 risk). No finding is dropped. If ALL inline candidates demote this way, the medium falls back to issue comment.
+
+**Mechanics**: head SHA fetch, JSON payload format, `comments[]` fields, and verification follow `post.md` "Optional Inline Review" procedure (event = `COMMENT`). The `body` field of the same POST carries the full Internal Review findings (title template + strengths + findings + assessment).
+
+| # | Don't | Do (correct alternative) |
+|---|-------|-------------------------|
+| 1 | Ask the user "post inline review?" at runtime | Apply the auto-fire policy table deterministically. The only user control is the `--inline` flag at invocation |
+| 2 | Inline-annotate every finding by default | Default = Critical + Important line-specific only. ALL requires the explicit `--inline` flag |
+| 3 | Force inline for a finding outside the PR diff | Demote to review-body text (fallback row above) |
+| 4 | Put a stub/pointer body in the review POST and the full findings elsewhere | The review POST `body` IS the Internal Review — full findings live there |
+
 ### Mandatory self-check before entering Step 4 (HARD STOP — run on every invocation)
 
 Step 4 may proceed only if both conditions below are satisfied:
 
-1. **Verify review comment URL**: In the `gh api repos/{owner}/{repo}/issues/{N}/comments` result, does the ID/URL of the code-reviewer/Copilot review comment posted in this session exist?
-2. **No self-reporting**: Reporting the classification result as text does not equal posting. **The comment must be visible on the PR page** to count as posted.
+1. **Verify posted-artifact URL**: per the medium — review medium: `gh api repos/{owner}/{repo}/pulls/{N}/reviews` contains this session's review (body starts with "## Internal Code Review"); comment medium: `gh api .../issues/{N}/comments` contains this session's comment.
+2. **No self-reporting**: Reporting the classification result as text does not equal posting. **The review/comment must be visible on the PR page** to count as posted.
 
-If unmet, **immediately return to Step 3.5.3** and run `gh pr comment <N> -R <repo> --body-file ...`. After posting, print the comment URL → proceed to Step 4.
+If unmet, **immediately return to Step 3.5.3** and post via the decided medium. After posting, print the URL → proceed to Step 4.
 
 **Forbidden pattern**:
 - Outputting only a classification table of code-reviewer results as text → jumping to the user with "scope of changes?" (Step 5 position)
@@ -108,21 +145,21 @@ If unmet, **immediately return to Step 3.5.3** and run `gh pr comment <N> -R <re
 
 ### Review comment ≠ AI Review Summary (HARD STOP — 5 recurrences 2026-05-22)
 
-The review comment is a Copilot substitute (detailed findings); the Summary is the overall reviewer consolidation (table). **Always post as 2 separate posts** — the Internal Review is always an issue comment, while the Summary's medium (issue comment vs Formal Review body) is decided by `post.md` Step 7. The "single combined post" pattern (Internal Review inlined into the Summary body) is deprecated.
+The Internal Review is a Copilot substitute (detailed findings); the Summary is the overall reviewer consolidation (table). **Always post as 2 separate posts** — the Internal Review medium follows the "Medium decision" table above (review POST when inline targets exist / issue comment otherwise), while the Summary's medium (issue comment vs Formal Review body) is decided by `post.md` Step 7. The "single combined post" pattern (Internal Review inlined into the Summary body) is deprecated.
 
-**Why always 2 comments**: At the Step 5 AskUserQuestion moment, the user must see the review content to decide. The "inline integration when posting Summary" pattern leaves no review medium present at ask time, preventing user decisions. The Internal Review comment is always posted first, independent of the Summary decision.
+**Why always 2 posts**: At the Step 5 AskUserQuestion moment, the user must see the review content to decide. The "inline integration when posting Summary" pattern leaves no review medium present at ask time, preventing user decisions. The Internal Review is always posted first, independent of the Summary decision.
 
-| Condition | Comment count | Posting order |
+| Condition | Post count | Posting order |
 |-----------|--------------|---------------|
-| External AI review exists (Copilot/CodeRabbit Pro) + Internal fallback | 2 | Internal Review comment → Summary |
-| **Internal fallback only (sole source)** | **2** (do not merge into 1) | Internal Review comment → Summary |
+| External AI review exists (Copilot/CodeRabbit Pro) + Internal fallback | 2 | Internal Review → Summary |
+| **Internal fallback only (sole source)** | **2** (do not merge into 1) | Internal Review → Summary |
 | External AI only without Internal Review | 1 | Summary only |
 
 | # | Don't | Do (correct alternative) |
 |---|-------|-------------------------|
-| 1 | "Internal fallback is the sole source, so inline-merge into the Summary" reasoning | Post the Internal Review comment first → then post the Summary separately. Keep media separated |
-| 2 | At Step 5 ask time, show review content only via chat text | Post the Internal Review comment on the GitHub PR right before Step 5 ask — comment URL may be included in the ask option description |
-| 3 | Step 4 → Step 5 direct jump (Step 3.5.3 comment posting omitted) | Strictly follow the order: Step 3.5.3 comment posting → Step 4 classification → Step 5 ask |
+| 1 | "Internal fallback is the sole source, so inline-merge into the Summary" reasoning | Post the Internal Review first → then post the Summary separately. Keep media separated |
+| 2 | At Step 5 ask time, show review content only via chat text | Post the Internal Review on the GitHub PR right before Step 5 ask — its URL may be included in the ask option description |
+| 3 | Step 4 → Step 5 direct jump (Step 3.5.3 posting omitted) | Strictly follow the order: Step 3.5.3 posting → Step 4 classification → Step 5 ask |
 
 ### Reviewer failure detection
 

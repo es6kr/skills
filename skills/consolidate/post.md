@@ -24,6 +24,49 @@ Plain `## AI Review Summary` is forbidden. The link form above is required.
 
 The two comments' superpowers links form a pair (requesting ↔ receiving). When one is updated, verify the other for consistency. **Do not merge them into one or post only one** (omitting Step 3.5.3 = procedure incomplete).
 
+#### Chronological order requirement (HARD STOP)
+
+**The Internal Code Review comment must appear chronologically BEFORE the AI Review Summary comment on the PR timeline** — Step 3.5 precedes Step 7 in the workflow, and that ordering must be visible to anyone scrolling the PR. Reviewers reading the PR scroll top-to-bottom; the Summary is the conclusion and belongs last.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Post AI Review Summary as a new comment when an Internal Review is still pending — Summary lands above the later Internal Review | Post Internal Code Review first (Step 3.5.3) → only then post the Summary (Step 7) so Summary is chronologically last |
+| 2 | After an ad-hoc consolidate bypass that posted Summary first, simply append the Internal Review as a new comment — leaves the paired comments in reversed order | When re-executing consolidate properly, detect the order error and swap contents (see "Order-correction damage control" below) |
+| 3 | Treat the pairing as order-agnostic ("both exist, that's enough") | Order is visible signal: Summary at the bottom = "final consolidated verdict". Summary above Internal Review = confusing |
+
+#### Order-correction damage control — Summary posted before Internal Review (HARD STOP)
+
+**When the AI Review Summary was posted before the Internal Code Review (e.g., during an ad-hoc bypass or a prior consolidate run that completed Step 7 without Step 3.5), do NOT create a third comment to "rebalance".** Swap the contents of the two existing comments by PATCH so the older comment carries the Internal Code Review and the newer comment carries the AI Review Summary.
+
+Procedure:
+
+1. Identify both comments by ID:
+   ```bash
+   # Older comment (currently AI Review Summary, posted by mistake first)
+   gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("# 🤖 AI Review Summary") or startswith("## AI Review Summary")) | .id'
+
+   # Newer comment (currently Internal Code Review, posted after — too late)
+   gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("## Internal Code Review")) | .id'
+   ```
+2. **PATCH the older comment** with the Internal Code Review body (full body, prescribed `## Internal Code Review — [requesting-code-review](...)` title)
+3. **PATCH the newer comment** with the AI Review Summary body (full body, prescribed `## AI Review Summary — [receiving-code-review](...)` title)
+4. Verify the chronological order on the PR page
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Add a third comment containing the AI Review Summary "to put a Summary at the bottom" — pollutes the PR timeline with duplicated Summary content | PATCH the two existing comments to swap content. No new comment |
+| 2 | Delete the older Summary comment and re-post — destroys the comment-ID URL anyone already referenced | PATCH preserves the URL; only the content changes |
+| 3 | Use `minimizeComment` (OUTDATED) on the older Summary as a workaround | Minimize hides the content but does not move it. The order error persists; the swap is the only correct fix |
+| 4 | Update only one of the two comments and leave the other contradicting | Swap is atomic: PATCH both in the same pass so the paired-content invariant holds |
+
+Why PATCH-swap (and not delete + repost): PATCH preserves the comment ID and URL — anyone who linked to either comment (commit message, issue thread, chat) still resolves to a valid comment, just with corrected content. Deletion + repost breaks every existing link.
+
+Self-check (before posting a new Step 7 Summary comment):
+
+1. Does an AI Review Summary already exist on this PR? — `gh api .../comments | jq '.[] | select(.body | startswith("# 🤖 AI Review Summary") or startswith("## AI Review Summary"))'`
+2. If yes, does an Internal Code Review also already exist? — same query for `## Internal Code Review`
+3. If both exist and the Summary's `created_at` precedes the Internal Review's `created_at` → **order is reversed**. Apply the PATCH-swap damage control. Do not create a third comment
+
 ### Medium selection — Mergeable + Formal Review action → unified POST (HARD STOP — 2026-05-22 reinforcement)
 
 The Summary body and the Formal Review body carry the **same verdict information** for Mergeable PRs. Posting them as separate media (issue comment + Formal Review) duplicates content. **When all of the following hold, Summary is posted as the Formal Review body (single POST). Issue comment Summary is forbidden:**
@@ -121,11 +164,12 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 ```markdown
 ## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
 
-| Reviewer | Finding | Status |
-|----------|---------|--------|
-| Copilot | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
-| CodeRabbit | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
-| code-reviewer | 📝 Unused import | 🟡 Minor |
+| # | Source | Severity | Finding | Status |
+|---|--------|----------|---------|--------|
+| 1 | `copilot` | 📝 Minor | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
+| 2 | `coderabbitai` | 🟡 Important | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
+| 3 | Internal Code Review | 📝 Minor | 📝 Unused import | 🟡 Minor |
+| 4 | @reviewer-login | 🟡 Important | 🛠️ DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
 
 [✅ All AI reviews passed. Ready to merge.
 
@@ -144,6 +188,30 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | Critical unresolved | 🔴 | ✅ (looks like no problem) |
 
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
+
+### Source attribution column is MANDATORY (HARD STOP)
+
+**The findings table MUST include a `Source` (or `Reviewer`) column attributing every row to the exact reviewer login it came from** — coderabbitai, copilot, @human-login (e.g., @reviewer-login), Internal Code Review, etc. Composing a findings table with only `# | Severity | Type | Location | Summary` columns strips the audit trail and conflates findings from multiple reviewers into an anonymous pool.
+
+**Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Findings table columns: `# | Severity | Type | Location | Summary` (no source) | Add a `Source` column: `# | Source | Severity | Type | Location | Summary`. Every row's `Source` cell names the exact reviewer login (or `Internal Code Review`) the finding originated from |
+| 2 | Collapse multiple distinct human MEMBER reviewers into a single "Internal Code Review" entry | Each human reviewer login is a separate `Source` value. Internal Code Review is the subagent-generated review only; human collaborator reviews carry the reviewer's GitHub login |
+| 3 | Omit the header reviewer matrix line when one of the sources is a non-bot MEMBER review | The opening `> Reviewer matrix:` line enumerates every source enumerated in `collect.md` Step 3 — bots + human MEMBER/OWNER reviews. Missing any source there = missing it in the table too |
+| 4 | Merge two findings from different sources into one row "to deduplicate" | Keep one row per (source × finding). If two reviewers raised the same finding, write two rows with the same `Location` + `Summary` but distinct `Source`. Deduplication belongs in the chat narrative, not in the table |
+| 5 | Wrap @mentions / SHAs / URLs in backticks in the Source cell or anywhere in the Summary body (e.g., `` `@octocat` ``, `` `de59590` ``, `` `https://...` ``) | Write them bare so GitHub autolinks fire: `@octocat`, `de59590`, `https://github.com/...`. Bot logins (coderabbitai, copilot) are bot identifiers, not human mentions — write them bare without the `@` prefix |
+| 6 | Append role/qualifier parentheses to the Source cell (e.g., `@octocat (MEMBER review)`, `@octocat (OWNER)`) | The `@id` already identifies the reviewer — no role qualifier needed. Source cell carries only the bare identifier: `@octocat`, `coderabbitai`, `Internal Code Review` |
+
+**Self-check (every time before POSTing the Summary)**:
+
+1. Did `collect.md` Step 3 enumerate every reviewer (bot + human MEMBER/OWNER/COLLABORATOR)? Re-run the query if uncertain
+2. Does the Summary's `> Reviewer matrix:` opening line list every enumerated source by name?
+3. Does the findings table have a `Source` column?
+4. Is every row's `Source` cell populated with the exact reviewer login (not blank, not "AI", not "external")?
+5. If a finding was raised by two reviewers independently, are both rows present?
+6. Scan the entire body — does any `@username`, 7+ hex SHA, or full URL sit inside backticks? If yes, unwrap to bare so GitHub autolink fires (per the `git.md` autolink rule)
 
 ## 7-A. Issue comment Summary (when unified POST does NOT apply)
 
@@ -387,6 +455,8 @@ GH_TOKEN="$(gh auth token --user <account>)" \
 ## Optional Inline Review (line-specific annotation — when needed)
 
 **Issue-level Summary is for the PR's overall evaluation. For recommendations targeting a specific line in a specific file, an inline review (line-level annotation) lets the author immediately see which line in the GitHub UI.** Inline is more effective than issue comments for residual recommendations not absorbed in the current PATCH cycle (deferred / post-Severity-downgrade).
+
+> **Primary auto-fire path**: when line-specific findings exist, the Internal Code Review itself is posted as a single reviews API POST at Step 3.5.3 (`body` = full findings + `comments[]` = inline annotations) — policy (Critical+Important default / `--inline` = all; re-review = new POST every time) lives in `internal.md` "Medium decision" + "Inline auto-fire policy". This section provides the shared mechanics (payload, fields, verification) and covers the residual Step 7 case (deferred annotation after user decision).
 
 ### Triggers (recommended when all are met)
 

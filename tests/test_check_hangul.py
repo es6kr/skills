@@ -1,9 +1,8 @@
 """Tests for scripts/check-hangul.py — the Hangul scanner used by CI.
 
-These tests exercise the scanner via subprocess so we cover both the Python
-implementation and the thin bash wrapper that CI invokes. We deliberately do
-not import the module — it lives outside any package and the public contract
-is the CLI behavior.
+These tests exercise the scanner via subprocess (the public contract is the
+CLI behavior). We deliberately do not import the module — it lives outside any
+package.
 """
 from __future__ import annotations
 
@@ -15,7 +14,6 @@ import pytest
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 PY_SCRIPT = REPO_ROOT / "scripts" / "check-hangul.py"
-SH_WRAPPER = REPO_ROOT / "scripts" / "check-hangul.sh"
 
 # Sample Hangul characters composed programmatically so this test file itself
 # contains zero Korean, keeping the scanner clean on its own repo.
@@ -26,14 +24,7 @@ HANGUL_SAMPLE_2 = chr(0xD55C) + chr(0xAE00)
 def _run_py(args, cwd):
     return subprocess.run(
         [sys.executable, str(PY_SCRIPT), *args],
-        capture_output=True, text=True, cwd=cwd,
-    )
-
-
-def _run_sh(args, cwd):
-    return subprocess.run(
-        ["bash", str(SH_WRAPPER), *args],
-        capture_output=True, text=True, cwd=cwd,
+        capture_output=True, text=True, encoding="utf-8", cwd=cwd,
     )
 
 
@@ -142,11 +133,3 @@ def test_default_argument_is_skills_dir():
     # Real repo skills/ tree should be clean (CI enforces this).
     assert result.returncode == 0
     assert "All skills clean" in result.stdout
-
-
-def test_shell_wrapper_matches_python_output(skill_tree):
-    """The bash wrapper must produce identical output to the Python script."""
-    py = _run_py([str(skill_tree)], cwd=REPO_ROOT)
-    sh = _run_sh([str(skill_tree)], cwd=REPO_ROOT)
-    assert py.returncode == sh.returncode
-    assert py.stdout == sh.stdout

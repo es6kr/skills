@@ -35,7 +35,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 | 7 (Auto-Post AI Review Summary + Formal Review) + 7.5 (Status line) + 7.6 (Auto-register Deferred Findings) | [`post.md`](./post.md) | Auto-post the Summary (no user decision) + auto-register Findings to fix_plan `[REVIEW_FEEDBACK]` (defer by default) |
 | 8 (Post-Summary Next-Action Ask) | [`next.md`](./next.md) | Merge/fix-deferred/hold option ask (fix only on explicit user instruction at this step) |
 
-Entry order: Step 1 → 2 → (2.5 multi-PR only) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
+Entry order: Step 1 → 2 → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
 ## Step 1: Identify PR
 
@@ -56,6 +56,62 @@ Skip entirely if any of these are true:
 > **Bash exit code caveat**: `grep -c` returns exit code 1 when there are zero matches. When chaining multiple commands with `grep` last, add a `|| true` guard to prevent false-positive errors.
 
 If skipped, report the reason and stop.
+
+## Step 2.4: Copilot availability pre-check (HARD STOP — auto-fallback, no ask)
+
+**GitHub Copilot Code Review is a paid subscription as of 2025.** Without an active subscription on the acting account or the repo's organization, adding `copilot-pull-request-reviewer` as a reviewer fails silently or returns 422. **Check availability BEFORE Step 2.5 sequential trigger or Step 2.6 re-review trigger. On unavailable → automatically route to Internal Review Fallback (Step 3.5) WITHOUT AskUserQuestion.**
+
+### Availability detection (primary-source signals — confirm via at least one)
+
+| # | Signal | Command | Interpretation |
+|---|--------|---------|----------------|
+| 1 | User-level subscription | `GH_TOKEN="$(gh auth token --user <account>)" gh api /user/copilot_billing 2>&1` | 200 with `seat_breakdown` → available. 404 / "Not Found" → **not available** |
+| 2 | Org-level subscription (org repos only) | `GH_TOKEN="$(gh auth token --user <account>)" gh api /orgs/<org>/copilot/billing 2>&1` | 200 with `seat_breakdown.total` > 0 → available for org members. 404 / 403 → **not available** |
+| 3 | Past behavior on this repo | `gh pr list -R <owner>/<repo> --state all --limit 20 --json reviews --jq '[.[].reviews[]? | select(.author.login == "copilot-pull-request-reviewer")] | length'` | `>0` → repo has historically used Copilot review (likely available). `0` → no historical evidence (unknown) |
+
+**Decision tree** (evaluate in order — each step's exit condition is exclusive):
+
+1. **Fork / cross-org guard (runs BEFORE signal 1's short-circuit)**: if the PR's repo is `isCrossRepository: true` OR `headRepositoryOwner != baseRepositoryOwner`, run signal 3. `0` historical Copilot reviews on this repo → **not available** → auto-fallback to Internal Review (Step 3.5), skip Step 2.5/2.6. `>0` → continue to step 2 (user's subscription may apply on this repo because the bot has reviewed here before).
+2. Run signal 1 (user-level). If 200 with active seat → **available** (skip to Step 2.5/2.6).
+3. If signal 1 = 404:
+   - **Org-owned repo** → run signal 3.0: signal 2 (org-level). If 200 with `seat_breakdown.total > 0` → **available**. If 404 / 403 → **not available** → auto-fallback to Internal Review (Step 3.5).
+   - **User-owned (non-org) repo** → run signal 3 (historical evidence). `>0` → assume **available** (the user previously had a Copilot subscription that worked on this repo). `0` → **not available** → auto-fallback.
+4. Network/auth errors during the check → assume not available (fail safe to Internal Review).
+
+### Auto-fallback (no AskUserQuestion)
+
+When Step 2.4 concludes "not available", **route DIRECTLY into Step 3.5 Internal Review Fallback**. Do NOT:
+
+- Call `AskUserQuestion` asking "Copilot or Internal Review?" — the user already pays the cost of the question by losing time to a forced decision they cannot change (subscription is out-of-band)
+- Wait for the user to explicitly say "use internal review" — that was the prior policy and it is now deprecated
+- Attempt Copilot reviewer add anyway "to see what happens" — it consumes API quota and emits user-visible noise on the PR if it partially succeeds
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Skip Step 2.4 → directly call Step 2.5 sequential → silent Copilot reviewer add fails → wait indefinitely | Run Step 2.4 first. On unavailable → Step 3.5 Internal Review automatic |
+| 2 | On Step 2.4 unavailable result → AskUserQuestion "Copilot or Internal Review?" | Unavailable is a primary-source fact (subscription state). No ask — auto-route to Internal Review |
+| 3 | Report "Copilot unavailable, proceeding with Internal Review" and stop, waiting for user OK | Report the same line **and continue executing Step 3.5** in the same turn. The report is a transparency note, not a gate |
+| 4 | Interpret 404 from `/user/copilot_billing` as "auth issue, retry with elevated scope" | 404 on this endpoint = no Copilot subscription (the endpoint exists and returns 404 only when the resource is absent). Treat as authoritative |
+| 5 | Cache availability across sessions ("user had no Copilot 2 weeks ago, still no") | Subscription can change. Run signal 1 every consolidate invocation. The check is one `gh api` call — cost is negligible |
+| 6 | When historical evidence (signal 3) shows past Copilot reviews on this repo but signal 1/2 returns 404 → assume "the bot was kicked off, manually add it back" | Past behavior is informational. Authoritative state is signal 1/2. If they return 404 → not available now → fallback |
+
+### Self-check (every time before Step 2.5/2.6 entry)
+
+1. Did you run signal 1 (`/user/copilot_billing`) in this consolidate session?
+2. If signal 1 returned 404/error → did you check signal 2 (org billing) when the repo is under an org?
+3. If signal 1+2 both indicate unavailable → did you skip Step 2.5/2.6 and route DIRECTLY into Step 3.5?
+4. Did you avoid calling AskUserQuestion for "Copilot vs Internal Review" branching? (Auto-fallback policy — ask forbidden)
+5. Did you record the unavailable-status note in the eventual AI Review Summary's reviewer matrix (so the reader knows why Copilot is absent)?
+
+### Reporting note (include in Summary reviewer matrix)
+
+When availability check returns "not available", the AI Review Summary's reviewer matrix should include a row noting the substitution. Example:
+
+```markdown
+> Reviewer matrix: **CodeRabbit** (walkthrough + actionable) + **Internal Code Review** (Copilot unavailable on the acting account/org — auto-fallback per Step 2.4).
+```
+
+This preserves transparency: the reader sees Copilot absence as a deterministic policy result, not as a missed review.
 
 ## Step 2.5: Sequential Copilot Review Execution (when consolidating multiple PRs)
 

@@ -8,6 +8,35 @@ Entry: `Skill("consolidate", "next ...")` or `pr.md` Workflow Step 8.
 
 Immediately after the Status line output, **ask the user for the PR handling direction**. Terminating without presenting options = procedural violation, **except** when the routing table below explicitly permits skipping (i.e., the only possible follow-up is "defer", so there is genuinely no actionable next step).
 
+### Finding-first ordering (HARD STOP — finding decision precedes merge)
+
+**When the PR has actionable findings, the finding-handling decision is a SEPARATE axis that PRECEDES the merge decision.** Do not lead with the merge question, and do not present finding-handling + merge as a `questions` array in a single turn — they form a dependency chain (a preceding decision determines the meaning of the following one → sequential ask), not parallel tracks.
+
+| Precedent axis (ask FIRST) | Dependent axis (ask AFTER the finding answer) |
+|----------------------------|-----------------------------------------------|
+| Finding handling (which findings to apply / defer) | Merge (merge content/timing depends on whether findings are applied first) |
+
+**Why finding-first**: applying a finding changes what gets merged (fix → reflected in branch → then merge) vs defer (merge as-is). The merge option's meaning is undetermined until the finding decision is made — leading with merge inverts the dependency.
+
+**Post-hoc review PR (HARD STOP)**: when the PR exists specifically to retrospectively review already-merged/deployed commits (see MEMORY "post-hoc review PR" workflow), **finding resolution IS the PR's purpose**. Merge (e.g., develop alignment) is strictly secondary — ask the finding-handling axis first; never lead with the merge question.
+
+**Post-hoc review PR finding options exclude "defer" (HARD STOP)**: since finding resolution is the very reason the PR exists, the finding-handling ask must NOT offer a "defer all (track only)" option — deferring the findings contradicts the PR's purpose ("pulled it in to review, why defer the review?"). The finding axis is a **scope decision only** (which findings to fix — e.g., "essential mismatches only" vs "all C+I"), and the chosen scope is **applied immediately**, not deferred. A "defer all" option belongs to normal PRs where merge is the goal; on a post-hoc review PR it is forbidden.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Put the merge question as Q1 and finding-handling as Q2 | Finding-handling axis is asked FIRST; merge is a follow-up after the finding answer |
+| 2 | Present merge + finding-handling as a `questions` array in one turn | Dependency axis → sequential: 1st finding-handling, then (after the answer) merge |
+| 3 | On a post-hoc review PR, lead with "merge to develop?" | Post-hoc review PR purpose = finding resolution. Lead with finding handling; merge secondary |
+| 4 | Treat finding-handling and merge as parallel tracks | They are a dependency chain — the finding result determines the merge content |
+| 5 | Offer "defer all (track only)" as a finding option on a post-hoc review PR | Post-hoc review PR = finding resolution is the purpose. Finding options are scope-only (which to fix), applied immediately. No defer-all option |
+
+**Self-check (Step 8 entry, before any AskUserQuestion)**:
+1. Does the PR have 1+ actionable findings? → If yes, finding-handling is a precedent axis
+2. Is this a post-hoc review PR (PR exists to review already-merged commits)? → If yes, finding-first is mandatory
+3. Am I about to present merge + finding-handling in one `questions` array? → STOP. Split: finding-handling first, merge as a sequential follow-up
+4. Is the merge question leading (Q1)? → If findings exist, invert: finding-handling leads
+5. Is this a post-hoc review PR? → finding options must NOT include "defer all" (deferring contradicts the PR's purpose). Offer scope choices only (which findings), applied immediately
+
 ### Routing: next vs wip
 
 | Situation | Skill to use | Reason |
@@ -16,7 +45,44 @@ Immediately after the Status line output, **ask the user for the PR handling dir
 | Consolidating multiple PRs in sequence | `Skill("wip")` | 1 question per task for independent per-PR decisions (questions array up to 4) |
 | Fewer than 1 follow-up action (no option other than defer) | Skip ask, terminate with report | Clearly no next step |
 
-### Option composition guide (single PR — next skill)
+### Authorship gate — no merge option on others' PRs (HARD STOP)
+
+**Before composing any merge option, confirm the PR author is the current account.** consolidate is a review tool — when you are a *requested reviewer* on someone else's PR, your role ends at APPROVE / review feedback. Merging is the **author's** domain (branch ownership — same principle as `decide.md` Step 6 "branch ownership check before fixing", extended to merge-option presentation). For a PR authored by someone else, **do not present a merge option at all** (not even as a non-Recommended option).
+
+```bash
+# Pre-check before merge-option composition
+AUTHOR=$(gh pr view <N> -R <owner>/<repo> --json author --jq '.author.login')
+
+# The comparison target is the API identity of the gh account being used for THIS repo
+# (per ~/.agents/rules/git.md account mapping: es6kr → DrumRobot, daegunsoftDev → daegunjhy).
+# Do NOT use `gh auth status` "active" account — when multiple accounts are logged in,
+# the active one can differ from the account whose token is actually being used for the repo.
+# Do NOT use `git config user.email` — commit identity ≠ GitHub API identity.
+ACCOUNT_FOR_REPO=$(  # the gh user matching the repo owner per git.md mapping
+  case "<owner>" in
+    es6kr) echo DrumRobot ;;
+    daegunsoftDev|daegunjhy) echo daegunjhy ;;
+    *) gh auth status 2>&1 | awk '/Logged in/{print $7; exit}' ;;
+  esac
+)
+ME=$(GH_TOKEN="$(gh auth token --user "$ACCOUNT_FOR_REPO")" gh api /user --jq '.login')
+# Mismatch ($AUTHOR != $ME) → no merge option
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Present "Squash merge (Recommended)" on a PR authored by someone else | Author ≠ me → omit merge options entirely. Offer review-scoped options only (relay deferred findings to author / hold / done) |
+| 2 | "4 merge conditions met → recommend merge" regardless of authorship | 4-condition check is necessary but not sufficient. Authorship is a prerequisite gate for any merge option |
+| 3 | Treat APPROVE on another's PR as license to drive the merge | APPROVE satisfies the review request; the merge decision/timing belongs to the author |
+| 4 | Offer "apply Minor then merge" on another's branch | Code changes on another's branch are forbidden (branch ownership). Deferred findings are already in the Internal Review comment for the author |
+
+**Self-check (before composing options on a consolidate-completed PR)**:
+1. `gh pr view <N> --json author` → capture `$AUTHOR`.
+2. Resolve `$ACCOUNT_FOR_REPO` per the owner → account mapping (`~/.agents/rules/git.md`), then `$ME = gh api /user --jq '.login'` with that account's token. **Do not** compare against `gh auth status` "active" account or `git config user.email`.
+3. If `$AUTHOR != $ME` → merge options forbidden. Options = "relay deferred findings to author / hold / done (review complete)". Report APPROVED state + that merge is the author's call.
+4. If `$AUTHOR == $ME` → proceed to the merge-condition option guide below.
+
+### Option composition guide (single PR — next skill, **own-authored PRs only**)
 
 To pass the `block-merge-without-review.sh` guard, **the merge option description must explicitly include "AI Review Summary posted (URL)"**.
 
@@ -146,10 +212,6 @@ A **Reject-only application option** is also possible (e.g., Accept defer + Reje
 3. Did you state the Reject rationale in the option description? (gives the user info to judge "is that rationale enough? override?")
 4. If only "Accept only" / "Defer only" options are presented = violation (Reject override omitted)
 
-#### Violation case (2026-05-24, 1st occurrence)
-
-In the PR #13 consolidate next-action ask, the Track A options were presented only as "apply 3 deferred Minor" / "keep Defer" / "hold". CodeRabbit Finding 1 (release-please.yml SHA pin) Major was auto-classified as Reject on repo-convention grounds and excluded from the options entirely. The user signaled Reject-override intent with "fix them all together". **The Reject finding was not exposed as a separate option, stripping the user's decision authority.**
-
 ### Invocation pattern
 
 ```text
@@ -165,9 +227,10 @@ The next skill performs the AskUserQuestion call + result handling. The consolid
 ### Self-check (on Step 8 entry)
 
 1. Was the Step 7.5 status line output?
-2. Is there at least 1 PR handling direction candidate? (including defer)
-3. If a merge option is among the candidates, does the description include the attestation?
-4. For a single PR, did you decide to route to next; for multiple PRs, to wip?
+2. **Is the PR authored by the current account?** (`gh pr view <N> --json author`) → If **no**, merge options are FORBIDDEN (see "Authorship gate" above). Offer review-scoped options only
+3. Is there at least 1 PR handling direction candidate? (including defer)
+4. If a merge option is among the candidates: (a) is the PR self-authored? (b) does the description include the attestation?
+5. For a single PR, did you decide to route to next; for multiple PRs, to wip?
 
 ### Don't / Do
 
@@ -177,6 +240,7 @@ The next skill performs the AskUserQuestion call + result handling. The consolid
 | 2 | Avoid the ask by reporting "awaiting explicit user instruction" | Defer is also an option — proceed with the ask |
 | 3 | Omit attestation from the merge option description | Include "AI Review Summary posted (URL)" → passes block-merge-without-review.sh |
 | 4 | Compress 4 PRs into next during a multi-PR consolidate | Route to wip (1 question per PR) |
+| 5 | Present a merge option on a PR authored by someone else | Authorship gate first — author ≠ me → no merge option; relay deferred findings to author / hold / done |
 
 ## Workflow termination
 

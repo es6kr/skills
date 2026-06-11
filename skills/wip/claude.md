@@ -258,6 +258,34 @@ date -u +"%Y-%m-%dT%H:%M:%SZ"
 | Waiting (long — 30+ min) | `"rate limit clears at: HH:MM UTC (in N hours). Prefer other work first"` |
 | No timing in the body | `"walkthrough pending (unlock time unknown — body parsing failed)"` (explicit) |
 
+## Copilot Rate Limit Sharing (HARD STOP)
+
+When a Copilot rate limit is detected (e.g. from GitHub Actions run failures containing "limit to reset in N hours M minutes"), the reset timestamp must be written to the shared cache to prevent other sessions from running blocked Copilot requests:
+
+1. **Calculate the reset timestamp** in ISO 8601 UTC format.
+2. **Write the reset timestamp** to `~/.claude/copilot-rate-limit.json`:
+   ```bash
+   echo '{"reset_at": "YYYY-MM-DDTHH:MM:SSZ"}' > ~/.claude/copilot-rate-limit.json
+   ```
+3. The `PreToolUse: Bash` hook (`~/.claude/hooks/block-copilot-rate-limit.sh`) intercepts `copilot-pull-request-reviewer` commands when the cache is present. **The hook MUST verify `reset_at >= now` before blocking** — a stale cache (timestamp already in the past) must not keep blocking. Hook contract (mandatory in the implementation):
+
+   ```bash
+   # ~/.claude/hooks/block-copilot-rate-limit.sh (pseudo)
+   CACHE=~/.claude/copilot-rate-limit.json
+   [[ -f "$CACHE" ]] || exit 0  # no cache → allow
+   RESET=$(jq -r .reset_at "$CACHE")
+   NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+   if [[ "$RESET" < "$NOW" ]]; then
+     rm -f "$CACHE"     # auto-cleanup stale cache
+     exit 0             # allow — limit has cleared
+   fi
+   # reset_at > now → still rate-limited
+   echo "Copilot rate limit active until $RESET" >&2
+   exit 2
+   ```
+
+4. **Cleanup responsibility**: the hook (step 3) is the primary cleanup path. As a backup, any session that detects `reset_at < now` while reading the file (e.g., during a `/wip` lookup or consolidate Step 2.4) should also `rm -f ~/.claude/copilot-rate-limit.json` so the next Copilot invocation is not gated by stale data.
+
 ## Compact recovery
 
 After a compact, restore the prior work state (a precursor to resume.md Step 1).
