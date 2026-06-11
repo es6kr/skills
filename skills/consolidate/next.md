@@ -52,7 +52,21 @@ Immediately after the Status line output, **ask the user for the PR handling dir
 ```bash
 # Pre-check before merge-option composition
 AUTHOR=$(gh pr view <N> -R <owner>/<repo> --json author --jq '.author.login')
-# Compare AUTHOR against the current gh active account. Mismatch → no merge option
+
+# The comparison target is the API identity of the gh account being used for THIS repo
+# (per ~/.agents/rules/git.md account mapping: es6kr → DrumRobot, daegunsoftDev → daegunjhy).
+# Do NOT use `gh auth status` "active" account — when multiple accounts are logged in,
+# the active one can differ from the account whose token is actually being used for the repo.
+# Do NOT use `git config user.email` — commit identity ≠ GitHub API identity.
+ACCOUNT_FOR_REPO=$(  # the gh user matching the repo owner per git.md mapping
+  case "<owner>" in
+    es6kr) echo DrumRobot ;;
+    daegunsoftDev|daegunjhy) echo daegunjhy ;;
+    *) gh auth status 2>&1 | awk '/Logged in/{print $7; exit}' ;;
+  esac
+)
+ME=$(GH_TOKEN="$(gh auth token --user "$ACCOUNT_FOR_REPO")" gh api /user --jq '.login')
+# Mismatch ($AUTHOR != $ME) → no merge option
 ```
 
 | # | Don't | Do |
@@ -63,9 +77,10 @@ AUTHOR=$(gh pr view <N> -R <owner>/<repo> --json author --jq '.author.login')
 | 4 | Offer "apply Minor then merge" on another's branch | Code changes on another's branch are forbidden (branch ownership). Deferred findings are already in the Internal Review comment for the author |
 
 **Self-check (before composing options on a consolidate-completed PR)**:
-1. `gh pr view <N> --json author` → is the author the current account?
-2. If **no** → merge options forbidden. Options = "relay deferred findings to author / hold / done (review complete)". Report APPROVED state + that merge is the author's call
-3. If **yes** → proceed to the merge-condition option guide below
+1. `gh pr view <N> --json author` → capture `$AUTHOR`.
+2. Resolve `$ACCOUNT_FOR_REPO` per the owner → account mapping (`~/.agents/rules/git.md`), then `$ME = gh api /user --jq '.login'` with that account's token. **Do not** compare against `gh auth status` "active" account or `git config user.email`.
+3. If `$AUTHOR != $ME` → merge options forbidden. Options = "relay deferred findings to author / hold / done (review complete)". Report APPROVED state + that merge is the author's call.
+4. If `$AUTHOR == $ME` → proceed to the merge-condition option guide below.
 
 ### Option composition guide (single PR — next skill, **own-authored PRs only**)
 

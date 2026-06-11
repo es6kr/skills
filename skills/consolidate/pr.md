@@ -35,7 +35,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 | 7 (Auto-Post AI Review Summary + Formal Review) + 7.5 (Status line) + 7.6 (Auto-register Deferred Findings) | [`post.md`](./post.md) | Auto-post the Summary (no user decision) + auto-register Findings to fix_plan `[REVIEW_FEEDBACK]` (defer by default) |
 | 8 (Post-Summary Next-Action Ask) | [`next.md`](./next.md) | Merge/fix-deferred/hold option ask (fix only on explicit user instruction at this step) |
 
-Entry order: Step 1 → 2 → (2.5 multi-PR only) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
+Entry order: Step 1 → 2 → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
 ## Step 1: Identify PR
 
@@ -69,13 +69,14 @@ If skipped, report the reason and stop.
 | 2 | Org-level subscription (org repos only) | `GH_TOKEN="$(gh auth token --user <account>)" gh api /orgs/<org>/copilot/billing 2>&1` | 200 with `seat_breakdown.total` > 0 → available for org members. 404 / 403 → **not available** |
 | 3 | Past behavior on this repo | `gh pr list -R <owner>/<repo> --state all --limit 20 --json reviews --jq '[.[].reviews[]? | select(.author.login == "copilot-pull-request-reviewer")] | length'` | `>0` → repo has historically used Copilot review (likely available). `0` → no historical evidence (unknown) |
 
-**Decision tree**:
+**Decision tree** (evaluate in order — each step's exit condition is exclusive):
 
-1. Run signal 1 (user-level). If 200 with active seat → **available** (skip to Step 2.5/2.6)
-2. If 404 → run signal 2 (org-level) when the repo is under an org
-3. If both 1 and 2 return 404/403 → **not available** → auto-fallback to Internal Review (Step 3.5), skip Step 2.5/2.6
-4. If signal 1 is 200 but the PR's repo is fork/cross-org → run signal 3. If `0` historical reviews on this repo → assume not available for this repo → fallback
-5. Network/auth errors during the check → assume not available (fail safe to Internal Review)
+1. **Fork / cross-org guard (runs BEFORE signal 1's short-circuit)**: if the PR's repo is `isCrossRepository: true` OR `headRepositoryOwner != baseRepositoryOwner`, run signal 3. `0` historical Copilot reviews on this repo → **not available** → auto-fallback to Internal Review (Step 3.5), skip Step 2.5/2.6. `>0` → continue to step 2 (user's subscription may apply on this repo because the bot has reviewed here before).
+2. Run signal 1 (user-level). If 200 with active seat → **available** (skip to Step 2.5/2.6).
+3. If signal 1 = 404:
+   - **Org-owned repo** → run signal 3.0: signal 2 (org-level). If 200 with `seat_breakdown.total > 0` → **available**. If 404 / 403 → **not available** → auto-fallback to Internal Review (Step 3.5).
+   - **User-owned (non-org) repo** → run signal 3 (historical evidence). `>0` → assume **available** (the user previously had a Copilot subscription that worked on this repo). `0` → **not available** → auto-fallback.
+4. Network/auth errors during the check → assume not available (fail safe to Internal Review).
 
 ### Auto-fallback (no AskUserQuestion)
 
