@@ -22,14 +22,30 @@ if ! command -v uvx >/dev/null 2>&1; then
   exit 1
 fi
 
+# Pick the first python that actually runs. A bare `command -v python3` is not
+# enough on Windows, where `python3` resolves to a non-functional Microsoft
+# Store App Execution Alias stub; probe each candidate so the broken stub is
+# skipped in favour of a working `python`. CI (real python3) matches first.
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import sys" >/dev/null 2>&1; then
+    PY="$cand"
+    break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "no working python interpreter found on PATH" >&2
+  exit 1
+fi
+
 # CI job: frontmatter-lint
 echo "Checking SKILL.md frontmatter (scripts/lint-frontmatter.sh)..."
 bash scripts/lint-frontmatter.sh
 
 # CI job: hangul-check — blocks Korean text in English skill content before it
 # reaches CI. This is the gate that was previously missing from pre-push.
-echo "Checking for Korean text (scripts/check-hangul.sh skills)..."
-bash scripts/check-hangul.sh skills
+echo "Checking for Korean text (scripts/check-hangul.py skills)..."
+"$PY" scripts/check-hangul.py skills
 
 # CI job: bats (Structure Tests) — run the whole tests/ dir, not a single file.
 echo "Running bats tests (tests/)..."
