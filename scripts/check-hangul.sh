@@ -19,14 +19,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Prefer python3; fall back to python so this works on minimal environments
-# (CI runners always have python3; this fallback is for older user setups).
-if command -v python3 >/dev/null 2>&1; then
-  PY=python3
-elif command -v python >/dev/null 2>&1; then
-  PY=python
-else
-  echo "check-hangul.sh: python3 not found on PATH" >&2
+# Pick the first interpreter that actually runs. A bare `command -v python3`
+# check is not enough on Windows, where `python3` resolves to a non-functional
+# Microsoft Store App Execution Alias stub (exits non-zero / opens the Store).
+# Probe each candidate with a trivial program so the broken stub is skipped in
+# favour of a working `python`. CI runners (real python3) match the first probe.
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import sys" >/dev/null 2>&1; then
+    PY="$cand"
+    break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "check-hangul.sh: no working python interpreter found on PATH" >&2
   exit 2
 fi
 
