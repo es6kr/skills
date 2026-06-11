@@ -20,6 +20,48 @@ gh pr checks <PR_NUMBER>
 - If any `fail`, stop. If `pending`, wait.
 - Required to be confirmed **in real time** — don't rely on a state recorded in fix_plan.
 
+#### CI rerun result verification (MANDATORY when `gh run rerun` / `gh workflow run` was invoked)
+
+After triggering CI (`gh run rerun <run-id> --failed`, `gh workflow run`, etc.) the **final result must be reported** — reporting only "in_progress" is forbidden.
+
+Procedure:
+1. Trigger: `gh run rerun <run-id> --failed` or `gh workflow run`
+2. Wait for completion: `gh run watch <run-id>` (or poll `gh run view --json status,conclusion` every 30s)
+3. Report SUCCESS/FAILURE; on failure, summarize the root cause
+
+If the wait is expected to exceed 2 minutes, launch `gh run watch` with `run_in_background: true` and report on the completion notification.
+
+#### Post-CI followup decision table (MANDATORY after CI SUCCESS)
+
+After confirming CI success, run this table sequentially — do not stop at "CI passed".
+
+| Condition | Action | Command |
+|-----------|--------|---------|
+| CI SUCCESS | **Check whether the AI Review Summary comment is posted** | `gh pr view <N> --json comments` → search for the user-authored AI Review Summary comment |
+| AI Review Summary **missing** | **Run `/consolidate pr-review` FIRST** — consolidate precedes Test Plan verification, which only runs after consolidate completes | `Skill("consolidate", "pr-review")` |
+| AI Review Summary **posted** (or consolidate-exempt PR) | Check the PR body Test Plan | `gh pr view <N> --json body` |
+| Test Plan has unchecked `- [ ]` items | Verify the unchecked items (deploy, Playwright, API call, etc.) → on pass, mark `- [x]` | `gh pr edit <N> --body` |
+| Test Plan fully `[x]` | Record CI success in `fix_plan.md` and check off the entry | Edit `fix_plan.md` |
+| Related issue exists | Check off the relevant items in the issue body checklist | `gh issue edit <N> --body` |
+| All complete | Move to the next pending item (fix_plan or TaskList) | — |
+
+**CI success ≠ work complete**: every Test Plan item checked + fix_plan reflected + issue body updated is the actual completion criterion.
+
+##### Direct-to-master projects (no PR) — fix_plan reflection still mandatory
+
+For projects pushing directly to master (e.g., infra-provisioning repos), commit + push + CI success **still requires** `fix_plan.md` reflection.
+
+| Condition | Action |
+|-----------|--------|
+| commit + push + CI passed | Mark the relevant `fix_plan.md` item `[x]` or update its status |
+| Related TaskList entry exists | `TaskUpdate(status: "completed")` |
+| New infrastructure artifact (deploy, migration, etc.) | Record the result in `fix_plan.md` (commit SHA, environment, status) |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Stop at "commit + CI confirmed" without updating `fix_plan.md` | Update the relevant `fix_plan.md` entry to `[x]` + `TaskUpdate completed` |
+| 2 | Assume "no PR workflow, so no fix_plan update needed" | Whether PR-based or master-push, `fix_plan` reflection is equally mandatory |
+
 ### 2. AI Review Summary — every Actionable item addressed
 
 **Default procedure (HARD STOP — strict order)**:
@@ -124,7 +166,8 @@ If ≥1 `[post-merge]` items exist, confirm they are registered in a tracking me
 
 ```bash
 # Extract [post-merge] items from the PR body
-gh pr view <PR_NUMBER> --json body --jq '.body' | grep -E '^\- \[.\] \`\[post-merge\]\`'
+# Category prefix output format is **[post-merge]** (bold bracket); tolerate legacy `[post-merge]` (backtick) too.
+gh pr view <PR_NUMBER> --json body --jq '.body' | grep -E '^- \[.\] (\*\*|`)\[post-merge\]'
 
 # Verify each item names a tracking link (issue # or fix_plan path)
 # 0 items without a tracking link is required to merge
@@ -134,6 +177,54 @@ gh pr view <PR_NUMBER> --json body --jq '.body' | grep -E '^\- \[.\] \`\[post-me
 |---|-------|-----|
 | 1 | `[post-merge]` item without a tracking medium → post-merge verification gets dropped | Inline `(tracking: gh issue #N)` or `(tracking: fix_plan.md [BLOCKED])` in the item description before merging |
 | 2 | Misclassify essential validation as `[post-merge]` to bypass the merge guard | Apply the "essential vs adjacent follow-up" self-check — essential validation belongs to `[general]` / `[UI]` |
+
+#### Runtime-verification → PR-body sync (HARD STOP)
+
+After verifying a Test Plan item at runtime (API call, Playwright, `curl`, etc.), immediately mark the corresponding `- [ ]` in the **PR body** to `- [x]`. Checking only `fix_plan.md` is insufficient — the PR body is the primary tracking medium.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Check off `fix_plan.md` `[x]` but skip updating the PR body | `fix_plan` `[x]` + `gh pr edit --body` so the PR body also shows `[x]` |
+| 2 | Conclude "the PR is MERGED, so updating the body is pointless" | A MERGED PR body can still be edited — record the verification trail for auditability |
+
+#### "Check the Test Plan" command handling (HARD STOP)
+
+When the user issues "check the PR Test Plan", "verify tests", "check it for me", etc., **all items must be re-run + results reported + then [x]/[ ] decided**. A simple grep that keeps existing `[x]` rows untouched and PATCHes only unchecked rows is a violation. Per-item workflow: **(a) execute → (b) report result → (c) decide [x]/[ ]**.
+
+##### Per-item handling
+
+| Item type | Execution medium | Treatment |
+|-----------|-----------------|-----------|
+| `pnpm test` / `pnpm check-types` / unit-test command | Run directly on the PR head commit (or a worktree) | Pass → `[x]` + result meta (e.g., "313/313 PASS, YYYY-MM-DD") / Fail → `[ ]` + reason |
+| `CI E2E` / `Playwright` / other CI-run items | Query latest CI run result (`gh run view <ID>`) | `conclusion=success` → `[x]` + run ID + date / unrun or failed → `[ ]` |
+| `curl <URL>` / `[runtime] <service> behavior` | Call directly (or via Playwright) | Verified response → `[x]` + response status + date / Fail → `[ ]` + response body |
+| `[post-merge]` / `[deploy]` prefix | Out of this cycle (separate post-merge cycle) | Keep `[ ]` + note "out of this cycle — follow-up work" |
+| **Existing `[x]` items (already checked)** | Re-run if visibility is in doubt (env drift, time passed) | Re-verified → keep `[x]` + add re-check meta / Re-fail → flip to `[ ]` + report |
+
+##### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "Already `[x]`, so skip" — only PATCH the unchecked items | **Re-run every item**. After environment changes (drift, time), re-verification is the 1st-priority outcome |
+| 2 | PATCH PR-body Test Plan `[x]` based only on overall CI status | Map each Test Plan item to the specific CI job that verified it → state job conclusion + run ID + date |
+| 3 | Mark `[x]` from a code Read / `package.json` script inspection ("it could run, so I declare pass") | **Actually execute the command + capture output**. Reading code is not a verification medium |
+| 4 | One command (`pnpm --filter dt test`) produces N `[x]` marks at once | Map each Test Plan item to the command executed 1:1 in the report. Unmapped items stay `[ ]` |
+| 5 | Report only the unchecked items PATCHed; skip re-verifying existing `[x]` | Re-verify the existing `[x]` in this same cycle and report the result (add "re-verified pass" meta) |
+| 6 | Omit result meta (run ID / date / response status / N/M PASS) | Each `[x]` carries verification medium + result + date so future readers can trace "when, by what, verified" |
+
+##### Self-check (every time the user issues "check Test Plan")
+
+1. Enumerate **every** Test Plan item in the PR body (`[x]` and `[ ]`). Reporting only the unchecked rows is forbidden
+2. Identify each item's execution medium (match the table above)
+3. Re-run **every item** (including existing `[x]`). Map results 1:1 per item in the report
+4. After reporting, decide `[x]`/`[ ]` → `gh pr edit --body` or `gh api PATCH .../pulls/<N>` (multi-line bodies go via a JSON file per `git.md`)
+5. `[post-merge]` / `[deploy]` items: stay `[ ]` and note "out of this cycle"
+6. Summarize the report as "Test Plan re-run: X/Y passing, Z out of cycle"
+
+##### Exceptions
+
+- User explicitly says "only the unchecked items" / "verify only the unchecked" → skipping re-verification of existing `[x]` is allowed
+- Without an explicit instruction, default = re-run all
 
 Legacy PRs (Test Plan without category prefix): the existing HARD STOP applies — if even one `- [ ]` is unchecked, you cannot merge. For items not executable before merge, change to a tracking annotation like `- [x] (verify post-deploy — tracked in issue #N)` + AskUserQuestion approval (but NEVER use the tracking annotation to bypass essential validation).
 
@@ -445,3 +536,19 @@ gh pr view <N> --json reviews -q '[.reviews[] | select(.state == "APPROVED") | .
 ```
 
 **Any one of the four unsatisfied = the AskUserQuestion options must NOT include "merge"**. Offer "address <missing condition> then merge" instead.
+
+## Merging requires explicit user instruction — no autonomous push (HARD STOP)
+
+**"All Test Plan items [x]" = mergeable**, not "proceed with merge". Merging is a separate decision.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Verification complete → auto-check 4 merge conditions + present a merge option AskUserQuestion | Report verification complete and end. Enter the merge flow only when the user explicitly says "merge" |
+| 2 | Treat "Test Plan all [x]" as a merge trigger | "Test Plan all [x]" is a verification-complete marker only. The merge decision belongs to the user |
+| 3 | Auto-offer "AI Review Summary post" right after verification | Summary posting comes after the merge decision. Without merge intent, hold the Summary too |
+| 4 | Auto-map "next unfinished item" = "merge or follow-up PR" | "Next unfinished item" is only an explicit fix_plan / TaskList entry. The merge is excluded unless explicitly listed |
+
+**Self-check (every time after verification completes)**:
+1. Did the user use the explicit words "merge" / "proceed with merge" / "ship it"? → If no, do NOT present a merge option
+2. Verification work and merge work are separate. End with the verification-complete report
+3. Including a merge option in the AskUserQuestion = rule violation (pressures the user into the merge decision)

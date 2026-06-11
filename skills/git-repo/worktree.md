@@ -195,6 +195,115 @@ User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktre
 
 **Verdict**: Failing any of items 1-4 = matrix check skipped = rule violation
 
+## Inactive worktree inventory before creating a new one (HARD STOP)
+
+**When a worktree is needed, inspect existing worktrees before creating a new one with `git worktree add`.**
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Default to creating a new worktree with `git worktree add` whenever one is needed | Run `git worktree list` first → identify inactive / merged-PR worktrees → reuse via `/git-repo rename-worktree` or `/git-repo move-worktree` |
+| 2 | AskUserQuestion options default to "create new and remove later" | Include "rename and reuse an inactive worktree" whenever at least one inactive candidate exists |
+| 3 | Ignore worktrees pinned at the merge commit of a merged PR | The base commit hash matching a merge commit = a reuse candidate |
+
+See the "Worktree decision tree" section above for the full procedure.
+
+## Branch state check before starting a new commit (HARD STOP)
+
+**Before committing new work (or before presenting commit-method options via AskUserQuestion), check whether the current branch has uncommitted changes from another task.** When other work is mixed in on a shared branch (main/master/develop), the commit can conflict with that other intent, and `git push` risks conflict/rollback. When detected, **split into a worktree or create a new branch first**.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Right after Edit, present commit options (PR branch / master push / hold) via AskUserQuestion without checking | Before composing the options, run `git status` — if other-task changes are present, include the "split into worktree" option |
+| 2 | Current branch is main/master/develop with unstaged/staged changes; still run `git add <new-file>` | Run `git status` → if changes belong to another task, split via `/git-repo` into a new worktree → commit there |
+| 3 | Assume "only my changes are staged, so other changes don't matter" | The same push can include unpushed commits from another task, and other dirty working-directory state can leak into the next step |
+| 4 | Omit "split into worktree" from the commit-options AskUserQuestion list | When branch is main/master/develop AND there are 1+ other-task changes, "split into worktree" is a required option |
+| 5 | Leave another task's unstaged changes in place and push only the new commit | Confirm the other-task intent (report to the user) → split into a worktree or separate it into another task |
+| 6 | **Place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **If 1+ inactive worktree candidates exist, place "rename and reuse" as option 1 / Recommended**. New goes to option 2 or lower. See the "Recommended placement rule" table above |
+| 7 | Assume "worktree split = move the working-tree changes out of the current repo" (stash + checkout) when the current repo is a live runtime environment whose working tree state is actively consumed by the user (e.g., `~/.agents` — rules are loaded always_on, skills are hardlinked to `~/.claude/skills/`) | Distinguish two split modes: **(a) move** — stash + checkout to a new branch (default for one-off feature work) vs **(b) copy** — leave the source working tree untouched + replicate the diff into a separate worktree via `cp`/`rsync` and commit there. Use (b) whenever the source repo's working tree is a live runtime environment. The source working tree must not change state for the user during commit/PR |
+
+### Self-check (every time before presenting commit options)
+
+1. `git -C <repo> status --short` — list of changed files
+2. `git -C <repo> branch --show-current` — current branch
+3. Branch is main/master/develop AND ≥2 changes (mine + other) → **worktree split is mandatory**
+4. Only my single-task change AND branch is PR/feature → commit in place
+5. Unpushed commits present → `git log @{u}..HEAD --oneline` — if another task's commits are mixed in, a separate push strategy is needed
+
+### worktree split decision tree
+
+```
+git status (changes)
+  ├─ Only mine (1 task), branch = PR/feature → commit in place
+  ├─ Mine + other-task, branch = main/master/develop → /git-repo worktree split mandatory
+  ├─ Only mine, branch = main/master/develop → present both "create PR branch in place" and "split into worktree + create PR branch"
+  └─ Another task in progress on a PR branch → leave it alone. Return to main and create a new worktree
+```
+
+### Failure case
+
+See failed-attempts.md HOT entry "worktree split option missing in commit-method ask".
+
+## Branch verification before editing code on issue work (HARD STOP)
+
+**When making a code change tied to an issue number (#N), verify the current branch is the issue's branch BEFORE running Edit/Write.**
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Editing for #326 while on `feat/222-backchannel-logout` | `git branch --show-current` → issue number mismatch → create the issue branch first |
+| 2 | After registering a task via /wip, edit code without verifying branch | Register → `git branch --show-current` → for a github-flow project, ensure issue branch → Edit |
+| 3 | "It's a small fix, current branch is fine" thinking | Even a one-line change: a github-flow project requires the issue branch (MEMORY.md reference) |
+
+**Self-check (every time before Edit/Write)**:
+1. Does the current branch name include the in-flight issue number?
+2. If not, is this project github-flow? (check MEMORY.md)
+3. github-flow + issue number mismatch → `gh issue develop --name "<tag>/<issue-number>-<desc>"` or `git checkout -b` first, then work
+
+## Branch verification before implementation in worktree (HARD STOP)
+
+**Before editing code in a worktree via Write/Edit, verify the branch is the intended one.**
+
+The verification timing is **before implementation starts** — not before commit. Once a file is written into the wrong environment, the damage is done.
+
+1. Right after `git worktree add`, **immediately** verify:
+   ```powershell
+   Set-Location "path/to/worktree"; git branch --show-current
+   ```
+2. If the output does not match the intended branch, **forbid Write/Edit** — re-create the worktree or checkout
+3. Starting Write/Edit without this verification = procedural violation
+
+## cd consistency on worktree entry (HARD STOP)
+
+**When the user specifies a worktree path (`.worktrees/<name>` or `.claude/worktrees/<name>`), run every subsequent git command in that worktree directory for the rest of the session.** Forbid `cd` back to the main repo to run git commands — the worktree and the main repo can have **different HEADs**, so `git log HEAD`, `git status`, `git branch --show-current` all return different results.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run the first command with `cd <worktree>`, then `cd <main repo> && git fetch ...` on the next | From the first to the last command, stay in the **same worktree only**. Even fetch can run inside the worktree (the `.git` is shared) |
+| 2 | "The `.git` is shared between worktree and main, so the results are identical" assumption | Shared `.git` ≠ identical HEAD. Each worktree has its own HEAD/index. `git log HEAD` differs |
+| 3 | Ignore that cwd resets between separate Bash calls, and omit `cd` | Add `cd <worktree>` to every Bash call, or use the `git -C <worktree>` flag |
+| 4 | Treat `git log origin/develop..HEAD` output as the worktree's commits without verifying where it ran | Before running, check current location via `pwd` or `git rev-parse --show-toplevel`, then report |
+
+### Self-check (before EVERY Bash call during worktree work)
+
+1. The user-specified worktree path = `<W>`
+2. Does the Bash command include `cd <W>` or `git -C <W>`?
+3. If not, add it. `cd ~/ghq/.../<repo>` (main repo) alone, with no worktree path, is a violation
+4. When interpreting command results, self-ask: "is this measured against the worktree or the main repo?"
+
+### Recommended pattern (using the `git -C` flag)
+
+```bash
+WT=~/ghq/github.com/daegunsoftDev/deps-provisioning/.worktrees/fix-18-dev38-launch-url
+git -C "$WT" branch --show-current
+git -C "$WT" log --oneline origin/develop..HEAD
+git -C "$WT" fetch origin develop
+```
+
+No cwd change required, no confusion with the main repo.
+
 ## Topic Dependencies
 
 ```
