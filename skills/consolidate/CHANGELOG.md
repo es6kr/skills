@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/es6kr/skills/compare/consolidate-v0.2.1...consolidate-v0.2.2) (2026-06-11)
+
+
+### Bug Fixes
+
+* **consolidate:** Copilot availability pre-check, inline review medium, finding-first ordering, authorship gate ([#49](https://github.com/es6kr/skills/issues/49)) ([7bc3ba2](https://github.com/es6kr/skills/commit/7bc3ba21978a0296809f92caabcc080dffa35d84))
+
 ## [0.2.1](https://github.com/es6kr/skills/compare/consolidate-v0.2.0...consolidate-v0.2.1) (2026-05-27)
 
 

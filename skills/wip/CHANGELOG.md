@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/es6kr/skills/compare/wip-v0.3.1...wip-v0.3.2) (2026-06-11)
+
+
+### Bug Fixes
+
+* **consolidate:** Copilot availability pre-check, inline review medium, finding-first ordering, authorship gate ([#49](https://github.com/es6kr/skills/issues/49)) ([7bc3ba2](https://github.com/es6kr/skills/commit/7bc3ba21978a0296809f92caabcc080dffa35d84))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/wip-v0.3.0...wip-v0.3.1) (2026-05-27)
 
 
