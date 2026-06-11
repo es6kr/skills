@@ -24,6 +24,49 @@ Plain `## AI Review Summary` is forbidden. The link form above is required.
 
 The two comments' superpowers links form a pair (requesting ↔ receiving). When one is updated, verify the other for consistency. **Do not merge them into one or post only one** (omitting Step 3.5.3 = procedure incomplete).
 
+#### Chronological order requirement (HARD STOP)
+
+**The Internal Code Review comment must appear chronologically BEFORE the AI Review Summary comment on the PR timeline** — Step 3.5 precedes Step 7 in the workflow, and that ordering must be visible to anyone scrolling the PR. Reviewers reading the PR scroll top-to-bottom; the Summary is the conclusion and belongs last.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Post AI Review Summary as a new comment when an Internal Review is still pending — Summary lands above the later Internal Review | Post Internal Code Review first (Step 3.5.3) → only then post the Summary (Step 7) so Summary is chronologically last |
+| 2 | After an ad-hoc consolidate bypass that posted Summary first, simply append the Internal Review as a new comment — leaves the paired comments in reversed order | When re-executing consolidate properly, detect the order error and swap contents (see "Order-correction damage control" below) |
+| 3 | Treat the pairing as order-agnostic ("both exist, that's enough") | Order is visible signal: Summary at the bottom = "final consolidated verdict". Summary above Internal Review = confusing |
+
+#### Order-correction damage control — Summary posted before Internal Review (HARD STOP)
+
+**When the AI Review Summary was posted before the Internal Code Review (e.g., during an ad-hoc bypass or a prior consolidate run that completed Step 7 without Step 3.5), do NOT create a third comment to "rebalance".** Swap the contents of the two existing comments by PATCH so the older comment carries the Internal Code Review and the newer comment carries the AI Review Summary.
+
+Procedure:
+
+1. Identify both comments by ID:
+   ```bash
+   # Older comment (currently AI Review Summary, posted by mistake first)
+   gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("# 🤖 AI Review Summary") or startswith("## AI Review Summary")) | .id'
+
+   # Newer comment (currently Internal Code Review, posted after — too late)
+   gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("## Internal Code Review")) | .id'
+   ```
+2. **PATCH the older comment** with the Internal Code Review body (full body, prescribed `## Internal Code Review — [requesting-code-review](...)` title)
+3. **PATCH the newer comment** with the AI Review Summary body (full body, prescribed `## AI Review Summary — [receiving-code-review](...)` title)
+4. Verify the chronological order on the PR page
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Add a third comment containing the AI Review Summary "to put a Summary at the bottom" — pollutes the PR timeline with duplicated Summary content | PATCH the two existing comments to swap content. No new comment |
+| 2 | Delete the older Summary comment and re-post — destroys the comment-ID URL anyone already referenced | PATCH preserves the URL; only the content changes |
+| 3 | Use `minimizeComment` (OUTDATED) on the older Summary as a workaround | Minimize hides the content but does not move it. The order error persists; the swap is the only correct fix |
+| 4 | Update only one of the two comments and leave the other contradicting | Swap is atomic: PATCH both in the same pass so the paired-content invariant holds |
+
+Why PATCH-swap (and not delete + repost): PATCH preserves the comment ID and URL — anyone who linked to either comment (commit message, issue thread, chat) still resolves to a valid comment, just with corrected content. Deletion + repost breaks every existing link.
+
+Self-check (before posting a new Step 7 Summary comment):
+
+1. Does an AI Review Summary already exist on this PR? — `gh api .../comments | jq '.[] | select(.body | startswith("# 🤖 AI Review Summary") or startswith("## AI Review Summary"))'`
+2. If yes, does an Internal Code Review also already exist? — same query for `## Internal Code Review`
+3. If both exist and the Summary's `created_at` precedes the Internal Review's `created_at` → **order is reversed**. Apply the PATCH-swap damage control. Do not create a third comment
+
 ### Medium selection — Mergeable + Formal Review action → unified POST (HARD STOP — 2026-05-22 reinforcement)
 
 The Summary body and the Formal Review body carry the **same verdict information** for Mergeable PRs. Posting them as separate media (issue comment + Formal Review) duplicates content. **When all of the following hold, Summary is posted as the Formal Review body (single POST). Issue comment Summary is forbidden:**
@@ -387,6 +430,8 @@ GH_TOKEN="$(gh auth token --user <account>)" \
 ## Optional Inline Review (line-specific annotation — when needed)
 
 **Issue-level Summary is for the PR's overall evaluation. For recommendations targeting a specific line in a specific file, an inline review (line-level annotation) lets the author immediately see which line in the GitHub UI.** Inline is more effective than issue comments for residual recommendations not absorbed in the current PATCH cycle (deferred / post-Severity-downgrade).
+
+> **Primary auto-fire path**: when line-specific findings exist, the Internal Code Review itself is posted as a single reviews API POST at Step 3.5.3 (`body` = full findings + `comments[]` = inline annotations) — policy (Critical+Important default / `--inline` = all; re-review = new POST every time) lives in `internal.md` "Medium decision" + "Inline auto-fire policy". This section provides the shared mechanics (payload, fields, verification) and covers the residual Step 7 case (deferred annotation after user decision).
 
 ### Triggers (recommended when all are met)
 
