@@ -18,6 +18,7 @@ Identify reviews from:
 - `coderabbitai[bot]` — CodeRabbit
 - `copilot[bot]` — GitHub Copilot
 - Other bots with `[bot]` suffix
+- **Human MEMBER/OWNER reviews and review-shaped comments (HARD STOP)** — enumerate every `reviews[]` entry whose `author.is_bot == false`, plus every `comments[]` entry whose `authorAssociation` is `MEMBER`/`OWNER`/`COLLABORATOR` AND whose body contains a review-style header (Code Review headers, `### Findings`, `### Issues`, `Critical`, `Important`, `Should fix`, `Must fix`, localized equivalents in any language). Each such reviewer (login) is a distinct **Source** that must be carried forward into the findings table — do not collapse them under "Internal Code Review". Query: `gh pr view <N> --json reviews,comments --jq '[.reviews[] | select(.author.is_bot==false) | {kind:"review", login:.author.login, body}] + [.comments[] | select(.authorAssociation == "MEMBER" or .authorAssociation == "OWNER" or .authorAssociation == "COLLABORATOR") | {kind:"comment", login:.author.login, body}]'`. Cross-check returned bodies for review-style headers before declaring a `comment` entry a review source.
 
 ### Source-Specific Handling
 

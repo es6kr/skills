@@ -36,10 +36,6 @@ The AI review handling flow is procedure:
 3. Only after the Axis B answer, decide the medium (feed the Axis B answer + mergeable into the post.md Step 7 medium table)
 4. If the thought "it's CONFLICTING so it's an issue comment anyway" arises = violation signal. Even CONFLICTING requires the Axis B ask first
 
-#### Violation case (2026-05-26, 1st occurrence)
-
-In a consolidate run on a PR where the operator was a requested reviewer, after confirming `mergeable: CONFLICTING`, post.md's "Non-Mergeable → issue comment only" rule was executed without the Axis B ask → the AI Review Summary was auto-posted as an issue comment. The user pointed it out (the Summary was posted in a non-Formal-Review medium without asking). The Axis B ask should have preceded the medium decision. Resolved with a manual APPROVE + this gate added.
-
 ### Don't / Do — Axis A ask forbidden (HARD STOP)
 
 | # | Don't | Do |
@@ -55,6 +51,13 @@ In a consolidate run on a PR where the operator was a requested reviewer, after 
 1. Are you a requested reviewer? (`gh pr view --json reviewRequests`) → If Yes, ask Axis B only. If No, skip Step 5 → Step 7
 2. Are you building an Axis A option? → Don't. Proceed automatically to Step 7
 3. If a "Fix actionable items" or "Whether to post the Summary" option appears = violation
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Place "Fix actionable items" as the first option + mark it Recommended | Place "Post summary as-is" as the first option. Fix goes second-or-later (Recommended marking forbidden) |
+| 2 | "Fix is more efficient, so mark it Recommended" / "Critical/Important findings → recommend fix" thinking | Independent of efficiency or severity. Acting on the AI review is the user's autonomous decision. Recommended marking itself is forbidden |
+| 3 | Auto-place "Fix actionable" as the first option when severity is Critical/Important | Severity belongs in the option description. Order prioritizes "decision preservation" |
+| 4 | "User decides on fix anyway, so first-position is fine" thinking | First option = implicit Recommended. Order itself is a statement of intent |
 
 ### Axis B: Formal Review action (HARD STOP — required when you are a requested reviewer)
 
@@ -145,12 +148,13 @@ Rejection: "Caller already handles retries (see middleware.ts:45). Adding here c
 
 ### Fixing accepted items
 
-**Critical items must be fixed AND verified before proceeding to the next stage (Summary posting, merge recommendation):**
+**Critical/Important items must be fixed AND verified before proceeding to the next stage (Summary posting, merge recommendation):**
 
 1. Code fix + commit + push
 2. Wait for CI pass (`gh run watch` or `gh pr checks`)
-3. Check `[x]` for the corresponding item in PR Test plan (`gh pr edit --body`)
-4. Post Summary and recommend merge only after verification is complete
+3. **Runtime verification of the fix's actual behavior (HARD STOP)** — see "Review-suggested API call runtime verification" below
+4. Check `[x]` for the corresponding item in PR Test plan (`gh pr edit --body`) **only after step 3 passes**
+5. Post Summary and recommend merge only after verification is complete
 
 The "Shall we merge?" question is allowed only after all Critical items have been fully verified.
 
@@ -158,6 +162,40 @@ After fixing, commit with message referencing the review:
 ```text
 fix: address CodeRabbit review on PR #NUMBER
 ```
+
+### Review-suggested API call runtime verification (HARD STOP)
+
+**When a review suggestion (AI bot OR Internal Code Review subagent) replaces one API call with another (e.g., "prefer X over Y", "use vscode.open instead of openExternal"), CI pass + type-check + build success do NOT verify the fix. Runtime verification is mandatory before claiming the Important/Critical is fixed.** CI checks compile-time correctness, not API semantics. A wrong API substitution (e.g., a command that resolves URIs as file paths when the original handled them as extension URIs) compiles cleanly, builds cleanly, and breaks at the first user click.
+
+#### Why this rule
+
+The fix author is often the same agent that wrote the review (Internal Code Review = code-reviewer subagent dispatched by this skill). Internal Review suggestions inherit the same blind spots that produced them — runtime verify is the only independent check. AI bot suggestions (CodeRabbit, Copilot) have analogous risk: pattern-match correctness without dispatch-semantics verification.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "CI pass + type-check + build OK → Important fixed" report | CI pass + build OK ≠ runtime correctness for API-substitution fixes. Add a runtime verification step before checking PR Test Plan items |
+| 2 | "Review suggestion came from a trusted source (Internal Review / CodeRabbit), so apply + commit" | Internal Review's author may be the same agent that wrote the buggy code. **Look up authoritative docs for the new API** (context7, official API ref, working PoC in the same repo) — if the docs/PoC contradict the suggestion, push back instead of applying |
+| 3 | "API replacement is a 1-line change so verify is overkill" | API replacement is HIGH risk. Wrong API often compiles cleanly. 1-line changes need MORE verify, not less — the wrong API hides in a single working-looking line |
+| 4 | Push the fix and rely on PR Test Plan checkbox as the verify | The checkbox is just a checkbox. The verify is the actual runtime exercise (install vsix → click → observe behavior; or curl the affected endpoint; or load the changed UI route) |
+| 5 | "Author of the suggestion already explained why" → trust without independent check | The explanation may be wrong. **Cross-check against**: (a) authoritative API docs, (b) an existing working sibling implementation in the same repo (e.g., `feat/resume-in-extension` PoC branch for this PR), (c) ride a runtime smoke test |
+
+#### Self-check (every time before checking the PR Test Plan item as `[x]`)
+
+1. Did this fix REPLACE one API call with another (e.g., `vscode.env.openExternal` → `vscode.commands.executeCommand('vscode.open', ...)`)? — Yes ⇒ rule applies
+2. Did you look up authoritative documentation (context7 / official API ref) for the NEW API's actual semantics? — `vscode.open` handles file/URL paths, NOT extension URIs; that fact would have killed the suggestion at design time
+3. Is there a working sibling implementation in the same repo using the OLD API? (`git branch -a` for PoC branches, `grep` for similar call sites) — if yes, the OLD API is the proven path; replacing it requires positive evidence the NEW API is superior, not just "more correct in theory"
+4. Did you exercise the changed code path at runtime? (vsix install + manual click for extension code; curl for endpoints; browser navigation for routes)
+5. Did the runtime exercise produce the expected outcome, OR did it produce a new error (e.g., `EntryNotFound`)?
+
+If step 5 produced a new error, **REVERT the API substitution immediately** and downgrade the finding in the Summary (e.g., Important → Minor, deferred — "no reliable success signal exists for this dispatch; openExternal best-effort is the accepted path per PoC branch").
+
+#### Cross-reference
+
+- `~/.agents/rules/external-publication-verification.md` — covers PR-body claims and external public statements
+- `superpowers:receiving-code-review` "Verify before implementing" — covers external bot review reception
+- This rule covers **the gap** between those two: applying an Internal Review's own suggestion + the runtime verify obligation specifically for API-substitution fixes
 
 ### 'Apply' interpretation rule for user instructions
 

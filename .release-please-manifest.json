@@ -6,10 +6,10 @@
   "skills/claudify": "0.3.0",
   "skills/code-workflow": "0.3.0",
   "skills/commit-tidy": "0.3.0",
-  "skills/consolidate": "0.2.1",
+  "skills/consolidate": "0.2.2",
   "skills/dotfile": "0.3.0",
   "skills/fix": "0.3.0",
-  "skills/fix-plan": "0.1.0",
+  "skills/fix-plan": "0.2.0",
   "skills/git-repo": "0.3.2",
   "skills/github-flow": "0.3.0",
   "skills/mcp-config": "0.3.0",
@@ -20,5 +20,5 @@
   "skills/tdd": "0.3.0",
   "skills/todowrite": "0.3.0",
   "skills/web-ui-test": "0.3.0",
-  "skills/wip": "0.3.1"
+  "skills/wip": "0.3.2"
 }

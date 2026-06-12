@@ -29,6 +29,16 @@ import re
 import sys
 from pathlib import Path
 
+# Force UTF-8 output regardless of the console's locale encoding. Windows
+# consoles default to cp949/cp1252, which raise UnicodeEncodeError when printing
+# the ✓/✗ glyphs or matched Korean lines — silently turning a "Korean found"
+# verdict into an unrelated crash. CI (UTF-8 locale) is unaffected.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # pragma: no cover — non-reconfigurable stream
+        pass
+
 # ANSI colors — match the original bash script's output exactly.
 RED = "\033[0;31m"
 GREEN = "\033[0;32m"
