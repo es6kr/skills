@@ -43,59 +43,9 @@ Done.
 
 ## Register Existing Directory as Worktree
 
-Register a directory that already contains files but is not listed as a git worktree, using metadata manipulation only.
+Registering a directory that already contains files (metadata-only, no fresh checkout) is the shared mechanism documented in **[worktree-register](./worktree-register.md)**. Use that topic's procedure here — pass the bare/main repo as `GITDIR`, the existing directory as `WT`, and the recovered branch.
 
-### Pre-check (mandatory)
-
-```bash
-# Verify it's not already registered
-cd /path/to/main-repo && git worktree list
-```
-
-If the directory is already listed, skip registration.
-
-### Procedure
-
-1. **Create branch** (based on existing commit):
-
-```bash
-cd /path/to/main-repo
-git branch worktree-<name> <commit-sha>
-```
-
-2. **Create gitdir metadata** (`<main-repo>/.git/worktrees/<name>/`):
-
-```bash
-mkdir -p .git/worktrees/<name>
-echo 'ref: refs/heads/worktree-<name>' > .git/worktrees/<name>/HEAD
-echo '../..' > .git/worktrees/<name>/commondir
-echo '<absolute-path-to-worktree-dir>/.git' > .git/worktrees/<name>/gitdir
-```
-
-3. **Create `.git` file in the worktree directory**:
-
-```bash
-echo 'gitdir: <absolute-path-to-main-repo>/.git/worktrees/<name>' > /path/to/worktree-dir/.git
-```
-
-4. **Rebuild index** (resolves deleted file status):
-
-```bash
-cd /path/to/worktree-dir && git reset HEAD -- .
-```
-
-5. **Verify**:
-
-```bash
-cd /path/to/main-repo && git worktree list   # confirm registration
-cd /path/to/worktree-dir && git status        # confirm clean state
-```
-
-### Key Principles
-
-- **Never move files (mv)** — only create metadata, leave existing files untouched
-- **Never use `git worktree add`** — it fails on directories that already contain files
-- **Always check registration first** — `git worktree list` to prevent duplicates
+The same mechanism is reused by [to-bare](./to-bare.md) after a regular→bare conversion. Keeping it in one place avoids drift between the two flows.
 
 ## Related Commands
 
