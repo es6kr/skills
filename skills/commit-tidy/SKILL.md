@@ -5,13 +5,15 @@ metadata:
 name: commit-tidy
 depends-on: [git-repo]
 description: >-
-  Analyze staged/committed changes and recommend splitting or squashing strategy.
-  interactive-amend - worktree-based amend+rebase loop for commits ahead of HEAD or multiple amend targets [interactive-amend.md].
-  soft-reset-amend - soft-reset top N commits and selectively re-commit, simpler alternative to worktree rebase [soft-reset-amend.md].
-  Use when the user says "commit split", "split commits", "should I split this commit",
-  "squash commits", "tidy commits", "amend earlier commit", "amend multiple commits",
-  "interactive amend", "soft reset", "reset --soft amend", "earlier commit amend", "rewrite commits",
-  or when reviewing large changesets before committing.
+  Analyze staged/committed changes and recommend split, squash, or commit-message strategy.
+  Topics — interactive-amend (worktree-based amend+rebase loop),
+  soft-reset-amend (soft-reset top N + selective re-commit),
+  staging-discipline (`git diff --cached --name-only` audit + sensitive-dir gate for rules/agents/docs),
+  security-scan (PUBLIC repo 4-grep secret pattern check before commit),
+  message-discipline (Conventional Commit tags, PUBLIC English enforcement, operation-type continuity, --amend refresh, source-code .md behavior verbs).
+  Use when: "commit split", "squash commits", "tidy commits", "amend earlier", "interactive amend",
+  "soft reset", "rewrite commits", "PUBLIC repo commit", "secret in commit", "commit message",
+  "commit author identity", "commit message English", "staging discipline".
 ---
 
 # Commit Tidy
@@ -21,7 +23,10 @@ description: >-
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | interactive-amend | Worktree-based amend+rebase loop for earlier/multiple commits | [interactive-amend.md](./interactive-amend.md) |
+| message-discipline | Commit message conventions — Conventional Commit tags, PUBLIC English enforcement, --amend refresh, source-code .md behavior verbs, operation-type continuity | [message-discipline.md](./message-discipline.md) |
+| security-scan | PUBLIC repo commit body 4-grep secret pattern check (PAT/Vault/API key/Base64) before commit | [security-scan.md](./security-scan.md) |
 | soft-reset-amend | Soft-reset top N commits and selectively re-commit (simpler than worktree rebase) | [soft-reset-amend.md](./soft-reset-amend.md) |
+| staging-discipline | `git diff --cached --name-only` audit + sensitive-dir gate (rules/agents/docs) before commit | [staging-discipline.md](./staging-discipline.md) |
 
 Analyze staged/unstaged changes and recommend whether to split into multiple commits.
 

@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), migrate (Git → ghq), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "bare convert", "multi-account clone", "core.sshCommand", "Repository not found", "worktree create" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "bare convert", "multi-account clone", "core.sshCommand", "Repository not found", "worktree create" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -30,13 +30,16 @@ Git repository management and SourceGit GUI client integration.
 | clone | ghq get with automatic SourceGit registration (multi-account support) | [clone.md](./clone.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
-| migrate | migrate regular Git repositories to ghq directory structure | [migrate.md](./migrate.md) |
+| migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
 | move-worktree | move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
 | patrol | batch inspection of ghq repositories (status, stash, unpushed + commit-splitter integration) | [patrol.md](./patrol.md) |
 | rename-worktree | rename worktree directory and metadata (cross-platform, Windows safe) | [rename-worktree.md](./rename-worktree.md) |
 | sourcegit | SourceGit preference.json management (add repos, workspaces, folder rename) | [sourcegit.md](./sourcegit.md) |
 | ssh-key | per-repo SSH key mapping for multi-account GitHub (core.sshCommand + IdentityAgent) | [ssh-key.md](./ssh-key.md) |
+| to-bare | convert a regular repo → bare + worktree at a custom location, preserving uncommitted changes (inverse of to-ghq; helper: `scripts/repo-to-bare-worktree.sh`) | [to-bare.md](./to-bare.md) |
+| to-ghq | migrate bare+worktree → regular `.git` at the ghq path (formerly `migrate`) | [to-ghq.md](./to-ghq.md) |
 | worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.claude/worktrees/` | [worktree.md](./worktree.md) |
+| worktree-register | shared: register a populated directory as a worktree via metadata only (used by fix-worktree + to-bare) | [worktree-register.md](./worktree-register.md) |
 
 ## Topic Dependencies
 
@@ -44,6 +47,12 @@ Git repository management and SourceGit GUI client integration.
 worktree (entry point — inventory + decision)
   └─→ rename-worktree (reuse registered worktree)
   └─→ move-worktree (register unregistered or relocate)
+
+worktree-register (shared metadata register/relink mechanism)
+  ├─← fix-worktree (recover a broken bare-worktree link)
+  └─← to-bare (link the working tree after a regular→bare conversion)
+
+to-bare  ←inverse→  to-ghq (formerly `migrate`)
 ```
 
 ## Worktree decision tree (HARD STOP — every time a worktree is needed)
@@ -161,16 +170,10 @@ Key features:
 
 [Detailed guide](./sourcegit.md)
 
-### ghq Migration
+### ghq Migration (to-ghq) / Bare conversion (to-bare)
 
-Migrate regular Git repositories to ghq directory structure (`~/ghq/host/group/repo/`).
-
-Key features:
-- Automatic bare+worktree structure conversion
-- Create symbolic links at original location
-- Nested group support (host/group/subgroup/repo)
-
-[Detailed guide](./migrate.md)
+- **to-ghq** (formerly `migrate`): bare+worktree → regular `.git` at the ghq path (`~/ghq/host/group/repo/`). Auto bare+worktree conversion, optional symlink, nested groups. [Detailed guide](./to-ghq.md)
+- **to-bare** (inverse): regular repo → bare + worktree at a custom location (e.g. `.claude/worktrees/`), preserving uncommitted changes. Includes a Windows lock pre-check (SourceGit/VS Code handle on `.git` blocks the rename). [Detailed guide](./to-bare.md)
 
 ### Repo Patrol (batch inspection)
 
@@ -185,10 +188,11 @@ Key features:
 
 ## Common Workflow
 
-1. **Repository migration**: Migrate to ghq structure with `migrate` topic
+1. **Repository migration**: Migrate to ghq structure with `to-ghq` topic (or `to-bare` for the inverse)
 2. **SourceGit update**: Register new paths with `sourcegit` topic
 3. **Batch inspection**: Clean up uncommitted/unpushed changes with `patrol` topic
 
 ## Scripts
 
-- `./scripts/repo-to-ghq.sh` - Script to move repositories to ghq path
+- `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
+- `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)

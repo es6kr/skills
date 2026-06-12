@@ -268,7 +268,7 @@ If any of the following applies, the PR is a UI-change PR — capture attachment
 |---|-------|-----|
 | 1 | Create a UI-change PR without captures | Attach at least one capture in the PR body or a comment |
 | 2 | Skip captures with the rationale "the reviewer can check it themselves" | The author attaches captures — removing the reviewer's burden of going from code → browser to verify |
-| 3 | Capture automation (web-ui-test / Playwright) is available, but skipped due to "manual effort" | Use `Skill("web-ui-test")` or `wmux browser screenshot` |
+| 3 | Capture automation (web-browser / Playwright) is available, but skipped due to "manual effort" | Use `Skill("web-browser")` or `wmux browser screenshot` |
 | 4 | Use `--no-capture` opt-out by default | `--no-capture` is forbidden on UI-change PRs. Allowed only on non-UI PRs |
 
 #### Attachment method
