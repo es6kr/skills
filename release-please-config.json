@@ -250,9 +250,9 @@
         }
       ]
     },
-    "skills/web-ui-test": {
-      "package-name": "web-ui-test",
-      "component": "web-ui-test",
+    "skills/web-browser": {
+      "package-name": "web-browser",
+      "component": "web-browser",
       "extra-files": [
         {
           "type": "generic",
