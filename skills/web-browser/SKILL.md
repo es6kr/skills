@@ -46,8 +46,8 @@ web-browser (Step 0: environment detection — shared by all topics)
 - `ui-test`, `cdp-trace` are the UI-testing family.
 - `credential-issue` reuses the same backend routing + the user-visibility rule, generalized into a
   service+command parameterized auth flow.
-- **Authentik SSO verification** (`sso-verify`) stays in the legacy `web-ui-test` skill (local-only,
-  untracked) — not pulled into `web-browser`.
+- **Authentik SSO verification** (`sso-verify`) is **not** included in this skill — it remains in a
+  separate local-only `sso-verify` skill (user-environment specific, untracked).
 
 ## CRITICAL — user visibility is the top priority (HARD STOP)
 

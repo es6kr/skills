@@ -3,7 +3,7 @@ name: github-flow
 metadata:
   author: es6kr
   version: "0.1.0"
-depends-on: [code-workflow, web-ui-test]
+depends-on: [code-workflow, web-browser]
 description: |
   GitHub issue and PR workflow automation. Topics — dependencies (blocked-by/sub-issues via GraphQL), expand (expand-vs-split mid-work), identity-auth (owner-based gh account mapping + scope refresh + GH_TOKEN fallback), merge (CI+review check + no autonomous push), plan-to-issue (MD to issue body), pr (PR with test plan), push-guards (branch change ask, push rejection ask, force-push CI check, main/master push restriction), register (duplicate check + strategy), review (structured comments), review-apply (deferred review feedback apply), sanitize (HARD STOP personal data scan for PUBLIC repos), upstream-issue (external OSS feature/bug). Use when: "plan to issue", "issue register", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "PII", "expand PR", "blocked by", "addBlockedBy", "upstream issue", "review apply", "sub-issue", "addSubIssue", "gh auth", "owner identity", "force push", "push reject", "branch change forbid", "no autonomous push".
 ---

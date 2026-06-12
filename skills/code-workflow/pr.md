@@ -31,7 +31,7 @@ After implementation is complete and tests pass, capture visual evidence.
 
 | Method | When to Use | Tool |
 |--------|------------|------|
-| Browser screenshot | Web UI changes | Playwright MCP `playwright.playwright_browser_take_screenshot` (see [`skills/web-ui-test`](../web-ui-test/SKILL.md)) |
+| Browser screenshot | Web UI changes | Playwright MCP `playwright.playwright_browser_take_screenshot` (see [`skills/web-browser`](../web-browser/SKILL.md)) |
 | Terminal output | CLI/API changes | Copy relevant output |
 | Before/after comparison | Visual regressions, layout fixes | Screenshot both states |
 

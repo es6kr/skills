@@ -567,7 +567,7 @@ options: [
 **When Test Plan has unchecked items** (multiSelect: false):
 ```typescript
 options: [
-  { label: "Verify unchecked items (Recommended)", description: "Verify N items via web-ui-test / curl → mark [x] → merge" },
+  { label: "Verify unchecked items (Recommended)", description: "Verify N items via web-browser / curl → mark [x] → merge" },
   { label: "Move to separate issue, then merge", description: "Register the unchecked items as a follow-up issue and remove from this PR's Test Plan" },
   { label: "Hold", description: "Decide after verification" },
 ]
