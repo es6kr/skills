@@ -1,6 +1,7 @@
 {
   "skills/cc-plugin": "0.3.0",
   "skills/chezmoi": "0.3.0",
+  "skills/choco": "0.0.0",
   "skills/claude-session": "0.3.0",
   "skills/claudify": "0.3.0",
   "skills/code-workflow": "0.3.0",
