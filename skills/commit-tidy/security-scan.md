@@ -52,7 +52,7 @@ git diff --cached | grep -E '[A-Za-z0-9+/]{32,}=' | grep -iE '(key|secret|token)
 2. `git rebase -i <parent>^` + mark the offending commit `edit` → sanitize file → `git commit --amend --no-edit -S` → `git rebase --continue`
 3. Push state:
    - Not yet pushed → fast-forward to remote after sanitize
-   - Already pushed → force-push gate applies (see `github-flow/merge.md` "Force push CI status check" guidance)
+   - Already pushed → force-push gate applies (see `github-flow/push-guards.md` "Force push CI status check" guidance)
 
 ## Exceptions
 
@@ -68,7 +68,7 @@ git diff --cached | grep -E '[A-Za-z0-9+/]{32,}=' | grep -iE '(key|secret|token)
 
 ## Failure pattern
 
-See failed-attempts.md HOT entry "PUBLIC repo commit body 4-secret-type exposure". An infrastructure markdown file slipped 4 different credential types into a commit (GitHub PAT + Vault Unseal Key + Vault Root Token + Plane API Token). GitHub's server-side scanner caught only 1 of the 4 on push. The pre-commit 4-grep self-check would have caught all 4.
+See the user-local `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry "PUBLIC repo commit body 4-secret-type exposure" (this file is external to the repo — not checked into version control). An infrastructure markdown file slipped 4 different credential types into a commit (GitHub PAT + Vault Unseal Key + Vault Root Token + Plane API Token). GitHub's server-side scanner caught only 1 of the 4 on push. The pre-commit 4-grep self-check would have caught all 4.
 
 ## Escalation
 

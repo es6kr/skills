@@ -220,7 +220,7 @@ See the "Worktree decision tree" section above for the full procedure.
 | 3 | Assume "only my changes are staged, so other changes don't matter" | The same push can include unpushed commits from another task, and other dirty working-directory state can leak into the next step |
 | 4 | Omit "split into worktree" from the commit-options AskUserQuestion list | When branch is main/master/develop AND there are 1+ other-task changes, "split into worktree" is a required option |
 | 5 | Leave another task's unstaged changes in place and push only the new commit | Confirm the other-task intent (report to the user) → split into a worktree or separate it into another task |
-| 6 | **Place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **If 1+ inactive worktree candidates exist, place "rename and reuse" as option 1 / Recommended**. New goes to option 2 or lower. See the "Recommended placement rule" table above |
+| 6 | **Place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **If 1+ inactive worktree candidates exist, place "rename and reuse" as option 1 / Recommended**. New goes to option 2 or lower |
 | 7 | Assume "worktree split = move the working-tree changes out of the current repo" (stash + checkout) when the current repo is a live runtime environment whose working tree state is actively consumed by the user (e.g., `~/.agents` — rules are loaded always_on, skills are hardlinked to `~/.claude/skills/`) | Distinguish two split modes: **(a) move** — stash + checkout to a new branch (default for one-off feature work) vs **(b) copy** — leave the source working tree untouched + replicate the diff into a separate worktree via `cp`/`rsync` and commit there. Use (b) whenever the source repo's working tree is a live runtime environment. The source working tree must not change state for the user during commit/PR |
 
 ### Self-check (every time before presenting commit options)
@@ -233,7 +233,7 @@ See the "Worktree decision tree" section above for the full procedure.
 
 ### worktree split decision tree
 
-```
+```text
 git status (changes)
   ├─ Only mine (1 task), branch = PR/feature → commit in place
   ├─ Mine + other-task, branch = main/master/develop → /git-repo worktree split mandatory
@@ -267,8 +267,8 @@ See failed-attempts.md HOT entry "worktree split option missing in commit-method
 The verification timing is **before implementation starts** — not before commit. Once a file is written into the wrong environment, the damage is done.
 
 1. Right after `git worktree add`, **immediately** verify:
-   ```powershell
-   Set-Location "path/to/worktree"; git branch --show-current
+   ```bash
+   cd "path/to/worktree" && git branch --show-current
    ```
 2. If the output does not match the intended branch, **forbid Write/Edit** — re-create the worktree or checkout
 3. Starting Write/Edit without this verification = procedural violation

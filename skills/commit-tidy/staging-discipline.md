@@ -53,7 +53,7 @@ The one exception: a new project's very first import commit, or a user-requested
 
 ## Failure pattern
 
-See failed-attempts.md HOT entry "staged files leaked into a different commit". The standard scenario: the assistant runs `git add <intended-file>`, but a prior-turn modification is already staged, and the commit ends up with the wrong fileset. The pre-commit `git diff --cached --name-only` dump catches this every time.
+See the user-local `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry "staged files leaked into a different commit" (this file is external to the repo — not checked into version control). The standard scenario: the assistant runs `git add <intended-file>`, but a prior-turn modification is already staged, and the commit ends up with the wrong fileset. The pre-commit `git diff --cached --name-only` dump catches this every time.
 
 ## Related topics
 

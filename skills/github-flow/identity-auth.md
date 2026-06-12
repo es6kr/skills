@@ -49,7 +49,7 @@ The browser agent is reserved for **situations CLI cannot handle** (e.g., comple
 
 The actual `<owner> → <git author identity>` + `<gh account>` mapping table is **workspace-scoped**, not part of this skill. Maintain it in `~/.agents/.claude/rules/identity.md` (per-user) or `<workspace>/.claude/rules/identity.md` (per-project). Example shape (the specifics belong elsewhere):
 
-```
+```text
 | Owner           | git author identity                   | gh account     |
 | --------------- | ------------------------------------- | -------------- |
 | org-A           | Identity-for-org-A <email-A@host>     | gh-account-A   |

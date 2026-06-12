@@ -167,7 +167,7 @@ If ≥1 `[post-merge]` items exist, confirm they are registered in a tracking me
 ```bash
 # Extract [post-merge] items from the PR body
 # Category prefix output format is **[post-merge]** (bold bracket); tolerate legacy `[post-merge]` (backtick) too.
-gh pr view <PR_NUMBER> --json body --jq '.body' | grep -E '^- \[.\] (\*\*|`)\[post-merge\]'
+gh pr view <PR_NUMBER> --json body --jq '.body' | grep -E '^- \[.\] (\*\*\[post-merge\]\*\*|`\[post-merge\]`)'
 
 # Verify each item names a tracking link (issue # or fix_plan path)
 # 0 items without a tracking link is required to merge
