@@ -22,7 +22,7 @@ This topic runs as a **post-completion check** after `/next` suggests actions or
 After any task completion or skill execution:
 
 1. **Check pending tasks**: Are there uncompleted tasks in the task list?
-2. **Check workflow rules**: Does `workflow.md` mandate a follow-up step? (e.g., CI pass → verify unchecked Test Plan items)
+2. **Check workflow rules**: Does an active workflow rule mandate a follow-up step? (e.g., CI pass → verify unchecked Test Plan items)
 3. **Check PR/issue body**: Are there unchecked `- [ ]` items in the PR Test plan or issue checklist?
 4. **Check fix_plan.md**: Does the current item have incomplete sub-steps?
 5. **Check skill procedure**: Did the skill's documented steps complete fully?
