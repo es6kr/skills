@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/es6kr/skills/compare/skill-kit-v0.3.1...skill-kit-v0.3.2) (2026-06-13)
+
+
+### Refactor
+
+* **fix,next:** decompose oversized SKILL.md into topic files ([#51](https://github.com/es6kr/skills/issues/51)) ([525eb17](https://github.com/es6kr/skills/commit/525eb170c1c3d371c76a4b1ef8033d624cea6002))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/skill-kit-v0.3.0...skill-kit-v0.3.1) (2026-06-07)
 
 

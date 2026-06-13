@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/claude-session-v0.3.0...claude-session-v0.3.1) (2026-06-13)
+
+
+### Refactor
+
+* **fix,next:** decompose oversized SKILL.md into topic files ([#51](https://github.com/es6kr/skills/issues/51)) ([525eb17](https://github.com/es6kr/skills/commit/525eb170c1c3d371c76a4b1ef8033d624cea6002))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/claude-session-v0.2.0...claude-session-v0.3.0) (2026-06-01)
 
 
