@@ -91,3 +91,4 @@ Per-context option templates for "After X" completions (code change, feature, bu
 5. **Register then execute** - When 2+ options are selected, TaskCreate then run sequentially. If only 1, execute directly
 6. **State conditions when proposing merge** - When including PR merge in options, the description must show condition state in the form `CI:✅ Review:✅ TestPlan:x/y`. Actual merge runs only via the `/github-flow merge` skill — direct `gh pr merge` is forbidden
 
+

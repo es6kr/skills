@@ -3,9 +3,9 @@ name: github-flow
 metadata:
   author: es6kr
   version: "0.1.0"
-depends-on: [code-workflow, web-ui-test]
+depends-on: [code-workflow, web-browser]
 description: |
-  GitHub issue and PR workflow automation. Topics — dependencies (blocked-by/sub-issues via GraphQL), expand (expand-vs-split mid-work), merge (CI+review check before merge), plan-to-issue (MD to issue body), pr (PR with test plan), register (duplicate check + strategy), review (post structured comments), sanitize (HARD STOP personal data scan for PUBLIC repos). Converts session findings + plan files into issues with proper body/comment separation. Use when: "plan to issue", "issue register", "issue comment", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "personal data", "PII", "redact", "expand PR", "expand issue", "blocked by", "blocking", "issue dependencies", "addBlockedBy", "upstream issue", "feature request", "bug report", "review apply", "deferred", "duplicate check", "sub-issue", "addSubIssue", "register issue", "post-fix issue".
+  GitHub issue and PR workflow automation. Topics — dependencies (blocked-by/sub-issues via GraphQL), expand (expand-vs-split mid-work), identity-auth (owner-based gh account mapping + scope refresh + GH_TOKEN fallback), merge (CI+review check + no autonomous push), plan-to-issue (MD to issue body), pr (PR with test plan), push-guards (branch change ask, push rejection ask, force-push CI check, main/master push restriction), register (duplicate check + strategy), review (structured comments), review-apply (deferred review feedback apply), sanitize (HARD STOP personal data scan for PUBLIC repos), upstream-issue (external OSS feature/bug). Use when: "plan to issue", "issue register", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "PII", "expand PR", "blocked by", "addBlockedBy", "upstream issue", "review apply", "sub-issue", "addSubIssue", "gh auth", "owner identity", "force push", "push reject", "branch change forbid", "no autonomous push".
 ---
 
 # GitHub Flow
@@ -18,9 +18,11 @@ Convert plans, research, and implementation results into GitHub issues and PRs.
 |-------|-------------|-------|
 | dependencies | Manage native Issue Relationships (blocked-by/blocking) via addBlockedBy/removeBlockedBy GraphQL mutations | [dependencies.md](./dependencies.md) |
 | expand | Decide expand-vs-split when new findings emerge mid-work and update title/body | [expand.md](./expand.md) |
+| identity-auth | Owner-based gh account mapping for commit author identity + gh auth scope refresh + GH_TOKEN env fallback for org repo 404 | [identity-auth.md](./identity-auth.md) |
 | merge | CI success and AI review check then merge with commit cleanup, including pre-merge blockedBy verification | [merge.md](./merge.md) |
 | plan-to-issue | Convert plan/research MD to GitHub issue body or comments | [plan-to-issue.md](./plan-to-issue.md) |
 | pr | Create PR with structured body, test plan, and optional visual attachments | [pr.md](./pr.md) |
+| push-guards | Branch-change ask + push rejection ask + force-push CI status check + main/master push restriction + shared-branch direct-push restriction | [push-guards.md](./push-guards.md) |
 | register | Evaluate duplicates and decide registration strategy (new issue vs comment vs sub-issue) | [register.md](./register.md) |
 | review | Review PR code and post structured review comments | [review.md](./review.md) |
 | review-apply | Apply deferred [REVIEW_FEEDBACK] items from fix_plan to code, update PR Summary | [review-apply.md](./review-apply.md) |

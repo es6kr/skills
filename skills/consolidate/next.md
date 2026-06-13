@@ -89,7 +89,7 @@ To pass the `block-merge-without-review.sh` guard, **the merge option descriptio
 | Merge 4-condition satisfaction | Recommended options (Recommended at top) |
 |-------------------------------|------------------------------------------|
 | 4/4 satisfied | (1) Squash merge — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
-| 1+ Test Plan unchecked | (1) Verify unchecked items (web-ui-test/curl) (2) File separate issue then merge (3) Defer |
+| 1+ Test Plan unchecked | (1) Verify unchecked items (web-browser/curl) (2) File separate issue then merge (3) Defer |
 | 1+ CI failures | (1) Investigate CI cause (2) If failure unrelated to PR, file separate issue (3) Defer |
 | Formal Review unapproved | (1) Self-approve (2) Request reviewer (3) Defer |
 | AI Review Summary not posted | **Cannot reach this stage** — Step 7 requires posting |
