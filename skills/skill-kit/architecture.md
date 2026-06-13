@@ -47,6 +47,10 @@ description: {unified description}. {topic1} - {desc1}, {topic2} - {desc2}. "{tr
 
 {Common theme description}
 
+## Topic Dispatch
+
+**When this skill is invoked with a topic specifier (e.g., `/{skill-name} {topic1}` or `Skill("{skill-name}", "{topic1}")`), load and follow only the matching topic file (`{topic1}.md`). Do not echo the Topics table or summarize other topics in the response.** The Topics table below is an index for invocations without a topic specifier — it is not user-facing output when a topic is named.
+
 ## Topics
 
 | Topic | Description | Guide |
@@ -111,6 +115,42 @@ Example:
 ```yaml
 description: ArgoCD Helm chart management. cleanup - clean Helm metadata [cleanup.md], oci - add OCI registry charts [oci.md]. "argocd helm", "helm metadata", "OCI helm" triggers
 ```
+
+## Topic Dispatch Behavior
+
+When a multi-topic skill is invoked with a topic specifier, the LLM must load the matching topic file directly and avoid echoing the SKILL.md Topics table back to the user. Exposing the full topic index is noise when the user has already named a specific topic.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | List the full Topics table in chat when the user typed `/skill-name topic` | Read `{topic}.md` and execute its instructions; the Topics table stays internal |
+| 2 | "Topic was specified, but here are the other topics for context…" preamble | No preamble. Begin executing the topic's procedure or answering directly |
+| 3 | Treat the SKILL.md Topics table as part of the user-facing response | The Topics table is an index for topic-less invocations only |
+| 4 | Re-read SKILL.md every turn even after the topic is resolved | After dispatching, work from the topic file contents until topic changes |
+
+### Required SKILL.md Section
+
+Every multi-topic SKILL.md must include a `## Topic Dispatch` section placed **immediately above the Topics table**. Copy the directive verbatim, replacing `{skill-name}` and `{topic1}` with concrete values:
+
+```markdown
+## Topic Dispatch
+
+**When this skill is invoked with a topic specifier (e.g., `/{skill-name} {topic1}` or `Skill("{skill-name}", "{topic1}")`), load and follow only the matching topic file (`{topic1}.md`). Do not echo the Topics table or summarize other topics in the response.** The Topics table below is an index for invocations without a topic specifier — it is not user-facing output when a topic is named.
+```
+
+### When the Topics Table IS Surfaced
+
+The Topics table remains the right answer in exactly these cases:
+- The user invokes the skill without a topic (e.g., `/skill-name` alone) and needs to discover available topics
+- The user explicitly asks "what topics does this skill have?"
+- The user requests an overview or comparison across topics
+
+### Integration with Other Topics
+
+- **writer**: When generating a new multi-topic SKILL.md, insert the `## Topic Dispatch` section above the Topics table by default
+- **upgrade**: When upgrading an existing multi-topic skill that lacks the section, add it as part of the upgrade procedure
+- **lint**: Verify that every multi-topic SKILL.md contains the `## Topic Dispatch` heading; emit a warning if missing
 
 ## Data Store Pattern
 

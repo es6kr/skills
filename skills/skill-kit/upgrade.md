@@ -392,16 +392,37 @@ After upgrade, always run lint:
 
 #### 1st-class signal: `published.json`
 
-The `es6kr` skill maintains `data/published.json` listing every skill published to ClawHub. Membership in this list is the canonical "public" signal:
+The `es6kr` skill maintains `published.json` listing every skill published to ClawHub. Membership in this list is the canonical "public" signal:
 
 ```bash
+# Locate published.json (path may drift — check both common locations)
+PUB_JSON=$(find ~/.claude/skills/es6kr ~/.agents/skills/es6kr -maxdepth 3 -name "published.json" 2>/dev/null | head -1)
+
 # Public: slug appears in published.json
-jq -r --arg slug "<skill-name>" '.skills[] | select(.slug == $slug or .local == $slug) | .slug' \
-  ~/.claude/skills/es6kr/data/published.json
+jq -r --arg slug "<skill-name>" '.skills[] | select(.slug == $slug or .local == $slug) | .slug' "$PUB_JSON"
 
 # Cross-check: tracked in the monorepo's main branch
 git -C ~/.agents ls-files skills/<skill-name>/ | head -1
 git -C ~/.agents ls-tree origin/main skills/<skill-name>/ 2>/dev/null | head -1
+```
+
+**Path verification (HARD STOP — when query returns empty)**: Before applying the "Not in `published.json`" matrix row, verify the file itself exists and the path is correct. An empty `jq` result has TWO causes — (a) skill genuinely absent, (b) path wrong / file missing. Conflating them silently downgrades a Public skill to Local-only.
+
+```bash
+# If jq returned empty, verify file:
+[ -f "$PUB_JSON" ] || echo "published.json NOT FOUND — locate it before classifying"
+```
+
+#### Public-repo fallback (when published.json unreachable)
+
+If `published.json` is missing/unreadable AND the skill is tracked in `~/.agents` AND `~/.agents` remote is the canonical public skills repo (`git@github.com:es6kr/skills.git` or equivalent), classify as **Public** by default. The remote URL is itself a public signal — every tracked path in a public repo is published.
+
+```bash
+REMOTE=$(git -C ~/.agents remote get-url origin 2>/dev/null)
+case "$REMOTE" in
+  *es6kr/skills*) PUBLIC_REPO=1 ;;
+  *) PUBLIC_REPO=0 ;;
+esac
 ```
 
 #### Scope matrix
@@ -409,7 +430,8 @@ git -C ~/.agents ls-tree origin/main skills/<skill-name>/ 2>/dev/null | head -1
 | Signals | Scope | Step 6 behavior |
 |---------|-------|-----------------|
 | In `published.json` + tracked in `origin/main` | **Public** | Run Step 6 commit + PR flow as written |
-| Not in `published.json` + tracked in `origin/main` | **Repo-internal** (test fixtures, CI helpers — rare) | Commit directly to working branch; no public PR unless user requests |
+| `published.json` unreachable + tracked + `~/.agents` remote = `es6kr/skills` (or canonical public repo) | **Public** (fallback) | Treat as Public — Step 6 commit + PR flow |
+| Not in `published.json` + tracked in `origin/main` (+ public-repo fallback fails) | **Repo-internal** (test fixtures, CI helpers — rare) | Commit directly to working branch; no public PR unless user requests |
 | Not in `published.json` + **untracked** (`?? skills/<name>/`) | **Local-only** | **Skip Step 6 entirely**. Direct file edit only. Do not stage / commit / push / PR |
 | In `published.json` but file untracked | First publish baseline | Apply "Publish-baseline split" subsection of Step 6 |
 
@@ -426,10 +448,12 @@ git -C ~/.agents ls-tree origin/main skills/<skill-name>/ 2>/dev/null | head -1
 #### Self-check (before entering Step 6)
 
 1. Run the `jq` published.json query for `<skill-name>` — was it present?
-2. Run `git -C ~/.agents ls-files skills/<skill-name>/` — was there at least one tracked file?
-3. Map the answers onto the scope matrix
-4. If **Local-only**, skip Step 6 entirely. Report to the user: "Local-only skill detected (not in published.json, untracked). Edit applied directly; no commit."
-5. If **Public**, proceed to Step 6
+2. **If jq returned empty: verify the path itself**. Run `[ -f "$PUB_JSON" ] && echo OK || echo MISSING`. If `MISSING`, run `find ~/.claude/skills/es6kr ~/.agents/skills/es6kr -name "published.json"` to relocate. **Do not classify as "Not in published.json" until you have confirmed the file actually exists at the queried path.**
+3. Run `git -C ~/.agents ls-files skills/<skill-name>/` — was there at least one tracked file?
+4. If jq returned empty but the file is missing/unreachable AND the skill is tracked AND `git -C ~/.agents remote get-url origin` matches the canonical public repo (`es6kr/skills`) → apply the **Public-repo fallback** row → classify as **Public**.
+5. Map the answers onto the scope matrix
+6. If **Local-only**, skip Step 6 entirely. Report to the user: "Local-only skill detected (not in published.json, untracked). Edit applied directly; no commit."
+7. If **Public** (incl. fallback), proceed to Step 6.
 
 ### 6. Commit Changes (MANDATORY — after every skill modification, **Public or Repo-internal scope**)
 
@@ -478,6 +502,7 @@ After upgrade Edit/Write is complete, **commit the changed skill files in the `~
 - The commit step is part of the upgrade procedure, not a separate task. Do not stop after Step 5 (lint).
 - If `git status` shows pre-existing modifications in other skills, **leave them alone** — they belong to the user / other sessions.
 - New `.md` files under `skills/<new-skill>/` must be added explicitly (`git add skills/<new-skill>/`) because they are untracked.
+- **PR bundling across multiple skills**: when this upgrade modifies 2+ skills (e.g., the target skill + a cross-cutting fix to `skill-kit/upgrade.md` itself), PR scoping follows **bump type**, not per-skill. **All patch-level changes go in one PR**; minor/major need their own PR. See `~/.agents/skills/es6kr/deploy-skill.md` "PR bundling by version bump type" section for the matrix. Commits stay per-skill (conventional commit header for release-please component routing), but the PR aggregates by bump type.
 
 #### Publish-baseline split (MANDATORY when registering an externally-published skill for the first time)
 
@@ -515,7 +540,7 @@ Bundling published baseline + new changes into a single commit makes attribution
 ##### When user signals "publish baseline" intent
 
 User phrases like "commit the deployed state to the worktree first", "publish state as baseline", or
-"commit release as-is" all signal this split. Per `ask-user-question.md` ambiguous-verb table entry
+"commit release as-is" all signal this split. Per the ambiguous-verb principle, the phrase
 "as-deployed / at publish time / release as-is", the default interpretation is **baseline split**,
 not "single commit in some order".
 
