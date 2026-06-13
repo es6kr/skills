@@ -1,10 +1,10 @@
 # Ask Gates — recording-skip / TaskList primary-source / current-work confirmation
 
-### Step 0.3: Recording/management topic ask-skip gate (HARD STOP)
+## Step 0.3: Recording/management topic ask-skip gate (HARD STOP)
 
 **If the just-completed work is a "simple recording/management topic", skip the next-action ask entirely.** Stop hook auto-triggers next skill on every task completion, but recording-topic completion is not a user-decision branch point.
 
-#### Skip-target topic list
+### Skip-target topic list
 
 | Topic / skill | Identification signal | Skip ask? |
 |---------------|----------------------|-----------|
@@ -17,7 +17,7 @@
 | Commit / push | git commit/push performed | ❌ Ask required (next-step branch) |
 | Skill/rule modification | Skill/rule file Edit | ❌ Ask required (test/commit branch) |
 
-#### Don't / Do table
+### Don't / Do table
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -26,31 +26,31 @@
 | 3 | "archive completed, should I delete the rest too?" autonomous proposal | archive = single-action. Report and end |
 | 4 | "User can pick Other or end-session option, so it's safe to ask" rationalization | Ask itself implies a user decision is needed. No decision needed = no ask |
 
-#### Self-check (every time before composing options)
+### Self-check (every time before composing options)
 
 1. What was the just-completed work? -- Identify by user message + action history
 2. Does it match the skip-target topic list above? -- If yes, skip ask immediately
 3. Did the user explicitly express follow-up intent alongside the recording-topic invocation (e.g., "record then proceed with X")? -- If no, end with report only
 4. Does the just-completed work include code change / commit / push / external publish? -- If yes, ask is required (decision branch exists)
 
-#### How to skip (procedure)
+### How to skip (procedure)
 
 1. Determine skip target via Step 0.3 self-check
 2. If skip-target, do not proceed to Step 0.5/0.7 (TaskList check, user-work confirmation)
 3. Report completion as plain text only (no AskUserQuestion call)
 4. If Stop hook re-triggers next skill, re-evaluate the same skip judgment
 
-#### Case history
+### Case history
 
 A recording-only instruction (record a checklist item) completed → the Stop hook triggered next → an AskUserQuestion proposed a "start a code-workflow (Recommended)" option → the user picked it → a full research + plan was authored against the user's intent of recording only. Recording topics are not decision branch points. (See failed-attempts.md "recording-topic ask-skip".)
 
 If skip-target → no ask. Otherwise → proceed to Step 0.4.
 
-### Step 0.4: Decision-deferral forced-ask gate (HARD STOP)
+## Step 0.4: Decision-deferral forced-ask gate (HARD STOP)
 
 **Before ending a completion report, scan your own just-emitted text for a decision left as prose.** If the report defers a decision to the user instead of asking it, that deferral is itself a decision axis — you **must** compose an `AskUserQuestion` for it, not end on the text. This is the mirror image of Step 0.3: 0.3 *skips* the ask for recording topics; 0.4 *forces* the ask when a real decision was left unasked.
 
-#### Trigger phrases — a decision left as text
+### Trigger phrases — a decision left as text
 
 A report that ends with any of these is a forbidden text-question. Convert it to an ask:
 
@@ -61,7 +61,7 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 | "your call / up to you / you decide" | "your call", "your decision", "up to you" |
 | "next step is X (if you want)" | "the next step is X if you want", "let me know to proceed" |
 
-#### Don't / Do table
+### Don't / Do table
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -69,7 +69,7 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 | 2 | Treat a deferred decision as "out of scope — the user will instruct later" | A deferred decision is in `next`'s scope: it is a decision axis, so ask it now |
 | 3 | Rely on the Stop hook firing to remember the ask | The Stop hook is belt-and-suspenders. This self-check is the first line — run it before ending the report |
 
-#### Self-check (every time before ending a completion report)
+### Self-check (every time before ending a completion report)
 
 1. Does my report contain a decision phrased as prose (any trigger phrase above)?
 2. If yes → an `AskUserQuestion` is **required** for that decision. Do not end on the text.
@@ -78,17 +78,17 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 
 Otherwise → proceed to Step 0.5.
 
-### Step 0.5: TaskList primary-source check (MANDATORY — every time before composing ask options)
+## Step 0.5: TaskList primary-source check (MANDATORY — every time before composing ask options)
 
 **Immediately before calling `AskUserQuestion`, call `TaskList` to directly verify current pending/in_progress tasks.** Do not compose options from context summary / memory / inference of recent work.
 
-#### Why it's mandatory
+### Why it's mandatory
 
 - Right after `/compact`, summary memory can be stale — frequent mismatch with the real task list
 - When task names/contents appear in option descriptions, the user **trusts they exist** → fabricating virtual tasks in options breaks that trust
 - One TaskList call = primary source for option accuracy
 
-#### Don't / Do table
+### Don't / Do table
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -97,17 +97,17 @@ Otherwise → proceed to Step 0.5.
 | 3 | Option-ify only some pending tasks (e.g., "only the 1 immediately actionable") | Include all pending tasks as option candidates. If trigger conditions differ, state them in description |
 | 4 | Write virtual tasks ("FA-update immediate progress") in option descriptions | Quote real task subject + ID (note: TaskList-internal `#NN` IDs are referenced by subject keyword, not exposed in user-visible output) |
 
-#### Self-check (every time before calling AskUserQuestion)
+### Self-check (every time before calling AskUserQuestion)
 
 1. Does this ask relate to task progress direction? → If yes, TaskList Read is mandatory
 2. Do the tasks mentioned in option descriptions **actually exist in TaskList**? — 1:1 mapping with TaskList output
 3. If there are N pending tasks but only M < N appear in options → state the filtering reason in description or use the wrap-up pattern
 
-### Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
+## Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
 
 **Before composing options, if any of the following conditions apply, ask the user "what are you currently working on / waiting for" FIRST. Do not bake assumptions into option descriptions.**
 
-#### Trigger conditions
+### Trigger conditions
 
 | Signal | Example | Required action |
 |--------|---------|-----------------|
@@ -116,7 +116,7 @@ Otherwise → proceed to Step 0.5.
 | Task description includes "user direct work" / "user execution wait" | {server-A} sudo wait, manual server work | Ask the user "is the work done? in progress? not started?" |
 | Stop hook auto-invoked next (not single task completion) | Multi-task session, partial completion | Ask the user "which work was completed? what to do next?" |
 
-#### Don't / Do table
+### Don't / Do table
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -125,14 +125,14 @@ Otherwise → proceed to Step 0.5.
 | 3 | Compose options assuming "user is waiting on task #N because TaskList says it's in_progress" | TaskList in_progress = registered state, not current real-time activity. Ask the user |
 | 4 | Skip the ask with the justification "Other is available so the user can adjust" | "Other" doesn't compensate for assumption errors. Ask explicitly when the activity is unclear |
 
-#### Self-check (every time before composing options)
+### Self-check (every time before composing options)
 
 1. Has the user explicitly told us in the last 1-2 messages what they are currently working on? → If yes, use that; if no, ask
 2. Are there 2+ in_progress tasks in TaskList? → If yes, the user might be working on any of them. Ask
 3. Did the user just hand off work that requires "manual sudo / external API / browser action"? → Ask if it's done
 4. Did the user say something ambiguous about scope ("in progress", "finishing", "applying the design change")? → Ask for pinpoint
 
-#### Distinguish "in progress" vs "waiting on" (HARD STOP)
+### Distinguish "in progress" vs "waiting on" (HARD STOP)
 
 **in progress** ≠ **waiting on**. Both must be asked separately when the situation is unclear.
 
@@ -143,7 +143,7 @@ Otherwise → proceed to Step 0.5.
 
 **Do not combine the two in a single option.** Example: "{server-A} sudo in progress" is in-progress, while "{server-B} 502 recovery waiting" is waiting-on. Mixing them in one option set makes the answer ambiguous.
 
-#### Avoid guess options — prefer free-text via Other (HARD STOP)
+### Avoid guess options — prefer free-text via Other (HARD STOP)
 
 **Listing 3–4 speculative options forces the user to pick something unrelated to their actual state.** AskUserQuestion's "Other" is a free-text channel — use it.
 
@@ -153,7 +153,7 @@ Otherwise → proceed to Step 0.5.
 | 2 | Hard-code a concrete task guess like "{server-A} in progress" as an option | Use "I'm doing external work (please write what in Other)" |
 | 3 | Fill option description with assumed information before receiving the user's answer | If user state is unconfirmed, minimize options and capture via free text |
 
-#### Example — user vs assistant
+### Example — user vs assistant
 
 **Bad (assumption-driven options)**:
 ```

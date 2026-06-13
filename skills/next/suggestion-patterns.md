@@ -1,6 +1,6 @@
 # Suggestion Patterns
 
-### After code writing/modification
+## After code writing/modification
 
 ```typescript
 options: [
@@ -9,7 +9,7 @@ options: [
 ]
 ```
 
-### After feature implementation
+## After feature implementation
 
 ```typescript
 multiSelect: true,
@@ -20,7 +20,7 @@ options: [
 ]
 ```
 
-### After bug fix
+## After bug fix
 
 ```typescript
 multiSelect: true,
@@ -31,7 +31,7 @@ options: [
 ]
 ```
 
-### After configuration change
+## After configuration change
 
 ```typescript
 options: [
@@ -40,7 +40,7 @@ options: [
 ]
 ```
 
-### After commit
+## After commit
 
 ```typescript
 options: [
@@ -49,7 +49,7 @@ options: [
 ]
 ```
 
-### After push
+## After push
 
 ```typescript
 options: [
@@ -58,13 +58,13 @@ options: [
 ]
 ```
 
-### After PR fix commit push (after pushing a fix commit to an existing PR)
+## After PR fix commit push (after pushing a fix commit to an existing PR)
 
 **Precondition**: A fix commit has just been pushed to an existing PR. CI has been re-triggered.
 
 **Self-check before calling**: Verify AI Review Summary posting status via `gh pr view <N> --json comments`.
 
-#### Re-review policy (HARD STOP — first review vs re-review)
+### Re-review policy (HARD STOP — first review vs re-review)
 
 | Scenario | Autonomous bot trigger allowed? |
 |----------|-------------------------------|
@@ -79,13 +79,14 @@ A "bot trigger" includes any of:
 
 These are external-medium actions (notify the reviewer bot's quota/queue + post user-visible artifacts on the PR). Initiating them autonomously on a fix-commit-push flow steps into user decision territory.
 
-#### Pre-trigger self-check (HARD STOP — every time before issuing a re-review trigger)
+### Pre-trigger self-check (HARD STOP — every time before issuing a re-review trigger)
 
 1. Has the same bot already produced **≥1 review** on this PR (any commit)? — `gh pr view <N> --json reviews --jq '[.reviews[] | select(.author.login | test("<bot>"; "i"))] | length'`. If `>0`, this is a re-review case.
-2. Is there a **review currently in progress** (no submitted artifact yet but the bot is known to be working)? — Check the `gh pr checks <N>` output for the bot's status line (e.g., `CodeRabbit\tpending\t0\t\tReview in progress`) and the latest issuecomment timestamp from that bot author within the last ~5 min. If in-progress, **do not trigger** — wait.
+2. Is there a **review currently in progress** (no submitted artifact yet but the bot is known to be working)? — Check the `gh pr checks <N>` output for the bot's status line (e.g., `CodeRabbit\tpending\t0\t\tReview in progress`) and the latest issuecomment timestamp from that bot author within the last **~10 min (600 s)**. The 600-second window is the canonical value set by `consolidate/pr.md` Step 2.6 (`now - 600 | strftime`); keep this file aligned with that source. If in-progress, **do not trigger** — wait.
 3. Re-review case ✚ no in-progress signal → **AskUserQuestion required** with explicit options (Re-trigger / Skip Copilot - use 1st review + apply-evidence / Hold).
+4. **Inconclusive in-progress detection** (HARD STOP) — if step 2's signals are unavailable (`gh pr checks` empty for the bot, `gh pr view --json comments` query fails, or no bot comment timestamp falls inside the 600 s window AND the bot has no submitted review either), do not interpret silence as "no in-progress" and do not autonomously trigger. Treat the state as **inconclusive** → **AskUserQuestion required** with options (Re-trigger / Skip bot — use prior review evidence / **Hold (Recommended when inconclusive)**). The Hold option lets the user wait for the next polling cycle without burning an external bot-trigger quota on uncertain state.
 
-#### Don't / Do
+### Don't / Do
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -120,7 +121,7 @@ options: [
 ]
 ```
 
-### After PR creation (BEFORE consolidate — branch on reviewer matrix)
+## After PR creation (BEFORE consolidate — branch on reviewer matrix)
 
 **Precondition**: Passed `github-flow/pr.md` Step 9. Branch on the **reviewer matrix** (CodeRabbit walkthrough + Copilot review request/post state), not just walkthrough.
 
@@ -208,7 +209,7 @@ options: [
 | 4 | Branch on walkthrough alone, ignoring Copilot state | Both reviewers form the matrix. Walkthrough ✅ + Copilot ❌ requires its own option set (Copilot register/skip/hold) |
 | 5 | Recommend "/consolidate" when Copilot is absent without making the Copilot decision explicit | Make Copilot status an explicit choice in the option description — user must decide register vs skip vs hold |
 
-### After skill/agent creation
+## After skill/agent creation
 
 ```typescript
 options: [
@@ -217,7 +218,7 @@ options: [
 ]
 ```
 
-### After file creation
+## After file creation
 
 ```typescript
 options: [
@@ -226,7 +227,7 @@ options: [
 ]
 ```
 
-### After refactoring
+## After refactoring
 
 ```typescript
 multiSelect: true,
@@ -237,7 +238,7 @@ options: [
 ]
 ```
 
-### After complex workflow completion
+## After complex workflow completion
 
 ```typescript
 multiSelect: true,
@@ -247,7 +248,7 @@ options: [
 ]
 ```
 
-### After project exploration/research
+## After project exploration/research
 
 ```typescript
 multiSelect: true,
@@ -257,7 +258,7 @@ options: [
 ]
 ```
 
-### After session wrap-up with pending tasks (HARD STOP — TaskList based)
+## After session wrap-up with pending tasks (HARD STOP — TaskList based)
 
 **Precondition**: The session's core work is complete and the user signals wrap-up intent (explicit wrap-up keyword such as "wrap up", "cleanup", "end session"), or only asset cleanup (file moves, doc updates) remains. At least one pending/in_progress task remains for carryover.
 
@@ -267,7 +268,7 @@ options: [
 TaskList   # use pending/in_progress entries as the source
 ```
 
-#### Recommended priority — actionable follow-up over "End session" (HARD STOP)
+### Recommended priority — actionable follow-up over "End session" (HARD STOP)
 
 **"End session" must never be the default Recommended option.** It carries no actionable value beyond what the user already implies by stopping responding; suggesting it autonomously is an autonomous proposal of a work-progression decision (branching / session termination / skipping), which is forbidden. If the user wants to end the session, they will say so or simply stop — `next` does not need to nominate it.
 
@@ -279,7 +280,7 @@ Instead, the **Recommended** option is always **the most actionable follow-up** 
 
 "End session" appears **only as a non-Recommended fallback option**, and only when the user has shown signals consistent with wrap-up intent (explicit wrap-up keyword or 2+ consecutive declines of other follow-ups). In that case, the label is plain `"End session"` — never `"End session (Recommended)"`.
 
-#### Option composition rules
+### Option composition rules
 
 | Pending count | multiSelect | Option layout |
 |------------|-------------|----------|
@@ -294,7 +295,7 @@ Instead, the **Recommended** option is always **the most actionable follow-up** 
 { label: "Run session retrospective + cleanup (Recommended)", description: "Invoke the session-cleanup helper to record this session's lessons + tidy temporary tasks. Skill router picks the matching tool." }
 ```
 
-#### Self-check (HARD STOP — before drafting the option array)
+### Self-check (HARD STOP — before drafting the option array)
 
 For every option you are about to include, answer:
 
@@ -303,7 +304,7 @@ For every option you are about to include, answer:
 3. **Is this an autonomous proposal of a work-progression decision (branching / session termination / skipping)?** If the user has not explicitly requested wrap-up, the entire wrap-up pattern may not apply — re-route to a regular next-action ask.
 4. **Is my Recommended option referencing a helper by purpose (not skill name)?** Hardcoded skill names break when external skills rename.
 
-#### Don't / Do table
+### Don't / Do table
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -318,7 +319,7 @@ For every option you are about to include, answer:
 | 9 | Compose the wrap-up ask **inline** without invoking `/next` and skip rows 1–8 because "I know the rule" | The rule is enforced by the skill's Self-check gate. **Inline composition = skill bypass = same gate applies**. Either call `/next` formally OR self-execute every row in this table + the 4-step Self-check before posting. Pattern: writing "Delete X + end session (Recommended)" as option 1 inline ≡ violating row 4 |
 | 10 | Generate two end-session-like options ("X + end session" + "End session, leave Y") | At most 1 plain `End session` option, last, no Recommended marker. Multiple end-variants = recurrence signal — re-check Self-check rows 1–2 |
 
-#### Example (2 pending, right after asset cleanup)
+### Example (2 pending, right after asset cleanup)
 
 ```typescript
 AskUserQuestion({
@@ -336,7 +337,7 @@ AskUserQuestion({
 })
 ```
 
-### After PR consolidate (after AI Review Summary is posted)
+## After PR consolidate (after AI Review Summary is posted)
 
 **Precondition**: Completed `consolidate/pr-review.md` through Step 7 (Internal Review + AI Review Summary posted).
 
