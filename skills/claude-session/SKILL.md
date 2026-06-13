@@ -202,16 +202,24 @@ Script: `scripts/purge-dead-sessions.sh <project_name> [--delete]`
 ### Repair (Session Recovery)
 
 ```bash
-/session repair                          # select session, then validate and repair
+/session repair                          # default: current session (uses hook-injected ID)
 /session repair <session_id>             # repair specific session
 /session repair --dry-run                # preview only
 /session repair --check-only             # validate only (no repair)
 ```
 
+**Primary script** (full pipeline: backup → dedup → 400 error → orphan tool_result → chain → validate):
+
+```bash
+python3 ~/.claude/skills/claude-session/scripts/repair-session.py <session_file>
+python3 ~/.claude/skills/claude-session/scripts/repair-session.py <session_file> --dry-run
+```
+
 Repair targets:
 - Broken chain (missing parentUuid)
 - Orphan tool_result (no matching tool_use)
-- Duplicate UUIDs
+- Duplicate UUIDs / duplicate message.id (Syncthing conflicts)
+- API 400 error lines (incl. invalid surrogate pair / thinking-block signature)
 
 [Detailed guide](./repair.md)
 
