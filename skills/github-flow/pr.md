@@ -190,9 +190,9 @@ For chore/docs/config changes, only build + type check items.
 ### Step 5: Sanitize Internal Paths
 
 Before posting, strip all internal paths per SKILL.md Core Rules:
-- `.ralph/docs/` references → remove or inline the content
+- Internal workflow-generated doc paths (e.g., `.ralph/docs/`, `.omc/plans/`) → remove or inline the content
 - Session IDs → remove
-- `.omc/` references → remove
+- Other internal working directories (`~/.claude/`, `~/.ralph/`, `~/.omc/`, etc.) → remove
 
 ### Step 6: Suggest Milestone
 

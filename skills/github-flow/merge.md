@@ -115,15 +115,18 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 2. **Verify tracking-medium registration** (per environment):
 
    ```bash
-   # Ralph environment
-   grep -cE '\[BLOCKED\].*\[REVIEW_FEEDBACK\].*PR #<N>' {workspace}/.ralph/fix_plan.md
+   # fix_plan tracker — workspace-relative path per fix-plan SKILL.md `task-tracker` config
+   # (e.g., Ralph wrappers place it at {workspace}/.ralph/fix_plan.md; vanilla workspaces use {workspace}/fix_plan.md)
+   grep -cE '\[BLOCKED(:[^]]+)?\].*\[REVIEW_FEEDBACK\].*PR #<N>' <fix_plan tracker path>
 
-   # checklist environment
-   grep -cE '\[BLOCKED\].*PR #<N>' {workspace}/checklist.md
+   # checklist tracker (non-Ralph workspaces)
+   grep -cE '\[BLOCKED(:[^]]+)?\].*PR #<N>' {workspace}/checklist.md
 
-   # GitHub Issue environment
+   # GitHub Issue tracker
    gh issue list --search "deferred from PR #<N>" --state open --json number
    ```
+
+   The `[BLOCKED(:[^]]+)?\]` pattern matches both the plain `[BLOCKED]` form and the priority-annotated `[BLOCKED:P0-P3:reason]` form (see fix-plan/priority.md).
 
 3. **Compare counts**: deferred-item count ≤ medium-registration count → proceed. deferred-item count > medium-registration count → block the merge
 
@@ -494,7 +497,7 @@ A bare `✅` leaves no basis to verify "the conditions were really satisfied" af
 
 **Forbidden pattern**: `### PR #N — ✅ MERGED YYYY-MM-DD` alone (no condition evidence)
 
-**For post-hoc verifiability**: the ralph improve 5-A2 step and the workflow.md supervision checklist Step 7 read this information for verification. Without evidence, `✅`-only entries are classified as "merged without checking conditions" suspects during supervision.
+**For post-hoc verifiability**: a post-hoc supervision flow (e.g., a Ralph wrapper's improve 5-A2 step, or the workflow.md supervision checklist Step 7) reads this information for verification. Without evidence, `✅`-only entries are classified as "merged without checking conditions" suspects during supervision.
 
 ## Merge-recommendation AskUserQuestion format (CRITICAL — HARD STOP)
 
