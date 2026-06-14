@@ -397,6 +397,53 @@ done
 | `rules/file-operations.md` | `/safe-delete` | OK / BROKEN |
 | `.ralph/PROMPT.md` | `Skill("safe-delete")` | OK / BROKEN |
 
+### Step D: Undeclared vendor-specific path coupling (HARD STOP)
+
+Detect skill body references to vendor-specific paths/workflows that are NOT declared via `depends-on`. Undeclared coupling breaks portability — the skill silently assumes the vendor wrapper is present.
+
+**Pattern**: a skill at `<scope>/skills/<X>/` references vendor paths like `.ralph/`, `.omc/`, vendor-named wrappers (`ralph improve`, `omc deploy`, etc.) without `depends-on` covering that vendor.
+
+```bash
+# Vendor paths: extend the regex as new wrappers are introduced
+VENDOR_PAT='\.ralph/|\.omc/|\.codex/|\.ai/'
+
+for skill_dir in ~/.claude/skills/*/ ~/.agents/skills/*/; do
+  skill_name=$(basename "$skill_dir")
+  skill_md="$skill_dir/SKILL.md"
+  [ -f "$skill_md" ] || continue
+
+  # Collect declared dependencies
+  declared=$(grep -E "^depends-on:" "$skill_md" | sed 's/depends-on: *\[//;s/\]//;s/,/ /g')
+
+  # Scan body files for vendor patterns
+  for body in "$skill_dir"*.md; do
+    matches=$(grep -nE "$VENDOR_PAT" "$body" 2>/dev/null | grep -v -E '^[[:space:]]*(#|//|<!--)')
+    [ -z "$matches" ] && continue
+
+    # Determine which vendor was hit (ralph / omc / codex / ai)
+    while IFS= read -r line; do
+      vendor=$(echo "$line" | grep -oE "\.($VENDOR_PAT)" | head -1 | sed 's/\.\([^/]*\)\/.*/\1/')
+      # If declared deps don't cover this vendor wrapper → BROKEN_COUPLING
+      if ! echo "$declared" | grep -qw "$vendor"; then
+        echo "BROKEN_COUPLING: $skill_name → $(basename $body) references $vendor without depends-on"
+      fi
+    done <<< "$matches"
+  done
+done
+```
+
+**Allowed exception (example/sanitize list)**: when the vendor reference appears in a "sanitize target list" (path enumeration to be **removed** before publishing) or example list, the coupling is informational, not structural. Detect by surrounding context (e.g., `## Sanitize`, `## Strip`, `removal target` headers within 5 lines above the match). Body matches outside such sections are flagged.
+
+**Report row format**: append BROKEN_COUPLING entries to the Step C table.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Hardcode `{workspace}/.ralph/fix_plan.md` path in a skill that does not declare `depends-on: ralph` | Use an abstract tracker reference (e.g., `<fix_plan tracker path>` per fix-plan SKILL.md `task-tracker` config). See fix-plan/SKILL.md "vendor-agnostic" note |
+| 2 | Reference `ralph improve 5-A2` step from a non-Ralph-dependent skill | Generalize to "a post-hoc supervision flow" (or whichever abstract role the vendor instantiates) |
+| 3 | Treat sanitize/strip lists as structural references | Sanitize/strip lists = informational; preserve as examples. Step D should NOT flag them |
+
 ## Related Actions
 
 After lint completes, recommend:
