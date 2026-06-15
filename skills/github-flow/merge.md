@@ -448,15 +448,15 @@ gh pr view <PR_NUMBER> --json mergeable
 
 Most feature work / bug fixes use squash merge. Clean up the commit message per the rules:
 
-1. **Subject**: start from the PR title with redundant tags (e.g. `[WIP]`, `[DRAFT]`) removed.
+1. **Subject**: start from the PR title with redundant tags (e.g. `[WIP]`, `[DRAFT]`) removed. **Subject MUST end with ` (#<PR_NUMBER>)` suffix** (HARD STOP) — matches GitHub's native squash default format. Enforced by `~/.claude/hooks/block-squash-subject-without-pr.sh` (PreToolUse:Bash): blocks `gh pr merge --squash` when (a) `--subject` is absent or (b) `--subject` value does not end with `(#<digits>)`.
 2. **Body**:
    - Distill the key content from the PR body's "Changes" or "Key changes" section.
    - Include `Closes #issue` or `Fixes #issue`.
    - On a PRIVATE repo you MAY add a non-sensitive trace reference (e.g. a short workspace identifier) if your team relies on one. On a PUBLIC repo, **do not embed session identifiers / personal handles / internal IDs** — they survive in `git log` forever and violate the sanitize HARD STOP introduced elsewhere in this skill.
 
 ```bash
-# Example (PUBLIC repo — no internal identifiers in the squash body)
-gh pr merge <PR_NUMBER> --squash --subject "feat: add user session countdown UI" --body "- JWT-exp-based countdown hook and header UI\n- Closes #253"
+# Example (PUBLIC repo — subject ends with (#<PR_NUMBER>), no internal identifiers in body)
+gh pr merge <PR_NUMBER> --squash --subject "feat: add user session countdown UI (#<PR_NUMBER>)" --body "- JWT-exp-based countdown hook and header UI\n- Closes #253"
 ```
 
 ### Regular Merge (merge commit)
@@ -471,7 +471,12 @@ gh pr merge <PR_NUMBER> --merge
 
 - **Always confirm**: `gh pr checks` right before merging is non-optional.
 - **Message quality**: at squash time, write a message that actually reveals the work — not GitHub's default "Merge pull request #..." text.
-- **Post-merge cleanup**: after a successful merge, delete the local branch and check the corresponding `fix_plan.md` item as `[x]`.
+- **Post-merge cleanup**: after a successful merge, delete the local branch and check the corresponding `fix_plan.md` item as `[x]`. **Worktree removal requires AskUserQuestion (HARD STOP)** — `git worktree remove` is a destructive action and the `git-repo` skill recommends reusing worktrees for the next PR rather than removing them. After merge, the worktree must be left in place by default; only remove on explicit user instruction. Listing "remove worktree" as a default cleanup step (or executing it autonomously) is forbidden.
+- **Post-merge AI Review Summary sync (HARD STOP)**: after a successful merge, immediately PATCH the AI Review Summary comment (the one posted in `consolidate/post.md` Step 7) to reflect the merged state — do NOT leave the Summary frozen at its pre-merge snapshot. The Summary is the user-facing record of the PR's final disposition; if it still says "⏳ Actionable PENDING" or shows an incomplete Test Plan after merge, anyone reading the PR later will see a contradictory record.
+  - **What to update**: (a) verdict line: `⏳ Actionable PENDING fix.` → `✅ MERGED <YYYY-MM-DD>` + merge commit SHA + `(#<PR>)` suffix. (b) findings table `Status` column: each "⏳ Pending decision" → either `🟢 Applied (commit <sha>)` or `🟢 Deferred (<tracking-medium reference>)` per the actual outcome. (c) any inline "Test Plan N/M items checked" → "Test Plan M/M ✅" if CI re-pass confirmed.
+  - **How**: `gh api repos/{owner}/{repo}/issues/comments/{comment_id} -X PATCH --input <(jq -n --rawfile body <updated-summary-file> '{body: $body}')` — find the comment id via `gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("## AI Review Summary")) | .id'`. Reuse the same id (PATCH, not new POST) — `consolidate/post.md` "Single Summary preservation guard" applies post-merge too.
+  - **Forbidden**: leaving the Summary at its pre-merge state because "the PR is MERGED so the comment is read-only". A MERGED PR's comment body is still PATCH-able and the audit trail benefits from the merged-state record.
+  - **Order vs Issue body checklist update (next bullet)**: Summary PATCH runs first (PR-scoped), then issue body checklist update (issue-scoped). Both run before `Deploy follow-up`.
 - **Update related issue body checklists (HARD STOP)**: if the PR referenced an issue via `Relates to #N` / `Resolves #N` / `Fixes #N` / `Refs #N`, immediately after merge update that issue body's checklist (`- [ ]`) to `- [x]` for items covered by the PR scope, and append a reference to the merged PR number. Especially for **epic-style issues** (multiple Phase 1/2/3 checkboxes), batch-update every Phase item completed by the PR merge.
   - Update format: `- [x] item description (merged in PR #N)` or `- [x] item description — PR #N`
   - Search: `gh pr view <PR> --json body -q '.body' | grep -iE 'Resolves|Relates to|Closes|Fixes|Refs'` → extract referenced issues

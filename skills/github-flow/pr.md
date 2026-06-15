@@ -56,6 +56,32 @@ gh pr list --head $(git branch --show-current) --state open
 - If **gh CLI missing** → proceed with body template only (no creation)
 - If **PR already exists** → report to user and stop
 
+#### Step 1.5: GitHub Actions Workflow YAML Verification (HARD STOP — when `.github/workflows/*.yml` was edited)
+
+After modifying or creating a workflow YAML, **verify locally before push**.
+
+##### Permissions matrix verification
+
+If the workflow declares a `permissions:` block, build a matrix of every action/API the jobs use and confirm no permission is missing.
+
+| Action/API | Required permission |
+|-----------|---------------------|
+| `actions/checkout@v4` | `contents: read` |
+| `docker/login-action@v3` + `build-push-action@v6` | `packages: write` |
+| `dorny/paths-filter@v3` (PR mode) | `pull-requests: read` |
+| `peter-evans/repository-dispatch@v3` | (uses PAT token, no permissions block needed) |
+| `softprops/action-gh-release@v2` | `contents: write` |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Copy the source workflow's permissions block verbatim into a consolidated workflow | After consolidation, walk every job's actions and **union** the required permissions |
+| 2 | Add a new action without updating permissions | Right after adding an action, check the matrix above → append the required permission |
+| 3 | Run only `act-check` and then push | Use `act` to validate every executable job. Even lightweight jobs (e.g., `paths-filter`) should pass syntax verification under `act` |
+
+##### `act` local verification
+
+Run `make act-check` or `make act-ci` and confirm **all executable jobs pass** before pushing. Jobs that cannot run under `act` (Tailscale, Semaphore-only paths, etc.) must at least pass YAML syntax verification.
+
 ### Step 2: Gather Changes
 
 ```bash
@@ -96,9 +122,9 @@ If `.github/pull_request_template.md` exists, use that template. Otherwise use t
 | ![before](url) | ![after](url) |
 
 ## Test plan
-- [ ] `[general]` Local build passes
-- [ ] `[general]` No type errors
-- [ ] `[general]` ...
+- [ ] **[general]** Local build passes
+- [ ] **[general]** No type errors
+- [ ] **[general]** ...
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
@@ -166,18 +192,19 @@ For chore/docs/config changes, only build + type check items.
 | 3 | Force `[x]` verification of `[post-merge]` items before merge | `[post-merge]` does not block merge. Register a tracking record (issue or `fix_plan.md [BLOCKED]`) and proceed to merge |
 | 4 | Mark an item `[post-merge]` without registering a tracking medium (post-merge verification gets lost) | `[post-merge]` items require `gh issue create` or `fix_plan` registration. Inline the tracking link in the item description |
 | 5 | Omit the category prefix and only write notes | Prefix is required — both the merge.md guard automation and human triage classify by prefix matching |
+| 6 | Wrap the category in backtick + bracket in the PR body (`` `[post-merge]` ``) — backtick renders an inline-code chip stacked on the brackets = redundant double-highlight | **PR-body output format = `**[category]**`** (bold + bracket, a single highlight): `**[general]**` / `**[UI]**` / `**[post-merge]**`. (Inline-code `[category]` references in *this doc's* prose/tables are fine — the rule applies only to the **PR body** the reader sees.) |
 
 #### Test Plan example
 
 ```markdown
 ## Test Plan
 
-- [ ] `[general]` `make plan ENV=dev-A` → backend switch confirmed + plan output 1 add / 2 change
-- [ ] `[general]` `make plan ENV=integration` → environment switch confirmed
-- [ ] `[UI]` Entry to service-A → `service-A-source-auto-redirect` flow exposed (Playwright)
-- [ ] `[UI]` After service-B logout, entry to service-A re-exposes the service-B login screen (Playwright, regression guard for case C-1)
-- [ ] `[post-merge]` After integration deploy, app logout → verify post-logout redirect (tracking: [#39-followup](url))
-- [ ] `[post-merge]` Self-hosted runner picks up at least one workflow run (tracking: workflow_dispatch or next PR's CI)
+- [ ] **[general]** `make plan ENV=dev-A` → backend switch confirmed + plan output 1 add / 2 change
+- [ ] **[general]** `make plan ENV=integration` → environment switch confirmed
+- [ ] **[UI]** Entry to service-A → `service-A-source-auto-redirect` flow exposed (Playwright)
+- [ ] **[UI]** After service-B logout, entry to service-A re-exposes the service-B login screen (Playwright, regression guard for case C-1)
+- [ ] **[post-merge]** After integration deploy, app logout → verify post-logout redirect (tracking: [#39-followup](url))
+- [ ] **[post-merge]** Self-hosted runner picks up at least one workflow run (tracking: workflow_dispatch or next PR's CI)
 ```
 
 #### Self-check (right before writing the Test Plan, every time)
@@ -572,3 +599,32 @@ PR creation is stateless. There is no automation that detects review arrival. So
 - **At least 1 classification label** required on every PR
 - **Sanitize internal paths** before posting (Step 5)
 - **Step 9 mandatory** — after PR creation, either register a consolidate follow-up task or invoke it immediately. Reporting and stopping is forbidden.
+
+## PR Creation Explicit Authorization (HARD STOP)
+
+**PR creation after implement is a separate decision point.** Do not chain push and PR creation as a single flow. PRs are permanently recorded on GitHub; closing them leaves "history garbage" so recovery cost is high.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "Start implementation" option selected → implement + commit + push + `gh pr create` auto-chain | "Start implementation" = implement + commit only. push/PR requires separate explicit instruction |
+| 2 | Plan says "submit Phase 1 as PR" → interpret plan approval as PR creation approval | Plan is a procedure spec. Each publish point requires explicit user instruction |
+| 3 | code-workflow Step 4 (implement) → auto-trigger github-flow/pr | After implement completion, report → wait for user "create PR" instruction |
+| 4 | Just before `gh pr create`, ask AskUserQuestion "title/body OK as is?" and proceed | Ask "Should I create the PR?" first — title/body confirmation comes after |
+| 5 | AskUserQuestion option description does not mention PR creation, but PR is created anyway | Publish actions not explicitly stated in option description require separate ask |
+| 6 | **Open PR(s) already in flight, but a new axis (new branch + push + PR) is added as an option, imposing simultaneous-handling burden** | **Before composing options, run `gh pr list --state open` as primary source. If 1+ open PRs exist, ask "handle existing PR first vs start new axis" as a separate question first** — including the new axis in option description is itself a burden |
+| 7 | "User selected option whose description mentions 'PR creation', so OK" — ignoring other in-flight PRs | Option description coverage is the single-PR-context rule (#5). Adding a multi-PR axis is a separate decision point **before options are even presented**. Option description inclusion ≠ multi-PR axis agreement |
+
+**Self-check (every time before `gh pr create` / new branch push)**:
+1. Did the user **explicitly** say "create PR", "register PR", "open PR", etc.?
+2. Or does the AskUserQuestion option description selected by the user **explicitly** mention PR creation?
+3. **Confirm via `gh pr list --state open` as primary source** — is there 1+ open PR in flight?
+   - **If yes**: regardless of #2 passing, axis split is required. "Handle existing PR (#N) first vs start new axis" must be asked separately. Option description must mark "existing PR in flight" + indicate this is a separate axis
+   - **If no**: passing #2 alone is OK
+4. If neither holds, or axis was not split → block `gh pr create` / new branch push
+
+**Why multi-PR axis split?**:
+- 2+ concurrent PRs = N× user burden for review/merge/CI monitoring decisions
+- Even if option description mentions "PR creation", the user may intend "existing PR must be processed first" — the option itself was composed wrong
+- 1+ in-flight PR = signal that user is focused on processing that PR. Adding a new axis disrupts the work flow
+
+Violation case history: see `~/.claude/skills/cleanup/data/failed-attempts.md` "PR creation explicit authorization" entries (2026-05-16 + 2026-06-05 recurrences).

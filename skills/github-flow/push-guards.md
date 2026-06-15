@@ -80,6 +80,64 @@ User confirmation is required before:
 - **Direct-push allowed conditions**: user explicitly names the branch / deployment pipeline instruction / urgent hotfix
 - **"Just push" instruction + current branch = develop**: AskUserQuestion → "direct push vs PR"
 
+## Pre-push hook registration verification (HARD STOP)
+
+When a repo ships a versioned hooks directory (`.githooks/`, usually wired via `make install-hooks` → `git config core.hooksPath .githooks`), the pre-push hook fires **only if `core.hooksPath` actually resolves to it**. A repo can carry `.githooks/pre-push` while `core.hooksPath` still points at the default `.git/hooks` (which is empty) — so **no local gate runs and bad content reaches CI uncaught** (e.g., untranslated Korean in an English skill caught only by the CI Korean-text job). File presence is not registration. Verify registration before the first push.
+
+### Procedure (before the first push to a repo with a tracked hooks dir)
+
+1. Detect a tracked hooks dir: `test -d .githooks && echo present`
+2. Resolve the active hooks path: `git config --get core.hooksPath` (empty output = default `.git/hooks`)
+3. If `.githooks/` is present but `core.hooksPath` is unset or not `.githooks` → the hook is **not registered**. Register it: `git config core.hooksPath .githooks` (or `make install-hooks` when the Makefile provides it)
+4. Confirm the hook exists and is executable: `ls -l "$(git rev-parse --show-toplevel)/$(git config --get core.hooksPath)/pre-push"`
+5. Only then push — the local gate now mirrors CI
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume the pre-push hook ran because `.githooks/pre-push` exists in the repo | Verify `core.hooksPath` resolves to the tracked hooks dir — file presence ≠ registration |
+| 2 | Push, then discover CI caught what a local gate should have | Verify hook registration before pushing; register if missing |
+| 3 | Treat a partial pre-push hook as sufficient | The pre-push hook must mirror the CI gates (lint / tests / language check). A hook that runs only a subset silently lets the unmirrored gate fail in CI alone |
+
+## Pre-push bump-matrix self-check (HARD STOP — release-automation pipelines)
+
+**When the target repo runs a commit-history-driven release automation (release-please, semantic-release, changesets, etc.), the PR's full commit-type distribution decides the release-please bump — not just the commit you are pushing this turn.** Adding a `fix` commit to a PR that already contains a `feat` commit still produces a `minor` bump on squash-merge, even though your incremental push was a patch-level change. Verify the bump matrix BEFORE pushing so the user is not surprised by `minor`/`major` on merge.
+
+### Procedure (run before any push that lands on an open PR)
+
+1. Detect the release-automation receiver in the target repo — `ls .github/workflows/ | grep -iE 'release-please|semantic-release|changesets'`. No match → bump-matrix check not applicable, skip
+2. Identify the PR's commit type distribution from the merge base:
+   ```bash
+   MERGE_BASE=$(git merge-base origin/<base-branch> HEAD)
+   git log "$MERGE_BASE..HEAD" --pretty=format:"%h %s"
+   git log "$MERGE_BASE..HEAD" --pretty=format:"%s" | grep -oE '^[a-z]+' | sort | uniq -c
+   ```
+3. Predict the squash-merge bump from the highest-precedence type present:
+   - `feat` → **minor**
+   - `fix`, `perf`, `refactor`, `chore`, `docs`, `style`, `test`, `ci` → **patch** (some scope configs treat refactor/chore as no-release)
+   - `feat!` or any commit body containing `BREAKING CHANGE:` → **major**
+4. Compare the predicted bump against the user's intent (or the PR title's Conventional Commit type). On mismatch (e.g., PR title implies patch but the body contains a feat) → **AskUserQuestion required** before pushing. Options: (a) push as-is and accept the higher bump, (b) split the offending commit into a separate PR, (c) hold the push
+5. Path-scoped release tooling (release-please monorepo, changesets): if a `feat(...)` commit touches multiple packages, predict the bump per package using `git log "$MERGE_BASE..HEAD" -- <path>` per package. Cross-cutting `feat(...)` that touches every package's path will minor-bump every package — report this matrix to the user before pushing
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Push the incremental commit and assume "my commit is `fix`, so the PR is patch" | The PR's bump = the highest-precedence type across **all** commits between merge-base and HEAD. Inspect the full distribution before pushing |
+| 2 | Trust the PR title's Conventional Commit type as the bump source of truth | release-please reads the commit messages, not the PR title (unless the repo is configured to use the PR title for squash). Verify the actual squash strategy in `.github/workflows/release-*.yml` |
+| 3 | Skip the bump-matrix check when the receiver is "obviously a release-please repo" | The check costs one `git log` + one `grep`. Run it every time — assumptions about the repo's release config drift |
+| 4 | On a `feat`-in-`patch`-PR mismatch, push autonomously thinking "user can revert the bump after merge" | release-please publish artifacts (npm, marketplace, ClawHub) are immutable. Pre-push AskUserQuestion is the last enforceable gate. Post-merge there is no clean revert |
+| 5 | Report only "your commit is `fix`" to the user and skip the distribution dump | Report the full type distribution `feat ×N, fix ×M, refactor ×K` so the user sees the cascade source, not just their incremental change |
+
+### Self-check (before every push that lands on an open PR)
+
+1. Does the repo run a release-please / semantic-release / changesets workflow? — if no, this check is not applicable
+2. Did you run `git log <merge-base>..HEAD --pretty=format:"%s" | grep -oE '^[a-z]+' | sort | uniq -c`?
+3. Does the predicted bump match the user's stated intent (or the PR title's Conventional Commit type)?
+4. On mismatch → AskUserQuestion BEFORE `git push`. Do not push first and report after
+5. For path-scoped release tooling (monorepo), did you verify which packages each `feat(...)` commit touches?
+
 ## Self-check (before every push)
 
 1. Push target = main / master / develop?
@@ -93,6 +151,11 @@ User confirmation is required before:
    - **No** → push complete
 4. Did the pre-push hook fail?
    - **Yes** → fix the root cause OR AskUserQuestion. `--no-verify` is forbidden
+5. Does the repo ship a tracked hooks dir (`.githooks/`)?
+   - **Yes** → confirm `core.hooksPath` resolves to it (register via `git config core.hooksPath .githooks` if not) before pushing — a present-but-unregistered hook means no local gate ran
+6. Does the repo run release-please / semantic-release / changesets?
+   - **Yes** → run the "Pre-push bump-matrix self-check" procedure above before pushing
+   - **No** → bump-matrix check not applicable
 
 ## Failure pattern
 
