@@ -24,6 +24,21 @@ npx skills update                    # Update all installed skills
 
 **Browse skills at:** https://skills.sh/
 
+### Search Source Priority
+
+Several CLIs can search the open ecosystem. Use this order:
+
+| Source | Command | Status | Use as |
+|--------|---------|--------|--------|
+| Skills CLI | `npx skills find <q>` | active | **primary** — non-interactive, parseable output, install counts |
+| ClawHub | `Skill("clawhub", "find <q>")` | active | secondary — different registry; slug/publish workflow |
+| context7 skills | `npx ctx7 skills search <q>` | **deprecated** | avoid — prints "Skill commands are deprecated and will stop working in the next major release"; interactive UI truncates to ~8 rows even with stdin closed |
+
+**Default = `npx skills find`** — active, non-interactive (parseable), the canonical
+Skills CLI. Use it for the `route` topic's 2b remote search. `ctx7 skills search`
+exposes richer `Trust ★` + `Popularity` columns, but being deprecated + interactive
+it is a one-off manual cross-check at best, never the automated default.
+
 ## Workflow
 
 ### 1. Understand the Need

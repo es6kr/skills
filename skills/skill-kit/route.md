@@ -1,6 +1,8 @@
 # Topic Route
 
-Receives a topic description, scans existing skills, and recommends **which skill and which topic to place it under**.
+Receives a topic description, scans existing skills (local + remote ecosystem), and recommends **which skill and which topic to place it under**.
+
+For **plugin-level clustering** (which *skills* to bundle into a shared plugin, not which *topic* goes in a skill), see `Skill("cc-plugin", "clustering")` — different scope (skill-level placement vs. plugin-level membership), different inputs, different output.
 
 ## When to Use
 
@@ -17,7 +19,13 @@ Receive the following from the user:
 - **Topic description**: What the feature does (e.g., "Helm chart lint")
 - **Trigger keywords** (optional): When it should activate (e.g., "helm lint", "chart validation")
 
-### 2. Scan All Existing Skills
+### 2. Scan Existing Skills (local + remote — both MANDATORY)
+
+Scanning the **local** install is not enough. A feature you are about to add may
+already be **published** by someone in the open ecosystem — reuse beats rebuild.
+Run both 2a (local) and 2b (remote) before forming any verdict.
+
+#### 2a. Local scan
 
 ```bash
 # Collect SKILL.md descriptions from all skills
@@ -39,12 +47,36 @@ for dir in ~/.claude/plugins/*/skills/*/; do
 done
 ```
 
+#### 2b. Remote ecosystem search (MANDATORY before recommending "build")
+
+Before recommending that a feature be authored (new skill **or** new topic on an
+existing skill), search the open skill ecosystem for an existing implementation.
+**This skill's own `find` topic is the primary tool** (npx skills CLI →
+skills.sh) — invoke it, do not skip it. ClawHub is an optional secondary registry
+(a different source).
+
+```text
+/skill-kit find <feature keywords>             # primary: this skill's find topic (npx skills → skills.sh)
+Skill("clawhub", "find <feature keywords>")    # optional: ClawHub registry (separate source)
+```
+
+- Search by **capability keywords**, not by your intended skill name (e.g., "plugin clustering", "skill affinity score", "bundle skills"), since an existing skill may name the same capability differently.
+- If a remote skill already covers the capability → prefer **reuse/install** (Verdict D below) over authoring a duplicate.
+- Record what you searched and what you found, so the verdict is auditable.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Scan only the local install and conclude "no existing feature" | Run 2a (local) **and** 2b (remote `find`/`clawhub`) before any verdict |
+| 2 | Search remote only when creating a brand-new skill | Remote-search also before adding a **topic/feature** to an existing skill — capability duplication is the risk, not just name collision |
+| 3 | Search by the skill name you plan to use | Search by capability keywords — the same feature may be published under a different name |
+
 ### 3. Matching Criteria
 
 Select candidates based on the following criteria:
 
 | Criteria | Weight | Description |
 |----------|--------|-------------|
+| Existing implementation (local OR remote-published) | Highest | If a local skill or a remote-published skill (from 2b) already covers the capability, reuse beats authoring a duplicate |
 | Domain match | High | Same tool/area (e.g., helm, k3s, git) |
 | Relevance to existing topics | High | Whether it forms a logical group with existing topics |
 | Description keyword similarity | Medium | Whether trigger keywords overlap |
@@ -90,18 +122,31 @@ Recommendation: Create new skill "docker-compose"
 Reason: no existing docker-related skill; /clawhub slug "docker-compose" = available
 ```
 
+#### D. Reuse an Existing Remote Skill (do not rebuild)
+
+When the 2b remote search surfaces a published skill that already covers the
+capability. Authoring a duplicate is the failure mode this verdict prevents.
+
+```
+Recommendation: Install existing skill "{remote-skill}" instead of authoring
+Reason: 2b remote search (find/clawhub) found {remote-skill} covering this capability — reuse over rebuild
+```
+
 ### 5. Present Results via AskUserQuestion
 
 ```
 AskUserQuestion {
   question: "Here's the placement recommendation for topic '{topic_name}'. Where should it go?",
   options: [
+    { label: "Reuse remote skill {X}", description: "2b remote search found existing coverage — install over rebuild" },
     { label: "Add topic to {skillA}", description: "Domain match, N existing topics" },
     { label: "Add as section in {topicB} of {skillB}", description: "Similar feature already exists" },
-    { label: "Create new skill", description: "Doesn't fit existing skills" }
+    { label: "Create new skill", description: "No local or remote skill covers it" }
   ]
 }
 ```
+
+Include the "Reuse remote skill" option whenever 2b surfaced a candidate. Omit it only when the remote search returned nothing.
 
 ### 6. Follow-up Action Chaining (HARD STOP — Skill tool call required when SKILL.md is touched)
 
