@@ -34,6 +34,11 @@ WT_BASE_WIN="$REPO_WIN/.claude/worktrees"
 OLD_PATH="$WT_BASE/$OLD"
 NEW_PATH="$WT_BASE/$NEW"
 NEW_PATH_WIN="$WT_BASE_WIN/$NEW"
+
+# Default GIT_WT_BASE assumes a non-bare layout where <repo>/.git is a directory.
+# In a bare-with-worktree layout (e.g., ~/.agents whose .git is a gitdir-file
+# pointing into a separate bare repo at ~/ghq/.../<repo>.git), this default is
+# wrong. Step 0 below overrides it from the actual worktree .git pointer.
 GIT_WT_BASE="$REPO/.git/worktrees"
 GIT_WT_BASE_WIN="$REPO_WIN/.git/worktrees"
 
@@ -44,15 +49,26 @@ if [[ -d "$NEW_PATH" ]]; then
   echo "ERROR: $NEW_PATH already exists" >&2; exit 1
 fi
 
-# 0. Resolve the actual metadata directory name from the worktree's .git file.
-# Git may use a suffixed directory name (e.g., "<name>_1") when collisions exist,
-# so we must not assume the metadata dir is named exactly $OLD.
+# 0. Resolve the actual metadata directory + base from the worktree's .git file.
+# Two concerns handled here:
+#   (a) Git may use a suffixed directory name (e.g., "<name>_1") when collisions
+#       exist, so we must not assume the metadata dir is named exactly $OLD.
+#   (b) Bare-with-worktree layouts (e.g., ~/.agents whose .git is a gitdir-file
+#       pointing into a separate bare repo) make the default GIT_WT_BASE wrong.
+#       Override it with the actual parent of the metadata dir.
 ACTUAL_OLD_META="$OLD"
 if [[ -f "$OLD_PATH/.git" ]]; then
   GITDIR_LINE=$(grep -E '^gitdir:' "$OLD_PATH/.git" || true)
   if [[ -n "$GITDIR_LINE" ]]; then
     META_PATH=$(echo "$GITDIR_LINE" | sed -E 's/^gitdir:[[:space:]]+//')
     ACTUAL_OLD_META=$(basename "$META_PATH")
+    # Override GIT_WT_BASE with the actual parent — supports both layouts.
+    GIT_WT_BASE=$(dirname "$META_PATH")
+    if command -v cygpath >/dev/null 2>&1; then
+      GIT_WT_BASE_WIN="$(cygpath -m "$GIT_WT_BASE")"
+    else
+      GIT_WT_BASE_WIN="$GIT_WT_BASE"
+    fi
   fi
 fi
 if [[ ! -d "$GIT_WT_BASE/$ACTUAL_OLD_META" ]]; then
