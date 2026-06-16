@@ -354,8 +354,14 @@ Auto-sort if not in alphabetical order:
 
 ```bash
 # Extract depends-on from all SKILL.md → verify skill existence
+# Handles BOTH inline (depends-on: [a, b]) AND block-style (depends-on:\n  - a\n  - b) YAML.
 for skill_md in ~/.claude/skills/*/SKILL.md; do
-  deps=$(grep "^depends-on:" "$skill_md" | sed 's/depends-on: *\[//;s/\]//;s/,/ /g')
+  deps=$(awk '
+    /^depends-on:[[:space:]]*\[/ { gsub(/^depends-on:[[:space:]]*\[|\]$|,/, " "); print; exit }
+    /^depends-on:[[:space:]]*$/ { block=1; next }
+    block && /^[[:space:]]+-[[:space:]]+/ { sub(/^[[:space:]]+-[[:space:]]+/, ""); printf "%s ", $0; next }
+    block && /^[^[:space:]]/ { exit }
+  ' "$skill_md")
   for dep in $deps; do
     dep=$(echo "$dep" | tr -d ' "'"'"'')
     [ -z "$dep" ] && continue
@@ -371,8 +377,8 @@ done
 Extract `/skill-name` or `Skill("skill-name"` patterns from rules, PROMPT.md, and skill topic files, then verify each referenced skill exists:
 
 ```bash
-# Scan targets: ~/.agent/rules/*.md, .ralph/PROMPT.md, ~/.claude/skills/*/*.md
-SCAN_PATHS="$HOME/.agent/rules/*.md .ralph/PROMPT.md $HOME/.claude/skills/*/*.md"
+# Scan targets: ~/.agents/rules/*.md, .ralph/PROMPT.md, ~/.claude/skills/*/*.md
+SCAN_PATHS="$HOME/.agents/rules/*.md .ralph/PROMPT.md $HOME/.claude/skills/*/*.md"
 
 # /skill-name pattern (slash command references)
 grep -hoP '(?<=/)[a-z][-a-z0-9]+' $SCAN_PATHS 2>/dev/null | sort -u | while read ref; do
@@ -404,7 +410,8 @@ Detect skill body references to vendor-specific paths/workflows that are NOT dec
 **Pattern**: a skill at `<scope>/skills/<X>/` references vendor paths like `.ralph/`, `.omc/`, vendor-named wrappers (`ralph improve`, `omc deploy`, etc.) without `depends-on` covering that vendor.
 
 ```bash
-# Vendor paths: extend the regex as new wrappers are introduced
+# Vendor paths: extend the regex as new wrappers are introduced.
+# VENDOR_PAT escapes the leading dot so the bare `grep -nE "$VENDOR_PAT"` body scan matches `.ralph/` etc.
 VENDOR_PAT='\.ralph/|\.omc/|\.codex/|\.ai/'
 
 for skill_dir in ~/.claude/skills/*/ ~/.agents/skills/*/; do
@@ -412,17 +419,31 @@ for skill_dir in ~/.claude/skills/*/ ~/.agents/skills/*/; do
   skill_md="$skill_dir/SKILL.md"
   [ -f "$skill_md" ] || continue
 
-  # Collect declared dependencies
-  declared=$(grep -E "^depends-on:" "$skill_md" | sed 's/depends-on: *\[//;s/\]//;s/,/ /g')
+  # Collect declared dependencies (handles BOTH inline `[a, b]` AND block-style YAML)
+  declared=$(awk '
+    /^depends-on:[[:space:]]*\[/ { gsub(/^depends-on:[[:space:]]*\[|\]$|,/, " "); print; exit }
+    /^depends-on:[[:space:]]*$/ { block=1; next }
+    block && /^[[:space:]]+-[[:space:]]+/ { sub(/^[[:space:]]+-[[:space:]]+/, ""); printf "%s ", $0; next }
+    block && /^[^[:space:]]/ { exit }
+  ' "$skill_md")
 
-  # Scan body files for vendor patterns
+  # Scan body files for vendor patterns (SKIP SKILL.md — its depends-on is the declaration, not a body reference)
   for body in "$skill_dir"*.md; do
-    matches=$(grep -nE "$VENDOR_PAT" "$body" 2>/dev/null | grep -v -E '^[[:space:]]*(#|//|<!--)')
+    [ "$(basename "$body")" = "SKILL.md" ] && continue
+    matches=$(grep -nE "$VENDOR_PAT" "$body" 2>/dev/null | grep -v -E ':[[:space:]]*(#|//|<!--)')
     [ -z "$matches" ] && continue
 
     # Determine which vendor was hit (ralph / omc / codex / ai)
     while IFS= read -r line; do
-      vendor=$(echo "$line" | grep -oE "\.($VENDOR_PAT)" | head -1 | sed 's/\.\([^/]*\)\/.*/\1/')
+      line_no=$(echo "$line" | cut -d: -f1)
+      # Suppress when a sanitize/strip section header appears within the preceding 5 lines (informational, not structural).
+      start=$(( line_no > 5 ? line_no - 5 : 1 ))
+      if sed -n "${start},${line_no}p" "$body" | grep -qiE '^##.*(sanitize|strip|removal[[:space:]]+target)'; then
+        continue
+      fi
+      # Drop the VENDOR_PAT leading `\.` and extract the vendor token directly.
+      vendor=$(echo "$line" | grep -oE "$VENDOR_PAT" | head -1 | sed 's#^\.\([^/]*\)/$#\1#')
+      [ -z "$vendor" ] && continue
       # If declared deps don't cover this vendor wrapper → BROKEN_COUPLING
       if ! echo "$declared" | grep -qw "$vendor"; then
         echo "BROKEN_COUPLING: $skill_name → $(basename $body) references $vendor without depends-on"

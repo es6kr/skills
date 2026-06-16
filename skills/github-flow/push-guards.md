@@ -107,16 +107,20 @@ When a repo ships a versioned hooks directory (`.githooks/`, usually wired via `
 ### Procedure (run before any push that lands on an open PR)
 
 1. Detect the release-automation receiver in the target repo — `ls .github/workflows/ | grep -iE 'release-please|semantic-release|changesets'`. No match → bump-matrix check not applicable, skip
-2. Identify the PR's commit type distribution from the merge base:
+2. Identify the PR's commit type distribution from the merge base. **Two passes are required** — the subject pass preserves the `!` marker on `feat!`, and the body pass catches `BREAKING CHANGE:` footers that never appear in subjects:
    ```bash
    MERGE_BASE=$(git merge-base origin/<base-branch> HEAD)
    git log "$MERGE_BASE..HEAD" --pretty=format:"%h %s"
-   git log "$MERGE_BASE..HEAD" --pretty=format:"%s" | grep -oE '^[a-z]+' | sort | uniq -c
+   # Subject pass: keep the optional trailing `!` so `feat!` is not collapsed into `feat`
+   git log "$MERGE_BASE..HEAD" --pretty=format:"%s" | grep -oE '^[a-zA-Z]+[!]?' | sort | uniq -c
+   # Body pass: count BREAKING CHANGE footers (one line per commit body)
+   git log "$MERGE_BASE..HEAD" --pretty=format:"%b" | grep -cE '^BREAKING CHANGE:' || true
    ```
-3. Predict the squash-merge bump from the highest-precedence type present:
+3. Predict the squash-merge bump from the highest-precedence type present. **Verify the patch/no-bump mapping against the target repo's release config** (`.release-please-config.json` / `.releaserc*.json`); the generic mapping below may diverge from a given repo's policy:
    - `feat` → **minor**
-   - `fix`, `perf`, `refactor`, `chore`, `docs`, `style`, `test`, `ci` → **patch** (some scope configs treat refactor/chore as no-release)
-   - `feat!` or any commit body containing `BREAKING CHANGE:` → **major**
+   - `fix`, `perf` → **patch**
+   - `refactor`, `chore`, `docs`, `style`, `test`, `ci` → **patch** by default in semantic-release, but many release-please configs (including this repo's `.release-please-config.json`) classify them as **no release**. Inspect the target config before predicting
+   - `feat!` (preserved via the `[!]?` group in the subject-pass regex) or any commit body line matching `^BREAKING CHANGE:` (body-pass count > 0) → **major**
 4. Compare the predicted bump against the user's intent (or the PR title's Conventional Commit type). On mismatch (e.g., PR title implies patch but the body contains a feat) → **AskUserQuestion required** before pushing. Options: (a) push as-is and accept the higher bump, (b) split the offending commit into a separate PR, (c) hold the push
 5. Path-scoped release tooling (release-please monorepo, changesets): if a `feat(...)` commit touches multiple packages, predict the bump per package using `git log "$MERGE_BASE..HEAD" -- <path>` per package. Cross-cutting `feat(...)` that touches every package's path will minor-bump every package — report this matrix to the user before pushing
 
@@ -133,7 +137,7 @@ When a repo ships a versioned hooks directory (`.githooks/`, usually wired via `
 ### Self-check (before every push that lands on an open PR)
 
 1. Does the repo run a release-please / semantic-release / changesets workflow? — if no, this check is not applicable
-2. Did you run `git log <merge-base>..HEAD --pretty=format:"%s" | grep -oE '^[a-z]+' | sort | uniq -c`?
+2. Did you run **both** passes — subject (`--pretty=format:"%s" | grep -oE '^[a-zA-Z]+[!]?'`) **and** body (`--pretty=format:"%b" | grep -cE '^BREAKING CHANGE:'`)?
 3. Does the predicted bump match the user's stated intent (or the PR title's Conventional Commit type)?
 4. On mismatch → AskUserQuestion BEFORE `git push`. Do not push first and report after
 5. For path-scoped release tooling (monorepo), did you verify which packages each `feat(...)` commit touches?

@@ -117,10 +117,13 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
    ```bash
    # fix_plan tracker — workspace-relative path per fix-plan SKILL.md `task-tracker` config
    # (e.g., Ralph wrappers place it at {workspace}/.ralph/fix_plan.md; vanilla workspaces use {workspace}/fix_plan.md)
-   grep -cE '\[BLOCKED(:[^]]+)?\].*\[REVIEW_FEEDBACK\].*PR #<N>' <fix_plan tracker path>
+   # Note: the inner class uses an explicit set (`[A-Za-z0-9:]+`) instead of `[^]]+` —
+   # BSD grep (macOS) raises "brackets ([ ]) not balanced" on `[^]]`, so the explicit
+   # set is the portable form across GNU + BSD ERE.
+   grep -cE '\[BLOCKED(:[A-Za-z0-9:]+)?\].*\[REVIEW_FEEDBACK\].*PR #<N>' <fix_plan tracker path>
 
-   # checklist tracker (non-Ralph workspaces)
-   grep -cE '\[BLOCKED(:[^]]+)?\].*PR #<N>' {workspace}/checklist.md
+   # checklist tracker (non-Ralph workspaces) — same BSD-portable class
+   grep -cE '\[BLOCKED(:[A-Za-z0-9:]+)?\].*PR #<N>' {workspace}/checklist.md
 
    # GitHub Issue tracker
    gh issue list --search "deferred from PR #<N>" --state open --json number

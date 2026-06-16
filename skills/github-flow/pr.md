@@ -480,9 +480,9 @@ gh pr view <N> -R <owner>/<repo> --json reviews --jq \
 3. Is the review body the placeholder string? Same as conclusion=failure path.
 4. Recorded the reset timestamp on the consolidate task? Confirm before reporting "registration done".
 
-##### Violation case (2026-05-25)
+##### Violation case (run conclusion=failure missed by presence-only check)
 
-PR #18 (es6kr/skills): Copilot reviewer registered via `gh pr edit --add-reviewer copilot-pull-request-reviewer`. `requested_reviewers` and `reviews[].author.login` were inspected and "registered + reviewed" was reported. The auto-triggered run 26365976044 ("Running Copilot Code Review") completed with conclusion `failure`, log contained `Please wait for your limit to reset in 7 hours 59 minutes`, and the review body was the placeholder string. The failure was missed entirely until the user supplied the run URL. Root cause: Step 0-3 verification stopped at presence checks (login + body posted) without inspecting the run conclusion or the body content. This Step 0-4 was added to close that gap.
+A PR registered the Copilot reviewer via `gh pr edit --add-reviewer copilot-pull-request-reviewer`. `requested_reviewers` and `reviews[].author.login` were inspected and "registered + reviewed" was reported. The auto-triggered "Running Copilot Code Review" Action run actually completed with conclusion `failure`; its log contained `Please wait for your limit to reset in N hours M minutes` and the review body was the placeholder string. The failure was missed entirely until the user supplied the run URL. Root cause: Step 0-3 verification stopped at presence checks (login + body posted) without inspecting the run conclusion or the body content. This Step 0-4 was added to close that gap.
 
 **Don't / Do table**:
 
@@ -569,9 +569,9 @@ The walkthrough body's "Refill in N minutes M seconds" / "wait N minutes" notice
 4. Did you compare against the current time (`date -u`)?
 5. When reporting to the user, did you say "reset @<timestamp> UTC — remaining Y minutes as of now" instead of quoting the body's static "X minutes M seconds"?
 
-##### Violation case (2026-05-26, 1st occurrence)
+##### Violation case (reset countdown quoted verbatim past expiry)
 
-PR #24 walkthrough body posted at 2026-05-25T15:38:24Z with a "29 minutes 36 seconds" notice → absolute reset = 2026-05-25T16:08:00Z. At fix time (16:13:51Z), reset had already passed by 5 minutes 51 seconds, yet the prior response quoted the body's "29 minutes 36 seconds" verbatim and reported "about 20 minutes remaining after the 9-minute wakeup." User correction: the time had already passed.
+A walkthrough body advertised a rate-limit reset as "N minutes M seconds remaining" at body-publication time. By the time consolidate re-checked, the absolute reset (`created_at + remaining`) had already passed, yet the prior response quoted the body's static "N minutes M seconds" verbatim and reported "about X minutes remaining after the wakeup." User correction: the time had already passed. Fix: every report MUST recompute `absolute_reset - now()` against the current `date -u`, never the static body string.
 
 **2. No automatic trigger between PR and consolidate — registration is mandatory**:
 

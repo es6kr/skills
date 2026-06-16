@@ -88,7 +88,7 @@ Select candidates based on the following criteria:
 
 The most ideal case. Matches the domain of an existing skill.
 
-```
+```text
 Recommendation: Add "lint" topic to helm-makefile-standard skill
 Reason: Helm-related features already exist, and lint belongs to the same build tool area as makefile
 ```
@@ -97,7 +97,7 @@ Reason: Helm-related features already exist, and lint belongs to the same build 
 
 When it's not large enough to warrant a separate topic.
 
-```
+```text
 Recommendation: Add "network diagnostics" section to the health topic of k3s skill
 Reason: Too small to separate as an independent topic; it's part of health checks
 ```
@@ -106,7 +106,7 @@ Reason: Too small to separate as an independent topic; it's part of health check
 
 When it doesn't fit anywhere in existing skills. **Before creating, check slug availability via Skill tool (3rd recurrence — HARD STOP):**
 
-```
+```text
 Skill("clawhub", "slug <slug-name>")
 ```
 
@@ -117,7 +117,7 @@ Skill("clawhub", "slug <slug-name>")
 | 3 | Read slug.md and run curl commands manually | Call `Skill("clawhub", "slug <name>")` |
 | 4 | Assume "no slug-occupancy concept" | clawhub.ai uses slug occupancy (307 = occupied, 200 = available) |
 
-```
+```text
 Recommendation: Create new skill "docker-compose"
 Reason: no existing docker-related skill; /clawhub slug "docker-compose" = available
 ```
@@ -127,14 +127,14 @@ Reason: no existing docker-related skill; /clawhub slug "docker-compose" = avail
 When the 2b remote search surfaces a published skill that already covers the
 capability. Authoring a duplicate is the failure mode this verdict prevents.
 
-```
+```text
 Recommendation: Install existing skill "{remote-skill}" instead of authoring
 Reason: 2b remote search (find/clawhub) found {remote-skill} covering this capability — reuse over rebuild
 ```
 
 ### 5. Present Results via AskUserQuestion
 
-```
+```text
 AskUserQuestion {
   question: "Here's the placement recommendation for topic '{topic_name}'. Where should it go?",
   options: [
@@ -173,7 +173,7 @@ In-topic-only changes (touching one topic `.md` file, no `SKILL.md` change) are 
 
 ### Scan Results
 
-```
+```text
 - sync skill: has syncthing topic (chezmoi + syncthing synchronization)
 - syncthing-conflict skill: dedicated skill already exists!
 - chezmoi skill: dotfile related
@@ -181,7 +181,7 @@ In-topic-only changes (touching one topic `.md` file, no `SKILL.md` change) are 
 
 ### Verdict
 
-```
+```text
 A syncthing-conflict skill already exists.
 → Add the new feature as a topic to that skill, or enhance the existing SKILL.md.
 ```

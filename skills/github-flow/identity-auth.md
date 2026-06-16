@@ -47,7 +47,7 @@ The browser agent is reserved for **situations CLI cannot handle** (e.g., comple
 
 ### Self-check (every time before push / PR creation — push-identity track)
 
-**Commit-author identity ≠ push identity.** Commit `author` is stamped from `git config user.*` at commit time and is independent from the `gh` account or SSH key used at push time. GitHub assigns **PR `author` = the GitHub user that pushed the head branch** (resolved from SSH key fingerprint or the gh credential at push time), not from the commit's `author` field. Wrong push identity records a wrong PR author and **cannot be fixed by `git commit --amend`** — the PR `author` is immutable on GitHub once recorded.
+**Commit-author identity ≠ PR-creator identity.** Commit `author` is stamped from `git config user.*` at commit time and is independent from the `gh` account or SSH key used at push or PR-create time. GitHub assigns **PR `author` = the gh account that runs `gh pr create`** (or, on the web UI, whichever account is signed in when "Create pull request" is clicked) — *not* the commit's `author` field, and not "whoever pushed" as a separate step. In the standard CLI flow that account is the one whose token/SSH key also authorized the immediately preceding push, so push identity and PR author usually coincide, but the canonical source is the PR-create action, not the push by itself. A wrong PR-create identity records a wrong PR author and **cannot be fixed by `git commit --amend`** — the PR `author` is immutable on GitHub once recorded.
 
 1. `git -C <repo> remote get-url origin` — determine the owner (same step as commit track)
 2. Look up the owner in the owner-identity mapping table → `<expected gh account>`
