@@ -10,12 +10,16 @@ description: >-
   ui-test - analyze snapshots, click/fill/verify UI, plus closed shadow DOM cascade diagnosis
   (cdp-trace) [ui-test.md, cdp-trace.md].
   credential-issue - take a service + command as parameters, open the service login screen via the
-  detected backend, wait for the user to sign in, then on a completion signal issue the requested
-  access key / token / secret and hand the result to follow-up automation (aws-cli upload, gh secret
-  set, etc.) [credential-issue.md].
+  detected backend, wait for the user to sign in, then on a completion signal issue OR refresh the
+  requested access key / token / secret / OAuth scope and hand the result to follow-up automation
+  (aws-cli upload, gh secret set, gh auth refresh, etc.) [credential-issue.md]. Covers both NEW
+  issuance and EXISTING token scope expansion (e.g. `gh auth refresh -s read:packages,repo,...`,
+  PAT scope add, OAuth re-authorize, device-code re-auth).
   Use for: "UI check", "browser test", "screen verify", "Playwright test", "UI verification", "shadow
   DOM cascade", "::part not working", "CDP trace", "issue access key", "issue token", "R2 token",
-  "issue after login", "service credential", "login then generate token", "open login screen".
+  "issue after login", "service credential", "login then generate token", "open login screen",
+  "gh auth refresh", "PAT refresh", "scope expansion", "token refresh", "OAuth scope add",
+  "device-code auth", "browser device-code".
 ---
 
 # Web Browser

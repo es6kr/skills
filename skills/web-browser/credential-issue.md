@@ -65,11 +65,30 @@ the flow benefits from backend automation.
      AskUserQuestion answer).
 5. **Collect the result** — receive the issued access key / token / secret / endpoint / public URL
    from the user (or scrape it from the page if the backend can read it post-issuance).
-6. **Hand off to automation** — immediately run `handoff` with the collected credential (e.g.,
-   configure aws-cli + `aws s3 cp` upload, `gh secret set`, `vault kv put`), then **store** the
-   credential in the appropriate secret store for reuse so the next run skips issuance.
-7. **Forbidden**: ending with only "please go to {URL} and issue it yourself" with no browser opened
+6. **Persist (HARD STOP — before handoff)** — every issued/refreshed credential MUST land in a reusable secret store so the next session does not re-issue. Persistence comes **before** any revoke discussion. See the Service × Store matrix below; pick the row matching `service`. Missing persistence = the same browser dance every session = procedural defect.
+7. **Hand off to automation** — run `handoff` with the credential (`gh secret set`, `aws s3 cp`, `vault kv put`, etc.) only after step 6 succeeds.
+8. **Forbidden**: ending with only "please go to {URL} and issue it yourself" with no browser opened
    and no follow-up.
+9. **Forbidden**: suggesting revoke/Delete on a freshly issued credential because "it appeared in chat output". Chat exposure is downstream of persistence — the credential's job is to be usable across sessions. Revoke is a separate explicit decision, not the default response to exposure.
+
+### Service × Store matrix (Step 6 Persist)
+
+Pick the matching row before declaring step 6 complete. If your service isn't listed, default to the generic password-manager / Vault row.
+
+| Service / token type | Primary store (preferred) | Persist command | Reuse path |
+|---------------------|---------------------------|-----------------|------------|
+| GitHub PAT (classic / fine-grained) | **gh CLI keyring** (OS-native — macOS Keychain / Windows Credential Manager / libsecret) | `echo <token> \| gh auth login --hostname github.com --with-token` | `gh auth token -u <user>` (and Docker uses `~/.docker/config.json` after `docker login` once) |
+| GitHub Actions repo/org secret | **GitHub secret store** | `gh secret set <NAME> -b<token>` | Workflow `${{ secrets.NAME }}` |
+| AWS access key / secret | **Vault** (preferred) or `~/.aws/credentials` profile | `vault kv put secret/aws/<profile> access_key=... secret_key=...` OR `aws configure --profile <name>` | `AWS_PROFILE=<name>` / `vault kv get -field=secret_key secret/aws/<profile>` |
+| Cloudflare R2 S3 token | **Vault** | `vault kv put secret/r2/<bucket> access_key=... secret_key=...` | `vault kv get -field=secret_key secret/r2/<bucket>` |
+| OCI API key | **`~/.oci/config`** (CLI-native) | append profile section + `oci_cli_rc` if needed | `OCI_CLI_PROFILE=<name>` |
+| Authentik admin token | **Vault** | `vault kv put secret/authentik/<env> token=...` | `vault kv get -field=token secret/authentik/<env>` |
+| Vault root/unseal | **External password manager** (Bitwarden / 1Password) — Vault cannot store its own root | manual entry in password manager — never plaintext in repo | password manager retrieval |
+| Slack / Discord webhook | **Vault** or `gh secret set` (if used by GH Actions) | `vault kv put secret/<provider>/webhook url=...` | `vault kv get` |
+| Anthropic / OpenAI API key | **Vault** or `.env` (chmod 600, gitignored) | `vault kv put secret/anthropic key=...` or `echo ANTHROPIC_API_KEY=... >> ~/.env` | `vault kv get` or `source ~/.env` |
+| Generic / unlisted | **Vault** (preferred) → password manager → `.env` (chmod 600, gitignored) | provider-appropriate | provider-appropriate |
+
+**Why this matrix exists**: without a per-service store, every fresh issuance is followed by either (a) the token rotting in chat history (b) re-issuance the next session. Both are procedural defects — persistence is the goal, not a side step.
 
 ## Don't / Do
 
@@ -84,6 +103,64 @@ the flow benefits from backend automation.
 | 7 | Leave an issued secret only in chat | Persist to the secret store (`vault kv put`, `gh secret set`) so it is reusable and not lost |
 | 8 | After user login completes, delegate the **token generation steps** (clicking "New Token", selecting scopes, clicking "Create", copying value) to the user with text instructions | Once logged in, **drive the token-generation UI via the backend** (chrome-devtools `click`/`fill`/`take_snapshot`) and **extract the token from the page snapshot** programmatically. User typing/copying is a fallback when backend extraction fails (e.g., token shown as `••••` masked, password manager intercepts) |
 | 9 | Treat "wait for user" as applying to the entire issuance flow | "Wait for user" applies to **(a) interactive login** and **(b) token reveal/copy when the token is masked or only shown once outside the DOM**. Token generation form-filling and "Create" click are backend-automatable when the user is logged in |
+| 10 | Suggest revoke/Delete the freshly issued credential because it appeared in chat output ("token exposed → revoke first") | Persistence wins. Run step 6 Persist (Service × Store matrix) **before** any revoke consideration. Revoke is a separate explicit user decision; chat-exposure-triggered auto-revoke is forbidden. Reusing the token across sessions is the design goal |
+| 11 | Skip step 6 Persist ("we'll just use it in this session") | Persist is HARD STOP. Every credential issuance ends in the secret store, not in shell history alone. Future sessions retrieve, not re-issue |
+| 12 | Treat the matrix as PAT-only — pick gh keyring for everything | Match the row to the credential type. AWS keys → vault/`~/.aws`, OCI → `~/.oci/config`, Vault root → password manager (Vault can't store itself), Anthropic → vault/`.env`. Wrong row = unusable persistence |
+
+### Scope expansion / token refresh (HARD STOP — Settings UI first, CLI fallback)
+
+**Token-refresh / OAuth scope expansion is the same shape as new issuance** — open the provider's Settings/Tokens page via the detected backend, let the user edit scopes (or issue a new token), capture the token, hand off. Driving `gh auth refresh` from a Bash prompt is a fragile path (CLI flag mismatches across versions, multi-account switching, device-code UX in nested shells); **prefer Settings UI** for human-in-the-loop control.
+
+#### Trigger forms
+
+| Form | Example | Mapping |
+|------|---------|---------|
+| GHCR pull denied → missing `read:packages` | `docker pull ghcr.io/.../image:tag` → `denied` + `www-authenticate: Bearer scope="repository:.../image:pull"` | service=`github`, command=`pat-scope-add`, args=`read:packages` (default scope-set per git.md PAT matrix) |
+| GitHub PAT scope add via Settings UI | "PAT needs `workflow` scope to push CI yml" | service=`github`, command=`pat-edit`, target=token id |
+| `gh auth refresh -s <scopes>` (CLI fallback) | `gh auth refresh -h github.com -s read:packages,repo,read:org,workflow,copilot` (active account only; for inactive account run `gh auth switch -u <user>` first) | service=`github`, command=`refresh-cli`, args=scope list |
+| OAuth re-authorize (3rd party app needs new scope) | Slack/Discord/Notion OAuth app scope upgrade | service=`<provider>`, command=`oauth-reauthorize` |
+| Device-code re-auth (gh, az, gcloud) | `gh auth login --web` / `az login --use-device-code` | service=`<cli>`, command=`device-auth` |
+
+#### Procedure (Settings UI first — Recommended)
+
+1. **Scope-set default** — per git.md PAT scope matrix: `read:packages,repo,read:org,workflow,copilot` (5 cumulative scopes). Narrow only when caller explicitly requires (e.g., `write:packages` only for publish operations).
+2. **Identify token** — `gh auth status` to list accounts and confirm which user/PAT needs scope expansion. For inactive accounts, do not auto-switch — surface the multi-account choice to the user first.
+3. **Open Settings UI in detected backend** — for GitHub PAT scope edit/issue:
+   - Classic PAT edit: `https://github.com/settings/tokens` (token list → select existing → Edit → check missing scopes → Update token → copy new value if regenerated)
+   - Classic PAT new: `https://github.com/settings/tokens/new?scopes=<comma-separated>&description=<note>` (pre-fills scope checkboxes)
+   - Fine-grained PAT: `https://github.com/settings/personal-access-tokens/new`
+   - Drive via cmux/wmux panel or chrome-devtools so the user sees the page in real time.
+4. **Collect token** — receive the new token value via user paste (token reveal screen is shown once). The skill's existing "wait for user" rule applies (Don't/Do #5).
+5. **Verify** — re-run the failed operation (e.g. `docker login ghcr.io -u <user> --password-stdin` + `docker pull <image>`) to confirm scope works. Failure = inspect `www-authenticate` header for remaining missing scope.
+6. **Persist** — store token in the secret store (`gh auth login --with-token <`, password manager, Vault) so future runs reuse it.
+7. **Handoff** — chain into the downstream command (the operation that originally hit `denied`).
+
+#### Procedure (CLI fallback — when Settings UI is blocked)
+
+Use only when (a) browser unavailable, (b) explicit user request, (c) automation pipeline. **Verify gh CLI syntax via `gh auth refresh --help` before running** — flags differ across gh versions and there is **no `-u/--user` flag on `refresh`**:
+
+```bash
+# Active account refresh — direct
+gh auth refresh -h github.com -s read:packages,repo,read:org,workflow,copilot
+
+# Inactive account — switch first, then refresh, then switch back
+ACTIVE_BEFORE=$(gh auth status --active --json -u 2>/dev/null | jq -r .username)  # placeholder; check --help
+gh auth switch -u <target-user>
+gh auth refresh -h github.com -s read:packages,repo,read:org,workflow,copilot
+gh auth switch -u "$ACTIVE_BEFORE"
+```
+
+The device-code prompt appears in the terminal; the user enters it in the browser. Wait for `gh auth status` to show the new scope list.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Output `gh auth refresh ...` text to the user and stop ("paste this yourself") | Open the Settings UI in a visible backend; CLI fallback only when explicitly chosen |
+| 2 | Cite `-u/--user` on `gh auth refresh` (the flag does not exist) | Verify each CLI flag via `<cmd> --help` before placing it in a rule body. Cross-account refresh uses `gh auth switch` |
+| 3 | Refresh only the missing scope (`read:packages` alone) — causes future re-refresh for the next missing scope | Default to git.md PAT matrix 5-scope set; only narrow when explicitly required |
+| 4 | Treat `gh auth refresh` as "user-only command" outside skill scope | Skill owns the Settings UI path; CLI is the fallback layer of the same skill, not an out-of-scope shortcut |
+| 5 | Skip when `gh auth status` shows the account is "logged in" (assume scope is fine) | "Logged in" ≠ "has required scopes". Always cross-check the scope list against the failing operation's PAT matrix entry |
 
 ### Login provider preference — GitHub SSO first for Azure/Microsoft (HARD STOP)
 
@@ -137,8 +214,9 @@ the flow benefits from backend automation.
 2. Can it be issued via API/SDK with a parent credential? → If yes, do that (no browser).
 3. Console-only? → Pick the backend: chrome-devtools (real session) > default browser > wmux/cmux > Playwright (only with an existing session).
 4. Does the flow need a fresh interactive login? → If yes, the backend MUST be user-visible. Never invisible Playwright.
-5. After collecting the credential, did you run `handoff` AND store it for reuse?
+5. After collecting the credential, did you **complete step 6 Persist** (Service × Store matrix row matched + persist command executed + reuse path verified)? `handoff` runs only after Persist succeeds.
 6. **Login complete → token generation automation check**: once the user is signed in, did the backend drive the token-generation UI (navigate → fill → click "Create" → snapshot the token) instead of writing text instructions for the user to follow? If text instructions were written, that is a violation of the boundary in the table above unless the token is genuinely behind a masked / copy-only UI element.
+7. **Persist-before-revoke check**: am I about to suggest revoke/Delete the freshly issued credential because it appeared in chat? Persistence wins — step 6 first; revoke is a separate explicit user decision, not the default exposure response.
 
 ## Scenarios
 
