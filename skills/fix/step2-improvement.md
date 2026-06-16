@@ -6,6 +6,7 @@ If Step 1 produced even one Why, Step 2 is **mandatory**. The deliverable depend
 - **1st-2nd recurrence (default)**: append a **`feedback` memory** entry (1-3 lines) capturing the rule/why/how-to-apply. No rule-file Edit required. Memory is the default medium — it preserves the lesson without inflating always-on context.
 - **3rd+ recurrence**: rule-file Edit is allowed **only if the 4-filter gate passes** (see below). If any filter fails → stay in memory + route to skill/hook/CLAUDE.md instead.
 - **4th+ recurrence with deterministic pattern**: hook implementation (script + settings.json registration + parse verification). Rule body minimizes to a pointer to the hook.
+- **AskUserQuestion mandatory before rule-file Edit (HARD STOP — every time)**: adding a new Don't/Do table OR a new self-check procedure section to a rule file requires explicit user ask first. Passing the 4-filter gate does NOT exempt the ask. The user must decide on the location (`~/.agents/rules/` vs `<repo>/.claude/rules/` vs inside a skill), the strength (HARD STOP vs note), the number of Don't/Do rows, and the length of the self-check procedure. Editing without ask = imposing always-on context cost without user consent. 1st-stage default = `feedback` memory OR a short skill cross-ref + failed-attempts entry (on-demand mediums). When rule strengthening is needed at 2nd+ stage, prefer hook → lazy-loaded skill invocation first to avoid the per-session always-on cost. See also: `rule-kit/add.md` same obligation.
 
 **4-filter gate for rule-file Edit (ALL must pass — entered at 3rd+ recurrence)**:
 
@@ -132,6 +133,32 @@ Minimize rule usage. **Default medium = memory (feedback)**. Edit a rule body on
 2. If yes, did you call AskUserQuestion for (a) location and (b) presence?
 3. Did you invoke `rule-kit` skill per `skill-usage.md` requirement?
 4. Only after both → Edit. Otherwise STOP and ask first.
+
+## Command / API / syntax primary-source verification (HARD STOP)
+
+**When adding a CLI command / API call / config option / file path to a rule or skill body, verify each token against primary source (`--help`, `man`, official docs, source code) BEFORE Edit/Write.** Citing a flag/option/path from memory or analogy with sibling commands silently embeds wrong syntax — the rule body becomes a recurrence trap.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Cite `gh auth refresh -u <user>` by analogy with `gh auth switch -u` / `gh auth status -u` | Run `gh auth refresh --help` first; confirm each flag exists. Sibling-command flag presence ≠ this command's flag presence |
+| 2 | Paste a `curl -X POST ...` example from training data without verifying the endpoint path / header shape against the provider's current API docs | Fetch the provider's API doc (or call the endpoint with `--head`) before pasting. APIs version-drift |
+| 3 | "It worked in another project, so the syntax is fine" | Verify in **the destination project's CLI/API version**. flag/path drifts across versions and forks |
+| 4 | Add a file path (`/etc/...`, `~/.config/...`) without confirming it exists on the target OS / version | `ls` / `command -v` / `find` to confirm. macOS/Linux/Windows paths differ |
+| 5 | Quote a complex multi-line command (heredoc, pipeline) without dry-running once | Dry-run once (with `--dry-run` or `echo`) before placing it in a rule body. Syntax errors hidden in heredoc/quoting are silent |
+
+### Self-check (every time before adding a command/API/syntax token to a rule/skill body)
+
+1. List each CLI flag / option / API path / file path being added.
+2. For each item, did I run `--help` / fetch docs / call the endpoint to verify it exists in the target version?
+3. Where the rule cites a "sibling command" pattern (e.g., `gh auth switch -u` while documenting `gh auth refresh`), did I verify each command independently?
+4. Did I dry-run multi-line commands or complex quoting?
+5. If verification was skipped, the rule body is unverified — re-verify before Edit, or remove the token.
+
+### Pointer
+
+`(see failed-attempts.md "command syntax primary-source missing")` for case history.
 
 ### Pointer
 
