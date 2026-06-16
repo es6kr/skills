@@ -9,6 +9,18 @@ Entry: `Skill("consolidate", "post ...")` or `pr.md` Workflow Step 7 / Step 7.5 
 **Always post a summary** (unless user chose "Skip" in Step 5).
 The summary MUST include a detailed table of the findings, verification notes, and status.
 
+### Interactive gate (when `--interactive` is on — literal or auto-activated by args)
+
+Before the Summary POST in 7-A / 7-B below, the caller MUST follow the **Interactive flow contract** defined in `SKILL.md`:
+
+1. Write the Summary body to `.tmp/summary-draft.md` (do not POST yet)
+2. Emit a chat summary (Source matrix line + finding counts per Severity + verdict line + draft path)
+3. Call `AskUserQuestion` with options: `Approve as-is` / `Edit (specify in Other)` / `Reject — do not POST`
+4. Apply user edits → re-present → re-ask, until Approve or Reject
+5. On Approve, proceed to 7-A or 7-B per the medium decision table below. On Reject, skip the POST and record the reason in chat (Step 7.5 status line still emitted).
+
+If `--interactive` is off, proceed directly to medium decision + POST (deterministic flow). The Interactive gate applies even when "Summary is procedure (automatic)" is otherwise asserted — automation applies to whether-to-post (Axis A is procedural), not to body content review (which is a separate axis requested via `--interactive`).
+
 ### Summary comment title template (MANDATORY)
 
 ```markdown
@@ -82,7 +94,50 @@ The Summary body and the Formal Review body carry the **same verdict information
 | **Mergeable + Formal Review action (APPROVE/COMMENT/REQUEST_CHANGES)** | **Unified** | Summary body → Formal Review POST only. **No issue comment Summary** |
 | Mergeable + Skip formal review | Issue comment only | `gh pr comment` Summary only |
 | Non-Mergeable (CONFLICTING/UNKNOWN) | Issue comment only | `gh pr comment` Summary only (Formal Review skipped — merge blocked anyway) |
-| Not a requested reviewer | Issue comment only | `gh pr comment` Summary only |
+| **Not a requested reviewer + author ≠ me** | **Unified (Formal Review POST)** | Summary body → Formal Review POST. Event auto-decided per "Non-requested reviewer event policy" below. **No issue comment Summary** when Formal Review is posted |
+| Not a requested reviewer + author == me (self-authored PR) | Issue comment only | `gh pr comment` Summary only — self-approving own PR via Formal Review is non-conventional |
+
+### Non-requested reviewer event policy (HARD STOP)
+
+When the current user is **not a requested reviewer** but the **author ≠ me** (i.e., a peer reviewer scenario where review request was not formally issued), the Summary still POSTs as a **Formal Review**. Issue comment medium is forbidden — `reviews` array is the canonical record, and a peer Review without a request still belongs there.
+
+**Event auto-decision** (caller-decided, no ask in the auto cases):
+
+| Condition | Event | Caller action |
+|-----------|-------|---------------|
+| Critical findings exist (after Step 4 classification) | `REQUEST_CHANGES` | Auto-POST (no ask) — Critical = merge blocker, peer review's duty is to surface it |
+| Non-Mergeable (CONFLICTING/UNKNOWN) OR CI failing OR Test Plan unchecked items > 0 | `COMMENT` | Auto-POST (no ask) — APPROVE is technically impossible while merge gates are open; COMMENT records the review without a merge-enabling verdict |
+| Critical = 0 AND Mergeable AND CI pass AND Test Plan all checked (or N/A) | **APPROVE candidate → ask** | `AskUserQuestion`: `APPROVE` / `COMMENT only` / `Skip Formal Review (issue comment fallback)` — Important/Minor findings do NOT block the APPROVE candidate (Important = "Should fix, does not block merge" per Severity definition) |
+
+**Why event auto-decide for non-APPROVE cases**: a peer reviewer's "what verdict to issue" decision is determined by the codebase state, not by user preference. Critical present = REQUEST_CHANGES is the only correct verdict; APPROVE under Critical = lying to GitHub merge gates. Conversely, "would APPROVE but Mergeable/CI/Test Plan blocks it" = COMMENT (record the review without falsely enabling merge). Only the APPROVE-candidate case is a user decision (the user may reserve APPROVE judgment).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Post Summary as issue comment because "I'm not a requested reviewer" | If author ≠ me, Formal Review POST is mandatory. Issue comment medium reserved for self-authored PRs |
+| 2 | Ask the user "Formal Review or issue comment?" for non-requested reviewer | Medium is deterministic by the table above — Formal Review POST when author ≠ me, period |
+| 3 | Auto-APPROVE when Critical = 0 + Mergeable + CI pass | APPROVE is a user decision even in the auto-eligible case. Caller asks; user answers |
+| 4 | Issue COMMENT event when Critical > 0 ("less confrontational") | Critical > 0 = REQUEST_CHANGES is the only honest verdict. Auto-POST REQUEST_CHANGES — do not soften to COMMENT |
+| 5 | Skip Formal Review POST when APPROVE candidate ask is rejected/skipped | If user picks "Skip Formal Review", fall back to issue comment Summary (Mergeable + Skip row in main table). Do not silently abort |
+
+**Self-check (every time before Summary POST for author ≠ me PR)**:
+
+1. Did Step 4 classification produce a Critical count? Used as the primary branch
+2. Are Mergeable / CI / Test Plan gates all green? Used as the APPROVE-candidate qualifier
+3. If REQUEST_CHANGES or COMMENT is auto, did you emit a chat note explaining why no ask? (e.g., "Critical 1 → REQUEST_CHANGES auto; no ask")
+4. If APPROVE candidate, did you call `AskUserQuestion` with 3 options (APPROVE / COMMENT only / Skip)?
+5. Did you avoid asking "Formal Review or issue comment?" — medium itself is deterministic, only the event for APPROVE candidate is asked
+
+### Authorship-aware merge recommendation in Summary body (peer reviewer disclaimer)
+
+When Summary body includes a `Merge Recommendation` line AND author ≠ me, append a one-line disclaimer that the recommendation is advisory:
+
+```markdown
+**Merge Recommendation**: <strategy>
+**Reason**: <reason>
+> Note: above is reviewer's advisory opinion. Final merge strategy/timing is at the author's discretion.
+```
+
+Localize the disclaimer to the repo's default language (Korean for PRIVATE Korean-default repos per opensource.md, English for PUBLIC). Omit the disclaimer when author == me (self-authored PRs — your own merge strategy is yours).
 
 | # | Don't | Do |
 |---|-------|-----|

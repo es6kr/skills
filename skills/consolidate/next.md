@@ -49,6 +49,8 @@ Immediately after the Status line output, **ask the user for the PR handling dir
 
 **Before composing any merge option, confirm the PR author is the current account.** consolidate is a review tool — when you are a *requested reviewer* on someone else's PR, your role ends at APPROVE / review feedback. Merging is the **author's** domain (branch ownership — same principle as `decide.md` Step 6 "branch ownership check before fixing", extended to merge-option presentation). For a PR authored by someone else, **do not present a merge option at all** (not even as a non-Recommended option).
 
+> **Formal Review event for peer reviewer** (author ≠ me, non-requested): the Formal Review event decision (APPROVE / COMMENT / REQUEST_CHANGES) is **NOT** part of Step 8 next-action options — it is handled at Step 7 Summary POST per `post.md` "Non-requested reviewer event policy". Critical > 0 → REQUEST_CHANGES auto; merge gate failures → COMMENT auto; APPROVE candidate → ask. Step 8 next-action ask runs AFTER the Formal Review POST and asks the post-review follow-up (relay deferred findings to author / hold / done) — never re-asks the Formal Review event.
+
 ```bash
 # Pre-check before merge-option composition
 AUTHOR=$(gh pr view <N> -R <owner>/<repo> --json author --jq '.author.login')
@@ -159,6 +161,17 @@ If actionable items (Critical + Minor + Refactor) total 2 or more, do not create
 2. Has the tracking medium been determined per environment (whether `.ralph/` exists)?
 3. Does the option description include all of (a) AI Review Summary URL (b) tracking location (c) form?
 4. Is the post-merge tracking-medium registration bundled as a separate executable task?
+
+### Cross-PR Epic bundling auto-suggest (offer when deferred findings accumulate across PRs)
+
+After registering this PR's deferred items in the tracking checklist, check whether the checklist now holds un-bundled deferred findings spanning **2+ distinct PRs**. If so, add one extra (non-merge) next-action option offering to bundle them into a single Epic tracking issue:
+
+| Condition | Extra option |
+|-----------|-------------|
+| 2+ PRs with un-bundled `[REVIEW_FEEDBACK]` deferred items in the checklist | "Bundle deferred findings into an Epic issue (`/github-flow epic-bundle`)" |
+
+- This is an **offer**, not an auto-run — Epic issue creation needs explicit user approval (`git.md` no-autonomous-issue-create). Selecting the option routes to `github-flow/epic-bundle`.
+- Do not add this option when only the current PR has deferred items — single-PR deferral is already covered by the section above.
 5. **Reject findings axis check (HARD STOP — 2026-05-24)**: are there 1+ findings auto-classified as Reject in Step 4? → If yes, **Reject findings must appear as a user-override option** in this Step 8 ask. See "Reject finding option mandate" below
 
 ### Reject finding option mandate (HARD STOP — added 2026-05-24)

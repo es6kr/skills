@@ -23,6 +23,54 @@ allowed-tools: [Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write]
 
 Consolidate and respond to external feedback on PRs and issues.
 
+## Options
+
+| Flag | Default | Behavior |
+|------|---------|----------|
+| `--interactive` | off | Before each POST (Internal Review at Step 3.5.3 / Summary at Step 7), pause and `AskUserQuestion` the drafted body to the user. User can approve, request edits, or reject. Edits applied → re-ask. Reject → abort POST for that artifact. |
+
+### Auto-activation by args keywords (HARD STOP)
+
+When the consolidate caller passes args containing any of the following intent classes (any language — match by meaning, not literal token), **treat `--interactive` as implicitly set** even if the flag was not literal. The keyword expresses the user's intent for review-before-post.
+
+| Intent class | Match signal |
+|--------------|--------------|
+| Explicit review request | Phrases requesting review of the draft before publishing — "review first", "review before post", "review the draft", localized equivalents (e.g., the Korean phrase meaning "review needed" / "after review") |
+| Interactive mode request | Words like `interactive` (any language transliteration), or phrases meaning "conversational mode" / "step-by-step ask" |
+| "Important decision ask" intent | Phrases stating that important decisions / important parts must be asked — e.g., "ask important parts", "ask the key decisions", localized equivalents |
+| Author-style review request | Phrases stating the user wants to see / review the artifact themselves — "let me review", "let me see the draft", "after I check" |
+
+When auto-activation fires, the caller MUST emit a one-line acknowledgement in chat before the first ask:
+
+```
+Interactive mode auto-activated by caller args (intent: <intent class>) — drafts will be reviewed before POST.
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat args keyword as flavor text and continue deterministic POST | Match against the intent-class table above. On any match, enable `--interactive` for the entire workflow |
+| 2 | Activate interactive only for the matched step (e.g., only the Summary) | Once activated, applies to ALL POST steps in this consolidate run (Internal Review + Summary + any inline edits). One match → all-step gating |
+| 3 | Silent activation without chat acknowledgement | Emit the one-liner above so the user can confirm the intent was caught |
+| 4 | Map "important decision ask" only to scope-decision axes (Step 5 Axis B / Step 8 next-action) | Body content of Internal Review / Summary is an "important decision" too — every POSTed artifact is subject to review-before-post |
+
+### Interactive flow contract
+
+When `--interactive` is on (literal or auto-activated), each artifact POST follows this contract:
+
+1. **Draft** — author the body into `.tmp/<artifact>-draft.md` (per `file-operations.md` `.tmp/` policy)
+2. **Present** — emit a chat summary of the draft (key sections, finding count, verdict line) + the `.tmp/` path
+3. **Ask** — `AskUserQuestion` with options:
+   - `Approve as-is` — POST immediately
+   - `Edit (specify in Other)` — capture user edits → apply via Edit → re-present → re-ask
+   - `Reject — do not POST` — skip POST for this artifact, record skip reason in chat
+4. **POST** — only after Approve. Use existing medium decision (deterministic) for the POST mechanics.
+
+### Edge cases
+
+- **Already POSTed before interactive auto-activation realized**: see post.md "Damage control" — content can be PATCHed in place. After `--interactive` auto-detection mid-flow, the caller asks the user whether to PATCH the already-posted artifacts with reviewed content.
+- **Multiple artifacts in one consolidate run** (Internal Review + Summary): ask each separately; do not bundle the two drafts into one ask.
+- **`--interactive` + `--inline` together**: inline annotation bodies are part of the Internal Review draft; review them in the same ask.
+
 ## Topics
 
 | Topic | Description | Guide |
