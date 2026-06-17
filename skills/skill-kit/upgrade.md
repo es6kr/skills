@@ -185,11 +185,13 @@ When writing behavioral constraints (forbidden patterns + correct alternatives),
 
 | Improvement Type | Task |
 |-----------------|------|
-| Add new topic | Create topic file → update SKILL.md topics table |
+| Add new topic | **First run the route `2b` remote ecosystem search** (`Skill("skill-kit", "find <capability>")` / `Skill("clawhub", "find ...")`) to confirm the capability is not already published — reuse over rebuild. Then create topic file → update SKILL.md topics table |
 | Improve frontmatter | Add new trigger keywords to description |
 | Integrate scripts | Create `scripts/` folder → migrate scripts → document execution in SKILL.md |
 | Add Quick Reference | Add usage section to SKILL.md |
 | Add Do & Don't table | Convert prose rules to Do & Don't format (see 3-2) |
+
+**Add-topic remote-dup gate (MANDATORY)**: adding a topic/feature is where capability duplication slips in — a feature already published elsewhere gets re-authored locally. Before creating the topic file, search the remote ecosystem (route topic Step 2b). If a remote skill covers it, reuse/install instead of authoring.
 
 ### 3-3. External Doc Embedding (Catalog Form)
 

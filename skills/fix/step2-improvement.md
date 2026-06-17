@@ -107,6 +107,35 @@ Minimize rule usage. **Default medium = memory (feedback)**. Edit a rule body on
 1. In Step 1 recurrence pre-check (Stage 0 RAG + Stage 1 grep), identify the Nth recurrence count
 2. Apply the stage matching N from the matrix above
 3. 1st-3rd time = author rule file content (Don't/Do / Scenarios / hook design); 4th time = implement the hook
+
+## Rule-file Edit gate (HARD STOP — AskUserQuestion mandatory)
+
+**Before Edit/Write on any file under `~/.agents/rules/**`, `~/.claude/rules/**`, `<repo>/.claude/rules/**`, the fix flow MUST call AskUserQuestion to confirm: (a) which file to add to, (b) whether to add at all (memory/skill might be the better medium).** This applies even when fix Step 2 has decided rule strengthening is the chosen stage.
+
+**Why**: `rule-management.md` (always_on) requires AskUserQuestion for any rule add/modify. fix's Step 2 routing decision (memory vs rule vs hook) selects the **medium category** but does not override the per-file `where to add` decision. Skipping the ask creates "/fix triggers rule rewrites without owner consent" — even sound rule additions accumulate without alignment.
+
+**Skill files (`skills/**/*.md`) are NOT rule files** — direct Edit allowed (e.g., `step2-improvement.md` itself). The rule scope is strictly `rules/`, `.claude/rules/` directories.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "/fix Step 2 chose rule → directly Edit `branch-policy.md` (or other rule file)" | AskUserQuestion first: "Add to {existing file X} / {existing file Y} / {new file} / drop" → only after answer, Edit |
+| 2 | Chain multiple rule additions in one fix run without ask | Each rule-file Edit is a separate ask. Even 2nd addition in the same fix needs its own ask |
+| 3 | Treat rule-kit skill as optional convenience | `skill-usage.md` HARD STOP: rule file Edit goes through `rule-kit` skill. Call `Skill("rule-kit", "add")` (or `route`) **before** Edit |
+| 4 | "Routing question was already implied by /fix scope" rationalization | /fix scope = "fix this behavior". Rule file location + content = separate decisions requiring explicit user input |
+| 5 | Skip ask on minor rule additions ("only 1 line") | Line count is irrelevant. The rule's location and presence are user decisions |
+
+### Self-check (every time before Edit/Write on rule file)
+
+1. Is the target path `~/.agents/rules/*.md`, `~/.claude/rules/*.md`, or `<repo>/.claude/rules/*.md`?
+2. If yes, did you call AskUserQuestion for (a) location and (b) presence?
+3. Did you invoke `rule-kit` skill per `skill-usage.md` requirement?
+4. Only after both → Edit. Otherwise STOP and ask first.
+
+### Pointer
+
+See `~/.agents/rules/rule-management.md` (rule scope) + `~/.agents/rules/skill-usage.md` "Rule file Edit triggers rule-kit" + `(see failed-attempts.md "rule edit without ask in fix")` for details.
 4. failed-attempts.md HOT entry only updates the Nth-time meta — do not re-author the case body redundantly
 
 **Hook deferral forbidden (HARD STOP)**:

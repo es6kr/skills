@@ -45,6 +45,30 @@ The browser agent is reserved for **situations CLI cannot handle** (e.g., comple
 4. If `git config user.email` does not match the mapping, fix BEFORE commit. If already committed wrong AND **unpushed**: `git commit --amend --reset-author` (no force-push needed)
 5. PR creation also uses the matched account (`gh pr create` consumes the active account → pre-switch via `gh auth switch` or inject `GH_TOKEN`)
 
+### Self-check (every time before push / PR creation — push-identity track)
+
+**Commit-author identity ≠ PR-creator identity.** Commit `author` is stamped from `git config user.*` at commit time and is independent from the `gh` account or SSH key used at push or PR-create time. GitHub assigns **PR `author` = the gh account that runs `gh pr create`** (or, on the web UI, whichever account is signed in when "Create pull request" is clicked) — *not* the commit's `author` field, and not "whoever pushed" as a separate step. In the standard CLI flow that account is the one whose token/SSH key also authorized the immediately preceding push, so push identity and PR author usually coincide, but the canonical source is the PR-create action, not the push by itself. A wrong PR-create identity records a wrong PR author and **cannot be fixed by `git commit --amend`** — the PR `author` is immutable on GitHub once recorded.
+
+1. `git -C <repo> remote get-url origin` — determine the owner (same step as commit track)
+2. Look up the owner in the owner-identity mapping table → `<expected gh account>`
+3. **Primary-source check** — confirm the active push identity matches:
+   - `gh auth status` → identify the `Active account` line. It must equal `<expected gh account>`
+   - `gh api user --jq '.login'` → the response login must equal `<expected gh account>`
+   - SSH-only repos: `ssh -T git@github.com 2>&1 | grep -oE 'Hi [^!]+!'` → the matched name must equal `<expected gh account>`
+4. Mismatch → `gh auth switch --user <expected>` (or inject `GH_TOKEN="$(gh auth token --user <expected>)"`), and for SSH ensure `core.sshCommand` or `ssh-add -l` points to the key registered on `<expected gh account>`
+5. **Only after Steps 3-4 pass** → run `git push` or `gh pr create`
+6. If push already happened with the wrong identity → the PR `author` is immutable. Options: (a) close the wrong-author PR + reopen from the correct account on a fresh branch; (b) accept the wrong author (PR `author` shows on the PR forever)
+
+### Don't / Do (push-identity track)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Trust that `git config user.email` matches → assume push identity is also right | Run `gh api user --jq '.login'` separately. Commit identity and push identity are independent tracks |
+| 2 | Push first, "fix the author later via `--amend`" | `--amend --reset-author` only fixes commit author. PR `author` (GitHub user that pushed) is immutable once the PR is created |
+| 3 | Skip the SSH-key check when remote is `git@github.com:...` | SSH-only repos route through the loaded key's GitHub account. `ssh -T` test must return the expected name |
+| 4 | Switch `gh auth` after `gh pr create` already ran | `gh pr create` consumes the active account at call time. Switch BEFORE the call |
+| 5 | Multi-account setup: rely on memory ("I think DrumRobot is active") | Always run `gh auth status` + `gh api user` immediately before push/PR-create. The `gh` active account can drift between sessions |
+
 ### Owner-identity mapping (defined elsewhere)
 
 The actual `<owner> → <git author identity>` + `<gh account>` mapping table is **workspace-scoped**, not part of this skill. Maintain it in `~/.agents/.claude/rules/identity.md` (per-user) or `<workspace>/.claude/rules/identity.md` (per-project). Example shape (the specifics belong elsewhere):

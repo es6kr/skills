@@ -42,7 +42,7 @@ Therefore, PR-to-PR dependencies are expressed via:
 |---|-------|-----|
 | 1 | Assume without verifying that "PRs are Issue nodes so `addBlockedBy` works" and call the mutation | Run a Step 2 query first to confirm `__typename` and `blockedBy` field existence. If it is a PR, branch into (A) / (B) / (C) |
 | 2 | Report the priority conclusion in chat without applying it to GitHub state | The conclusion is itself the call trigger. In the same response turn, update the (A) PR body or invoke (C) `addBlockedBy` on the issue |
-| 3 | Over-apply the "scope discipline" rule with "the user did not explicitly ask, so I'll defer" | Fact analysis implies applying the result to GitHub. `ask-user-question.md` "scope discipline" forbids adding **new work** the user did not ask for, NOT applying the **answer** that was concluded |
+| 3 | Over-apply the "scope discipline" rule with "the user did not explicitly ask, so I'll defer" | Fact analysis implies applying the result to GitHub. Scope discipline forbids adding **new work** the user did not ask for, NOT applying the **answer** that was concluded |
 
 **Self-check (every time, right before reporting a PR/issue priority conclusion)**:
 1. Does the report text contain priority words such as "merge X first", "Y blocked by X", "X → Y rebase is natural"?
@@ -161,7 +161,7 @@ GH_TOKEN="$(gh auth token --user <account>)" gh api graphql \
 - `issueId`: the issue being blocked (downstream)
 - `blockingIssueId`: the issue that blocks (upstream)
 
-**The `ask-user-question.md` "do not repeatedly call external APIs" rule applies** — apply 1 at a time, verify response, get user confirmation before next.
+**Do not repeatedly call external APIs** — apply 1 at a time, verify response, get user confirmation before next.
 
 ### Step 5: Verify
 
@@ -332,4 +332,4 @@ code-workflow plan (frontmatter chain:)
 
 - `plan-to-issue.md` — issue body/comment management. Dependencies are separate from body content
 - `merge.md` — Step 5 pre-merge check uses Step 3 query
-- `~/.agents/rules/ask-user-question.md` — the "do not repeatedly call external APIs" rule applied to Step 4
+- "Do not repeatedly call external APIs" principle — applied to Step 4 (1 at a time, confirm before next)

@@ -56,6 +56,32 @@ gh pr list --head $(git branch --show-current) --state open
 - If **gh CLI missing** → proceed with body template only (no creation)
 - If **PR already exists** → report to user and stop
 
+#### Step 1.5: GitHub Actions Workflow YAML Verification (HARD STOP — when `.github/workflows/*.yml` was edited)
+
+After modifying or creating a workflow YAML, **verify locally before push**.
+
+##### Permissions matrix verification
+
+If the workflow declares a `permissions:` block, build a matrix of every action/API the jobs use and confirm no permission is missing.
+
+| Action/API | Required permission |
+|-----------|---------------------|
+| `actions/checkout@v4` | `contents: read` |
+| `docker/login-action@v3` + `build-push-action@v6` | `packages: write` |
+| `dorny/paths-filter@v3` (PR mode) | `pull-requests: read` |
+| `peter-evans/repository-dispatch@v3` | (uses PAT token, no permissions block needed) |
+| `softprops/action-gh-release@v2` | `contents: write` |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Copy the source workflow's permissions block verbatim into a consolidated workflow | After consolidation, walk every job's actions and **union** the required permissions |
+| 2 | Add a new action without updating permissions | Right after adding an action, check the matrix above → append the required permission |
+| 3 | Run only `act-check` and then push | Use `act` to validate every executable job. Even lightweight jobs (e.g., `paths-filter`) should pass syntax verification under `act` |
+
+##### `act` local verification
+
+Run `make act-check` or `make act-ci` and confirm **all executable jobs pass** before pushing. Jobs that cannot run under `act` (Tailscale, Semaphore-only paths, etc.) must at least pass YAML syntax verification.
+
 ### Step 2: Gather Changes
 
 ```bash
@@ -96,9 +122,9 @@ If `.github/pull_request_template.md` exists, use that template. Otherwise use t
 | ![before](url) | ![after](url) |
 
 ## Test plan
-- [ ] `[general]` Local build passes
-- [ ] `[general]` No type errors
-- [ ] `[general]` ...
+- [ ] **[general]** Local build passes
+- [ ] **[general]** No type errors
+- [ ] **[general]** ...
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
@@ -166,18 +192,19 @@ For chore/docs/config changes, only build + type check items.
 | 3 | Force `[x]` verification of `[post-merge]` items before merge | `[post-merge]` does not block merge. Register a tracking record (issue or `fix_plan.md [BLOCKED]`) and proceed to merge |
 | 4 | Mark an item `[post-merge]` without registering a tracking medium (post-merge verification gets lost) | `[post-merge]` items require `gh issue create` or `fix_plan` registration. Inline the tracking link in the item description |
 | 5 | Omit the category prefix and only write notes | Prefix is required — both the merge.md guard automation and human triage classify by prefix matching |
+| 6 | Wrap the category in backtick + bracket in the PR body (`` `[post-merge]` ``) — backtick renders an inline-code chip stacked on the brackets = redundant double-highlight | **PR-body output format = `**[category]**`** (bold + bracket, a single highlight): `**[general]**` / `**[UI]**` / `**[post-merge]**`. (Inline-code `[category]` references in *this doc's* prose/tables are fine — the rule applies only to the **PR body** the reader sees.) |
 
 #### Test Plan example
 
 ```markdown
 ## Test Plan
 
-- [ ] `[general]` `make plan ENV=dev-A` → backend switch confirmed + plan output 1 add / 2 change
-- [ ] `[general]` `make plan ENV=integration` → environment switch confirmed
-- [ ] `[UI]` Entry to service-A → `service-A-source-auto-redirect` flow exposed (Playwright)
-- [ ] `[UI]` After service-B logout, entry to service-A re-exposes the service-B login screen (Playwright, regression guard for case C-1)
-- [ ] `[post-merge]` After integration deploy, app logout → verify post-logout redirect (tracking: [#39-followup](url))
-- [ ] `[post-merge]` Self-hosted runner picks up at least one workflow run (tracking: workflow_dispatch or next PR's CI)
+- [ ] **[general]** `make plan ENV=dev-A` → backend switch confirmed + plan output 1 add / 2 change
+- [ ] **[general]** `make plan ENV=integration` → environment switch confirmed
+- [ ] **[UI]** Entry to service-A → `service-A-source-auto-redirect` flow exposed (Playwright)
+- [ ] **[UI]** After service-B logout, entry to service-A re-exposes the service-B login screen (Playwright, regression guard for case C-1)
+- [ ] **[post-merge]** After integration deploy, app logout → verify post-logout redirect (tracking: [#39-followup](url))
+- [ ] **[post-merge]** Self-hosted runner picks up at least one workflow run (tracking: workflow_dispatch or next PR's CI)
 ```
 
 #### Self-check (right before writing the Test Plan, every time)
@@ -190,9 +217,9 @@ For chore/docs/config changes, only build + type check items.
 ### Step 5: Sanitize Internal Paths
 
 Before posting, strip all internal paths per SKILL.md Core Rules:
-- `.ralph/docs/` references → remove or inline the content
+- Internal workflow-generated doc paths (e.g., `.ralph/docs/`, `.omc/plans/`) → remove or inline the content
 - Session IDs → remove
-- `.omc/` references → remove
+- Other internal working directories (`~/.claude/`, `~/.ralph/`, `~/.omc/`, etc.) → remove
 
 ### Step 6: Suggest Milestone
 
@@ -453,9 +480,9 @@ gh pr view <N> -R <owner>/<repo> --json reviews --jq \
 3. Is the review body the placeholder string? Same as conclusion=failure path.
 4. Recorded the reset timestamp on the consolidate task? Confirm before reporting "registration done".
 
-##### Violation case (2026-05-25)
+##### Violation case (run conclusion=failure missed by presence-only check)
 
-PR #18 (es6kr/skills): Copilot reviewer registered via `gh pr edit --add-reviewer copilot-pull-request-reviewer`. `requested_reviewers` and `reviews[].author.login` were inspected and "registered + reviewed" was reported. The auto-triggered run 26365976044 ("Running Copilot Code Review") completed with conclusion `failure`, log contained `Please wait for your limit to reset in 7 hours 59 minutes`, and the review body was the placeholder string. The failure was missed entirely until the user supplied the run URL. Root cause: Step 0-3 verification stopped at presence checks (login + body posted) without inspecting the run conclusion or the body content. This Step 0-4 was added to close that gap.
+A PR registered the Copilot reviewer via `gh pr edit --add-reviewer copilot-pull-request-reviewer`. `requested_reviewers` and `reviews[].author.login` were inspected and "registered + reviewed" was reported. The auto-triggered "Running Copilot Code Review" Action run actually completed with conclusion `failure`; its log contained `Please wait for your limit to reset in N hours M minutes` and the review body was the placeholder string. The failure was missed entirely until the user supplied the run URL. Root cause: Step 0-3 verification stopped at presence checks (login + body posted) without inspecting the run conclusion or the body content. This Step 0-4 was added to close that gap.
 
 **Don't / Do table**:
 
@@ -542,9 +569,9 @@ The walkthrough body's "Refill in N minutes M seconds" / "wait N minutes" notice
 4. Did you compare against the current time (`date -u`)?
 5. When reporting to the user, did you say "reset @<timestamp> UTC — remaining Y minutes as of now" instead of quoting the body's static "X minutes M seconds"?
 
-##### Violation case (2026-05-26, 1st occurrence)
+##### Violation case (reset countdown quoted verbatim past expiry)
 
-PR #24 walkthrough body posted at 2026-05-25T15:38:24Z with a "29 minutes 36 seconds" notice → absolute reset = 2026-05-25T16:08:00Z. At fix time (16:13:51Z), reset had already passed by 5 minutes 51 seconds, yet the prior response quoted the body's "29 minutes 36 seconds" verbatim and reported "about 20 minutes remaining after the 9-minute wakeup." User correction: the time had already passed.
+A walkthrough body advertised a rate-limit reset as "N minutes M seconds remaining" at body-publication time. By the time consolidate re-checked, the absolute reset (`created_at + remaining`) had already passed, yet the prior response quoted the body's static "N minutes M seconds" verbatim and reported "about X minutes remaining after the wakeup." User correction: the time had already passed. Fix: every report MUST recompute `absolute_reset - now()` against the current `date -u`, never the static body string.
 
 **2. No automatic trigger between PR and consolidate — registration is mandatory**:
 
@@ -572,3 +599,32 @@ PR creation is stateless. There is no automation that detects review arrival. So
 - **At least 1 classification label** required on every PR
 - **Sanitize internal paths** before posting (Step 5)
 - **Step 9 mandatory** — after PR creation, either register a consolidate follow-up task or invoke it immediately. Reporting and stopping is forbidden.
+
+## PR Creation Explicit Authorization (HARD STOP)
+
+**PR creation after implement is a separate decision point.** Do not chain push and PR creation as a single flow. PRs are permanently recorded on GitHub; closing them leaves "history garbage" so recovery cost is high.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "Start implementation" option selected → implement + commit + push + `gh pr create` auto-chain | "Start implementation" = implement + commit only. push/PR requires separate explicit instruction |
+| 2 | Plan says "submit Phase 1 as PR" → interpret plan approval as PR creation approval | Plan is a procedure spec. Each publish point requires explicit user instruction |
+| 3 | code-workflow Step 4 (implement) → auto-trigger github-flow/pr | After implement completion, report → wait for user "create PR" instruction |
+| 4 | Just before `gh pr create`, ask AskUserQuestion "title/body OK as is?" and proceed | Ask "Should I create the PR?" first — title/body confirmation comes after |
+| 5 | AskUserQuestion option description does not mention PR creation, but PR is created anyway | Publish actions not explicitly stated in option description require separate ask |
+| 6 | **Open PR(s) already in flight, but a new axis (new branch + push + PR) is added as an option, imposing simultaneous-handling burden** | **Before composing options, run `gh pr list --state open` as primary source. If 1+ open PRs exist, ask "handle existing PR first vs start new axis" as a separate question first** — including the new axis in option description is itself a burden |
+| 7 | "User selected option whose description mentions 'PR creation', so OK" — ignoring other in-flight PRs | Option description coverage is the single-PR-context rule (#5). Adding a multi-PR axis is a separate decision point **before options are even presented**. Option description inclusion ≠ multi-PR axis agreement |
+
+**Self-check (every time before `gh pr create` / new branch push)**:
+1. Did the user **explicitly** say "create PR", "register PR", "open PR", etc.?
+2. Or does the AskUserQuestion option description selected by the user **explicitly** mention PR creation?
+3. **Confirm via `gh pr list --state open` as primary source** — is there 1+ open PR in flight?
+   - **If yes**: regardless of #2 passing, axis split is required. "Handle existing PR (#N) first vs start new axis" must be asked separately. Option description must mark "existing PR in flight" + indicate this is a separate axis
+   - **If no**: passing #2 alone is OK
+4. If neither holds, or axis was not split → block `gh pr create` / new branch push
+
+**Why multi-PR axis split?**:
+- 2+ concurrent PRs = N× user burden for review/merge/CI monitoring decisions
+- Even if option description mentions "PR creation", the user may intend "existing PR must be processed first" — the option itself was composed wrong
+- 1+ in-flight PR = signal that user is focused on processing that PR. Adding a new axis disrupts the work flow
+
+Violation case history: see `~/.claude/skills/cleanup/data/failed-attempts.md` "PR creation explicit authorization" entries (2026-05-16 + 2026-06-05 recurrences).
