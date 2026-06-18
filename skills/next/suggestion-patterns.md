@@ -49,6 +49,28 @@ options: [
 ]
 ```
 
+### Branch convention pre-check (HARD STOP — before composing Push / Create PR options)
+
+The generic `Push` option above is only valid when the **current branch is push-ready**. Many repos use **local-only working branches** (`local`, `wip`, `scratch`, `tmp/*`, named after the user) that must NOT be pushed — pushing creates a new branch on the remote, polluting the namespace and bypassing the project's PR / release workflow.
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|------------------------|
+| 1 | Quote the branch name shown in `[<branch> <sha>]` after commit and suggest `git push origin <branch>` | Run `git branch -a` and `git ls-remote --heads origin <branch>` first. If the branch does not exist on origin, do NOT offer a direct `Push` option |
+| 2 | Treat every branch as a feature branch ready for `Push` / `Create PR` | Classify the branch first: feature branch (`feat/*`, `fix/*`, `chore/*`) → PR-ready; local-only working branch (`local`, `wip`, names matching user-personal pattern) → NOT pushable as-is |
+| 3 | Skip remote-existence check because "the user can pick Other if wrong" | Wrong defaults waste the user's verification budget. Verify branch class before offering options |
+| 4 | Offer `Push` to a branch whose remote counterpart does not exist | Offer instead: "Cherry-pick to feature branch + push" or "Reset on feature branch + push" — make the working-branch detour explicit |
+
+### Self-check (every time before composing After-commit options)
+
+1. Run `git branch --show-current` → record the branch name
+2. Run `git ls-remote --heads origin <branch>` → if empty, the branch does NOT exist on origin
+3. Run `git branch -a | grep -E "(remotes/origin|^\\*)"` → confirm the remote layout pattern (e.g., `origin/main` + feature branches only, no working branch siblings)
+4. Classify the current branch:
+   - Tracked remote-counterpart exists → push-ready (Push / Create PR options OK)
+   - Remote counterpart absent + matches working-branch pattern (`local`, `wip`, `scratch`, `tmp/*`, user-personal name) → NOT pushable. Offer cherry-pick / move-to-feature-branch options instead
+   - Remote counterpart absent + looks like a new feature branch (`feat/*`, `fix/*`, `chore/*`) → first push OK, but state "creates new origin branch" in the description
+5. Never quote the branch name from `[<branch> <sha>]` commit output alone — that line tells you the commit landed, not whether the branch belongs on the remote
+
 ## After push
 
 ```typescript
@@ -359,7 +381,7 @@ options: [
 **When Test Plan has unchecked items** (multiSelect: false):
 ```typescript
 options: [
-  { label: "Verify unchecked items (Recommended)", description: "Verify N items via web-ui-test / curl → mark [x] → merge" },
+  { label: "Verify unchecked items (Recommended)", description: "Verify N items via web-browser / curl → mark [x] → merge" },
   { label: "Move to separate issue, then merge", description: "Register the unchecked items as a follow-up issue and remove from this PR's Test Plan" },
   { label: "Hold", description: "Decide after verification" },
 ]
