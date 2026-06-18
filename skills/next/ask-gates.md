@@ -4,6 +4,18 @@
 
 **If the just-completed work is a "simple recording/management topic", skip the next-action ask entirely.** Stop hook auto-triggers next skill on every task completion, but recording-topic completion is not a user-decision branch point.
 
+### Default = ask. Skip = exception (closed list — HARD STOP)
+
+**The skip-target table below is a CLOSED list.** Any just-completed work that does not exactly match a row in the table = **ask is required** (proceed to Step 0.4+). Do not extrapolate skip justification to "similar" cases such as plan/research authoring, user-awaiting-reply states, or "prior turn already asked" rationales.
+
+| # | Don't (skip extrapolation — forbidden) | Do (closed-list discipline) |
+|---|------|------|
+| 1 | "Plan/research/analysis authoring just completed → similar to recording → skip" | Plan/research/analysis is **not** recording (it creates new decision axes: proceed / refine / hold). Ask required |
+| 2 | "User is awaiting reply on a prior chat-text question → skip the next-action ask" | Awaiting-reply on one axis ≠ no decision on the next-action axis. trade-off ask and next-action ask are **separate axes** — both required |
+| 3 | "Re-asking would revert the user's prior Other selection → skip" | Prior ask = topic-decision axis (e.g., PR tag). Next-action ask = progress-decision axis (proceed / refine / hold). Different axes, no revert |
+| 4 | "Stop hook re-triggered next, but I already asked once this turn → skip" | The just-completed work is the trigger condition, not "have I asked in this turn". If the work changed (new artifact, new state), ask again |
+| 5 | "TaskList has just one item and it depends on user → no decision axis → skip" | Even single-item TaskList has progress / refine / hold axes for the just-produced artifact. Ask the artifact-level decision |
+
 ### Skip-target topic list
 
 | Topic / skill | Identification signal | Skip ask? |
@@ -29,9 +41,10 @@
 ### Self-check (every time before composing options)
 
 1. What was the just-completed work? -- Identify by user message + action history
-2. Does it match the skip-target topic list above? -- If yes, skip ask immediately
+2. Does it **exactly match a row** in the skip-target topic list above? -- The list is CLOSED. "Similar" / "in spirit" matches don't count. If no exact match → ask required (proceed to Step 0.4+)
 3. Did the user explicitly express follow-up intent alongside the recording-topic invocation (e.g., "record then proceed with X")? -- If no, end with report only
-4. Does the just-completed work include code change / commit / push / external publish? -- If yes, ask is required (decision branch exists)
+4. Does the just-completed work include code change / commit / push / external publish / plan-or-research authoring? -- If yes, ask is required (decision branch exists)
+5. Am I about to skip on grounds of "user awaiting reply" / "prior turn already asked" / "re-ask reverts prior selection"? -- All three are extrapolation traps (see Don't/Do #2–4 above). Ask required
 
 ### How to skip (procedure)
 
@@ -44,7 +57,9 @@
 
 A recording-only instruction (record a checklist item) completed → the Stop hook triggered next → an AskUserQuestion proposed a "start a code-workflow (Recommended)" option → the user picked it → a full research + plan was authored against the user's intent of recording only. Recording topics are not decision branch points. (See failed-attempts.md "recording-topic ask-skip".)
 
-If skip-target → no ask. Otherwise → proceed to Step 0.4.
+Inverse-extrapolation: skipping the next-action ask because a prior chat-text question is awaiting reply is forbidden — the awaiting-reply axis is separate from the next-action axis, and plan/research authoring is not a recording-only topic. (See failed-attempts.md "next-skill ask skip extrapolation".)
+
+If skip-target (exact match in closed list) → no ask. Otherwise → proceed to Step 0.4.
 
 ## Step 0.4: Decision-deferral forced-ask gate (HARD STOP)
 

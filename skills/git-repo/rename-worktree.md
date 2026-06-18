@@ -10,6 +10,11 @@ Rename an existing git worktree — both the directory and all internal metadata
 - Fix a misleading worktree name after branch rename
 - Reclaim a worktree created by vibe-kanban or Claude Code isolation
 
+## Supported layouts
+
+- **Standard layout** — `<repo>/.git/worktrees/<name>` is the metadata location
+- **Bare-with-worktree** — `<repo>/.git` is a gitdir-file pointing into a separate bare repo (e.g., `~/.agents/.git` → `~/ghq/.../<repo>.git`). The script auto-detects this by reading the worktree's `.git` pointer and overriding `GIT_WT_BASE` with the actual metadata parent directory; no special flag is required.
+
 ## Procedure
 
 **One script call completes the rename** — no manual steps.
@@ -84,6 +89,7 @@ Use only when the script cannot run (permission issues, non-standard paths, etc.
 | worktree not in `git worktree list` | metadata dir name mismatch | Check `.git/worktrees/` for old name remnants |
 | `fatal: <path> is already registered` | old metadata not fully renamed | Remove old entry, re-register |
 | worktree shows `prunable` after rename | metadata file paths are Unix-style on Windows | Rewrite `.git` and `.git/worktrees/<name>/gitdir` with `C:/...` paths, then `git worktree repair` |
+| `ERROR: metadata directory not found at <repo>/.git/worktrees/<name>` in a bare-with-worktree layout | Older script revision hardcoded `<repo>/.git/worktrees` and did not resolve from the worktree `.git` pointer | Script now derives `GIT_WT_BASE` from `dirname(gitdir)` of the worktree's `.git` file — pull the latest skill version |
 
 ### Windows path compatibility (2026-05-21 fix)
 

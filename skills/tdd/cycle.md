@@ -151,6 +151,18 @@ TaskCreate([
 | Creating tests forced to fail | Define expected behavior → natural failure due to missing implementation |
 | Committing after Red only (no Green) | Complete Red→Green→Refactor before commit |
 
+## Test-Authoring Principles (when NOT to write a test)
+
+Before writing a test, self-ask: **"What bug fails to be caught if this test does not exist?"** No answer → do not write the test.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Restate the implementation as a test (e.g., test every `switch`/`if` branch verbatim) | Test the **integration point** — the path where the function is correctly called, not the function itself |
+| 2 | Cover trivial functions (`switch`, getters, simple maps) with their own unit tests | Cover them through the **integration test of the caller** |
+| 3 | Bypass test failures via `process.env.CI` guards, `.skip()`, `.todo()`, comments, or relaxed conditional asserts (unless the user explicitly instructs) | **Fix the root cause**. If a fix is not possible, report via AskUserQuestion. See [run.md "test.skip recommendation limits"](./run.md) |
+
+The principle: tests prove behavior matters, not that code exists.
+
 ## Checklist
 
 - [ ] Did you read the production code accurately?

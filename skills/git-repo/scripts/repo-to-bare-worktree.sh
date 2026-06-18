@@ -81,7 +81,11 @@ echo "../.."                   > "$BARE/worktrees/$NAME/commondir"
 echo "$WT_W/.git"              > "$BARE/worktrees/$NAME/gitdir"
 echo "gitdir: $BARE_W/worktrees/$NAME" > "$WT/.git"
 
-# --- (f) rebuild the worktree index from HEAD (preserves uncommitted working files) ---
+# --- (f) rebuild the worktree index from HEAD ---
+# Mixed-mode reset: working-tree files are preserved as-is. Any pre-conversion
+# staged-but-uncommitted changes are unstaged (re-stage with `git add` after
+# conversion if needed) — intentional, so the new worktree starts with a clean
+# index aligned to HEAD instead of an index inherited from the pre-move repo.
 git -C "$WT" reset HEAD -- . >/dev/null 2>&1 || true
 
 # --- (g) verify ---

@@ -103,6 +103,20 @@ Test result: Failed
 - Reporting completion with only related tests without full suite (moderate and above)
 - Reporting "tests failed" without analyzing the failure cause
 
+## Pre-Commit Test Execution (MANDATORY)
+
+After code changes, related tests MUST run before commit. "It would fail anyway" is not a valid reason to skip — even when external deps (API, DB) cause failures, run the tests to record the current state.
+
+> Exception: when tests literally cannot run in any local environment (CI-only execution surface), see `cycle.md` "`[CI-VERIFY]` Red-only commit" — tag the commit and treat Green as incomplete until CI confirms.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Commit and report "done" without running tests | Check `package.json` scripts (or repo's runner) → execute → report results before commit |
+| 2 | Skip tests because "they will fail due to external deps" | Run regardless — failure state is information. Note external-dep failure cause in the report |
+| 3 | Sequence: change → commit → (later: tests) | Sequence: **change → verify → commit**. Reporting "test passed" after commit when tests were not run is procedure violation |
+
+The principle: every commit ships a measured state — passing or failing. Untested commits ship an unknown state.
+
 ## CI Failure Triage (CRITICAL)
 
 Recommendation priority when a test fails in CI:

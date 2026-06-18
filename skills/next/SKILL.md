@@ -3,7 +3,9 @@ metadata:
   author: es6kr
   version: "0.1.1"
 name: next
-depends-on: [fix, hook]
+depends-on:
+  - fix
+  - hook
 description: >-
   Suggest next actions after completing any task. Auto-invocation via Stop hook (`resources/next-trigger.sh`) using JSON `decision:"block"` (registered in the settings.json Stop array). Fires when assistant response contains completion keywords (locale patterns in `data/*.regex`).
   stall-detect - detect stalled follow-up steps and invoke /fix [stall-detect.md], ask-gates - recording-skip / decision-deferral forced-ask / TaskList primary-source / current-work confirmation gates [ask-gates.md], suggestion-patterns - per-context "After X" next-action option templates [suggestion-patterns.md].
@@ -56,17 +58,49 @@ Identify the type of task just completed.
 
 ### Step 2: Use AskUserQuestion tool
 
-Present next step options via `AskUserQuestion`:
+**HARD STOP — Read [suggestion-patterns.md](./suggestion-patterns.md) BEFORE composing options.** suggestion-patterns.md holds per-context "After X" option templates that include diversity sources (pending tasks, open PRs, dependency follow-ups, session wrap-up, etc.). Skipping this Read = ad-hoc option list = high risk of missing candidate sources. Step 2 entry without suggestion-patterns.md Read = skill bypass (skill-usage.md "Multi-topic topic .md Read mandatory" violation).
+
+#### Option diversity (HARD STOP)
+
+**Fill all 4 option slots whenever possible.** AskUserQuestion supports max 4 options + auto "Other" = 5 candidates total. Composing only 2-3 options when 4+ candidates exist = under-recommendation. The user typically phrases this as "no more candidates?" or "any more suggestions?".
+
+#### Candidate discovery sources (enumerate all before composing)
+
+| Source | What to look for |
+|--------|------------------|
+| Visible TaskList | All pending/in_progress entries (call `TaskList` per Step 0.5) |
+| Just-completed work | Direct follow-ups (commit / push / verify / test / publish) |
+| Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) |
+| Recent commits awaiting CI | `gh run list --limit 5` for pending CI watch |
+| fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) |
+| Session wrap-up | `/cleanup` if multiple tasks done + no immediate user follow-up |
+| Other (free text) | Auto-provided by AskUserQuestion |
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|------------------------|
+| 1 | Compose 2-3 options + end Step 2 | Enumerate sources above → fill 4 slots. Cap at 4 only if exhausted |
+| 2 | "User can pick Other for anything else" rationale for fewer options | Other is for unexpected branches. Explicit options surface options the user might not think of |
+| 3 | Skip Read of suggestion-patterns.md because "I know the patterns" | suggestion-patterns.md is updated with new "After X" templates regularly. Read every time |
+| 4 | Treat just-completed work as the only source | Each candidate discovery source row is a separate enumeration. Cover all rows before stopping |
+
+#### Self-check (every time before calling AskUserQuestion)
+
+1. Did I Read `suggestion-patterns.md` this turn? → If no, Read first
+2. Did I enumerate all 7 candidate discovery sources? → If skipped any, revisit before composing
+3. Do I have 4 options or did I stop at 2-3? → If <4 and candidates remain, add until 4 or exhausted
+4. Are options diverse (different action types: progress task / external follow-up / wrap-up / verify)? → If all 3 are the same family, broaden
 
 ```typescript
 AskUserQuestion({
   questions: [{
     question: "What would you like to do next?",
     header: "Next Action",
-    multiSelect: true
+    multiSelect: true,
     options: [
       { label: "Option 1", description: "Description" },
-      { label: "Option 2", description: "Description" }
+      { label: "Option 2", description: "Description" },
+      { label: "Option 3", description: "Description" },
+      { label: "Option 4", description: "Description" }
     ]
   }]
 })

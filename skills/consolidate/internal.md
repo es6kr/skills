@@ -70,6 +70,18 @@ gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | test(
 
 Post the code-reviewer result via the medium decided above. **The review (or comment) must exist on the PR before proceeding to Step 4** — substitution with a text report is forbidden.
 
+#### Interactive gate (when `--interactive` is on — literal or auto-activated by args)
+
+Before the POST step (the title-template + medium-decided POST in the rest of this Step 3.5 procedure), the caller MUST follow the **Interactive flow contract** defined in `SKILL.md`:
+
+1. Write the Internal Review body to `.tmp/internal-review-draft.md` (do not POST yet)
+2. Emit a chat summary (finding counts per Severity + verdict line + draft path)
+3. Call `AskUserQuestion` with options: `Approve as-is` / `Edit (specify in Other)` / `Reject — do not POST`
+4. Apply user edits → re-present → re-ask, until Approve or Reject
+5. On Approve, proceed to the medium-decided POST in the rest of Step 3.5. On Reject, skip the POST and record the reason in chat.
+
+If `--interactive` is off, proceed directly to the medium-decided POST (deterministic flow). Inline annotation bodies (per "Inline auto-fire policy" below) are part of the draft and reviewed in the same ask — do not POST inline comments separately under interactive mode.
+
 **Title template (MANDATORY — first line of the review body / comment body)**:
 ```markdown
 ## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)

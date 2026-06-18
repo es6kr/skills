@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # link-shared-ai-configs.sh
 # Symlink shared AI configs folders to Claude and Gemini directories
 
