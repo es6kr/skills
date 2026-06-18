@@ -1,9 +1,9 @@
 ---
 name: consolidate
 depends-on:
-  - superpowers
   - git-repo
   - github-flow
+  - superpowers
 metadata:
   author: es6kr
   version: "0.3.0" # x-release-please-version
@@ -70,7 +70,7 @@ When `--interactive` is on (literal or auto-activated), each artifact POST follo
 
 ### Edge cases
 
-- **Already POSTed before interactive auto-activation realized**: see post.md "Damage control" — content can be PATCHed in place. After `--interactive` auto-detection mid-flow, the caller asks the user whether to PATCH the already-posted artifacts with reviewed content.
+- **Already POSTed before interactive auto-activation realized**: see post.md "Damage control — Summary already posted in wrong medium" — content can be PATCHed in place. After `--interactive` auto-detection mid-flow, the caller asks the user whether to PATCH the already-posted artifacts with reviewed content.
 - **Multiple artifacts in one consolidate run** (Internal Review + Summary): ask each separately; do not bundle the two drafts into one ask.
 - **`--interactive` + `--inline` together**: inline annotation bodies are part of the Internal Review draft; review them in the same ask.
 

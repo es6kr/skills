@@ -168,9 +168,9 @@ After registering this PR's deferred items in the tracking checklist, check whet
 
 | Condition | Extra option |
 |-----------|-------------|
-| 2+ PRs with un-bundled `[REVIEW_FEEDBACK]` deferred items in the checklist | "Bundle deferred findings into an Epic issue (`/github-flow epic-bundle`)" |
+| 2+ PRs with un-bundled `[REVIEW_FEEDBACK]` deferred items in the checklist | "Bundle deferred findings into an Epic tracking issue" |
 
-- This is an **offer**, not an auto-run — Epic issue creation needs explicit user approval (`git.md` no-autonomous-issue-create). Selecting the option routes to `github-flow/epic-bundle`.
+- This is an **offer**, not an auto-run — Epic issue creation needs explicit user approval (`git.md` no-autonomous-issue-create). The caller selects whichever epic-bundling workflow is registered in the environment (vendor-agnostic — `gh issue create` with sub-issue links is the minimal path).
 - Do not add this option when only the current PR has deferred items — single-PR deferral is already covered by the section above.
 5. **Reject findings axis check (HARD STOP — 2026-05-24)**: are there 1+ findings auto-classified as Reject in Step 4? → If yes, **Reject findings must appear as a user-override option** in this Step 8 ask. See "Reject finding option mandate" below
 
