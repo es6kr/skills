@@ -57,7 +57,7 @@
 
 A recording-only instruction (record a checklist item) completed → the Stop hook triggered next → an AskUserQuestion proposed a "start a code-workflow (Recommended)" option → the user picked it → a full research + plan was authored against the user's intent of recording only. Recording topics are not decision branch points. (See failed-attempts.md "recording-topic ask-skip".)
 
-Inverse-extrapolation case: plan/research authoring completed with one chat-text question awaiting reply (PR tag) → next skill invoked via Stop hook → next-action ask **skipped** with the justification "user is awaiting reply + re-ask would revert prior selection". This is forbidden — plan authoring is **not** recording (it creates a real progress/refine/hold axis), and the awaiting-reply axis is separate from the next-action axis. (See failed-attempts.md "next-skill ask skip extrapolation".)
+Inverse-extrapolation: skipping the next-action ask because a prior chat-text question is awaiting reply is forbidden — the awaiting-reply axis is separate from the next-action axis, and plan/research authoring is not a recording-only topic. (See failed-attempts.md "next-skill ask skip extrapolation".)
 
 If skip-target (exact match in closed list) → no ask. Otherwise → proceed to Step 0.4.
 

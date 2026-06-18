@@ -95,7 +95,7 @@ AskUserQuestion({
   questions: [{
     question: "What would you like to do next?",
     header: "Next Action",
-    multiSelect: true
+    multiSelect: true,
     options: [
       { label: "Option 1", description: "Description" },
       { label: "Option 2", description: "Description" },
