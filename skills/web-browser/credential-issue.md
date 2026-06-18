@@ -144,10 +144,13 @@ Use only when (a) browser unavailable, (b) explicit user request, (c) automation
 gh auth refresh -h github.com -s read:packages,repo,read:org,workflow,copilot
 
 # Inactive account — switch first, then refresh, then switch back
-ACTIVE_BEFORE=$(gh auth status --active --json -u 2>/dev/null | jq -r .username)  # placeholder; check --help
+# (gh auth status does not have a structured --json output for the active user
+#  as of gh 2.x; parse the human-readable output instead and verify the
+#  capture in your own shell before relying on it.)
+ACTIVE_BEFORE=$(gh auth status 2>&1 | awk '/active account/{for(i=1;i<=NF;i++) if ($i ~ /^[A-Za-z0-9_-]+$/ && $i != "active") {print $i; exit}}')
 gh auth switch -u <target-user>
 gh auth refresh -h github.com -s read:packages,repo,read:org,workflow,copilot
-gh auth switch -u "$ACTIVE_BEFORE"
+[ -n "$ACTIVE_BEFORE" ] && gh auth switch -u "$ACTIVE_BEFORE"
 ```
 
 The device-code prompt appears in the terminal; the user enters it in the browser. Wait for `gh auth status` to show the new scope list.

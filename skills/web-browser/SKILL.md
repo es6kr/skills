@@ -4,22 +4,18 @@ metadata:
   author: es6kr
   version: "0.1.0"
 description: >-
-  Environment-aware browser operations. Detects wmux/cmux/tmux and routes to the right browser
-  backend (wmux/cmux panel → user-visible, plain → Playwright MCP, chrome-devtools → reuse the
-  user's real logged-in session). Two topics:
-  ui-test - analyze snapshots, click/fill/verify UI, plus closed shadow DOM cascade diagnosis
-  (cdp-trace) [ui-test.md, cdp-trace.md].
-  credential-issue - take a service + command as parameters, open the service login screen via the
-  detected backend, wait for the user to sign in, then on a completion signal issue OR refresh the
-  requested access key / token / secret / OAuth scope and hand the result to follow-up automation
-  (aws-cli upload, gh secret set, gh auth refresh, etc.) [credential-issue.md]. Covers both NEW
-  issuance and EXISTING token scope expansion (e.g. `gh auth refresh -s read:packages,repo,...`,
-  PAT scope add, OAuth re-authorize, device-code re-auth).
-  Use for: "UI check", "browser test", "screen verify", "Playwright test", "UI verification", "shadow
-  DOM cascade", "::part not working", "CDP trace", "issue access key", "issue token", "R2 token",
-  "issue after login", "service credential", "login then generate token", "open login screen",
-  "gh auth refresh", "PAT refresh", "scope expansion", "token refresh", "OAuth scope add",
-  "device-code auth", "browser device-code".
+  Environment-aware browser operations. Detects wmux/cmux/tmux and routes to the right backend
+  (wmux/cmux panel → user-visible, plain → Playwright MCP, chrome-devtools → reuse the user's
+  real logged-in session). Topics:
+  ui-test - snapshots, click/fill/verify, closed shadow DOM cascade diagnosis (cdp-trace)
+  [ui-test.md, cdp-trace.md].
+  credential-issue - open service login via detected backend → wait for user sign-in → issue
+  OR refresh an access key / token / secret / OAuth scope → hand off to follow-up automation
+  (aws-cli, gh secret set, gh auth refresh, etc.) [credential-issue.md]. Covers both new
+  issuance and existing-token scope expansion (PAT scope add, OAuth re-authorize, device-code).
+  Use for: "UI check", "browser test", "screen verify", "Playwright test", "shadow DOM cascade",
+  "::part not working", "CDP trace", "issue token", "service credential", "open login screen",
+  "PAT refresh", "scope expansion", "device-code auth", "browser device-code".
 ---
 
 # Web Browser
