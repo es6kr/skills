@@ -107,6 +107,8 @@ Test result: Failed
 
 After code changes, related tests MUST run before commit. "It would fail anyway" is not a valid reason to skip — even when external deps (API, DB) cause failures, run the tests to record the current state.
 
+> Exception: when tests literally cannot run in any local environment (CI-only execution surface), see `cycle.md` "`[CI-VERIFY]` Red-only commit" — tag the commit and treat Green as incomplete until CI confirms.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Commit and report "done" without running tests | Check `package.json` scripts (or repo's runner) → execute → report results before commit |
