@@ -2,10 +2,18 @@
 
 Cross-environment + cross-tool layout policy: **`~/.agents/` is the single source of truth** for `skills/`, `rules/`, and `agents/`. Every AI tool installation (Claude, Codex, Gemini, Antigravity) symlinks into it. **`~/.claude/plugins/` is deliberately NOT shared** to avoid marketplace cache races.
 
+> **Applicability**: This topic targets hosts that share `~/.agents/` between Windows and WSL via NTFS. macOS / Linux-only hosts can skip the Windows-specific subsections below (marked `<details>`); the linking matrix, why-share rationale, and recovery procedure apply identically on any Unix host.
+
 ## Source of truth
+
+<details>
+<summary>Windows + WSL hosts</summary>
 
 - **Windows-side**: `C:\Users\<user>\.agents\` is the actual on-disk storage.
 - **WSL-side**: `~/.agents/` is a symlink to `/mnt/c/Users/<user>/.agents/`. Editing on either side modifies the same files.
+
+</details>
+
 - Other machines (e.g., macOS) keep their own `~/.agents/` and sync via Syncthing at the host-to-host layer — that is **out of this topic's scope**.
 
 ## Layout diagram
@@ -81,12 +89,18 @@ On a fresh environment (new install or rebuild), invoke the script via its
 on first run, but `~/.agents/skills/dotfile/` is always present:
 
 ```bash
-# WSL (sh)
+# macOS / Linux / WSL (sh)
 bash ~/.agents/skills/dotfile/scripts/link-shared-ai-configs.sh
+```
 
-# Windows (PowerShell)
+<details>
+<summary>Windows (PowerShell)</summary>
+
+```powershell
 ~/.agents/skills/dotfile/scripts/link-shared-ai-configs.ps1
 ```
+
+</details>
 
 The script:
 - Detects WSL via `/proc/version` and rewrites `AGENT_DIR` to `/mnt/c/Users/<WIN_USER>/.agents/`
