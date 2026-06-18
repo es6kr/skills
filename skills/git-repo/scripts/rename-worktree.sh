@@ -61,6 +61,10 @@ if [[ -f "$OLD_PATH/.git" ]]; then
   GITDIR_LINE=$(grep -E '^gitdir:' "$OLD_PATH/.git" || true)
   if [[ -n "$GITDIR_LINE" ]]; then
     META_PATH=$(echo "$GITDIR_LINE" | sed -E 's/^gitdir:[[:space:]]+//')
+    # Note: standard git writes an absolute `gitdir:` path here. Some setups
+    # (worktree.useRelative = true, manual edits) may write a relative path —
+    # if you hit a "metadata directory not found" error below with an unusual
+    # META_PATH, run `git worktree repair` first to renormalize the .git file.
     ACTUAL_OLD_META=$(basename "$META_PATH")
     # Override GIT_WT_BASE with the actual parent — supports both layouts.
     GIT_WT_BASE=$(dirname "$META_PATH")
