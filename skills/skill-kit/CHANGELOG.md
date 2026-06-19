@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/skill-kit-v0.3.2...skill-kit-v0.4.0) (2026-06-19)
+
+
+### Features
+
+* skill-kit graph topic + harness Phase 1 + auxiliary improvements ([01437f2](https://github.com/es6kr/skills/commit/01437f2135d5729eee16f074cb77e52b3cb1772c))
+* **skill-kit:** add graph + language + portability + publish-scope topics + extract-deps script ([8bf9ea2](https://github.com/es6kr/skills/commit/8bf9ea231cbe8c76fecae08aa7ffcb20e19a7a7f))
+
+
+### Bug Fixes
+
+* bundle skill patches across github-flow, skill-kit, fix ([0ef74c1](https://github.com/es6kr/skills/commit/0ef74c14aabfbdc2f802c34b3a1b431217e95208))
+* **fix,skill-kit:** add rule-file Edit gate + undeclared vendor coupling lint ([009348b](https://github.com/es6kr/skills/commit/009348b42a41fe23e94c42c2960d0e789dcc1cbc))
+* **skill-kit,github-flow:** address CodeRabbit + Internal Review feedback on PR [#54](https://github.com/es6kr/skills/issues/54) ([c5c741d](https://github.com/es6kr/skills/commit/c5c741da5631a042860e684580d1c92687b59eec))
+* **skill-kit:** require remote ecosystem scan before authoring topics or skills ([5447153](https://github.com/es6kr/skills/commit/54471534f071f60ae5a328afdcafba8805d9785a))
+
 ## [0.3.2](https://github.com/es6kr/skills/compare/skill-kit-v0.3.1...skill-kit-v0.3.2) (2026-06-13)
 
 

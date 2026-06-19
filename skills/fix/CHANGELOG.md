@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/es6kr/skills/compare/fix-v0.3.1...fix-v0.3.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* bundle skill patches across github-flow, skill-kit, fix ([0ef74c1](https://github.com/es6kr/skills/commit/0ef74c14aabfbdc2f802c34b3a1b431217e95208))
+* **fix,skill-kit:** add rule-file Edit gate + undeclared vendor coupling lint ([009348b](https://github.com/es6kr/skills/commit/009348b42a41fe23e94c42c2960d0e789dcc1cbc))
+* **fix:** require command / API / syntax primary-source verification before Edit ([738c388](https://github.com/es6kr/skills/commit/738c38802b129af233d14d35ee5233685da65d59))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/fix-v0.3.0...fix-v0.3.1) (2026-06-13)
 
 

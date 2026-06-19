@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.1](https://github.com/es6kr/skills/compare/git-repo-v0.4.0...git-repo-v0.4.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* **git-repo:** clarify repo-to-bare-worktree index reset behavior ([1503dbf](https://github.com/es6kr/skills/commit/1503dbf29e9eb4269e892920772ab24024b358e3))
+* **git-repo:** note relative gitdir edge case in rename-worktree.sh ([3761f77](https://github.com/es6kr/skills/commit/3761f7714eb0de26be63bf03d634c4753ff12560))
+* **git-repo:** support bare-with-worktree layout in rename-worktree.sh ([3a2e261](https://github.com/es6kr/skills/commit/3a2e2618f3e85bcbeb500cfd023dccf9241cff7c))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/git-repo-v0.3.2...git-repo-v0.4.0) (2026-06-12)
 
 
