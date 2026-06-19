@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.1](https://github.com/es6kr/skills/compare/github-flow-v0.4.0...github-flow-v0.4.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across github-flow, skill-kit, fix ([0ef74c1](https://github.com/es6kr/skills/commit/0ef74c14aabfbdc2f802c34b3a1b431217e95208))
+* **github-flow:** abstract ralph references and priority-compatible BLOCKED grep ([b735f41](https://github.com/es6kr/skills/commit/b735f41ccd4b6fedd980895a07b59f7ba3068864))
+* **github-flow:** add PR lifecycle guards across identity, workflow YAML, merge, and push ([5c5bc86](https://github.com/es6kr/skills/commit/5c5bc86a1ee1b6fe1bbae8e416afe5b31b790829))
+* **skill-kit,github-flow:** address CodeRabbit + Internal Review feedback on PR [#54](https://github.com/es6kr/skills/issues/54) ([c5c741d](https://github.com/es6kr/skills/commit/c5c741da5631a042860e684580d1c92687b59eec))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/github-flow-v0.3.0...github-flow-v0.4.0) (2026-06-12)
 
 

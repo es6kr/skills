@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/tdd-v0.3.0...tdd-v0.3.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* **tdd:** add test-authoring principles + pre-commit test execution sections ([c0d1e5a](https://github.com/es6kr/skills/commit/c0d1e5a266422fe269206312cb34b422a36c1ad9))
+* **tdd:** cross-reference cycle.md [CI-VERIFY] exception from run.md pre-commit section ([30c6cb5](https://github.com/es6kr/skills/commit/30c6cb5b0541be3c2888d83e4e12d66de2b98ebe))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/tdd-v0.2.0...tdd-v0.3.0) (2026-06-03)
 
 

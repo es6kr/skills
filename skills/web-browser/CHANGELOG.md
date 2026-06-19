@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/es6kr/skills/compare/web-browser-v0.2.0...web-browser-v0.2.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* **credential:** add PAT scope matrix + Settings UI procedure + Service × Store persist matrix ([c61525b](https://github.com/es6kr/skills/commit/c61525b1a2d886b677c85d2638d39a1e2311c142))
+* **web-browser:** compress SKILL.md description + replace credential-issue placeholder ([4fb1148](https://github.com/es6kr/skills/commit/4fb114800991d757c07eb63d1a3d3b8fc19bde4a))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/web-browser-v0.1.0...web-browser-v0.2.0) (2026-06-12)
 
 

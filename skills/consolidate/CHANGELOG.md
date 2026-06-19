@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/consolidate-v0.3.0...consolidate-v0.3.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* **consolidate:** add --interactive mode + author≠me Formal Review POST policy ([d1d5a41](https://github.com/es6kr/skills/commit/d1d5a4125443bc26c82ec923095a17ef1fafe49e))
+* **consolidate:** add github-flow to depends-on for accurate dependency graph ([0c7e088](https://github.com/es6kr/skills/commit/0c7e08832fcc16cb52f967fb68bfaa09078cbd81))
+* **consolidate:** convert depends-on to block-style for strictyaml compat ([00d733f](https://github.com/es6kr/skills/commit/00d733f8ada220448eb8cf09378690685ffa49c3))
+* **consolidate:** sort depends-on + disambiguate cross-references ([6c06b04](https://github.com/es6kr/skills/commit/6c06b049363d66a96aee80a85bd1e99f3feada1c))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/consolidate-v0.2.2...consolidate-v0.3.0) (2026-06-12)
 
 

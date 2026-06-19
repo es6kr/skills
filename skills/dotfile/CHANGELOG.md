@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/es6kr/skills/compare/dotfile-v0.4.0...dotfile-v0.4.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* **dotfile:** convert depends-on to block-style for strictyaml compat ([9549786](https://github.com/es6kr/skills/commit/95497865d1c36c0a599d496f27e095b017f478a2))
+* **dotfile:** gate Windows-specific sections + add strict shell mode ([f333ee2](https://github.com/es6kr/skills/commit/f333ee2b8eb81de3cf7872afd4b715b0e0956307))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/dotfile-v0.3.0...dotfile-v0.4.0) (2026-06-12)
 
 

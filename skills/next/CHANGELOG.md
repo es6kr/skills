@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.2](https://github.com/es6kr/skills/compare/next-v0.4.1...next-v0.4.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* bundle skill patches across 7 scopes ([f18f47c](https://github.com/es6kr/skills/commit/f18f47c2d05f13b8e3f3ad42675a2dabbb31c824))
+* **next:** block-style depends-on + suggestion-patterns Read mandate + option diversity ([3127d4e](https://github.com/es6kr/skills/commit/3127d4eadf5399c65ffb9036c6fe567afb0da507))
+* **next:** enforce closed-list discipline on Step 0.3 ask-skip gate ([486ea9c](https://github.com/es6kr/skills/commit/486ea9c2f7b2fe5cec685123f5330a276b0350bb))
+* **next:** require branch convention pre-check before Push / Create PR options ([3c06f52](https://github.com/es6kr/skills/commit/3c06f5282cc17bdd750102a928f17e09f89a12ad))
+* **next:** syntax-fix multiSelect example + tighten ask-gates inverse-extrapolation paragraph ([9e112da](https://github.com/es6kr/skills/commit/9e112dad4885205e378571a78a48759f1329077d))
+
 ## [0.4.1](https://github.com/es6kr/skills/compare/next-v0.4.0...next-v0.4.1) (2026-06-13)
 
 
