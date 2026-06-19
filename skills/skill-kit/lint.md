@@ -21,13 +21,38 @@ Validate and fix SKILL.md frontmatter issues automatically.
 
 **`description` field must be ≤ 1024 characters.** Claude Code's system reminder truncates descriptions beyond the limit, dropping trigger keywords at the tail — which causes skill discovery failures.
 
-**Measure**:
+**Measure** (3-layer fallback — first available wins):
 
 ```bash
-DESC=$(awk '/^description:/,/^---$/' SKILL.md | sed -E 's/^description: //; /^---$/d' | tr -d '\n')
+# Layer 1 (preferred — uses upstream YAML parser, exits cleanly on all frontmatter shapes)
+DESC=$(skills-ref read-properties <skill-dir> 2>/dev/null | jq -r '.description // ""')
+
+# Layer 2 (when skills-ref unavailable but Python+PyYAML present)
+DESC=$(python3 -c "
+import yaml
+parts = open('SKILL.md').read().split('---', 2)
+print(yaml.safe_load(parts[1]).get('description','') or '', end='')
+")
+
+# Layer 3 (awk fallback — block-scalar aware, exits on next top-level key or end of frontmatter)
+DESC=$(awk '
+  BEGIN { fm=0; in_desc=0 }
+  /^---$/ { fm++; if (fm==2) exit; if (in_desc) exit; next }
+  fm==1 {
+    if (in_desc) {
+      if (/^[A-Za-z_][A-Za-z0-9_-]*:/) exit          # next top-level key terminates block scalar
+      sub(/^  /, ""); printf "%s", $0; next
+    }
+    if (/^description:[[:space:]]*\|/)  { in_desc=1; next }
+    if (/^description:[[:space:]]/)     { sub(/^description:[[:space:]]*/,""); printf "%s", $0; exit }
+  }
+' SKILL.md)
+
 echo "len: ${#DESC}"
 # Expected: ≤ 1024. If over → truncate or split topics.
 ```
+
+**Why 3-layer (HARD STOP — historical bug)**: A naive `awk '/^description:/,/^---$/' SKILL.md | sed -E 's/^description: //; /^---$/d'` works **only when `description:` is the LAST key in the frontmatter**. If any other key (`depends-on`, `triggers`, `metadata`, `allowed-tools`) follows `description:`, that key's value is also captured and the measured length is inflated. The 3-layer fallback above (a) uses `skills-ref` which delegates to the upstream YAML parser (most accurate), (b) Python `yaml.safe_load` (parser-correct), (c) an awk that terminates at the next top-level key (boundary-aware). Pick the first layer whose dependency is available — do not fall back to the naive range pattern.
 
 **Reduction strategies (in priority order)**:
 
@@ -53,7 +78,7 @@ echo "len: ${#DESC}"
 | 9 | Trust system reminder display ("looks fine to me") | System reminder truncates with `…`. Always measure with `wc` or awk every Edit | claude-session: `"sess…"` truncate confirmed in system reminder |
 
 **Self-check (every time before Edit on `description:` field)**:
-1. Measure current length (`awk + tr -d '\n' + ${#}` pattern)
+1. Measure current length (3-layer fallback — `skills-ref read-properties` → `python yaml.safe_load` → boundary-aware awk; **never** use the legacy `/^description:/,/^---$/` range pattern alone — it over-counts when `description:` is not the last frontmatter key)
 2. Estimate new length after Edit
 3. If `> 1024`, apply reduction strategies #1~4 + Don't/Do patterns #1~9 first
 4. Re-measure after Edit. Confirm ≤ 1024

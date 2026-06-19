@@ -4,7 +4,12 @@
 
 ## Summary format
 
-Compress the verbose Progress entry to a single chronological line, then move to Completed.
+Move = **two artifacts from one `[x]` entry**:
+
+1. **Body → RAG receiver** (vendor-agnostic dispatch — see "RAG dispatch" section below). Full Progress entry body (sub-bullets, commit hashes, session IDs, verification logs) is stored externally for semantic recall.
+2. **Summary → Completed section**. One-line chronological summary (verb + result) replaces the moved entry in the file.
+
+Keep the Completed file minimal — detailed steps, commit hashes, and session IDs **belong in RAG, not in the file**. The Completed line is a pointer; the body lives in RAG.
 
 ```markdown
 # Before (Progress)
@@ -17,25 +22,25 @@ Compress the verbose Progress entry to a single chronological line, then move to
   - Verification: 307 → /app/sign-in **success**
 
 # After (Completed)
-- 2026-03-15 17:30 — app image v1.8 build / deploy — proxy.ts and route handler basePath redirect fix (commit a1b2c3d4, Session xxxxxxxx)
+- 2026-03-15 17:30 — app image v1.8 build and deploy
 ```
 
 ## Summary rules
 
 | Rule | Detail |
 |------|--------|
-| One line | Drop sub-steps; keep only the core deliverable verb + result |
+| One line | Keep it minimal. Drop sub-steps and detailed changes. Use a simple high-level title. |
 | Verb + result | "X fixed", "Y deployed", "Z added" |
-| Merge related | Items belonging to the same deploy cycle collapse into one line |
+| Merge related | Collapsed related tasks into a single high-level headline |
 | Deduplicate | If a similar entry already exists in Completed, update it instead of adding a duplicate |
-| Sort order | Completed is **chronological ascending**. Insert at sort position — the new entry may not be at the end |
-| Timestamp | `YYYY-MM-DD HH:mm —` prefix required. **`HH:mm` mandatory** — extract from the original `[x]` line. If absent, use `git log --format=%ci` for the commit time; if still unknown, ask the user (do **not** silently use `00:00`) |
-| Reference | Always include the commit hash. With a PR: `(PR #N, commit <hash>)` — PR number first, then commit. Without a PR: `(commit <hash>)` only. Append `, Session xxxxxxxx` when the entry was completed by an autonomous loop (Ralph) and the session ID is known; omit otherwise |
-| No `[x]` marker | Completed uses `-` followed by a space (no checkbox) since the section already implies completion |
+| Sort order | Completed is **chronological ascending**. Insert at sort position |
+| Timestamp | `YYYY-MM-DD HH:mm —` prefix required. **`HH:mm` mandatory** |
+| Reference | Do NOT include commit hashes or session IDs. These are cataloged in RAG. If applicable, keep only the PR or Issue number (e.g. `(PR #N)`). |
+| No `[x]` marker | Completed uses `-` followed by a space (no checkbox) |
 
 ## PR-level item
 
-When a top-level `[x]` PR entry carries branch / CI / code-review sub-bullets, **roll the whole thing into one line**:
+When a top-level `[x]` PR entry carries branch / CI / code-review sub-bullets, **roll the whole thing into one simple line**:
 
 ```markdown
 # Before
@@ -45,7 +50,7 @@ When a top-level `[x]` PR entry carries branch / CI / code-review sub-bullets, *
   - Code review: APPROVE — 3-line change, minimal and correct
 
 # After
-- 2026-04-27 14:08 — loginFailCount-not-reset bug fix (PR #241, commit 0db8d76)
+- 2026-04-27 14:08 — loginFailCount-not-reset bug fix (PR #241)
 ```
 
 Rule: branch name, CI status, code-review verdict, etc., are PR metadata — they do not belong in the Completed summary. PR number and commit hash are sufficient references.
@@ -89,7 +94,7 @@ A top-level item may stay `[ ]` while a completed sub-tree under it moves to Com
   - [ ] Spring Boot SSO sample redirect bug
 
 ## Completed
-- 2026-04-27 05:39 — nginx root redirect + Jinja2 template migration + integration server verified (PR #10, commit `abc1234`)
+- YYYY-MM-DD HH:mm — nginx root redirect + Jinja2 template migration + integration server verified (PR #10)
 ```
 
 ### Cleanup rule
@@ -98,9 +103,9 @@ A top-level item may stay `[ ]` while a completed sub-tree under it moves to Com
 - Other unfinished sub-items remain
 - If the parent ends up with zero sub-items but still `[ ]` — confirm with the user via AskUserQuestion before deleting the parent
 
-## RAG indexing (optional, vendor-agnostic)
+## RAG dispatch (vendor-agnostic, body preservation)
 
-If the caller supplies `--rag=<skill>:<topic>` dispatch, Completed entries are forwarded to the receiver for semantic indexing after the move. The receiver skill owns all storage details — endpoint, embedding model, collection naming, schema.
+Move's **body-preservation step**. The Progress entry's body (sub-bullets, commit hashes, session IDs, verification details) is forwarded to the RAG receiver supplied via `--rag=<skill>:<topic>` dispatch. The receiver skill owns all storage details — endpoint, embedding model, collection naming, schema.
 
 Caller side (example):
 
@@ -111,13 +116,21 @@ Caller side (example):
 
 This skill makes no assumption about the backend. Common receivers might be a vector store (Qdrant, Chroma, Weaviate, Pinecone, pgvector, etc.) or a managed semantic index. The receiver picks.
 
+### Behavior matrix
+
+| `--rag` supplied? | Body | Summary |
+|-------------------|------|---------|
+| ✅ supplied | Stored in receiver (full body + metadata) | Inserted into Completed |
+| ❌ omitted | **Lost** (body discarded permanently) | Inserted into Completed |
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Hard-code a specific store URL, MCP tool name, or embedding model in this skill | Declare abstract dispatch only (`--rag=<skill>:<topic>`). Caller (e.g. Ralph wrapper) implements the concrete receiver |
-| 2 | Decide "qdrant is default" inside the move topic | The receiver topic decides. Without `--rag` flag, this topic operates without indexing |
-| 3 | Surface receiver errors as move failures | Receiver errors are logged but do not block the move. The Completed entry already exists in the file |
+| 2 | Decide "qdrant is default" inside the move topic | The receiver topic decides. Caller (Ralph wrapper, project skill, etc.) is responsible for supplying `--rag` per the local environment's available receiver |
+| 3 | Surface receiver errors as move failures | Receiver errors are logged but do not block the move. The Completed summary entry already exists in the file |
+| 4 | Run move without `--rag` when body preservation matters | Caller must supply `--rag` to preserve the body. Without it, the Completed one-liner is the only surviving record |
 
-Default: no `--rag` flag → move operates without any indexing dispatch.
+**Caller responsibility (Ralph wrapper, project skill, etc.)**: detect the local environment's available RAG receiver and supply `--rag=<skill>:<topic>` automatically when invoking move. The fix-plan skill itself stays vendor-agnostic; the caller routes.
 
 ## See also
 

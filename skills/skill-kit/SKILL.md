@@ -1,10 +1,13 @@
 ---
 name: skill-kit
+depends-on:
+  - cc-plugin
+  - clawhub
 metadata:
   author: es6kr
   version: "0.1.2"
 description: |
-  Claude Code skill management. Topics — writer (create), lint (validate + fix frontmatter), merge (combine related), dedup (find duplicates), convert (agent → skill), architecture (multi-topic structure), upgrade (enhance + add topics), route (topic placement), trigger (declare + auto-register hooks), find (discover via npx skills CLI). Use when: "skill writer", "skill lint", "skill merge", "skill dedup", "create skill", "frontmatter fix", "multi-topic skill", "convert agent", "skill upgrade", "add topic", "topic route", "trigger compile", "hook auto register", "find skill", "discover skill", "npx skills", "skills.sh", "install skill".
+  Claude Code skill management. Topics — writer (create), lint (validate + fix frontmatter), merge (combine related), dedup (find duplicates), convert (agent → skill), architecture (multi-topic structure), upgrade (enhance + add topics), route (topic placement), trigger (declare + auto-register hooks), find (discover via npx skills CLI), graph (extract depends-on + topic body Skill calls into Edge Table + Mermaid + dispatched d3 force-directed render), language (per-skill language consistency enforcement), portability (public skill cross-ref + vendor isolation), publish-scope (published skill scope review before extending). Use when: "skill writer", "skill lint", "skill merge", "skill dedup", "create skill", "frontmatter fix", "multi-topic skill", "convert agent", "skill upgrade", "add topic", "topic route", "trigger compile", "hook auto register", "find skill", "discover skill", "npx skills", "skills.sh", "install skill", "skill graph", "skill dependency graph", "depends-on extract", "mermaid skill graph", "force-directed skill graph", "skill language", "description language", "portability", "publish scope".
 ---
 
 # Skill-Kit
@@ -19,9 +22,13 @@ Comprehensive toolkit for creating, managing, and maintaining Claude Code skills
 | convert | Convert agents or scripts to skills | [convert.md](./convert.md) |
 | dedup | Identify and merge duplicate skills | [dedup.md](./dedup.md) |
 | find | Discover and install skills via npx skills CLI | [find.md](./find.md) |
+| graph | Extract `depends-on` + topic body `Skill(...)` edges into Edge Table + Mermaid + dispatched d3 force-directed render | [graph.md](./graph.md) |
+| language | Enforce per-skill language consistency (description-language rule + Edit/Write pre-check) | [language.md](./language.md) |
 | lint | Validate and fix SKILL.md frontmatter | [lint.md](./lint.md) |
 | merge | Combine related skills into one | [merge.md](./merge.md) |
-| route | Recommend topic placement within skills | [route.md](./route.md) |
+| portability | public/published skill cross-ref + vendor-specific isolation rules | [portability.md](./portability.md) |
+| publish-scope | published skill scope check before adding topics/scripts | [publish-scope.md](./publish-scope.md) |
+| route | Recommend topic placement within skills (plugin-level clustering → cc-plugin/clustering) | [route.md](./route.md) |
 | trigger | Register triggers and generate hooks | [trigger.md](./trigger.md) |
 | upgrade | Enhance existing skills or add topics | [upgrade.md](./upgrade.md) |
 | writer | Interactive skill creation wizard | [writer.md](./writer.md) |

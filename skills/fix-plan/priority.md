@@ -85,8 +85,21 @@ The plain `[BLOCKED]` form remains valid (no priority, no reason) — readers/pa
 
 Ralph's autonomous loop continues to skip `[BLOCKED]` regardless of suffix — the suffix is for human triage, not loop control.
 
+### Plan Drafts (`## Plan Drafts` section)
+
+Entries in `## Plan Drafts` are **always** `[BLOCKED:P*:selfable]`, never `[ ]` — see [draft.md](./draft.md) for the rationale. The marker pieces decompose as:
+
+| Piece | Plan Drafts value | Why |
+|-------|-------------------|-----|
+| `[BLOCKED]` | always | Promote requires a user decision; autonomous loops must skip |
+| `:P*` | `P0`-`P3`, default `P2` | Ranks promote urgency relative to other drafts |
+| `:selfable` | always | Body file / stub is prepared; wait-state is on a user signal, not on a third party. `:external` is reserved for items in `## Progress` waiting on real third-party dependencies |
+
+Default when uncertain: `[BLOCKED:P2:selfable]`.
+
 ## See also
 
 - [format.md](./format.md) — marker syntax and section semantics
 - [add.md](./add.md) — authoring schema
+- [draft.md](./draft.md) — Plan Drafts section uses `[BLOCKED:P*:selfable]` exclusively
 - Ralph autonomous-loop integration (when a Ralph wrapper is in use): the wrapper skips `[BLOCKED]` items regardless of the `:P*:reason` suffix — the suffix is for human triage, not loop control
