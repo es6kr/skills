@@ -59,7 +59,8 @@ The reason distinguishes true blockers from items that look blocked but are actu
 
 When the user asks "extract priority from BLOCKED" or "pick what to do next":
 
-1. **Scan** all `[BLOCKED]` entries in fix_plan.md / checklist.md
+0. **Sync external state FIRST (HARD STOP)** — before scanning, invoke the [sync](./sync.md) topic on every `[BLOCKED]` / `[ ]` / `[x]` entry that references a PR / Issue / CI run. `gh pr view <N> --json state,mergedAt` + `gh issue view <N> --json state,closedAt`. MERGED PR / CLOSED issue → auto `[x]` (no longer BLOCKED). PR CLOSED-without-merge → re-tag `[BLOCKED:P2:external]`. **Without this step, triage classifies stale state** — items whose external dependency already resolved still show up as `[BLOCKED]` and get sorted as if they were live blockers
+1. **Scan** the remaining `[BLOCKED]` entries (post-sync) in fix_plan.md / checklist.md
 2. **Extract** the `:P*` and `:reason` suffix from each. If missing, propose adding (do not auto-fill — the user may want different values)
 3. **Sort** in this order:
    1. P0 `:selfable` (immediate action — actually doable now)
@@ -72,12 +73,28 @@ When the user asks "extract priority from BLOCKED" or "pick what to do next":
    8. P3 `:external`
 4. **Report** the top-3 candidates suitable for immediate action — typically P0 + P1 `:selfable`. Surface the priority + reason in the report so the user can override
 
+### Don't / Do — stale state classification (HARD STOP)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Classify a `[BLOCKED]` / `[ ]` entry referencing a PR/Issue without running `gh pr view` / `gh issue view` first | Step 0: sync external state. MERGED PR → `[x]` (Completed), not `[BLOCKED]` |
+| 2 | "Item text says 'awaiting user merge' so it's still BLOCKED" — trusting tracker text over external state | Tracker text is a snapshot from when the item was authored. External state polling = primary source. Tracker stale ≠ item still blocked |
+| 3 | "PR #N user merge decision" stays `[BLOCKED:P1:external]` for days/weeks after merge because no one ran sync | Every triage run starts with sync. The same item that triages as `P1:external` today should be `[x]` and harvestable to Completed by the next triage, not perpetually re-listed |
+| 4 | Report sorted output without noting which entries were auto-checked by sync this run | Step 4 report must surface "N entries auto-resolved via sync (PR #X MERGED, Issue #Y CLOSED)" alongside the remaining live BLOCKERs |
+
 ## Self-check when adding a `[BLOCKED]` tag
 
 1. Is this item truly blocked, or is it `:selfable`? — If selfable, P-rank it for immediate action instead of stashing it
 2. What's the priority axis: blocker-for-others (P0), session blocker (P1), next-session (P2), nice-to-have (P3)?
 3. Does the reason annotation match? — `:external` if waiting on user / bot / CI; `:selfable` if just deferred
 4. Did you write the reason? — Reasonless `[BLOCKED]` annotations re-create the original problem
+
+## Self-check when running Triage (HARD STOP — before reporting sorted output)
+
+1. Did Step 0 sync run on every entry that references a `#NN` (PR/Issue) or CI run? — If no, abort + run sync
+2. Did sync produce any auto-resolutions (`[x]`) this run? — If yes, those entries leave the BLOCKED list (do not include them in sorted output)
+3. Are any items in the sorted output > 7 days old without sync verification? — Mark them with the date of last sync; consider them suspect until re-synced
+4. Did the report surface "N entries auto-resolved" before listing live BLOCKERs? — Without that line, the user cannot tell whether triage actually checked external state
 
 ## Compatibility
 
