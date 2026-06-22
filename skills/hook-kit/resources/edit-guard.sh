@@ -269,10 +269,12 @@ check_stub_file_substantive_edit() {
   # Stub identification: 2-axis (either axis matches → consider stub)
   #   AXIS A (strict): frontmatter `type: stub` / `pointer: true` / `stub: true`
   #                    declared in the first 10 lines. Explicit author intent.
-  #   AXIS B (loose):  body pointer phrase + size < 2KB. Reserved for truly
-  #                    small pointer files only — prevents FP on 2-5KB topic
-  #                    files that happen to contain a body phrase like
-  #                    "location pointer" or "Use X instead" inside their own content.
+  #   AXIS B (loose):  body pointer phrase + size < 2KB + `## section count <= 1`.
+  #                    True stubs are small pointer files with at most one ##
+  #                    section ("위치 안내" or equivalent). Topic files that
+  #                    happen to contain a body phrase like "Use X instead"
+  #                    typically carry 2+ ## sections (Method, Example, etc.)
+  #                    — the section-count gate filters those out.
   local frontmatter_stub=0
   if head -10 "$FILE_PATH" 2>/dev/null | grep -qE "^(type: *stub|pointer: *true|stub: *true)$"; then
     frontmatter_stub=1
@@ -280,10 +282,14 @@ check_stub_file_substantive_edit() {
 
   local body_marker_stub=0
   local stub_match=0
+  local section_count=0
   if [[ "$file_size" -lt 2048 ]]; then
     stub_match=$(grep -cE "$HG_EDIT_STUB_MARKERS" "$FILE_PATH" 2>/dev/null | head -1)
     stub_match=${stub_match:-0}
-    if [[ "$stub_match" =~ ^[0-9]+$ ]] && [[ "$stub_match" -ge 1 ]]; then
+    section_count=$(grep -cE '^## [^#]' "$FILE_PATH" 2>/dev/null)
+    section_count=${section_count:-0}
+    if [[ "$stub_match" =~ ^[0-9]+$ ]] && [[ "$stub_match" -ge 1 ]] \
+       && [[ "$section_count" =~ ^[0-9]+$ ]] && [[ "$section_count" -le 1 ]]; then
       body_marker_stub=1
     fi
   fi
@@ -302,7 +308,7 @@ check_stub_file_substantive_edit() {
   if [[ "$frontmatter_stub" -eq 1 ]]; then
     axis_label="frontmatter declares stub (type: stub / pointer: true / stub: true)"
   else
-    axis_label="body marker + size < 2KB (loose: ${stub_match} matches, ${file_size} bytes)"
+    axis_label="body marker + size < 2KB + ## section count <= 1 (loose: ${stub_match} marker matches, ${section_count} sections, ${file_size} bytes)"
   fi
 
   {
