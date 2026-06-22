@@ -123,7 +123,8 @@ check_skill_language_mismatch() {
 
   local desc
   desc=$(awk '
-    /^description:[[:space:]]*\|/ { in_block=1; next }
+    # YAML block scalar headers: |, |-, |+, >, >-, >+ (literal + folded, all chomping indicators)
+    /^description:[[:space:]]*[|>][-+]?[[:space:]]*$/ { in_block=1; next }
     in_block && /^[^[:space:]]/ { in_block=0 }
     in_block { print; next }
     /^description:/ { sub(/^description:[[:space:]]*/, ""); print; exit }
