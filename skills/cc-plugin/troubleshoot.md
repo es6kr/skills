@@ -46,6 +46,53 @@ cp -r ~/.claude/plugins/marketplaces/<marketplace>/plugins/<name>/.claude-plugin
       ~/.claude/plugins/cache/<marketplace>/<name>/<version>/
 ```
 
+### "Plugin X has conflicting manifests" — load error
+
+**Symptom** (shown by `/plugin`, `/reload-plugins`, or `/doctor`):
+
+```
+Plugin <name> has conflicting manifests: both plugin.json and marketplace entry
+specify components. Set strict: true in marketplace entry or remove component
+specs from one location
+```
+
+**Cause**: The plugin's marketplace.json entry lists explicit component paths
+(`skills`, `hooks`, `commands`, `agents`) while its `source` directory *also*
+auto-discovers components — e.g. `source: "./"` whose root holds a `skills/`
+directory. With the default `strict: false`, the explicit paths and the
+auto-discovered components are two competing manifests.
+
+**Diagnosis**:
+
+```bash
+MP=~/.claude/plugins/marketplaces/<marketplace>/.claude-plugin/marketplace.json
+# 1. Does the entry specify component paths?
+grep -nE '"(skills|hooks|commands|agents)"' "$MP"
+# 2. Does the source root auto-discover components? (source: "./" + a skills/ dir, etc.)
+ls ~/.claude/plugins/marketplaces/<marketplace>/{skills,hooks,commands,agents} 2>/dev/null
+```
+
+**Fix — set `strict: true` on the entry** (makes the entry authoritative; only its
+listed components load):
+
+```jsonc
+{
+  "name": "<plugin>",
+  "source": "./",
+  "skills": ["./skills/<one>"],
+  "strict": true        // ← was false / absent
+}
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "Fix" it by removing the entry's `skills`/`hooks` paths | Removing them re-broadens the plugin to the whole auto-discovered collection (e.g. the entire `skills/`). Set `strict: true` to keep the narrowed set |
+| 2 | Edit only the cache marketplace.json | Edit **both** the cache (loaded copy) and the source repo's marketplace.json (canonical) — otherwise the next sync reverts it (see [dev-reflect.md](./dev-reflect.md)) |
+
+After editing run `/reload-plugins` (or restart) — the `conflicting manifests` line
+disappears and the entry's hooks/skills load. Authoring rule + example:
+[create.md](./create.md) "Marketplace entry: narrowing components with `strict`".
+
 ### Plugin HUD load failed — "npm install && npm run build"
 
 **Cause**: `dist/` not built. Plugin has TypeScript source that needs compilation.
