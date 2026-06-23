@@ -3,7 +3,7 @@ name: harness
 description: AI harness for stable LLM workflows. Topics — pipeline (clarify → ground → plan → generate → verify, dispatches to code-workflow) [pipeline.md], guardrails (denylist + scope + conditional-reject, self-contained for openclaw headless) [guardrails.md], recovery (fail-analyze → adapt → fallback, self-contained) [recovery.md]. Use when enforcing stable AI agent workflows, applying guardrails to autonomous execution, or recovering from verification failures. "harness", "AI harness", "pipeline guardrails", "fail recovery", "workflow stability", "agent harness" triggers
 metadata:
   author: es6kr
-  version: "0.1.0"
+  version: "0.0.0" # x-release-please-version
 depends-on:
   - code-workflow
 ---
