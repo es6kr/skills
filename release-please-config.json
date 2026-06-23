@@ -180,6 +180,16 @@
         }
       ]
     },
+    "skills/harness": {
+      "package-name": "harness",
+      "component": "harness",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/mcp-config": {
       "package-name": "mcp-config",
       "component": "mcp-config",
