@@ -163,7 +163,8 @@ gh pr view <PR_NUMBER> --json body --jq '.body' | node scripts/check-test-plan.j
 |-----------------|----------------------|
 | `[general]` | **Cannot merge** (HARD STOP, no exception) |
 | `[UI]` | **Cannot merge** (HARD STOP, no exception) |
-| `[post-merge]` | **Merge allowed** (but tracking-medium registration must be verified — procedure below) |
+| `[e2e]` | If the suite runs on **PR CI** → the CI check is the guard (**cannot merge** until green). If **deploy-branch-only** → treated like `[post-merge]` (merge allowed; tracking required) |
+| `[post-merge]` / `[deploy]` | **Merge allowed** (but tracking-medium registration must be verified — procedure below) |
 | No prefix (legacy) | Treated as `[general]` or `[UI]` — **cannot merge** |
 
 #### `[post-merge]` items — verify tracking-medium registration (HARD STOP)
