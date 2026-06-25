@@ -181,17 +181,18 @@ For chore/docs/config changes, only build + type check items.
 | **Automatic** | (none — excluded from Test Plan) | pre-commit hook / GitHub Actions / lint run automatically | At push time | Workflow itself (no Test Plan entry needed) |
 | **General test** | `[general]` | Run local code / CLI / Make / scripts and check the result | Before merge | `[x]` required (merge.md HARD STOP) |
 | **UI test** | `[UI]` | Browser scenario (Playwright / wmux browser / direct clicks) | Before merge | `[x]` required (merge.md HARD STOP) |
-| **E2E / integration suite** | `[e2e]` | Automated end-to-end / integration test suite (Playwright e2e job, integration CI job). Tagged for behavioral-coverage visibility even though CI-run — unlike lint/typecheck this documents a meaningful scenario | If the suite runs on **PR CI** → before merge (CI is the guard). If it runs only on the **deploy branch** (master/deploy-only) → after merge | PR-CI e2e: the CI check is the guard. Deploy-gated e2e: treated like `[post-merge]` (does NOT block merge; needs tracking medium) |
+| **PR-CI e2e / integration suite** | `[e2e]` | Automated end-to-end / integration test suite that runs on **PR CI** (Playwright e2e job, integration CI job). Tagged for behavioral-coverage visibility even though CI-run — unlike lint/typecheck this documents a meaningful scenario | Before merge | `[x]` required — the CI check is the guard (check-test-plan.js enforces) |
+| **Deploy-branch e2e / deployment verification** | `[deploy]` | Automated suite that runs only on the **deploy branch** (master/deploy-only e2e job) OR manual post-deploy verification of integrated behavior | After merge | Does NOT block merge; must be registered in a tracking medium (issue / fix_plan) |
 | **Post-merge test** | `[post-merge]` | Manual verification after deploy / CD trigger (production-environment behavior, integrated deploy result) | After merge | Does NOT block merge; must be registered in a tracking medium (issue / fix_plan) |
 
-**`[e2e]` vs Automatic exclusion**: rule #1 excludes mechanical CI checks (lint, typecheck, fmt) because they carry no behavioral information. An e2e/integration suite is the exception — it verifies a real scenario, so tag it `[e2e]` for visibility even though CI runs it. Distinguish from `[post-merge]` (manual post-deploy check) and `[UI]` (single-screen manual browser scenario).
+**`[e2e]` vs Automatic exclusion**: rule #1 excludes mechanical CI checks (lint, typecheck, fmt) because they carry no behavioral information. An e2e/integration suite is the exception — it verifies a real scenario, so tag it `[e2e]` for visibility even though CI runs it. Distinguish from `[deploy]` (deploy-gated e2e, exempt from merge-gate), `[post-merge]` (manual post-deploy check), and `[UI]` (single-screen manual browser scenario).
 
 #### Don't / Do
 
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Put a pre-commit/CI/lint item as `[ ]` in the Test Plan (e.g. "lint passes", "type check passes", "terraform fmt passes") | Exclude — the workflow guarantees it. No need to report it in the PR body either |
-| 2 | List everything as a flat single list | Use category prefixes (`[general]` / `[UI]` / `[e2e]` / `[post-merge]`) so authors, reviewers, and the merge guard can see verification method / timing clearly |
+| 2 | List everything as a flat single list | Use category prefixes (`[general]` / `[UI]` / `[e2e]` / `[deploy]` / `[post-merge]`) so authors, reviewers, and the merge guard can see verification method / timing clearly |
 | 3 | Edit an existing PR body (sanitize, review-apply, any `gh pr edit --body`) and leave a pre-existing uncategorized Test Plan untouched | The category invariant applies to **every** body write — create AND edit. After any body mutation, re-run the self-check below; add prefixes to any flat item |
 | 4 | Force `[x]` verification of `[post-merge]` items before merge | `[post-merge]` does not block merge. Register a tracking record (issue or `fix_plan.md [BLOCKED]`) and proceed to merge |
 | 5 | Mark an item `[post-merge]` without registering a tracking medium (post-merge verification gets lost) | `[post-merge]` items require `gh issue create` or `fix_plan` registration. Inline the tracking link in the item description |
@@ -207,7 +208,7 @@ For chore/docs/config changes, only build + type check items.
 - [ ] **[general]** `make plan ENV=integration` → environment switch confirmed
 - [ ] **[UI]** Entry to service-A → `service-A-source-auto-redirect` flow exposed (Playwright)
 - [ ] **[UI]** After service-B logout, entry to service-A re-exposes the service-B login screen (Playwright, regression guard for case C-1)
-- [ ] **[e2e]** Integration e2e suite passes on the deploy branch (deploy-master e2e job — verified post-merge on master push)
+- [ ] **[deploy]** Integration e2e suite passes on the deploy branch (deploy-master e2e job — verified post-merge on master push)
 - [ ] **[post-merge]** After integration deploy, app logout → verify post-logout redirect (tracking: [#39-followup](url))
 - [ ] **[post-merge]** Self-hosted runner picks up at least one workflow run (tracking: workflow_dispatch or next PR's CI)
 ```
@@ -217,7 +218,7 @@ For chore/docs/config changes, only build + type check items.
 Runs at PR creation **and** after any body mutation (sanitize, review-apply, `gh pr edit --body`). Editing a body must not leave a pre-existing flat Test Plan uncategorized.
 
 1. Is the item a mechanical CI check (lint / typecheck / fmt)? → Yes → exclude from Test Plan
-2. Is the item an automated e2e / integration suite scenario? → `[e2e]` (tag for visibility even though CI-run)
+2. Is the item an automated e2e / integration suite scenario? → If it runs on **PR CI** → `[e2e]` (required-checked, CI is the guard). If it runs only on the **deploy branch** → `[deploy]` (exempt + tracking-medium required)
 3. Can the item be verified manually in this session before merge? → `[general]` or `[UI]`
 4. Is the item a manual deploy / production-environment behavior verifiable only after merge? → `[post-merge]` + tracking-medium registration required
 5. Does every `[ ]` have a category prefix? → Re-review any item missing one (applies to edited bodies too — legacy flat items get prefixed now)
