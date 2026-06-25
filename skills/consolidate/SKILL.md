@@ -6,8 +6,8 @@ depends-on:
   - superpowers
 metadata:
   author: es6kr
-  version: "0.3.1" # x-release-please-version
-description: >-
+  version: "0.3.2" # x-release-please-version
+description: |
   Consolidate and respond to external feedback on PRs/issues. Topics —
   pr (workflow entrypoint + skip conditions),
   collect (gather AI reviews + superpowers load),
@@ -16,7 +16,7 @@ description: >-
   decide (user decision: findings + Formal Review),
   post (Summary + Formal Review + status + deferred),
   next (post-summary next-action ask).
-  Use when: "review consolidate", "PR review", "AI review", "CodeRabbit review", "Copilot review",
+  Use when - "review consolidate", "PR review", "AI review", "CodeRabbit review", "Copilot review",
   "review check", "review summary", "merge ready", "internal review", "code-reviewer",
   "inline review", "line-level comment", "PR line review".
 allowed-tools: [Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write]
