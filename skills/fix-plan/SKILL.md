@@ -41,6 +41,7 @@ fix-plan (schema + lifecycle)
   ├─→ (default, no args) → archive-receiver dispatch (caller-supplied) — falls back to move
   ├─→ format (entry — section structure + markers)
   ├─→ priority (new convention — BLOCKED P0-P3 + reason)
+  │     └─→ depends on sync (Step 0: refresh external state before classifying)
   ├─→ add (authoring act-now items)
   ├─→ draft (deferred plan stub → `## Plan Drafts`)
   │     └─→ code-workflow/steps dispatch on promote (research → plan)
@@ -50,7 +51,7 @@ fix-plan (schema + lifecycle)
   └─→ issue-drafts (lifecycle of draft files)
 ```
 
-- All topics are independently invocable
+- All topics are independently invocable, **except `priority` which invokes `sync` as Step 0 (HARD STOP)** — triage on stale state is the failure mode the dependency prevents (see [priority.md](./priority.md) Triage workflow Step 0)
 - **Default invocation (no args)** dispatches Completed section to a caller-supplied archive-receiver (`--archive=<skill>:<topic>`); if no receiver is registered, falls back to in-tracker `move` (Completed cleanup only). See "Default invocation" section
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic uses `gh` CLI per `github-flow` skill's conventions
@@ -143,6 +144,7 @@ See [format.md](./format.md) for full schema.
 - **P0**–**P3**: GitHub priority label-aligned (P0 highest)
 - **external**: true external dependency
 - **selfable**: progressable now (P-rank for immediate action)
+- **Triage Step 0 — sync external state first (HARD STOP)**: `/fix-plan priority` invokes `sync` topic before classifying — `gh pr view <N>` + `gh issue view <N>` on every referenced PR/Issue. Auto-resolves merged/closed entries to `[x]` so stale items don't get sorted as live BLOCKERs
 
 See [priority.md](./priority.md) for full convention.
 

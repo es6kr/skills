@@ -10,5 +10,7 @@ __pycache__/
 *.bak
 *.pyc
 *.tmp
+/checklist.md
 docs/generated/
+skills/*/data
 skills/*/LICENSE

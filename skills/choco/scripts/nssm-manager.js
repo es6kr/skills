@@ -8,7 +8,7 @@
  *   post-upgrade          - Full check after choco upgrade + output all refresh commands at once
  */
 
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -19,8 +19,15 @@ const CHOCO_LIB = "C:\\ProgramData\\chocolatey\\lib";
 
 function getNssmServices() {
   try {
-    const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Service | Where-Object { $_.PathName -like '*nssm*' } | Select-Object -ExpandProperty Name"`;
-    const output = execSync(cmd, { encoding: "utf-8", timeout: 15000 });
+    const output = execFileSync(
+      "powershell",
+      [
+        "-NoProfile",
+        "-Command",
+        "Get-CimInstance Win32_Service | Where-Object { $_.PathName -like '*nssm*' } | Select-Object -ExpandProperty Name",
+      ],
+      { encoding: "utf-8", timeout: 15000 },
+    );
     return output
       .trim()
       .split(/\r?\n/)
@@ -33,7 +40,7 @@ function getNssmServices() {
 
 function getServiceStatus(svc) {
   try {
-    return execSync(`nssm status "${svc}"`, {
+    return execFileSync("nssm", ["status", svc], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     })
@@ -47,7 +54,7 @@ function getServiceStatus(svc) {
 
 function getNssmApp(svc) {
   try {
-    const out = execSync(`nssm get "${svc}" Application`, {
+    const out = execFileSync("nssm", ["get", svc, "Application"], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
