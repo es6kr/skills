@@ -88,7 +88,7 @@ When any scan matches:
 1. **Abort** the `gh ... create/edit/comment` call immediately.
 2. **Report** to fix_plan: `BLOCKED: <category> found in PUBLIC repo content (<line snippet>)`.
 3. **Rewrite** the offending lines in the source draft (issue-draft or working buffer).
-4. **Re-scan**. Only proceed when all five scans return zero matches.
+4. **Re-scan**. Only proceed when all six scans return zero matches (internal-artifact-path + four personal-data + Hangul).
 
 Do **not** "translate-as-you-write" or "sanitize while typing" — produce a fully cleaned draft first, scan, then post.
 

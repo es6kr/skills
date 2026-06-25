@@ -89,7 +89,7 @@ See the user-local `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry 
 
 ### Worktree-split decision tree
 
-```
+```text
 git status (change list)
   ├─ Only my single change, branch = PR/feature → commit directly
   ├─ Mine + other-task, branch = main/master/develop → /git-repo worktree split mandatory

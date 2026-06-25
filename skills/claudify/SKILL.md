@@ -65,7 +65,7 @@ Full comparison: [automation-decision-guide.md](./resources/automation-decision-
 3. Is the operation parallelizable (multiple Reads, multiple files)?
 4. If 1=intermediate OR 2=yes OR 3=yes → dispatch subagent
 
-**Subagent return contract**: subagent returns only (a) the deliverable path(s) and (b) a one-line confirmation. No template dump, no intermediate analysis.
+**Subagent return contract**: subagent returns only the deliverable path(s). No template dump, no intermediate analysis, no confirmation text.
 
 ### Step 1: Identify Candidates
 

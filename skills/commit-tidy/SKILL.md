@@ -217,11 +217,11 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 find "$REPO_ROOT/.claude/rules/" -name '*.md' 2>/dev/null
 ```
 
-If the find returns one or more files, grep them for commit-type semantics:
+If the find returns one or more files, grep them for commit-type semantics (recursive to match the `find` scope above):
 
 ```bash
-grep -liE 'commit type|conventional commit|version bump|feat|fix|topic' \
-  "$REPO_ROOT/.claude/rules/"*.md 2>/dev/null
+grep -rliE 'commit type|conventional commit|version bump|feat|fix|topic' \
+  "$REPO_ROOT/.claude/rules/" --include='*.md' 2>/dev/null
 ```
 
 Read each matched file. If a local mapping exists (e.g., "new topic = `feat:`, in-place edit of existing topic = `fix:`"), **re-classify each recommended subject under the local mapping before invoking Step 5**. Example reclassification:

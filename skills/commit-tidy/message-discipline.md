@@ -20,7 +20,7 @@ Conventional Commit conventions, PUBLIC repo English enforcement, Git operation-
 
 **Default commit message form is a `<subject>` line, a blank line, a `<body>`, optionally another blank line and a `<footer>`.** A body is recommended for every commit. A footer is optional.
 
-```
+```text
 <type>(<scope>): <subject>
 
 <body>
@@ -104,7 +104,7 @@ EOF
 2. Does the drafted subject + body contain any non-English characters in the relevant native script? — mental grep right before the Edit / Bash call
 3. 1+ matches → translate immediately. Parenthetical asides, post-hyphen notes, code-review summaries all included
 4. Visual whole-message inspection right before `git commit -m` / `-F` / heredoc
-5. Post-amend force-push: verify with `git log -1 --format=%B | grep -P '[^[:ascii:]]'` — must return zero matches for the relevant script
+5. Post-amend force-push: visually verify the final commit message is English. Mechanical check is a heuristic only: `git log -1 --format=%B | grep -P '[^[:ascii:]]'` rejects non-ASCII characters (catches CJK/accented native scripts) but does NOT cover ASCII-only non-English text (e.g., romanized Korean/Japanese) — pair with a language-aware validator when available, or scope the check to "non-ASCII characters" rather than treating it as definitive "non-English"
 
 ### Exceptions
 
@@ -159,7 +159,7 @@ Cumulative violations → escalate to a PreToolUse:Bash hook (`git commit` comma
 
 **Pre-release tags are always ORDERED BEFORE their corresponding release** (semver 2.0.0 spec):
 
-```
+```text
 v0.4.7 < v0.4.8-beta.0 < v0.4.8-beta.1 < v0.4.8
 ```
 

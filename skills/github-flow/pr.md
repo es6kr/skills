@@ -192,11 +192,11 @@ For chore/docs/config changes, only build + type check items.
 |---|-------|-----|
 | 1 | Put a pre-commit/CI/lint item as `[ ]` in the Test Plan (e.g. "lint passes", "type check passes", "terraform fmt passes") | Exclude — the workflow guarantees it. No need to report it in the PR body either |
 | 2 | List everything as a flat single list | Use category prefixes (`[general]` / `[UI]` / `[e2e]` / `[post-merge]`) so authors, reviewers, and the merge guard can see verification method / timing clearly |
-| 7 | Edit an existing PR body (sanitize, review-apply, any `gh pr edit --body`) and leave a pre-existing uncategorized Test Plan untouched | The category invariant applies to **every** body write — create AND edit. After any body mutation, re-run the self-check below; add prefixes to any flat item |
-| 3 | Force `[x]` verification of `[post-merge]` items before merge | `[post-merge]` does not block merge. Register a tracking record (issue or `fix_plan.md [BLOCKED]`) and proceed to merge |
-| 4 | Mark an item `[post-merge]` without registering a tracking medium (post-merge verification gets lost) | `[post-merge]` items require `gh issue create` or `fix_plan` registration. Inline the tracking link in the item description |
-| 5 | Omit the category prefix and only write notes | Prefix is required — both the merge.md guard automation and human triage classify by prefix matching |
-| 6 | Wrap the category in backtick + bracket in the PR body (`` `[post-merge]` ``) — backtick renders an inline-code chip stacked on the brackets = redundant double-highlight | **PR-body output format = `**[category]**`** (bold + bracket, a single highlight): `**[general]**` / `**[UI]**` / `**[post-merge]**`. (Inline-code `[category]` references in *this doc's* prose/tables are fine — the rule applies only to the **PR body** the reader sees.) |
+| 3 | Edit an existing PR body (sanitize, review-apply, any `gh pr edit --body`) and leave a pre-existing uncategorized Test Plan untouched | The category invariant applies to **every** body write — create AND edit. After any body mutation, re-run the self-check below; add prefixes to any flat item |
+| 4 | Force `[x]` verification of `[post-merge]` items before merge | `[post-merge]` does not block merge. Register a tracking record (issue or `fix_plan.md [BLOCKED]`) and proceed to merge |
+| 5 | Mark an item `[post-merge]` without registering a tracking medium (post-merge verification gets lost) | `[post-merge]` items require `gh issue create` or `fix_plan` registration. Inline the tracking link in the item description |
+| 6 | Omit the category prefix and only write notes | Prefix is required — both the merge.md guard automation and human triage classify by prefix matching |
+| 7 | Wrap the category in backtick + bracket in the PR body (`` `[post-merge]` ``) — backtick renders an inline-code chip stacked on the brackets = redundant double-highlight | **PR-body output format = `**[category]**`** (bold + bracket, a single highlight): `**[general]**` / `**[UI]**` / `**[post-merge]**`. (Inline-code `[category]` references in *this doc's* prose/tables are fine — the rule applies only to the **PR body** the reader sees.) |
 
 #### Test Plan example
 
