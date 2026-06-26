@@ -382,11 +382,95 @@ MSG
   exit 2
 }
 
+# ============================================================================
+# Check 6: Stateful infrastructure data-safety assertion guard
+# ============================================================================
+# Two sub-gates protect against irreversible data loss in stateful infra
+# (longhorn / PV / PVC / volume / replica / snapshot / etcd / vault):
+#
+#   (A) Destructive volume/replica operations presented as ask options.
+#       Operations such as PV recreate, volume delete, replica force-delete,
+#       snapshot purge, etc. risk irreversible data loss and MUST NOT be
+#       offered as casual user options.
+#
+#   (B) Data-safety assertions (no data loss / auto-recovery / salvage)
+#       about stateful resources WITHOUT primary-source state verification
+#       attestation (kubectl get replica/volume, spec.numberOfReplicas,
+#       status.robustness, replica count, primary-source verified).
+#
+# Patterns live in data/hangul-patterns.regex (locale-specific keywords
+# externalized per opensource.md "Public repo locale-specific patterns").
+# English-only fallbacks below keep this hook functional in environments
+# without the data file.
+HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:-longhorn|replica|PVC|persistentvolume|volume\.longhorn|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume}"
+HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:-PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume}"
+HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:-no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)}"
+HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:-kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*verified|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified}"
+
+check_stateful_data_safety() {
+  [[ -z "$OPTIONS_BLOB" ]] && return 0
+
+  # Gate A: destructive volume/replica operation present in any option
+  if echo "$OPTIONS_BLOB" | grep -qiE "$HG_ASK_DESTRUCTIVE_VOLUME_OP"; then
+    cat >&2 <<'MSG'
+DENIED: AskUserQuestion option proposes destructive operation on a stateful resource (PV/volume/PVC/replica/snapshot).
+
+Why blocked:
+  - One or more options contains a destructive verb (recreate / delete / wipe / purge / fresh volume) applied to a stateful resource.
+  - Destructive stateful operations risk irreversible data loss and MUST NOT be presented as casual user options.
+
+Required action (pick one before retrying):
+  1. Remove the destructive option entirely. Stateful recovery uses non-destructive paths first:
+     - Replica salvage (clear .spec.failedAt) — preserves data on disk
+     - Restore from snapshot/backup (if exists)
+     - Manual disk inspection (SSH + check /var/lib/longhorn/replicas/.../volume.meta)
+  2. If destruction is truly the only path, do NOT present it as an option. Instead:
+     - Report the situation as text (no options)
+     - Document the data-loss implication explicitly
+     - Wait for the user to explicitly type the destructive command themselves
+
+Reference: failed-attempts.md "stateful destructive option in ask"
+MSG
+    exit 2
+  fi
+
+  # Gate B: data-safety claim on stateful resource without state attestation
+  if echo "$OPTIONS_BLOB" | grep -qiE "$HG_ASK_STATEFUL_RESOURCE" && \
+     echo "$OPTIONS_BLOB" | grep -qiE "$HG_ASK_DATA_SAFETY_CLAIM"; then
+    if ! echo "$OPTIONS_BLOB" | grep -qiE "$HG_ASK_STATE_ATTESTATION"; then
+      cat >&2 <<'MSG'
+DENIED: AskUserQuestion claims data safety on a stateful resource without primary-source state verification.
+
+Why blocked:
+  - Option references a stateful resource (longhorn / replica / PV / PVC / volume / snapshot / etcd / vault) AND
+  - Option asserts data safety (no data loss / auto-recovery / salvage / safely delete) BUT
+  - No option text quotes state verification (kubectl get replica/volume, spec.numberOfReplicas, status.robustness, replica count, primary-source verified).
+
+Why this matters:
+  - "Auto-recovers from healthy replicas on node X" was asserted previously without checking that node X actually had replicas. Result: only 1 replica existed, on the failed node. Data was at risk before verification.
+  - Stateful claims require primary-source proof in the same option, not assumptions about defaults (e.g., "longhorn usually has 3 replicas").
+
+Required action (pick one before retrying):
+  1. Run primary-source checks first, then include the result in the option description:
+     - kubectl -n <ns> get replica.longhorn.io -o jsonpath='{.items[*].spec.nodeID},{.items[*].status.currentState}'
+     - kubectl -n <ns> get volume.longhorn.io <vol> -o jsonpath='{.spec.numberOfReplicas}|{.status.robustness}'
+     - kubectl get pvc <pvc> -o jsonpath='{.status.phase}'
+  2. Quote the verified state in option description (e.g., "verified: 2 replicas, 1 healthy on a1-1, robustness=degraded").
+  3. If verification is not possible, do NOT claim data safety. State the risk explicitly instead.
+
+Reference: failed-attempts.md "stateful data-safety claim without verification"
+MSG
+      exit 2
+    fi
+  fi
+}
+
 # Execute checks in cost order
 check_tasklist_id
 check_merge_without_review
 check_release_please_close
 check_vendor_leak
 check_supervisor_loop_recommend
+check_stateful_data_safety
 
 exit 0
