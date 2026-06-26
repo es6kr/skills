@@ -135,5 +135,25 @@ jobs:
           SLUG: ${{ steps.parse.outputs.slug }}
           VERSION: ${{ steps.parse.outputs.version }}
         run: |
-          # `clawhub inspect` returns the metadata page; grep for the version we just pushed.
-          clawhub inspect "$SLUG" | grep -F "Latest: $VERSION"
+          # ClawHub registry refuses to demote `latest` to a lower SemVer. When we
+          # publish a corrective lower version (e.g., 0.1.1 to undo a 1.0.0 jump
+          # caused by release-please default behavior), `Latest:` stays on the
+          # higher historical version. Asserting `Latest: $VERSION` would then
+          # fail forever even though the publish itself succeeded.
+          #
+          # Accept either:
+          #   (a) Latest pointer matches $VERSION (normal forward bump), OR
+          #   (b) The version exists anywhere in the metadata page (corrective
+          #       lower-version publish; latest stays on the higher historical).
+          OUT=$(clawhub inspect "$SLUG")
+          if echo "$OUT" | grep -qF "Latest: $VERSION"; then
+            echo "OK: latest pointer advanced to $VERSION"
+            exit 0
+          fi
+          if echo "$OUT" | grep -qE "(^|[^.0-9])$(echo "$VERSION" | sed 's/\./\\./g')([^.0-9]|$)"; then
+            echo "OK: $VERSION present in registry (latest pointer kept on higher historical version — known SemVer-monotonic behavior)"
+            exit 0
+          fi
+          echo "::error::Version $VERSION not found in registry for $SLUG"
+          echo "$OUT"
+          exit 1
