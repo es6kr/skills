@@ -1,0 +1,107 @@
+name: release-please-validate
+
+on:
+  pull_request:
+    paths:
+      - release-please-config.json
+      - .release-please-manifest.json
+      - .github/workflows/release-please-validate.yml
+  push:
+    branches: [main]
+    paths:
+      - release-please-config.json
+      - .release-please-manifest.json
+
+permissions:
+  contents: read
+
+jobs:
+  validate-pre-major-options:
+    name: pre-major guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Verify bump-minor-pre-major is true
+        run: |
+          set -euo pipefail
+          VALUE=$(jq -r '."bump-minor-pre-major" // "null"' release-please-config.json)
+          if [ "$VALUE" != "true" ]; then
+            cat <<EOF
+          ::error file=release-please-config.json::"bump-minor-pre-major" must be true.
+          Current value: $VALUE
+          Reason: release-please default treats pre-1.0 + feat: as a stable-1.0 promotion,
+          which has caused unintended 0.0.0 -> 1.0.0 jumps (see docs/generated/report-choco-1.0.0-overbump.md).
+          Set "bump-minor-pre-major": true so 0.x + feat: yields 0.(x+1).0 instead.
+          Docs: https://github.com/googleapis/release-please/blob/main/docs/customizing.md#bump-minor-pre-major
+          EOF
+            exit 1
+          fi
+          echo "OK: bump-minor-pre-major = true"
+
+      - name: Verify bump-patch-for-minor-pre-major is true
+        run: |
+          set -euo pipefail
+          VALUE=$(jq -r '."bump-patch-for-minor-pre-major" // "null"' release-please-config.json)
+          if [ "$VALUE" != "true" ]; then
+            cat <<EOF
+          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be true to keep pre-1.0 fix: bumps as patch (0.x.y -> 0.x.(y+1)).
+          Current value: $VALUE
+          EOF
+            exit 1
+          fi
+          echo "OK: bump-patch-for-minor-pre-major = true"
+
+  validate-new-component-versions:
+    name: new-component initial version guard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff manifest keys between base and head
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          git show "$BASE_SHA:.release-please-manifest.json" > /tmp/base-manifest.json 2>/dev/null || echo '{}' > /tmp/base-manifest.json
+          git show "$HEAD_SHA:.release-please-manifest.json" > /tmp/head-manifest.json
+
+          # Keys present in head but not in base = newly introduced components
+          NEW_KEYS=$(jq -r --slurpfile base /tmp/base-manifest.json '
+            keys[] as $k
+            | select($base[0][$k] == null)
+            | $k
+          ' /tmp/head-manifest.json)
+
+          if [ -z "$NEW_KEYS" ]; then
+            echo "No new manifest entries in this PR."
+            exit 0
+          fi
+
+          echo "New manifest entries:"
+          echo "$NEW_KEYS"
+
+          # For each new key, verify the version is exactly "0.0.0"
+          FAIL=0
+          while IFS= read -r KEY; do
+            VERSION=$(jq -r --arg k "$KEY" '.[$k]' /tmp/head-manifest.json)
+            if [ "$VERSION" != "0.0.0" ]; then
+              echo "::error file=.release-please-manifest.json::New entry '$KEY' must start at 0.0.0 (release-please-scope.md HARD STOP). Got: $VERSION"
+              FAIL=1
+            fi
+          done <<< "$NEW_KEYS"
+
+          if [ "$FAIL" -ne 0 ]; then
+            cat <<EOF
+          One or more new manifest entries violate the initial-version policy.
+          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록".
+          EOF
+            exit 1
+          fi
+          echo "OK: all new entries are 0.0.0"
