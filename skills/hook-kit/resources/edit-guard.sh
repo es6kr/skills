@@ -271,7 +271,7 @@ check_stub_file_substantive_edit() {
   #                    declared in the first 10 lines. Explicit author intent.
   #   AXIS B (loose):  body pointer phrase + size < 2KB + `## section count <= 1`.
   #                    True stubs are small pointer files with at most one ##
-  #                    section ("위치 안내" or equivalent). Topic files that
+  #                    section ("Location pointer" or equivalent). Topic files that
   #                    happen to contain a body phrase like "Use X instead"
   #                    typically carry 2+ ## sections (Method, Example, etc.)
   #                    — the section-count gate filters those out.
