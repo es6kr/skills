@@ -1,0 +1,179 @@
+name: release-please-validate
+
+on:
+  pull_request:
+    paths:
+      - release-please-config.json
+      - .release-please-manifest.json
+      - .github/workflows/release-please-validate.yml
+  push:
+    branches: [main]
+    paths:
+      - release-please-config.json
+      - .release-please-manifest.json
+
+permissions:
+  contents: read
+
+jobs:
+  validate-pre-major-options:
+    name: pre-major guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Verify bump-minor-pre-major is true
+        run: |
+          set -euo pipefail
+          VALUE=$(jq -r '."bump-minor-pre-major" // "null"' release-please-config.json)
+          if [ "$VALUE" != "true" ]; then
+            cat <<EOF
+          ::error file=release-please-config.json::"bump-minor-pre-major" must be true.
+          Current value: $VALUE
+          Reason: release-please default treats pre-1.0 + feat: as a stable-1.0 promotion,
+          which has caused unintended 0.0.0 -> 1.0.0 jumps (see docs/generated/report-choco-1.0.0-overbump.md).
+          Set "bump-minor-pre-major": true so 0.x + feat: yields 0.(x+1).0 instead.
+          Docs: https://github.com/googleapis/release-please/blob/main/docs/customizing.md#bump-minor-pre-major
+          EOF
+            exit 1
+          fi
+          echo "OK: bump-minor-pre-major = true"
+
+      - name: Verify bump-patch-for-minor-pre-major is true
+        run: |
+          set -euo pipefail
+          VALUE=$(jq -r '."bump-patch-for-minor-pre-major" // "null"' release-please-config.json)
+          if [ "$VALUE" != "true" ]; then
+            cat <<EOF
+          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be true to keep pre-1.0 feat: bumps as patch (0.x.y -> 0.x.(y+1)) instead of minor (0.x+1.0). Note: fix: is already patch by default; this flag changes feat: behavior.
+          Current value: $VALUE
+          EOF
+            exit 1
+          fi
+          echo "OK: bump-patch-for-minor-pre-major = true"
+
+  validate-new-component-versions:
+    name: new-component initial version guard
+    runs-on: ubuntu-latest
+    # Runs on pull_request only — direct pushes to main bypass this guard.
+    # Accepted residual risk: main is branch-protected against direct push, so
+    # the bypass path is unreachable in practice. If branch protection is ever
+    # removed, add a push-event variant of these jobs that diffs HEAD~1..HEAD.
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Diff manifest keys between base and head
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          git show "$BASE_SHA:.release-please-manifest.json" > /tmp/base-manifest.json 2>/dev/null || echo '{}' > /tmp/base-manifest.json
+          git show "$HEAD_SHA:.release-please-manifest.json" > /tmp/head-manifest.json
+
+          # Keys present in head but not in base = newly introduced components
+          NEW_KEYS=$(jq -r --slurpfile base /tmp/base-manifest.json '
+            keys[] as $k
+            | select($base[0][$k] == null)
+            | $k
+          ' /tmp/head-manifest.json)
+
+          if [ -z "$NEW_KEYS" ]; then
+            echo "No new manifest entries in this PR."
+            exit 0
+          fi
+
+          echo "New manifest entries:"
+          echo "$NEW_KEYS"
+
+          # For each new key, verify the version is exactly "0.0.0"
+          FAIL=0
+          while IFS= read -r KEY; do
+            VERSION=$(jq -r --arg k "$KEY" '.[$k]' /tmp/head-manifest.json)
+            if [ "$VERSION" != "0.0.0" ]; then
+              echo "::error file=.release-please-manifest.json::New entry '$KEY' must start at 0.0.0 (release-please-scope.md HARD STOP). Got: $VERSION"
+              FAIL=1
+            fi
+          done <<< "$NEW_KEYS"
+
+          if [ "$FAIL" -ne 0 ]; then
+            cat <<EOF
+          One or more new manifest entries violate the initial-version policy.
+          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록".
+          EOF
+            exit 1
+          fi
+          echo "OK: all new entries are 0.0.0"
+
+      - name: Block new component entry combined with feat commits in the same PR
+        run: |
+          set -euo pipefail
+          # Root cause of the choco@1.0.0 / harness@1.0.0 incident: PR #50 introduced
+          # the choco component (manifest 0.0.0) AND carried a top-level `feat:` commit
+          # whose squash subject became the merge commit. release-please then treated
+          # the new 0.0.0 component as bumpable by that feat → pre-1.0 promotion → 1.0.0.
+          #
+          # Hard-block the pattern: if this PR adds any new manifest entry, every
+          # commit between base..head must be a non-bumping type (chore/docs/ci/test/
+          # style/refactor). Any feat/fix in the same PR forces a split:
+          #   - PR A (chore): register the new manifest entry + the new skill directory
+          #   - PR B (feat or fix): the actual content change for that skill
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          git show "$BASE_SHA:.release-please-manifest.json" > /tmp/base-manifest.json 2>/dev/null || echo '{}' > /tmp/base-manifest.json
+          git show "$HEAD_SHA:.release-please-manifest.json" > /tmp/head-manifest.json
+
+          NEW_KEYS=$(jq -r --slurpfile base /tmp/base-manifest.json '
+            keys[] as $k
+            | select($base[0][$k] == null)
+            | $k
+          ' /tmp/head-manifest.json)
+
+          if [ -z "$NEW_KEYS" ]; then
+            echo "No new manifest entries — split-policy guard does not apply."
+            exit 0
+          fi
+
+          # Bump-producing commits across base..head. Two sources release-please
+          # treats as bumping:
+          #   1. Subject-line types:
+          #      - feat/fix/perf (with or without !:) — default-bump rules
+          #      - any other type with !: — breaking-change marker (major bump)
+          #   2. Body footer: BREAKING CHANGE: or BREAKING-CHANGE: (any type — major bump)
+          # Both are caught; results merged + deduped.
+          SUBJECT_BUMPS=$(git log "$BASE_SHA..$HEAD_SHA" --pretty=format:'%s' \
+            | grep -E '^(feat|fix|perf)(\([^)]+\))?!?: |^[a-z]+(\([^)]+\))?!: ' \
+            || true)
+          BODY_BREAKS=$(git log "$BASE_SHA..$HEAD_SHA" --grep='BREAKING[- ]CHANGE:' --pretty=format:'%s' \
+            || true)
+          BUMP_COMMITS=$(printf '%s\n%s\n' "$SUBJECT_BUMPS" "$BODY_BREAKS" | grep -v '^$' | sort -u || true)
+
+          if [ -z "$BUMP_COMMITS" ]; then
+            echo "OK: PR adds new manifest entries and contains only non-bumping commits (chore/docs/ci/test/style/refactor)."
+            exit 0
+          fi
+
+          cat <<EOF
+          ::error::PR adds new manifest entries AND contains bump-producing commits (feat/fix/perf). This pattern causes release-please to immediately promote a fresh 0.0.0 component to 1.0.0 (or 0.1.0). Split into two PRs:
+            1. chore PR — register manifest entry (0.0.0) + add skill directory + non-bumping infra changes only
+            2. feat/fix PR — actual content changes that should bump the new skill
+
+          New manifest entries added by this PR:
+          $NEW_KEYS
+
+          Bumping commits found in this PR:
+          $BUMP_COMMITS
+
+          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록" + "PR scope 외부 commit = bump cascade".
+          Reference incident: docs/generated/report-choco-1.0.0-overbump.md.
+          EOF
+          exit 1

@@ -9,6 +9,11 @@ on:
         description: 'Release tag (e.g., skill-kit-v0.3.0)'
         required: true
         type: string
+      allow_first_1_0:
+        description: 'Override first-1.0 publish guard (set true only when a 1.0.0 jump is genuinely intended)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -50,6 +55,57 @@ jobs:
             exit 1
           fi
 
+      # ClawHub CLI must be installed + authenticated BEFORE the Guard step
+      # below, since the Guard's "prior history" branch calls `clawhub inspect`.
+      # Earlier ordering (Install/Authenticate after the Guard) made that
+      # branch unreachable — every 1.0.0 publish, including legitimate stable
+      # promotions with prior history, fell through to "Refusing to publish".
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub@0.17.0
+
+      - name: Authenticate
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
+
+      - name: Guard against first-publish 1.0.0 jump
+        env:
+          SLUG: ${{ steps.parse.outputs.slug }}
+          VERSION: ${{ steps.parse.outputs.version }}
+          ALLOW_OVERRIDE: ${{ github.event.inputs.allow_first_1_0 }}
+        run: |
+          # Block accidental 0.0.0 -> 1.0.0 jumps caused by release-please default
+          # behavior when "bump-minor-pre-major" is not true. See:
+          #   docs/generated/report-choco-1.0.0-overbump.md
+          #   ~/.agents/.claude/rules/release-please-scope.md
+          #     "신규 published skill 초기 version 등록" / "Major bump trigger 사용 사전 ask"
+          if [ "$VERSION" != "1.0.0" ]; then
+            echo "OK: version $VERSION is not the guarded 1.0.0 pattern"
+            exit 0
+          fi
+          if [ "${ALLOW_OVERRIDE:-false}" = "true" ]; then
+            echo "Override accepted (workflow_dispatch input allow_first_1_0=true). Proceeding with $SLUG@1.0.0."
+            exit 0
+          fi
+          # 1.0.0 publish + no override: only allowed when at least one prior
+          # publish exists for this slug. Without prior history, this is a
+          # first-publish 1.0.0 jump which must be confirmed manually.
+          if clawhub inspect "$SLUG" 2>/dev/null | grep -qE '(Latest:|Versions:)'; then
+            echo "OK: $SLUG has prior publish history. 1.0.0 here is a deliberate stable promotion."
+            exit 0
+          fi
+          cat <<EOF
+          ::error::Refusing to publish first release of '$SLUG' at version 1.0.0.
+          A first-publish 1.0.0 is almost always a release-please default-bump artifact
+          (pre-1.0 + feat: with bump-minor-pre-major != true → 1.0.0 jump).
+          If the 1.0.0 release is genuinely intended:
+            1. Run this workflow via 'Actions → publish → Run workflow' and set
+               allow_first_1_0 = true with tag_name = $SLUG-v1.0.0.
+            2. Or amend the release-please release PR to a 0.x.x version first.
+          See docs/generated/report-choco-1.0.0-overbump.md and the rules referenced above.
+          EOF
+          exit 1
+
       - name: Ensure LICENSE present in skill directory
         env:
           SLUG: ${{ steps.parse.outputs.slug }}
@@ -66,14 +122,6 @@ jobs:
             echo "::error::No LICENSE found in skills/$SLUG/ or repo root — publish would ship without a license"
             exit 1
           fi
-
-      - name: Install ClawHub CLI
-        run: npm install -g clawhub@0.17.0
-
-      - name: Authenticate
-        env:
-          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
-        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
 
       - name: Publish
         env:
@@ -92,5 +140,25 @@ jobs:
           SLUG: ${{ steps.parse.outputs.slug }}
           VERSION: ${{ steps.parse.outputs.version }}
         run: |
-          # `clawhub inspect` returns the metadata page; grep for the version we just pushed.
-          clawhub inspect "$SLUG" | grep -F "Latest: $VERSION"
+          # ClawHub registry refuses to demote `latest` to a lower SemVer. When we
+          # publish a corrective lower version (e.g., 0.1.1 to undo a 1.0.0 jump
+          # caused by release-please default behavior), `Latest:` stays on the
+          # higher historical version. Asserting `Latest: $VERSION` would then
+          # fail forever even though the publish itself succeeded.
+          #
+          # Accept either:
+          #   (a) Latest pointer matches $VERSION (normal forward bump), OR
+          #   (b) The version exists anywhere in the metadata page (corrective
+          #       lower-version publish; latest stays on the higher historical).
+          OUT=$(clawhub inspect "$SLUG")
+          if echo "$OUT" | grep -qF "Latest: $VERSION"; then
+            echo "OK: latest pointer advanced to $VERSION"
+            exit 0
+          fi
+          if echo "$OUT" | grep -qE "(^|[^.0-9])$(echo "$VERSION" | sed 's/\./\\./g')([^.0-9]|$)"; then
+            echo "OK: $VERSION present in registry (latest pointer kept on higher historical version — known SemVer-monotonic behavior)"
+            exit 0
+          fi
+          echo "::error::Version $VERSION not found in registry for $SLUG"
+          echo "$OUT"
+          exit 1
