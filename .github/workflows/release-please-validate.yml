@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Verify bump-minor-pre-major is true
         run: |
@@ -46,7 +48,7 @@ jobs:
           VALUE=$(jq -r '."bump-patch-for-minor-pre-major" // "null"' release-please-config.json)
           if [ "$VALUE" != "true" ]; then
             cat <<EOF
-          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be true to keep pre-1.0 fix: bumps as patch (0.x.y -> 0.x.(y+1)).
+          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be true to keep pre-1.0 feat: bumps as patch (0.x.y -> 0.x.(y+1)) instead of minor (0.x+1.0). Note: fix: is already patch by default; this flag changes feat: behavior.
           Current value: $VALUE
           EOF
             exit 1
@@ -56,12 +58,17 @@ jobs:
   validate-new-component-versions:
     name: new-component initial version guard
     runs-on: ubuntu-latest
+    # Runs on pull_request only — direct pushes to main bypass this guard.
+    # Accepted residual risk: main is branch-protected against direct push, so
+    # the bypass path is unreachable in practice. If branch protection is ever
+    # removed, add a push-event variant of these jobs that diffs HEAD~1..HEAD.
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout PR head
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Diff manifest keys between base and head
         run: |
@@ -136,10 +143,19 @@ jobs:
             exit 0
           fi
 
-          # Conventional Commit type frequency across base..head
-          BUMP_COMMITS=$(git log "$BASE_SHA..$HEAD_SHA" --pretty=format:'%s' \
-            | grep -E '^(feat|fix|perf)(\([^)]+\))?!?: ' \
+          # Bump-producing commits across base..head. Two sources release-please
+          # treats as bumping:
+          #   1. Subject-line types:
+          #      - feat/fix/perf (with or without !:) — default-bump rules
+          #      - any other type with !: — breaking-change marker (major bump)
+          #   2. Body footer: BREAKING CHANGE: or BREAKING-CHANGE: (any type — major bump)
+          # Both are caught; results merged + deduped.
+          SUBJECT_BUMPS=$(git log "$BASE_SHA..$HEAD_SHA" --pretty=format:'%s' \
+            | grep -E '^(feat|fix|perf)(\([^)]+\))?!?: |^[a-z]+(\([^)]+\))?!: ' \
             || true)
+          BODY_BREAKS=$(git log "$BASE_SHA..$HEAD_SHA" --grep='BREAKING[- ]CHANGE:' --pretty=format:'%s' \
+            || true)
+          BUMP_COMMITS=$(printf '%s\n%s\n' "$SUBJECT_BUMPS" "$BODY_BREAKS" | grep -v '^$' | sort -u || true)
 
           if [ -z "$BUMP_COMMITS" ]; then
             echo "OK: PR adds new manifest entries and contains only non-bumping commits (chore/docs/ci/test/style/refactor)."
