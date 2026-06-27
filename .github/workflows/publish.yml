@@ -55,6 +55,19 @@ jobs:
             exit 1
           fi
 
+      # ClawHub CLI must be installed + authenticated BEFORE the Guard step
+      # below, since the Guard's "prior history" branch calls `clawhub inspect`.
+      # Earlier ordering (Install/Authenticate after the Guard) made that
+      # branch unreachable — every 1.0.0 publish, including legitimate stable
+      # promotions with prior history, fell through to "Refusing to publish".
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub@0.17.0
+
+      - name: Authenticate
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
+
       - name: Guard against first-publish 1.0.0 jump
         env:
           SLUG: ${{ steps.parse.outputs.slug }}
@@ -109,14 +122,6 @@ jobs:
             echo "::error::No LICENSE found in skills/$SLUG/ or repo root — publish would ship without a license"
             exit 1
           fi
-
-      - name: Install ClawHub CLI
-        run: npm install -g clawhub@0.17.0
-
-      - name: Authenticate
-        env:
-          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
-        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
 
       - name: Publish
         env:
