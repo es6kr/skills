@@ -211,6 +211,27 @@ The device-code prompt appears in the terminal; the user enters it in the browse
 | 6. Handoff (`gh secret set`, `vault kv put`, local CLI publish) | **Backend** (Bash) | Mandatory automation |
 | 7. Persist for reuse (skill `data/secrets/`, keychain) | **Backend** (Write) | Mandatory automation |
 
+### Backend automation failure cascade (HARD STOP — before falling back to user copy)
+
+**A single backend command failure (e.g., `eval` JS exception) is NOT permission to delegate to user.** When the primary automation matcher fails, **cycle through alternate matchers in this order** before any "please copy the token yourself" handoff:
+
+| Order | Matcher | Example (cmux) | Example (chrome-devtools) |
+|-------|---------|----------------|---------------------------|
+| 1 | JS evaluation (DOM query) | `cmux browser eval --script '<js>'` | `evaluate_script` |
+| 2 | CSS selector targeting | `cmux browser fill --selector '<css>'` / `click --selector '<css>'` | `fill` / `click` with `selector` |
+| 3 | Interactive snapshot (ref-based) | `cmux browser snapshot --interactive` → click `@eN` | `take_snapshot` → click ref |
+| 4 | Visual screenshot + bbox coordinates | `cmux browser screenshot` → analyze coords → `click --x --y` (if backend supports) | `take_screenshot` |
+| 5 | User copy fallback | text instructions, user pastes back | text instructions, user pastes back |
+
+Order 1 failure (most common: `eval` cross-origin or JS exception) → try Order 2 (CSS selector) BEFORE Order 5. Each transition must show **at least one tool call** in the actual workflow — "I tried JS, it failed, the user can do it" with no Order 2/3/4 attempts = violation.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `eval` returns "JavaScript exception" → conclude "automation unavailable" → user text instructions | `eval` failure = try `fill --selector` / `click --selector` next. Document the JS exception (likely cross-origin), then iterate matchers |
+| 2 | One snapshot returns minimal accessibility tree (form fields invisible) → "form not automatable" | `snapshot --interactive` or `snapshot --max-depth N` or CSS selector — extend probe before giving up |
+| 3 | "User can do it in 30 seconds, faster than backend automation" | Backend automation is the **mandatory contract** of credential-issue. Speed argument = boundary violation. The Phase 3-5 boundary table is not advisory |
+| 4 | Frame each automation attempt as "let me try one more thing" with user as fallback in the same response | The cascade is silent — try Orders 1→4 sequentially in **the same turn**, only emit a user-handoff request when Order 4 also fails |
+
 ## Self-check (before opening any browser for issuance)
 
 1. Is the credential already stored (skill data / memory / `.env` / secret store)? → If yes, skip to `handoff`.
@@ -220,6 +241,24 @@ The device-code prompt appears in the terminal; the user enters it in the browse
 5. After collecting the credential, did you **complete step 6 Persist** (Service × Store matrix row matched + persist command executed + reuse path verified)? `handoff` runs only after Persist succeeds.
 6. **Login complete → token generation automation check**: once the user is signed in, did the backend drive the token-generation UI (navigate → fill → click "Create" → snapshot the token) instead of writing text instructions for the user to follow? If text instructions were written, that is a violation of the boundary in the table above unless the token is genuinely behind a masked / copy-only UI element.
 7. **Persist-before-revoke check**: am I about to suggest revoke/Delete the freshly issued credential because it appeared in chat? Persistence wins — step 6 first; revoke is a separate explicit user decision, not the default exposure response.
+
+### Phase 3-5 entry gate — pre-handoff tool-call count check (HARD STOP)
+
+**Before composing any AskUserQuestion or text request that asks the user to take action on the token-issuance page (sign in, click Generate, copy the token), audit the transcript for backend automation attempts.** If fewer than 3 backend tool calls in the cascade (Order 1-4 above) have been made for the current `service`, the handoff request is **forbidden** — return to the cascade.
+
+**Forcing function checklist (run BEFORE any user-facing handoff message)**:
+
+1. Count `Bash(cmux browser ...)` / `mcp__plugin_chrome-devtools-mcp_*` / equivalent tool calls in the current `service` flow within this turn
+2. Filter to ones that drove **the token-generation UI** (not just opening the URL or initial snapshot)
+3. If count < 3 across Order 1-4, the handoff message is premature — pick the next matcher and try
+4. Only when 3+ distinct matchers have been attempted (with the actual tool-call evidence) is user copy fallback (Order 5) eligible
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | One `eval` JS exception → "let me ask the user to do it" | Audit tool-call count first. If <3 automation attempts on the form, try `fill`, `click`, `snapshot --interactive` |
+| 2 | Treat self-check #6 as post-action review (check after writing user instructions) | Apply self-check #6 + this gate **before** composing user-facing text. Pre-action forcing function, not post-action audit |
+| 3 | "User mentioned the form is open, they can just fill it" — frame as user convenience | User said the form is open ≠ user wants to fill it. Backend automation contract stays in force |
+| 4 | Justify handoff by token being one-time-shown (Phase 5 user-copy exception) | Phase 5 user-copy fallback applies only when the token is **DOM-invisible** (masked behind `••••`, behind clipboard-only API). Visible plain-text token field is backend-extractable via Order 1-4 |
 
 ## Scenarios
 
