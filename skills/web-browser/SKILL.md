@@ -3,7 +3,7 @@ name: web-browser
 metadata:
   author: es6kr
   version: "0.1.0"
-description: >-
+description: |
   Environment-aware browser operations. Detects wmux/cmux/tmux and routes to the right backend
   (wmux/cmux panel → user-visible, plain → Playwright MCP, chrome-devtools → reuse the user's
   real logged-in session). Topics:
