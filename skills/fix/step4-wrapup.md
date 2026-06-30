@@ -94,6 +94,8 @@ A fix produces TWO independent deliverables that must **both** exist (or neither
 
 **Self-check (before deleting fix-3)**: Did this fix (or this session's preceding ad-hoc correction) edit any rule/skill/hook? → If yes, `grep` failed-attempts.md HOT for this case's keyword. Absent = record the case body now, before pruning.
 
+> See `step2-improvement.md` "Case history medium" + `fix/SKILL.md` for the full `failed-attempts.md` HOT path. Consumers who installed only `fix/` (without the owning skill that hosts `failed-attempts.md` HOT) must wire the path via their environment.
+
 **[Measure 3] Status-based pruning of completed tasks (MANDATORY — HARD STOP)**:
 
 The cleanup-step prune target is **status-based, not prefix-based**. Cleaning up only `fix-*` and leaving the original-work tasks behind is a violation.
