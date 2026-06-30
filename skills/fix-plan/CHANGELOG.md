@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/es6kr/skills/compare/fix-plan-v0.3.0...fix-plan-v0.3.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **fix-plan:** require sync as Step 0 of priority triage ([0ce37e9](https://github.com/es6kr/skills/commit/0ce37e9af80e0d453d8441ad730ea2d6d88b226e))
+* **fix:** split Step 2 medium by content type — case history to failed-attempts.md ([#62](https://github.com/es6kr/skills/issues/62)) ([747b3f9](https://github.com/es6kr/skills/commit/747b3f957ca0fefdbc5044eb08f66b8aafc1e26a))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/fix-plan-v0.2.0...fix-plan-v0.3.0) (2026-06-19)
 
 

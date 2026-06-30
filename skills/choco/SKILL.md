@@ -2,7 +2,7 @@
 name: choco
 metadata:
   author: es6kr
-  version: "0.0.0"
+  version: "1.0.1" # x-release-please-version
 description: |
   Chocolatey operations integration — post-processing after choco upgrade, nssm service path refresh, NSSM → shawl migration (syncthing v2 etc.), resync on UniGetUI/choco metadata update failures. diagnose [diagnose.md], metadata-fix [metadata-fix.md], post-upgrade [post-upgrade.md], shawl-migration [shawl-migration.md], update-path [update-path.md].
   Use when: "choco", "chocolatey", "choco upgrade", "choco outdated", "vcredist", "nssm", "nssm recovery", "nssm path", "service path refresh", "after choco upgrade", "service failure", "SERVICE_STOPPED", "shim issue", "syncthing nssm", "syncthing v2", "shawl migration", "nssm deprecation", "service-specific error", "UniGetUI", "metadata update failure", "metadata stale", ".nuspec stale", "choco metadata".
