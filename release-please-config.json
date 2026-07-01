@@ -132,6 +132,16 @@
         }
       ]
     },
+    "skills/docxport": {
+      "package-name": "docxport",
+      "component": "docxport",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/dotfile": {
       "package-name": "dotfile",
       "component": "dotfile",
