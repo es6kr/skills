@@ -10,10 +10,12 @@ Create PRs with structured body, test plan, and optional visual attachments.
 
 ## Options
 
-- `--draft`: Create as Draft PR (`gh pr create --draft`)
+- **Draft is the DEFAULT (HARD STOP)**: every `gh pr create` includes `--draft`. Create a ready (non-draft) PR **ONLY on explicit user request** (user says "ready PR" / "non-draft" or passes `--ready`). **Never create a ready PR autonomously** — review cost grows per non-draft PR (CodeRabbit/Copilot fire immediately on a ready PR).
+- `--ready`: opt out of the default draft → create a ready-for-review PR (requires explicit user request)
+- **Draft default governs upstream asks too (HARD STOP)**: when an `AskUserQuestion` option offers PR creation (from `register`, `next`, or any ad-hoc ask), label it as a **draft PR by default** (e.g. "push + draft PR"). A ready (non-draft) PR must be a **separate option** (e.g. "push + ready PR `--ready`"), never folded into a generic "create PR" label. No explicit ready request → draft. This applies even when an earlier registration-strategy answer named a "→ PR" flow: that selects the flow shape, not draft-vs-ready.
 - `--skip-review`: Skip CodeRabbit review (`--label coderabbit:ignore`)
 - `--no-capture`: Skip visual attachment step
-- Options can be combined: `/github-flow pr --draft --skip-review`
+- Options can be combined: `/github-flow pr --ready --skip-review`
 
 ## Procedure
 
@@ -271,10 +273,11 @@ EOF
   --head $(git branch --show-current) \
   --label [label] \
   --milestone "<milestone>" \
-  --add-assignee @me
+  --add-assignee @me \
+  --draft
 ```
 
-- `--draft` option → add `--draft` flag
+- **`--draft` is included BY DEFAULT (HARD STOP)** — the command above always creates a draft PR. Remove `--draft` **ONLY** when the user explicitly requested a ready PR (`--ready` or "non-draft"/"ready PR"). Autonomous ready-PR creation is forbidden. After CI passes on a draft, transition with `gh pr ready <N>` per the merge topic — but the initial creation stays draft.
 - `--skip-review` option → add `--label coderabbit:ignore` (in addition to classification label)
 - **At least 1 classification label required**: enhancement, bug, documentation, test, chore, etc.
 - **Milestone from Step 6** → add `--milestone "<title>"` flag
@@ -550,7 +553,7 @@ Check the result for one of the following patterns:
 
 | Result | Next action |
 |--------|-------------|
-| Walkthrough / Summary by CodeRabbit body (posting complete) | `/consolidate pr-review <N>` **invoked immediately** |
+| Walkthrough / Summary by CodeRabbit body (posting complete) | `/consolidate pr <N>` **invoked immediately** |
 | `Rate limit exceeded` / `wait N minutes` / `Refill in N minutes M seconds` | **Compute the absolute reset timestamp** (procedure below). If reset has not passed: TaskCreate + ScheduleWakeup. If reset has passed: post `@coderabbitai review` as a PR comment (with user approval) to trigger a fresh walkthrough |
 | No comment yet (immediately after creation, pending) | Wait another 30 seconds and re-check; if still missing, register a task |
 | `coderabbit:ignore` label applied | Skip consolidate — proceed with Internal Code Review only (`superpowers:code-reviewer` or `coderabbit:code-review` direct invocation) |
@@ -605,7 +608,7 @@ PR creation is stateless. There is no automation that detects review arrival. So
 
 | PR state | When | How to invoke |
 |----------|------|---------------|
-| Walkthrough posted | Immediately (same session as PR creation) | `/consolidate pr-review <N>` directly |
+| Walkthrough posted | Immediately (same session as PR creation) | `/consolidate pr <N>` directly |
 | Rate limited (wait time stated) | At the stated time + 1 minute | Register a task + invoke when the time arrives |
 | Reviewer not registered (e.g. Copilot not set up) | Handled in consolidate Step 1 | Invoke immediately — consolidate branches the fallback |
 | `coderabbit:ignore` label | No walkthrough — Internal Review only | `superpowers:code-reviewer` or `coderabbit:code-review` directly |
