@@ -29,6 +29,7 @@ Failing any filter → route to other medium per the table below:
 | Project-bounded policy | workspace CLAUDE.md / `.claude/rules/` |
 | "Recommended" / "would be nice" | drop (rules enforce, not suggest) |
 | Deterministic + automatable | hook (rule is fallback only) |
+| **Wrong factual claim inside a curated wiki (Wiki-LLM) that Claude cites** | **Wiki-LLM medium** — edit `pages/**/*.md` + `log.md` `page-update` + commit. Bidirectional: fix Step 1 recurrence pre-check should also Grep the wiki for pattern re-emergence before authoring the correction |
 
 Zero Edit/Write **on the rule file** is allowed when memory + skill/hook is the chosen medium. Step 2 is complete when the chosen medium received its deliverable.
 
@@ -43,7 +44,9 @@ Zero Edit/Write **on the rule file** is allowed when memory + skill/hook is the 
 | 7 | Author vendor-specific code (URL, skill name, MCP tool name, instance-bound command) into a generic skill body | Before authoring integration in a generic skill, **grep vendor skill docs for existing dispatch design**: `grep -rE "<generic-skill-name>" ~/.claude/skills/<vendor>/`. If found, follow that pattern. Generic skill declares abstract dispatch (`--<verb>=<skill>:<topic>`); vendor skill implements receiver. See the rule on forbidding vendor-specific references in generic skills |
 | 8 | Add case-history meta OR ANY date stamp into a skill or rule body — case-history examples: "violation case", "verified YYYY-MM-DD", "Nth recurrence". Date stamp examples: `(HARD STOP -- added YYYY-MM-DD)`, `(HARD STOP -- newly added YYYY-MM-DD)`, `(recurrence-driven YYYY-MM-DD)`, "observed YYYY-MM-DD", "added in YYYY-MM-DD fix". Any literal `\d{4}-\d{2}-\d{2}` substring in new_string counts | Skill/rule body keeps Don't/Do + self-check + procedure only -- **no date stamps anywhere**, including section headers (`### X (HARD STOP -- added DATE)`), parenthetical annotations, code comments (`// observed DATE`), "added/newly added" footers, "since DATE" inline notes. Case history lives **only** in `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT). If a case reference is essential, use a date-free pointer: `(see failed-attempts.md "<keyword>")`. **Self-check before every skill/rule Edit (MANDATORY, regex-strict)**: run `grep -E '[0-9]{4}-[0-9]{2}-[0-9]{2}' <<< "$new_string"` mentally -- 1+ match -> STRIP every match before calling Edit, then move case-history content (if any) into failed-attempts.md HOT as a separate write. Enforcement hook: `~/.claude/hooks/block-date-in-skill-rule.sh` (PreToolUse:Edit/Write on `skills/**/*.md` and `rules/**/*.md`) -- rejects calls whose new_string contains the date regex. Hook is the safety net; the self-check is the first line |
 
-"Prompt" = any persistent text that influences Claude's behavior. Priority (check in order — **stop at the first match**):
+"Prompt" = any persistent text that influences Claude's behavior — **including project-domain knowledge stores (Wiki-LLM, RAG index, curated notes) that Claude cites during Query**. When a domain-knowledge store exists, a factual error inside it recirculates on every Query → treat wiki content correction as a Step 2 target medium, not just a Step 3 artifact edit.
+
+Priority (check in order — **stop at the first match**):
 
 | Priority | Target | Condition | Example |
 |----------|--------|-----------|---------|
@@ -52,6 +55,7 @@ Zero Edit/Write **on the rule file** is allowed when memory + skill/hook is the 
 | 3rd | **Rule** (`~/.agents/rules/`, `.claude/rules/`) | 3rd+ recurrence + 4-filter gate ALL pass | Add to existing rule section |
 | 4th | **Sub-agent / CLAUDE.md** (`.claude/agents/*.md`, project root) | Policy bound to a specific context (agent/project) | Add to agent description / project CLAUDE.md |
 | 5th | **Hook** (`settings.json` hooks) | 4th+ recurrence + deterministic pattern (grep/regex-judgeable) | Add PreToolUse/PostToolUse hook |
+| **Parallel (any stage)** | **Wiki-LLM / project domain knowledge store** (`<workspace>/wiki/pages/**`, RAG index, curated docs) | Wrong / oversimplified / outdated **domain claim** cited by wiki pages that Claude uses during Query. Not behavior — factual correctness of stored knowledge | Edit `pages/**/*.md` (correction) + amend `raw/*.md` frontmatter (source note) + add `log.md` `page-update` entry + commit. If a Lint procedure exists in `wiki/CLAUDE.md`, also propose a Lint rule strengthening |
 
 **Why Rule is not 1st**: a rule consumes always-on token cost continuously. Adding a rule for every mistake inflates the context until you can no longer follow the rules themselves — a paradox. memory (feedback) costs 0 tokens + is reachable via search — the natural medium for 1st-2nd-recurrence learning. Rules are reserved for permanent protection patterns that passed the 4-filter gate.
 
