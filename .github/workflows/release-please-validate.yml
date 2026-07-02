@@ -45,12 +45,14 @@ jobs:
       - name: Verify bump-patch-for-minor-pre-major is false
         run: |
           set -euo pipefail
-          VALUE=$(jq -r '."bump-patch-for-minor-pre-major" // "null"' release-please-config.json)
+          # NOTE: jq's // alternative operator treats false as empty, so
+          # `."key" // "null"` would turn a legitimate `false` into "null".
+          # Use tostring instead: false -> "false", missing key -> "null".
+          VALUE=$(jq -r '."bump-patch-for-minor-pre-major" | tostring' release-please-config.json)
           if [ "$VALUE" != "false" ]; then
             cat <<EOF
           ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be false so that pre-1.0 feat: bumps as minor (0.x.y -> 0.(x+1).0). This encodes the "new-topic = minor bump" policy: only feat commits (which land on the next-feat staging branch and represent a genuine skill topic addition) should raise the minor version. fix: remains patch by default.
           Current value: $VALUE
-          Docs: docs/generated/plan-skill-release-branch-split.md (Confirmed decision Axis 2)
           EOF
             exit 1
           fi
