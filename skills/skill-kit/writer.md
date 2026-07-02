@@ -11,6 +11,22 @@ Create well-structured Agent Skills for Claude Code with proper validation.
 
 ## Instructions
 
+### Step 0.5: Quality-method routing (before scoping)
+
+skill-kit owns the operational lifecycle (structure, lint, publish). Two external
+skills cover verification methods skill-kit does not provide. Route BEFORE writing:
+
+| Concern | Route to |
+|---------|----------|
+| Output quality is objectively measurable (file transform, extraction, codegen) | `skill-creator` — eval benchmark, then return here for lint/publish |
+| Description trigger accuracy needs measurement (under/over-trigger) | `skill-creator` — description optimization loop |
+| Behavioral compliance risk (agent may bypass the rule under pressure) | `superpowers:writing-skills` — TDD pressure scenarios. Token-heavy: apply to discipline skills only |
+| Structure / frontmatter / dedup / publish lifecycle only | Continue with this workflow |
+| Medium undecided (skill vs rule vs hook vs memory) | `claudify` create first — decide the medium |
+
+If a routed skill is not installed (check the session's available-skills list),
+proceed with this workflow alone and note the skipped verification in the report.
+
 ### Step 1: Determine Skill Scope
 
 Ask clarifying questions:
