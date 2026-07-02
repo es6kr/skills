@@ -1,0 +1,77 @@
+#!/usr/bin/env sh
+
+# Pre-commit gate — block Korean text in ANY staged .md/.sh before commit lands.
+# Mirrors the CI "hangul-check" job (.github/workflows/test.yml) but at
+# commit time rather than push time, so violations are caught earlier
+# (the rejected commit can be fixed and amended without a push attempt).
+#
+# Scope: EVERY staged .md/.sh file — not just skills/. This repo is PUBLIC and
+# English-only, so every tracked text file is publishing surface. The narrow
+# skills/-only scope let a Korean workspace-local rule file
+# (.claude/rules/*.md) slip through untranslated (2026-07-01 incident).
+#
+# Other CI parity checks (frontmatter-lint, bats, pytest) remain in pre-push
+# because they are heavier and only need to gate the push boundary.
+
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+STAGED_TEXT_FILES=$(git diff --cached --name-only --diff-filter=ACM \
+  | grep -E '\.(md|sh)$' \
+  || true)
+
+if [ -z "$STAGED_TEXT_FILES" ]; then
+  exit 0
+fi
+
+# Pick the first python that actually runs. A bare `command -v python3` is not
+# enough on Windows, where `python3` resolves to a non-functional Microsoft
+# Store App Execution Alias stub; probe each candidate so the broken stub is
+# skipped in favour of a working `python`.
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import sys" >/dev/null 2>&1; then
+    PY="$cand"
+    break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "no working python interpreter found on PATH" >&2
+  exit 1
+fi
+
+echo "Checking staged .md/.sh files for Korean text:"
+echo "$STAGED_TEXT_FILES" | sed 's/^/  - /'
+
+FAIL=0
+for f in $STAGED_TEXT_FILES; do
+  # Check the STAGED content (index), not the working tree — a partially
+  # staged file must be judged by what would actually land in the commit.
+  if git show ":$f" | "$PY" -c "
+import sys
+data = sys.stdin.buffer.read().decode('utf-8', errors='replace')
+hits = [(i, l) for i, l in enumerate(data.splitlines(), 1)
+        if any('\uac00' <= ch <= '\ud7a3' for ch in l)]
+for i, l in hits[:5]:
+    print(f'{i}:{l.strip()[:120]}')
+sys.exit(1 if hits else 0)
+" >/tmp/hangul_hits_$$ 2>&1; then
+    :
+  else
+    echo "BLOCKED: Korean text in staged file: $f"
+    sed 's/^/    /' /tmp/hangul_hits_$$
+    FAIL=1
+  fi
+  rm -f /tmp/hangul_hits_$$
+done
+
+if [ "$FAIL" -ne 0 ]; then
+  echo ""
+  echo "BLOCKED: Korean text found in staged files. Translate before committing."
+  echo "This repo (es6kr/skills) is PUBLIC and English-only — every tracked"
+  echo ".md/.sh is publishing surface, including non-skills paths."
+  exit 1
+fi
+echo "All staged text files clean."

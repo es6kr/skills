@@ -1,14 +1,52 @@
 #!/usr/bin/env sh
 
 # Pre-push gate — mirrors the CI "Test" workflow (.github/workflows/test.yml)
-# so failures are caught locally instead of only after push. The four checks
-# below are 1:1 with the CI jobs: frontmatter-lint, bats, pytest, hangul-check.
+# so failures are caught locally instead of only after push. The three checks
+# below are 1:1 with the heavier CI jobs: frontmatter-lint, bats, pytest.
+# The hangul-check CI job runs in pre-commit instead (see .githooks/pre-commit)
+# so Korean text is rejected at commit time before the push attempt.
 # Keep this in sync whenever a CI job is added/changed.
 
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
+
+# 'local' branch push guard — HARD STOP. The 'local' branch is a user-private
+# stage / working branch; pushing it to origin pollutes other environments
+# and it is not a valid PR head (PR heads use the <tag>/<scope> convention).
+# stdin is the pre-push protocol: `<local_ref> <local_sha> <remote_ref> <remote_sha>` lines.
+LOCAL_PUSH_ATTEMPTED=0
+LOCAL_STDIN=""
+while IFS= read -r line; do
+  LOCAL_STDIN="${LOCAL_STDIN}${line}
+"
+  # shellcheck disable=SC2086
+  set -- $line
+  remote_ref="${3:-}"
+  if [ "$remote_ref" = "refs/heads/local" ]; then
+    LOCAL_PUSH_ATTEMPTED=1
+  fi
+done
+if [ "$LOCAL_PUSH_ATTEMPTED" = "1" ] && [ "${PUSH_LOCAL_OVERRIDE:-}" != "1" ]; then
+  cat >&2 <<'GUARD_MSG'
+ERROR: Pushing the 'local' branch to origin is blocked.
+
+'local' is a user-private stage branch. Push a feature branch + PR instead:
+    git switch -c <tag>/<scope>      # <tag>=docs|fix|feat, <scope>=short slug
+    git cherry-pick <sha>...          # bring the commits you want to publish
+    git push -u origin <tag>/<scope>
+    gh pr create -R es6kr/skills --title '...' --body '...'
+
+If you truly intend to force-push 'local' (rare, requires explicit user consent):
+    PUSH_LOCAL_OVERRIDE=1 git push origin local
+GUARD_MSG
+  exit 1
+fi
+# Re-emit the stdin we consumed so downstream logic (if any) sees the same lines.
+# (Currently downstream CI checks below do not read stdin, but preserve the
+# contract for future hook chaining.)
+printf '%s' "$LOCAL_STDIN" >/dev/null
 
 echo "Running pre-push checks (CI parity)..."
 
@@ -42,10 +80,7 @@ fi
 echo "Checking SKILL.md frontmatter (scripts/lint-frontmatter.sh)..."
 bash scripts/lint-frontmatter.sh
 
-# CI job: hangul-check — blocks Korean text in English skill content before it
-# reaches CI. This is the gate that was previously missing from pre-push.
-echo "Checking for Korean text (scripts/check-hangul.py skills)..."
-"$PY" scripts/check-hangul.py skills
+# CI job: hangul-check is enforced in .githooks/pre-commit (commit-time gate).
 
 # CI job: bats (Structure Tests) — run the whole tests/ dir, not a single file.
 echo "Running bats tests (tests/)..."

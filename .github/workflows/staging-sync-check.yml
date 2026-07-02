@@ -1,0 +1,96 @@
+name: staging-sync-check
+
+# Nudges the maintainer when main has drifted ahead of next-feat / next-fix.
+# The staging branches are supposed to be fast-forwarded manually after each
+# main merge so PR bases stay current; this job surfaces the drift instead of
+# doing the fast-forward automatically (rebase cases would fight an auto FF).
+#
+# Runs weekly (Monday 09:00 KST = 00:00 UTC) and on manual dispatch.
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch staging branches
+        run: |
+          set -euo pipefail
+          git fetch origin main next-feat next-fix
+
+      - name: Compute drift for each staging branch
+        id: drift
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          drift_report=""
+          for BRANCH in next-feat next-fix; do
+            if ! git rev-parse "origin/${BRANCH}" >/dev/null 2>&1; then
+              echo "::warning::origin/${BRANCH} does not exist yet — skipping drift check."
+              continue
+            fi
+            BEHIND=$(git rev-list --count "origin/${BRANCH}..origin/main")
+            AHEAD=$(git rev-list --count "origin/main..origin/${BRANCH}")
+            echo "${BRANCH}: behind=${BEHIND} ahead=${AHEAD}"
+            if [ "$BEHIND" -gt 0 ]; then
+              drift_report+="- \`${BRANCH}\` is **${BEHIND}** commits behind \`main\` (and ${AHEAD} ahead).\n"
+            fi
+          done
+          if [ -n "$drift_report" ]; then
+            {
+              echo "drift<<DRIFT_EOF"
+              printf '%b' "$drift_report"
+              echo "DRIFT_EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open / update drift-notice issue
+        if: steps.drift.outputs.drift != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DRIFT: ${{ steps.drift.outputs.drift }}
+        run: |
+          set -euo pipefail
+          BODY=$(cat <<EOF
+          Staging branches are behind \`main\`. Fast-forward them manually:
+
+          \`\`\`
+          git fetch origin
+          git push origin origin/main:next-feat origin/main:next-fix
+          \`\`\`
+
+          Current drift:
+
+          $DRIFT
+
+          Staging branches receive PRs (next-feat: topic additions, next-fix: bug fixes)
+          and are manually fast-forwarded from main — never auto-FF, so rebases stay possible.
+          EOF
+          )
+          TITLE="staging drift: main is ahead of next-feat/next-fix"
+          # Find an existing open drift issue authored by github-actions.
+          EXISTING=$(gh issue list -R "$REPO" \
+            --state open \
+            --search "in:title \"staging drift\" author:app/github-actions" \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" -R "$REPO" --body "$BODY"
+          else
+            gh issue create -R "$REPO" --title "$TITLE" --body "$BODY"
+          fi

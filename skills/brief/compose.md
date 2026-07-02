@@ -4,6 +4,22 @@
 
 The output of this skill must be **plain text** that can be pasted as-is into chat apps such as KakaoTalk, Slack, Teams, etc.
 
+### Length cap — 500 characters (HARD STOP)
+
+**A single brief message MUST NOT exceed 500 characters.** If the draft is longer, split the content **before** copying to the clipboard.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Copy a 564-char message to clipboard on the assumption that "a bit long, but fine" | Run length check BEFORE Set-Clipboard. >500 → split |
+| 2 | Cram template file refs / branch convention / AI tool tips all into one message | Keep the core ask in message 1 (≤500); secondary info → message 2 or `.txt` file |
+| 3 | Compress by removing line breaks to fit 500 | Line breaks aid readability. Split the content instead, do not collapse formatting |
+| 4 | Silently drop content to fit | Tell the user "split into N messages" and copy message 1 to clipboard; offer to copy message 2 next |
+
+**Split priorities** (when > 500):
+1. **Core ask** (what's wrong + what to do) → message 1 (≤500)
+2. **Reference info** (file paths, doc links, tool tips) → message 2 or omit
+3. **Long examples** (sample code, full template body) → `.txt` file, attach as link or paste-after-message
+
 ### Strictly Forbidden (Markdown Syntax)
 
 | Forbidden Syntax | Replacement |
@@ -59,9 +75,37 @@ Before output, always apply:
 - Remove trailing blank lines at the end of the file/message
 - Collapse 2+ consecutive blank lines into 1
 
-### Step 4. Output + Clipboard Copy
+### Step 3.5. Length Check + Split (MANDATORY before clipboard)
 
-1. Print the message as plain chat text (no code block)
+Run `.Length` on the trimmed draft. If `> 500`, split per the priority list above.
+
+```powershell
+if ($message.Length -gt 500) {
+  Write-Output "Draft is $($message.Length) chars (>500). Split required."
+  # Manually split into $message1 + $message2 per priority list
+  # Copy $message1 to clipboard; report split count + offer $message2 next
+} else {
+  Set-Clipboard -Value $message
+}
+```
+
+Do not bypass with "only slightly over" / "just one long line" — 500 is the hard cap.
+
+### Step 4. Output + Clipboard Copy (HARD STOP — both, in this order)
+
+**Text output to chat is the primary medium. Clipboard is a convenience copy.** Clipboards are volatile — the user may overwrite it before pasting — so the chat-rendered text is the authoritative record.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run `Set-Clipboard` and report "Copied (N chars)" without printing the message body to chat | Print the full message body to chat as plain text FIRST, then run `Set-Clipboard`, then report length |
+| 2 | Wrap the printed message in a code block (` ``` ` / triple-backtick) — even for "readability" / "preserves formatting" | Plain text only — code block changes meaning for some chat apps, may collapse/scroll, and obscures intended formatting. Some chat clients (e.g., KakaoTalk, cmux preview) hide code block content from quick scroll |
+| 3 | Print only the clipboard length and assume the user can paste from clipboard | Print the body even if length is short — the user needs a visible record after clipboard is overwritten |
+| 4 | Skip the chat print when re-iterating in later turns (wrap-up / status / summary / final-deliverable report / session-end message), referencing the message only as "Copied to clipboard" or "N chars copied" | Every clipboard mention = re-print the full body. Trigger words: "copied", "wrap-up", "status", "summary", "final", "session end" — any of these in a turn referencing the message MUST include the full body re-printed |
+| 5 | Assume "the user can scroll up to find the body" because it was printed once N turns ago | Clipboard outlives one turn; chat scroll buries the body after 5-10 turns. Re-print every time the body is referenced |
+
+**Procedure order**:
+
+1. Print the message as plain chat text (no code block) — **mandatory, first**
 2. Auto-copy to clipboard:
 
 ```powershell
