@@ -81,10 +81,35 @@ diagnose_metadata_version() {
 
 exit_code=0
 
+# Tracked-skill filter — mirrors check-hangul.py. Untracked local-only skills
+# (in-development, personal, or not yet published) are exempt from this
+# publish-time gate. See .claude/rules/release-please-scope.md.
+declare -A TRACKED_SET=()
+if tracked_out=$(git ls-files "$SKILLS_DIR" 2>/dev/null); then
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    # Strip the leading "$SKILLS_DIR/" prefix, then take the first path segment.
+    case "$line" in
+      "$SKILLS_DIR"/*) rel="${line#"$SKILLS_DIR"/}" ;;
+      *)               continue ;;
+    esac
+    head="${rel%%/*}"
+    [[ -n "$head" ]] && TRACKED_SET[$head]=1
+  done <<< "$tracked_out"
+fi
+filter_active=0
+[[ ${#TRACKED_SET[@]} -gt 0 ]] && filter_active=1
+
 for dir in "$SKILLS_DIR"/*/; do
   [[ -d "$dir" ]] || continue
   name=$(basename "$dir")
   skill_md="$dir/SKILL.md"
+
+  # Skip untracked skills when the filter is active. If git is unavailable or
+  # nothing is tracked (fresh repo), fall back to scanning everything.
+  if [[ $filter_active -eq 1 && -z "${TRACKED_SET[$name]:-}" ]]; then
+    continue
+  fi
 
   if [[ ! -f "$skill_md" ]]; then
     echo -e "${RED}✗${NC} $name — SKILL.md missing"

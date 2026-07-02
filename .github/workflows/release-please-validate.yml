@@ -42,18 +42,19 @@ jobs:
           fi
           echo "OK: bump-minor-pre-major = true"
 
-      - name: Verify bump-patch-for-minor-pre-major is true
+      - name: Verify bump-patch-for-minor-pre-major is false
         run: |
           set -euo pipefail
           VALUE=$(jq -r '."bump-patch-for-minor-pre-major" // "null"' release-please-config.json)
-          if [ "$VALUE" != "true" ]; then
+          if [ "$VALUE" != "false" ]; then
             cat <<EOF
-          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be true to keep pre-1.0 feat: bumps as patch (0.x.y -> 0.x.(y+1)) instead of minor (0.x+1.0). Note: fix: is already patch by default; this flag changes feat: behavior.
+          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be false so that pre-1.0 feat: bumps as minor (0.x.y -> 0.(x+1).0). This encodes the "new-topic = minor bump" policy: only feat commits (which land on the next-feat staging branch and represent a genuine skill topic addition) should raise the minor version. fix: remains patch by default.
           Current value: $VALUE
+          Docs: docs/generated/plan-skill-release-branch-split.md (Confirmed decision Axis 2)
           EOF
             exit 1
           fi
-          echo "OK: bump-patch-for-minor-pre-major = true"
+          echo "OK: bump-patch-for-minor-pre-major = false"
 
   validate-new-component-versions:
     name: new-component initial version guard
@@ -106,8 +107,9 @@ jobs:
 
           if [ "$FAIL" -ne 0 ]; then
             cat <<EOF
-          One or more new manifest entries violate the initial-version policy.
-          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록".
+          One or more new manifest entries violate the initial-version policy:
+          every newly registered component must start at 0.0.0 so release-please
+          issues the first release from the first conventional commit.
           EOF
             exit 1
           fi
@@ -173,7 +175,8 @@ jobs:
           Bumping commits found in this PR:
           $BUMP_COMMITS
 
-          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록" + "PR scope 외부 commit = bump cascade".
-          Reference incident: docs/generated/report-choco-1.0.0-overbump.md.
+          Policy: new components register at 0.0.0 in a non-bumping (chore) PR;
+          the first feat/fix lands in a separate PR so the fresh component is not
+          promoted by an unrelated squash subject (bump cascade).
           EOF
           exit 1
