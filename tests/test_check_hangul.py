@@ -6,6 +6,7 @@ package.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import sys
@@ -133,3 +134,54 @@ def test_default_argument_is_skills_dir():
     # Real repo skills/ tree should be clean (CI enforces this).
     assert result.returncode == 0
     assert "All skills clean" in result.stdout
+
+
+def test_scanner_ignores_poisoned_grep(tmp_path):
+    """Regression: the scanner must NOT depend on the ambient ``grep``.
+
+    The original bash implementation shelled out to ``grep -rP``, so a
+    ugrep-as-grep wrapper (or any grep that reports "no match") produced false
+    negatives — Korean text shipped to GitHub uncaught. The Python rewrite reads
+    files directly. Prepend a ``grep`` that always exits 1 ("no match") and
+    confirm Korean is still detected. If a future refactor reintroduces a grep
+    dependency, this test flips to a false-clean and fails.
+    """
+    tree = tmp_path / "tree"
+    dirty = tree / "skill-with-hangul"
+    dirty.mkdir(parents=True)
+    (dirty / "SKILL.md").write_text(f"# x\nKorean: {HANGUL_SAMPLE_1}\n", encoding="utf-8")
+
+    fake_bin = tmp_path / "fakebin"
+    fake_bin.mkdir()
+    fake_grep = fake_bin / "grep"
+    fake_grep.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")  # always "no match"
+    fake_grep.chmod(0o755)
+
+    env = dict(os.environ, PATH=f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
+    result = subprocess.run(
+        [sys.executable, str(PY_SCRIPT), str(tree)],
+        capture_output=True, text=True, encoding="utf-8", cwd=REPO_ROOT, env=env,
+    )
+    assert result.returncode == 1, result.stderr
+    assert "skill-with-hangul" in result.stdout
+    assert "BLOCKED" in result.stdout
+
+
+def test_max_matches_env_limits_printed_lines(tmp_path):
+    """MAX_MATCHES caps the matched lines printed per skill; the header count
+    (total Korean lines) is unaffected."""
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text(
+        "".join(f"Korean {HANGUL_SAMPLE_1} line {i}\n" for i in range(4)),
+        encoding="utf-8",
+    )
+    env = dict(os.environ, MAX_MATCHES="1")
+    result = subprocess.run(
+        [sys.executable, str(PY_SCRIPT), str(skill)],
+        capture_output=True, text=True, encoding="utf-8", cwd=REPO_ROOT, env=env,
+    )
+    assert result.returncode == 1
+    assert "4 Korean lines found" in result.stdout  # header counts all matches
+    printed = [ln for ln in result.stdout.splitlines() if "SKILL.md:" in ln]
+    assert len(printed) == 1  # but only MAX_MATCHES=1 line is printed
