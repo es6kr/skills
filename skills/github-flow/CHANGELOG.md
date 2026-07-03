@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.3](https://github.com/es6kr/skills/compare/github-flow-v0.4.2...github-flow-v0.4.3) (2026-07-03)
+
+
+### Bug Fixes
+
+* **github-flow:** update stale pr-review topic refs to pr after archive ([1e6c0ad](https://github.com/es6kr/skills/commit/1e6c0ad27fa75be13690343b32b3d05e9f4869a4))
+* **skills:** patch bundle — consolidate/next/fix/skill-kit/github-flow ([3cb90cb](https://github.com/es6kr/skills/commit/3cb90cb7601f619b63518860bebfb693d58a7633))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/github-flow-v0.4.1...github-flow-v0.4.2) (2026-06-25)
 
 

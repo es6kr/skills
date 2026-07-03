@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/es6kr/skills/compare/skill-kit-v0.4.0...skill-kit-v0.4.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **skill-kit:** add quality-method routing gate + release-please-aware version rule ([1a8e786](https://github.com/es6kr/skills/commit/1a8e7862d4096f02d8e7a2b049a359dee90d0a6e))
+* **skill-kit:** update parse_slash_calls comment to reflect consolidate pr topic ([fca143d](https://github.com/es6kr/skills/commit/fca143da79a70de3ec37f374d367b2d323a5759c))
+* **skills:** patch bundle — consolidate/next/fix/skill-kit/github-flow ([3cb90cb](https://github.com/es6kr/skills/commit/3cb90cb7601f619b63518860bebfb693d58a7633))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/skill-kit-v0.3.2...skill-kit-v0.4.0) (2026-06-19)
 
 
