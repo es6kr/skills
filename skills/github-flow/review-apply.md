@@ -107,7 +107,7 @@ gh pr checks <N>  # wait for CI to pass
 ## Relationship with consolidate
 
 ```text
-consolidate pr-review
+consolidate pr
   Step 4: classify (Actionable / Non-blocking)
   Step 6: immediate apply (with user approval)
   Step 7: post Summary + register deferred items into fix_plan

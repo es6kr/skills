@@ -4,6 +4,60 @@ Internal Code Review fallback when external AI review is insufficient (CodeRabbi
 
 Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Step 4.5.
 
+## Step 3.5.0: CodeRabbit CLI local pre-check (before superpowers fallback)
+
+When Step 3.5 trigger conditions match (CodeRabbit cloud walkthrough-only / cloud reviewer error / cloud reviewer unavailable), check **CodeRabbit CLI local** availability before falling through to the `superpowers:requesting-code-review` path. CodeRabbit CLI runs locally on the operator machine and bypasses cloud tier × repo-visibility limitations (full review even on PRIVATE+Free repos that the cloud GitHub App cannot serve detailed reviews on).
+
+**Why CLI first**: CodeRabbit cloud + CodeRabbit CLI share the same AI engine and finding format. CLI is the closest substitute when cloud is insufficient — using superpowers `code-reviewer` agent is a second-order fallback (generic reviewer, not CodeRabbit-trained). When the cloud limit is the trigger, the matching alternative is CLI; superpowers fallback applies when CLI is also unavailable.
+
+**CodeRabbit invocation-mode matrix** (self-contained — do not rely on external rule files):
+
+| Repo visibility | Cloud Free | Cloud Lite/Pro/Team | CLI local | superpowers code-reviewer |
+|-----------------|------------|---------------------|-----------|--------------------------|
+| PUBLIC | Walkthrough + line-by-line | Full (Pro+ adds advanced rules) | Full (CLI auth) | Full |
+| PRIVATE | **Walkthrough only / line-by-line blocked** | Full | Full (visibility-agnostic) | Full |
+| INTERNAL (Enterprise) | per org plan | Full | Full | Full |
+
+The PRIVATE+Free row is the primary trigger for this pre-check — yaml updates do not unlock line-by-line on this combination; only CLI/agent or plan upgrade does.
+
+**Pre-check procedure**:
+
+1. Probe CLI availability + auth:
+   ```bash
+   command -v coderabbit && coderabbit auth status 2>&1 | head -3
+   ```
+
+2. Branch on result:
+
+| Probe outcome | Action |
+|--------------|--------|
+| CLI installed + authenticated | Run `coderabbit review --agent -t all` in the worktree (from `pr.md` Step 2.7) → use findings as Internal Review body. Skip Step 3.5 superpowers fallback. Continue with Step 3.5 "Medium decision" + posting sub-steps |
+| CLI installed, not authenticated | AskUserQuestion: run `coderabbit auth login` (interactive) → after auth, retry probe. On user decline → fall through to Step 3.5 superpowers fallback |
+| CLI not installed | AskUserQuestion: install CodeRabbit CLI (https://www.coderabbit.ai/cli) → after install, retry probe. On user decline → fall through to Step 3.5 superpowers fallback |
+
+3. Reviewer matrix entry in Summary records the chosen path: `CodeRabbit CLI local (visibility/tier bypass)` when CLI succeeded, or `superpowers code-reviewer (CLI declined/unavailable)` on fall-through.
+
+**Don't / Do**:
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Jump directly to Step 3.5 superpowers fallback when cloud walkthrough-only triggered | Run the CLI probe first — CodeRabbit-trained > generic reviewer |
+| 2 | Assume CLI is unavailable without `command -v coderabbit` check | Run the actual probe command; do not infer from session state |
+| 3 | Install CLI silently or via assumed package manager | Offer install via AskUserQuestion — install + `coderabbit auth login` require user interaction |
+| 4 | Use CLI without `coderabbit auth status` check — silently fail on expired auth | Always run `auth status` after `command -v` succeeds; offer re-auth if expired |
+| 5 | Skip the pre-check when PR is on PUBLIC repo with Free plan (line-by-line works there) | Pre-check runs only when Step 3.5 trigger matches. PUBLIC+Free cloud already provides line-by-line — no fall-through needed in the first place |
+| 6 | Modify `.coderabbit.yaml` (cloud config) hoping to unlock CLI/agent capabilities | yaml is the cloud-config medium only. CLI/agent capabilities are mode-orthogonal — yaml has no effect on them |
+
+**Self-check (before falling through to Step 3.5 superpowers fallback)**:
+
+1. Did Step 3.5 trigger condition match (cloud walkthrough-only / unavailable / error)?
+2. Did you run `command -v coderabbit` and `coderabbit auth status` to determine actual CLI state (not inferred)?
+3. If CLI was uninstalled or unauthenticated, did you offer install/auth via AskUserQuestion before falling through?
+4. If CLI ran successfully, did you skip the superpowers fallback path and proceed to Step 3.5 "Medium decision" with CLI findings as the Internal Review body?
+5. Reviewer matrix line in Summary names the actual path chosen (CLI / superpowers fallback / declined)?
+
+---
+
 ## Step 3.5: Internal Review Fallback
 
 **Trigger conditions** (run fallback if any of these apply):

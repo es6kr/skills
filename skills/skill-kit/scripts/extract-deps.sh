@@ -120,7 +120,7 @@ parse_skill_calls() {
     | sort -u
 }
 
-# Parse body /name slash references (e.g., `/skill-kit upgrade`, `/consolidate pr-review`).
+# Parse body /name slash references (e.g., `/skill-kit upgrade`, `/consolidate pr`).
 # Requires a word boundary before the slash so paths like `org/repo` and shell
 # arguments like `--dir ~/work/repo` don't match. Then strips the leading slash.
 parse_slash_calls() {
