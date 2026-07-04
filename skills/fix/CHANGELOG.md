@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.5](https://github.com/es6kr/skills/compare/fix-v0.3.4...fix-v0.3.5) (2026-07-03)
+
+
+### Bug Fixes
+
+* **skills:** patch bundle — consolidate/next/fix/skill-kit/github-flow ([3cb90cb](https://github.com/es6kr/skills/commit/3cb90cb7601f619b63518860bebfb693d58a7633))
+
 ## [0.3.4](https://github.com/es6kr/skills/compare/fix-v0.3.3...fix-v0.3.4) (2026-06-30)
 
 
