@@ -162,6 +162,16 @@
         }
       ]
     },
+    "skills/forge": {
+      "package-name": "forge",
+      "component": "forge",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/git-repo": {
       "package-name": "git-repo",
       "component": "git-repo",

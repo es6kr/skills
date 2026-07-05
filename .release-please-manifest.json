@@ -10,6 +10,7 @@
   "skills/dotfile": "0.4.2",
   "skills/fix": "0.3.5",
   "skills/fix-plan": "0.3.1",
+  "skills/forge": "0.0.0",
   "skills/git-repo": "0.4.2",
   "skills/github-flow": "0.4.3",
   "skills/harness": "0.1.0",
