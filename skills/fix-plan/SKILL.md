@@ -62,6 +62,7 @@ fix-plan (schema + lifecycle)
 | Option | Default | Description |
 |--------|---------|-------------|
 | `archive-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for **default invocation** (no args). When set, the caller routes the source's `## Completed` section to this receiver for external archiving (weekly report, postmortem log, RAG store, etc.). Receiver harvests + appends to its own report + removes harvested lines from source. Set via `--archive=<skill>:<topic>` CLI flag. See "Default invocation" below |
+| `completed-archive-period` | `monthly` | Period for the **receiver-independent local archive** of the `## Completed` section — `monthly` (`YYYY-MM`) or `weekly` (ISO `YYYY-Www`). On the period boundary, older Completed entries move to `<tracker-dir>/.bak/<tracker-stem>-completed-<period>.md` and are removed from the tracker, keeping the live file small. Set via `--completed-archive-period=weekly\|monthly`. See [move.md](./move.md) "Completed-section size management" |
 | `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing — set via the `--rag=<skill>:<topic>` CLI flag on the `move` topic (see [move.md](./move.md)). No env var or config file is consumed by this skill; the caller routes |
 | `task-tracker` | `fix_plan.md` | Tracker filename. Use `checklist.md` for non-Ralph workspaces |
 
@@ -176,6 +177,17 @@ Plan Drafts are **always** `[BLOCKED:P*:selfable]`, never `[ ]` — `[ ]` would 
 ### Move to Completed
 
 After `[x]` checked, summarize to one line + move to Completed section. See [move.md](./move.md).
+
+### Archive Completed periodically (keep the tracker small)
+
+On a period boundary, move older `## Completed` entries to a local partition file so the tracker never bloats:
+
+```
+<tracker-dir>/.bak/<tracker-stem>-completed-YYYY-MM.md     # monthly (default)
+<tracker-dir>/.bak/<tracker-stem>-completed-YYYY-Www.md    # weekly (--completed-archive-period=weekly)
+```
+
+Receiver-independent (no external receiver needed). Entries before the current period move out; the current period stays. See [move.md](./move.md) "Completed-section size management".
 
 ### Sync GitHub state
 
