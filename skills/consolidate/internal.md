@@ -1,14 +1,23 @@
 # Internal Review Fallback + UI Capture Verification
 
-Internal Code Review fallback when external AI review is insufficient (CodeRabbit Free walkthrough only, Copilot failure) + UI change PR capture attachment verification.
+Internal Code Review fallback when external AI review is insufficient — CodeRabbit walkthrough-only (e.g., PRIVATE+Free) or Copilot failure — + UI change PR capture attachment verification.
 
 Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Step 4.5.
 
-## Step 3.5.0: CodeRabbit CLI local pre-check (before superpowers fallback)
+## Step 3.5.0: Internal-review engine selection (superpowers default; CLI = bot-review substitute only)
 
-When Step 3.5 trigger conditions match (CodeRabbit cloud walkthrough-only / cloud reviewer error / cloud reviewer unavailable), check **CodeRabbit CLI local** availability before falling through to the `superpowers:requesting-code-review` path. CodeRabbit CLI runs locally on the operator machine and bypasses cloud tier × repo-visibility limitations (full review even on PRIVATE+Free repos that the cloud GitHub App cannot serve detailed reviews on).
+**The Internal Review engine is `superpowers:requesting-code-review` (code-reviewer agent) by DEFAULT.** CodeRabbit CLI local is NOT an internal-review engine — it is a **bot-review-layer substitute**, used only when the bot layer produced nothing: **no CodeRabbit cloud review evidence on the PR AND Copilot unavailable/failed**. (User policy — see failed-attempts.md "0-findings".)
 
-**Why CLI first**: CodeRabbit cloud + CodeRabbit CLI share the same AI engine and finding format. CLI is the closest substitute when cloud is insufficient — using superpowers `code-reviewer` agent is a second-order fallback (generic reviewer, not CodeRabbit-trained). When the cloud limit is the trigger, the matching alternative is CLI; superpowers fallback applies when CLI is also unavailable.
+**Two engine layers (do not mix)**:
+
+| Layer | Engines | Purpose |
+|-------|---------|---------|
+| **Bot review layer** | CodeRabbit cloud, Copilot; **CodeRabbit CLI local as substitute when BOTH are unavailable** | External AI bot findings |
+| **Internal review layer** (Step 3.5) | **superpowers code-reviewer agent — always** | Second **independent** perspective (different engine from the bot layer) |
+
+**Why superpowers is the internal default**: CodeRabbit cloud + CodeRabbit CLI share the same AI engine. When any CodeRabbit review evidence already exists on the PR (walkthrough, prior CLI run), running CLI again duplicates the same engine and adds zero independent perspective — the internal review's purpose. The CLI's tier/visibility bypass matters only when the bot layer is empty.
+
+**Engine-duplication gate (HARD STOP — before running ANY review engine)**: enumerate engines that already produced review evidence on this PR (cloud walkthrough/summary comment, Copilot review, a prior CLI run recorded in the existing Internal Review comment or session tracker). Running an engine that already reviewed this PR = duplicate → **forbidden without an explicit user ask**.
 
 **CodeRabbit invocation-mode matrix** (self-contained — do not rely on external rule files):
 
@@ -18,50 +27,57 @@ When Step 3.5 trigger conditions match (CodeRabbit cloud walkthrough-only / clou
 | PRIVATE | **Walkthrough only / line-by-line blocked** | Full | Full (visibility-agnostic) | Full |
 | INTERNAL (Enterprise) | per org plan | Full | Full | Full |
 
-The PRIVATE+Free row is the primary trigger for this pre-check — yaml updates do not unlock line-by-line on this combination; only CLI/agent or plan upgrade does.
+The PRIVATE+Free row explains why cloud output may be walkthrough-only — but that alone does NOT route to CLI. Cloud walkthrough evidence = the CodeRabbit engine already reviewed → the internal review runs on **superpowers** (different engine). yaml updates do not unlock line-by-line on PRIVATE+Free; only plan upgrade does.
 
-**Pre-check procedure**:
+**CLI-substitute procedure (ONLY when bot layer is empty — no cloud CodeRabbit evidence AND Copilot unavailable)**:
 
-1. Probe CLI availability + auth:
+1. Confirm the bot layer is empty:
+   ```bash
+   # CodeRabbit cloud evidence (walkthrough / summarize / zero-findings verdict)
+   gh api repos/{owner}/{repo}/issues/{N}/comments \
+     --jq '[.[] | select(.user.login | test("coderabbit"; "i"))] | length'
+   # Copilot availability: pr.md Step 2.4 result
+   ```
+   Cloud evidence ≥1 OR Copilot available → **skip CLI entirely**; internal review = superpowers (Step 3.5).
+
+2. Bot layer empty → probe CLI availability + auth:
    ```bash
    command -v coderabbit && coderabbit auth status 2>&1 | head -3
    ```
 
-2. Branch on result:
-
 | Probe outcome | Action |
 |--------------|--------|
-| CLI installed + authenticated | Run `coderabbit review --agent -t all` in the worktree (from `pr.md` Step 2.7) → use findings as Internal Review body. Skip Step 3.5 superpowers fallback. Continue with Step 3.5 "Medium decision" + posting sub-steps |
-| CLI installed, not authenticated | AskUserQuestion: run `coderabbit auth login` (interactive) → after auth, retry probe. On user decline → fall through to Step 3.5 superpowers fallback |
-| CLI not installed | AskUserQuestion: install CodeRabbit CLI (https://www.coderabbit.ai/cli) → after install, retry probe. On user decline → fall through to Step 3.5 superpowers fallback |
+| CLI installed + authenticated | Run `coderabbit review --agent -t all` in the worktree (from `pr.md` Step 2.7) → CLI output fills the **bot layer** (record as such in the reviewer matrix). The internal review (Step 3.5, superpowers) still runs on top |
+| CLI installed, not authenticated | AskUserQuestion: run `coderabbit auth login` (interactive) → after auth, retry probe. On user decline → bot layer stays empty; proceed with superpowers internal review only |
+| CLI not installed | AskUserQuestion: install CodeRabbit CLI (https://www.coderabbit.ai/cli) → after install, retry probe. On user decline → bot layer stays empty; proceed with superpowers internal review only |
 
-3. Reviewer matrix entry in Summary records the chosen path: `CodeRabbit CLI local (visibility/tier bypass)` when CLI succeeded, or `superpowers code-reviewer (CLI declined/unavailable)` on fall-through.
+3. Reviewer matrix entry in Summary records the layers separately: bot layer (`CodeRabbit cloud` / `Copilot` / `CodeRabbit CLI local (substitute — bot layer empty)` / `none`) + internal layer (`superpowers code-reviewer`).
 
 **Don't / Do**:
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Jump directly to Step 3.5 superpowers fallback when cloud walkthrough-only triggered | Run the CLI probe first — CodeRabbit-trained > generic reviewer |
-| 2 | Assume CLI is unavailable without `command -v coderabbit` check | Run the actual probe command; do not infer from session state |
-| 3 | Install CLI silently or via assumed package manager | Offer install via AskUserQuestion — install + `coderabbit auth login` require user interaction |
-| 4 | Use CLI without `coderabbit auth status` check — silently fail on expired auth | Always run `auth status` after `command -v` succeeds; offer re-auth if expired |
-| 5 | Skip the pre-check when PR is on PUBLIC repo with Free plan (line-by-line works there) | Pre-check runs only when Step 3.5 trigger matches. PUBLIC+Free cloud already provides line-by-line — no fall-through needed in the first place |
+| 1 | Run CodeRabbit CLI as the internal-review engine when cloud walkthrough-only triggered | Internal review = superpowers code-reviewer (default, always). CLI is a bot-layer substitute only when cloud evidence is absent AND Copilot is unavailable |
+| 2 | Run an engine that already produced review evidence on this PR (cloud walkthrough exists → run CLI; prior CLI run exists → run CLI again) | Engine-duplication gate: same engine twice = zero added perspective. Ask the user explicitly before any duplicate-engine run |
+| 3 | PATCH an existing Internal Review comment without Reading its current body first | Read the existing body. If it carries an accepted agent-based review, the replacement must supersede it with equal-or-greater verification depth — never overwrite it with tool-status output |
+| 4 | Use tool status lines (`findings: 0`) as the Internal Review body | The body must show what was verified and how (per-hunk verification notes). A zero-findings tool run is evidence, not a review |
+| 5 | Install CLI silently, or use CLI without `coderabbit auth status` check | Offer install/re-auth via AskUserQuestion — install + `coderabbit auth login` require user interaction |
 | 6 | Modify `.coderabbit.yaml` (cloud config) hoping to unlock CLI/agent capabilities | yaml is the cloud-config medium only. CLI/agent capabilities are mode-orthogonal — yaml has no effect on them |
 
-**Self-check (before falling through to Step 3.5 superpowers fallback)**:
+**Self-check (before dispatching any review engine in Step 3.5)**:
 
-1. Did Step 3.5 trigger condition match (cloud walkthrough-only / unavailable / error)?
-2. Did you run `command -v coderabbit` and `coderabbit auth status` to determine actual CLI state (not inferred)?
-3. If CLI was uninstalled or unauthenticated, did you offer install/auth via AskUserQuestion before falling through?
-4. If CLI ran successfully, did you skip the superpowers fallback path and proceed to Step 3.5 "Medium decision" with CLI findings as the Internal Review body?
-5. Reviewer matrix line in Summary names the actual path chosen (CLI / superpowers fallback / declined)?
+1. Which engines already reviewed this PR? (cloud comments, Copilot reviews, prior CLI runs in the existing Internal Review comment / session tracker) — enumerate before choosing
+2. Is the candidate engine a duplicate of an existing one? → If yes, STOP — explicit user ask required
+3. Is the bot layer empty (no cloud evidence AND Copilot unavailable)? → Only then is CLI a legitimate substitute; otherwise internal review = superpowers only
+4. Before PATCHing an existing Internal Review comment, did you Read its current body and confirm the new body supersedes (not degrades) it?
+5. Reviewer matrix line in Summary names both layers (bot layer engines + internal layer superpowers)?
 
 ---
 
 ## Step 3.5: Internal Review Fallback
 
 **Trigger conditions** (run fallback if any of these apply):
-- **CodeRabbit is walkthrough only** (Free plan — provides only summary without line-by-line review)
+- **CodeRabbit is walkthrough only** (line-by-line blocked — e.g., PRIVATE+Free per the invocation-mode matrix above; note PUBLIC+Free does provide line-by-line, so it does not trigger this fallback)
 - **Reviewer failure/error** — review is impossible such as Copilot "encountered an error"
 - **Copilot subscription unavailable** — `pr.md` Step 2.4 availability pre-check returned not-available (free account / no org seat / 404 on `/user/copilot_billing` and `/orgs/<org>/copilot/billing`). **This is the auto-fallback path — no AskUserQuestion required.** Record the substitution in the Summary's reviewer matrix (e.g., "Copilot unavailable on the acting account/org — auto-fallback per Step 2.4")
 
@@ -86,7 +102,7 @@ Two gates: Step 5 (User Decision ask) and Step 7 (Summary post). Both forbid ent
 
 Before posting **either** the Step 5 AskUserQuestion **or** the Step 7 `## AI Review Summary`, run the following self-check:
 
-1. Was the state CodeRabbit walkthrough only (Free plan) or reviewer error? → If Yes, Step 3.5 trigger is satisfied
+1. Was the state CodeRabbit walkthrough only (line-by-line blocked — e.g., PRIVATE+Free), a reviewer error, or Copilot subscription unavailable (Step 2.4 auto-fallback)? → If Yes, Step 3.5 trigger is satisfied
 2. If trigger was satisfied, was a `## Internal Code Review` comment posted on the GitHub PR? → `gh api .../issues/{N}/comments | jq '.[] | select(.body | startswith("## Internal Code Review"))'`
 3. If the comment is absent → **forbid entering Step 5 or Step 7**. Return to the Step 3.5 procedure and post the comment first
 4. Does the comment body contain dual-label findings (Type | Severity) or their equivalent?
@@ -141,6 +157,19 @@ If `--interactive` is off, proceed directly to the medium-decided POST (determin
 ## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
 ```
 Do not write `code-reviewer` as plain text; use the link format above.
+
+#### Caller-supplied custom title contract (HARD STOP)
+
+When the consolidate caller passes a custom title for this review (e.g. args "rename Internal Review → Code Review" / "title it Superpowers Review"), the retitle applies **only to this Code Review comment's heading text** — the `— [requesting-code-review](...)` link suffix stays. The retitle does **NOT** merge this comment into the Summary, and does **NOT** change the separate AI Review Summary (Step 7) title.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Fold the retitle into a single "<CustomTitle> Summary" comment combining Code Review + Summary | Two separate comments always (see "Review comment ≠ AI Review Summary"). Retitle only this Code Review comment's heading |
+| 2 | Put "Summary" / "AI Review Summary" in this comment's title because the custom title sounds summary-like | **Forbid the token "Summary" in this comment's heading** — "Summary" belongs to the separate Step 7 comment only. Heading = `## <CustomTitle> — [requesting-code-review](...)` (e.g. `## Code Review — [requesting-code-review](...)`) |
+| 3 | Drop the `[requesting-code-review](...)` link when applying the custom title | Keep the link suffix — it pairs with the Summary's `receiving-code-review` link |
+| 4 | Apply the caller's retitle to the Step 7 Summary heading too | Summary keeps `## AI Review Summary — [receiving-code-review](...)`. The retitle is scoped to this Code Review comment |
+
+**Self-check (when a caller custom title is supplied)**: ① two comments, not one? ② this comment's heading = `## <CustomTitle> — [requesting-code-review](...)` with NO "Summary" token? ③ Summary heading unchanged (`## AI Review Summary — [receiving-code-review](...)`)?
 
 #### 🌐 Verify repository default language before posting (MANDATORY)
 
@@ -209,7 +238,7 @@ If unmet, **immediately return to Step 3.5.3** and post via the decided medium. 
 - "Classification is clear, so skip posting the comment" reasoning
 - "User will respond anyway, so post later" reasoning
 
-### Review comment ≠ AI Review Summary (HARD STOP — 5 recurrences 2026-05-22)
+### Review comment ≠ AI Review Summary (HARD STOP — 6 recurrences, latest 2026-06-26)
 
 The Internal Review is a Copilot substitute (detailed findings); the Summary is the overall reviewer consolidation (table). **Always post as 2 separate posts** — the Internal Review medium follows the "Medium decision" table above (review POST when inline targets exist / issue comment otherwise), while the Summary's medium (issue comment vs Formal Review body) is decided by `post.md` Step 7. The "single combined post" pattern (Internal Review inlined into the Summary body) is deprecated.
 
@@ -226,6 +255,8 @@ The Internal Review is a Copilot substitute (detailed findings); the Summary is 
 | 1 | "Internal fallback is the sole source, so inline-merge into the Summary" reasoning | Post the Internal Review first → then post the Summary separately. Keep media separated |
 | 2 | At Step 5 ask time, show review content only via chat text | Post the Internal Review on the GitHub PR right before Step 5 ask — its URL may be included in the ask option description |
 | 3 | Step 4 → Step 5 direct jump (Step 3.5.3 posting omitted) | Strictly follow the order: Step 3.5.3 posting → Step 4 classification → Step 5 ask |
+| 4 | A caller "retitle Internal Review → X" instruction → produce one "X Summary" comment merging Code Review + Summary (2026-06-26 6th recurrence — collect→post topic skip; internal.md never read) | Caller retitle scopes to the Code Review comment heading ONLY (see "Caller-supplied custom title contract"). Still two comments. "Summary" token forbidden in the Code Review heading |
+| 5 | Reach post.md (Summary) without having read internal.md → never see this 2-comment rule | Follow the consolidate step order: read internal.md (Step 3.5) **before** post.md (Step 7). post.md Step 7 also hard-gates on the Code Review comment pre-existing |
 
 ### Reviewer failure detection
 

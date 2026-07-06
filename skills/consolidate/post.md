@@ -29,6 +29,20 @@ If `--interactive` is off, proceed directly to medium decision + POST (determini
 
 Plain `## AI Review Summary` is forbidden. The link form above is required.
 
+**Caller retitle does NOT touch this Summary title (HARD STOP)**: a caller "rename the review → X" instruction scopes to the **Code Review comment** (Step 3.5.3 / `internal.md` "Caller-supplied custom title contract") — NEVER this Summary. The Summary heading stays `## AI Review Summary — [receiving-code-review](...)`. The two comments must not share the "Summary" token: the Code Review comment's heading must contain **no** "Summary" (e.g. `## Code Review — [requesting-code-review](...)`), this Summary comment owns "Summary" exclusively.
+
+### Pre-Summary gate — Code Review comment MUST already exist (HARD STOP — visible even if internal.md was skipped)
+
+**Before posting this Summary, a Code Review comment (Step 3.5.3, `requesting-code-review` link — under whatever title, default `## Internal Code Review` or a caller custom title like `## Code Review`) MUST already exist on the PR.** This gate is restated here in post.md (not only in internal.md) so that skipping the internal.md topic does not also skip the 2-comment invariant.
+
+```bash
+gh api repos/{owner}/{repo}/issues/{N}/comments \
+  --jq '[.[] | select(.body | test("requesting-code-review"))] | length'
+```
+
+- Result `0` → **STOP. Do not post the Summary.** Return to Step 3.5 (internal.md) and post the Code Review comment first. Posting the Summary alone (or merging both into one comment) is the documented 6-recurrence violation ("Review comment ≠ AI Review Summary").
+- Result `≥1` → the paired Code Review comment exists; proceed with the Summary post (chronologically after it).
+
 ### Step 3.5.3 review comment ↔ Step 7 Summary paired pattern
 
 - Step 3.5.3 = Internal Code Review (`internal.md` `### Post/update review comment` section: `## Internal Code Review — [requesting-code-review](...)`) — code-reviewer subagent findings
@@ -107,7 +121,7 @@ When the current user is **not a requested reviewer** but the **author ≠ me** 
 |-----------|-------|---------------|
 | Critical findings exist (after Step 4 classification) | `REQUEST_CHANGES` | Auto-POST (no ask) — Critical = merge blocker, peer review's duty is to surface it |
 | Non-Mergeable (CONFLICTING/UNKNOWN) OR CI failing OR Test Plan unchecked items > 0 | `COMMENT` | Auto-POST (no ask) — APPROVE is technically impossible while merge gates are open; COMMENT records the review without a merge-enabling verdict |
-| Critical = 0 AND Mergeable AND CI pass AND Test Plan all checked (or N/A) | **APPROVE candidate → ask** | `AskUserQuestion`: `APPROVE` / `COMMENT only` / `Skip Formal Review (issue comment fallback)` — Important/Minor findings do NOT block the APPROVE candidate (Important = "Should fix, does not block merge" per Severity definition) |
+| Critical = 0 AND Mergeable AND CI pass AND Test Plan all checked (or N/A) | **APPROVE candidate → ask** | `AskUserQuestion` (question text MUST identify the PR: `PR #<N> (<owner>/<repo>)` + URL): `APPROVE` / `COMMENT only` / `Skip Formal Review (issue comment fallback)` — Important/Minor findings do NOT block the APPROVE candidate (Important = "Should fix, does not block merge" per Severity definition) |
 
 **Why event auto-decide for non-APPROVE cases**: a peer reviewer's "what verdict to issue" decision is determined by the codebase state, not by user preference. Critical present = REQUEST_CHANGES is the only correct verdict; APPROVE under Critical = lying to GitHub merge gates. Conversely, "would APPROVE but Mergeable/CI/Test Plan blocks it" = COMMENT (record the review without falsely enabling merge). Only the APPROVE-candidate case is a user decision (the user may reserve APPROVE judgment).
 
@@ -282,7 +296,9 @@ Only include reviewers that actually posted reviews on this PR, and only include
 
 **The findings table MUST include a `Source` (or `Reviewer`) column attributing every row to the exact reviewer login it came from** — coderabbitai, copilot, @human-login (e.g., @reviewer-login), Internal Code Review, etc. Composing a findings table with only `# | Severity | Type | Location | Summary` columns strips the audit trail and conflates findings from multiple reviewers into an anonymous pool.
 
-**Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
+**Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and **real** PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
+
+**Finding/item-number references — the inverse direction (HARD STOP)**: bare `#N` is autolink-correct **only for a real PR/issue reference**. A finding **item number** — a reference to a row of the findings table or to a reviewer's numbered comment, e.g. a narrative line like `Notable: #2 and #3 sit inside the CI workflows` — is NOT a PR/issue reference. Written bare, GitHub autolinks it to the unrelated PR/issue of that number **in the same repo**, creating a permanent false timeline backref that comment editing cannot remove. Wrap every finding/item number in backticks (`` `#2` ``, `` `#14/#15` ``) or reword to a non-`#` form (`finding 2`, `row 2`). This applies everywhere in the Summary body — the findings table cells, the `Notable`/conclusion narrative, and any inline prose — not just the Source column. Direction summary: **real PR/issue/SHA/@mention → bare (autolink ON); finding/item number → backtick (autolink OFF)**.
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -292,6 +308,7 @@ Only include reviewers that actually posted reviews on this PR, and only include
 | 4 | Merge two findings from different sources into one row "to deduplicate" | Keep one row per (source × finding). If two reviewers raised the same finding, write two rows with the same `Location` + `Summary` but distinct `Source`. Deduplication belongs in the chat narrative, not in the table |
 | 5 | Wrap @mentions / SHAs / URLs in backticks in the Source cell or anywhere in the Summary body (e.g., `` `@octocat` ``, `` `de59590` ``, `` `https://...` ``) | Write them bare so GitHub autolinks fire: `@octocat`, `de59590`, `https://github.com/...`. Bot logins (coderabbitai, copilot) are bot identifiers, not human mentions — write them bare without the `@` prefix |
 | 6 | Append role/qualifier parentheses to the Source cell (e.g., `@octocat (MEMBER review)`, `@octocat (OWNER)`) | The `@id` already identifies the reviewer — no role qualifier needed. Source cell carries only the bare identifier: `@octocat`, `coderabbitai`, `Internal Code Review` |
+| 7 | Reference a finding by bare `#N` in the `Notable`/conclusion narrative or any cell (e.g., `Notable: #2 and #3`, `#14/#15 correctly flag ...`) — autolinks to the unrelated PR/issue #N in the repo (permanent false backref) | Backtick every finding/item number: `` `#2` ``, `` `#14/#15` ``, or reword to `finding 2` / `row 2`. Only a **real** PR/issue reference stays bare |
 
 **Self-check (every time before POSTing the Summary)**:
 
@@ -301,6 +318,7 @@ Only include reviewers that actually posted reviews on this PR, and only include
 4. Is every row's `Source` cell populated with the exact reviewer login (not blank, not "AI", not "external")?
 5. If a finding was raised by two reviewers independently, are both rows present?
 6. Scan the entire body — does any `@username`, 7+ hex SHA, or full URL sit inside backticks? If yes, unwrap to bare so GitHub autolink fires (per the `git.md` autolink rule)
+7. Scan the entire body for bare `#[0-9]+` (grep `#[0-9]` sitting outside backticks — the `Notable`/conclusion narrative is the usual offender). For each match decide: **real** PR/issue reference (keep bare, autolink desired) or finding/item number (wrap in backticks / reword — autolink must be suppressed)? A bare finding number silently autolinks to the wrong PR/issue in the repo
 
 ## 7-A. Issue comment Summary (when unified POST does NOT apply)
 
