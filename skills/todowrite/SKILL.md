@@ -4,7 +4,7 @@ metadata:
   author: es6kr
   version: "0.1.0"
 depends-on: [wip]
-description: Route TODO checklists to the right storage. session - in-session tracking via /wip, file - persistent TODO (fix_plan.md, TODO.md), issue - team-shared via GitHub Issues. "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue" triggers.
+description: Route TODO checklists to the right storage. session - in-session tracking via /wip, file - persistent TODO (fix_plan.md, TODO.md), issue - team-shared via GitHub Issues, priority-prefix - encode task priority + execution order via subject prefix when TaskUpdate has no priority field. "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue", "task priority", "prefix ordering" triggers.
 ---
 
 # TodoWrite
@@ -27,6 +27,7 @@ New TODO arrives
 | session | TaskCreate/TodoWrite | Session | → `/wip` skill |
 | file | fix_plan.md, TODO.md | While file exists | Write/Edit |
 | issue | GitHub Issues | Permanent | `gh issue create` |
+| priority-prefix | — | Always-on | [priority-prefix.md](./priority-prefix.md) |
 
 ## Session → /wip
 
