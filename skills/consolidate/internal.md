@@ -1,6 +1,6 @@
 # Internal Review Fallback + UI Capture Verification
 
-Internal Code Review fallback when external AI review is insufficient (CodeRabbit Free walkthrough only, Copilot failure) + UI change PR capture attachment verification.
+Internal Code Review fallback when external AI review is insufficient (CodeRabbit walkthrough-only — e.g., PRIVATE+Free, Copilot failure) + UI change PR capture attachment verification.
 
 Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Step 4.5.
 
@@ -61,7 +61,7 @@ The PRIVATE+Free row is the primary trigger for this pre-check — yaml updates 
 ## Step 3.5: Internal Review Fallback
 
 **Trigger conditions** (run fallback if any of these apply):
-- **CodeRabbit is walkthrough only** (Free plan — provides only summary without line-by-line review)
+- **CodeRabbit is walkthrough only** (line-by-line blocked — e.g., PRIVATE+Free per the invocation-mode matrix above; note PUBLIC+Free does provide line-by-line, so it does not trigger this fallback)
 - **Reviewer failure/error** — review is impossible such as Copilot "encountered an error"
 - **Copilot subscription unavailable** — `pr.md` Step 2.4 availability pre-check returned not-available (free account / no org seat / 404 on `/user/copilot_billing` and `/orgs/<org>/copilot/billing`). **This is the auto-fallback path — no AskUserQuestion required.** Record the substitution in the Summary's reviewer matrix (e.g., "Copilot unavailable on the acting account/org — auto-fallback per Step 2.4")
 
@@ -86,7 +86,7 @@ Two gates: Step 5 (User Decision ask) and Step 7 (Summary post). Both forbid ent
 
 Before posting **either** the Step 5 AskUserQuestion **or** the Step 7 `## AI Review Summary`, run the following self-check:
 
-1. Was the state CodeRabbit walkthrough only (Free plan) or reviewer error? → If Yes, Step 3.5 trigger is satisfied
+1. Was the state CodeRabbit walkthrough only (line-by-line blocked — e.g., PRIVATE+Free) or reviewer error? → If Yes, Step 3.5 trigger is satisfied
 2. If trigger was satisfied, was a `## Internal Code Review` comment posted on the GitHub PR? → `gh api .../issues/{N}/comments | jq '.[] | select(.body | startswith("## Internal Code Review"))'`
 3. If the comment is absent → **forbid entering Step 5 or Step 7**. Return to the Step 3.5 procedure and post the comment first
 4. Does the comment body contain dual-label findings (Type | Severity) or their equivalent?
