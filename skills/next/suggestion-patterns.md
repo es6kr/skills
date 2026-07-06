@@ -164,7 +164,7 @@ options: [
 **When AI Review Summary is not posted + first-review case** (multiSelect: false):
 ```typescript
 options: [
-  { label: "Wait for CI → consolidate (Recommended)", description: "After CI passes, run /consolidate pr-review <N>. Test Plan verification comes after consolidate" },
+  { label: "Wait for CI → consolidate (Recommended)", description: "After CI passes, run /consolidate pr <N>. Test Plan verification comes after consolidate" },
   { label: "Wait for CI only", description: "Decide next action after CI result" },
 ]
 ```
@@ -217,7 +217,7 @@ Then map to a branch:
 **Branch: Both reviewers complete** (multiSelect: false):
 ```typescript
 options: [
-  { label: "Call consolidate pr-review immediately (Recommended)", description: "/consolidate pr-review <N> — CodeRabbit walkthrough ✅ + Copilot review ✅ both present" },
+  { label: "Call consolidate pr immediately (Recommended)", description: "/consolidate pr <N> — CodeRabbit walkthrough ✅ + Copilot review ✅ both present" },
   { label: "Internal Review first", description: "Self-review via superpowers:code-reviewer → then consolidate" },
   { label: "Hold", description: "Push additional commits and wait for re-review" },
 ]
@@ -228,22 +228,22 @@ options: [
 **Sub-branch A: Copilot registration available** (org `active >= 1` and `management != "disabled"`) (multiSelect: false):
 ```typescript
 options: [
-  { label: "Request Copilot review and wait (Recommended)", description: "gh pr edit <N> --add-reviewer copilot-pull-request-reviewer → wait for Copilot review → then /consolidate pr-review <N>. Aligned with consolidate/pr.md Step 2.5 sequential Copilot policy" },
-  { label: "Skip Copilot — consolidate with CodeRabbit only", description: "/consolidate pr-review <N> — Internal Review fallback covers Copilot's domain. Faster but loses Copilot's inline suggestions" },
+  { label: "Request Copilot review and wait (Recommended)", description: "gh pr edit <N> --add-reviewer copilot-pull-request-reviewer → wait for Copilot review → then /consolidate pr <N>. Aligned with consolidate/pr.md Step 2.5 sequential Copilot policy" },
+  { label: "Skip Copilot — consolidate with CodeRabbit only", description: "/consolidate pr <N> — Internal Review fallback covers Copilot's domain. Faster but loses Copilot's inline suggestions" },
   { label: "Hold", description: "Decide later" },
 ]
 ```
 
 **Sub-branch B: Copilot registration unavailable** (org `active: 0`, `management: "disabled"`, or `Not Found`) — **NO ask** (only one option is actually executable, so do not ask):
-- Self-decide on `/consolidate pr-review <N>` immediately (CodeRabbit only with Internal Review fallback)
+- Self-decide on `/consolidate pr <N>` immediately (CodeRabbit only with Internal Review fallback)
 - Briefly report: "Copilot registration unavailable for this org (verified via `gh api orgs/<org>/copilot/billing`); proceeding with CodeRabbit-only consolidate."
 - Do not present the "Request Copilot review" option — it cannot execute and asking wastes a user turn
 
 **Branch: Copilot pending** (multiSelect: false):
 ```typescript
 options: [
-  { label: "Register task and wait for Copilot (Recommended)", description: "TaskCreate \"Run /consolidate pr-review <N> after Copilot review arrives\" — call when notified" },
-  { label: "Skip Copilot — consolidate with CodeRabbit only", description: "/consolidate pr-review <N> now, ignore pending Copilot" },
+  { label: "Register task and wait for Copilot (Recommended)", description: "TaskCreate \"Run /consolidate pr <N> after Copilot review arrives\" — call when notified" },
+  { label: "Skip Copilot — consolidate with CodeRabbit only", description: "/consolidate pr <N> now, ignore pending Copilot" },
   { label: "Hold", description: "Decide later" },
 ]
 ```
@@ -251,7 +251,7 @@ options: [
 **Branch: Walkthrough rate limited / pending** (multiSelect: false):
 ```typescript
 options: [
-  { label: "Register task and move on (Recommended)", description: "TaskCreate \"Run /consolidate pr-review <N> after CodeRabbit review arrives\" — call when notified" },
+  { label: "Register task and move on (Recommended)", description: "TaskCreate \"Run /consolidate pr <N> after CodeRabbit review arrives\" — call when notified" },
   { label: "Manual trigger and wait", description: "Force trigger with @coderabbitai review comment and wait for walkthrough arrival" },
   { label: "Skip consolidate (skip-review)", description: "Apply coderabbit:ignore label → proceed with Internal Review only" },
 ]
@@ -405,13 +405,13 @@ AskUserQuestion({
 
 ## After PR consolidate (after AI Review Summary is posted)
 
-**Precondition**: Completed `consolidate/pr-review.md` through Step 7 (Internal Review + AI Review Summary posted).
+**Precondition**: Completed `consolidate/pr.md` workflow through Step 7 (Internal Review + AI Review Summary posted; Step 7 body is in `consolidate/post.md`).
 
 **Authorship gate (HARD STOP — check FIRST)**: merge options below apply **only when the PR is authored by the current account**. `gh pr view <N> --json author` → if author ≠ current account, you are a reviewer on someone else's PR: **omit all merge options** (merging is the author's domain — branch ownership). Offer review-scoped options only (relay deferred findings to author / hold / done — review complete). Do not present "Squash merge" or "Apply minor then merge" on another's branch.
 
 **Merge option guard** (`block-merge-without-review.sh` pass-through conditions):
 - Description must include "AI Review Summary posted (\<URL\>)" or "AI Review Summary ✅"
-- Or replace with a non-merge option such as "consolidate pr-review first"
+- Or replace with a non-merge option such as "consolidate pr first"
 
 **When all 4 merge conditions are met** (multiSelect: false):
 ```typescript

@@ -329,3 +329,53 @@ TodoWrite([
 
 - Skip if the compact summary contains no in-progress work
 - Skip if the user chooses "Start fresh"
+
+### Step C. Start priority decision (only after Step A/B are complete)
+
+From the tasks whose direction was resolved to "proceed" in Step A, confirm the start priority via AskUserQuestion.
+
+### Step D. Task decomposition — pulling unfinished fix_plan items into session tasks (MANDATORY)
+
+**fix_plan.md is the "work source"** — the place where what needs to be done is recorded. On `/wip`, pull the `[ ]` unfinished items from fix_plan into **session tasks to track execution**.
+
+**Key distinctions**:
+- `[ ]` unfinished items (can proceed autonomously) → **execution task** (deploy, code change, verification, etc.)
+- `[ ] [BLOCKED]` items (waiting for external response/permission) → **do not create a task**. Leave in fix_plan.md as-is; promote to a task when the trigger (reply/permission) arrives
+- `[x]` completed items → **cleanup task** (move to Completed) — do not create only this type
+
+**Media separation principle (HARD STOP)**:
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Register a `[BLOCKED]` item via TaskCreate | Leave it in the fix_plan.md on-hold section; do not create a task |
+| 2 | Double-register a BLOCKED item as a task under the logic "must be in a task to remember it" | fix_plan.md is reloaded every session so nothing is forgotten. Duplicate media = sync burden |
+| 3 | Use `[BLOCKED]` as a task subject prefix (e.g., `"[BLOCKED] xxx waiting for reply"`) | Place in fix_plan.md `## On Hold` section as `- [ ] [BLOCKED] xxx (waiting for reply, trigger: ...)` |
+| 4 | Report a waiting-for-external-reply task as "BLOCKED as-is" on every /wip | It is not in the task list, so it is not a reporting target. Promote to a task from fix_plan when the reply arrives |
+
+**Procedure**:
+1. **Temporarily remove held tasks**: if the existing TaskList contains held/waiting tasks, remove them as `deleted` first
+2. Read the target section and extract all `[ ]` unfinished items
+3. Register each `[ ]` item via TaskCreate (include the issue/PR number + the actual action to be done in the subject) — **execution tasks are registered first so they appear at the top of the list**
+4. If `[x]` completed items need to be moved to Completed, bundle them into **one task** (not individual tasks per item)
+5. **Recreate held tasks**: re-create via TaskCreate the held tasks removed in Step 1 — they will appear at the bottom of the list
+6. If there are dependencies, connect them with `addBlockedBy`
+7. After registration is complete, start the first task with `in_progress`
+
+**Ordering principle**: execution tasks (what to do now) appear **before (at the top of)** held tasks. Since TaskCreate appends to the end, process in this order: delete held tasks → register execution tasks → recreate held tasks.
+
+**Forbidden patterns (2nd recurrence — HARD STOP)**:
+- Creating only "review/move" tasks for `[x]` items and not pulling `[ ]` unfinished work into tasks
+- Only editing fix_plan without tracking the actual work via session tasks
+- Working only in fix_plan without calling TaskCreate — "don't just play around in fix_plan; bring it into tasks"
+
+**Correct example** — `/wip #283 nested`:
+```
+# [ ] unfinished → execution task
+TaskCreate("#306 dev-36 E2E spec mismatch fix — decide option a/b/c + execute")
+TaskCreate("deps-prov #18: apply to int/prod environments (#20, #21)")
+TaskCreate("deps-prov #18: code cleanup (PR #17 remainder)")
+TaskCreate("#284 k3s CI/CD migration — start research")
+
+# [x] done → cleanup task (bundle into 1)
+TaskCreate("fix_plan: move completed items to Completed")
+```
