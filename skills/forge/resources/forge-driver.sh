@@ -76,3 +76,33 @@ pr_create() {
       ;;
   esac
 }
+
+# issue_create <title> <body>
+issue_create() {
+  local title="$1" body="$2"
+  case "$(forge_detect)" in
+    github) _run gh issue create --title "$title" --body "$body" ;;
+    gitlab) _run glab issue create --title "$title" --description "$body" ;;
+    gitea)  _run tea issue create --title "$title" --description "$body" ;;
+  esac
+}
+
+# issue_edit <ref> <body>
+issue_edit() {
+  local ref="$1" body="$2"
+  case "$(forge_detect)" in
+    github) _run gh issue edit "$ref" --body "$body" ;;
+    gitlab) _run glab issue update "$ref" --description "$body" ;;
+    gitea)  echo "# gitea:issue_edit boundary (tea/API — Phase 2 follow-up)" ;;
+  esac
+}
+
+# pr_merge <ref> <squash|merge|rebase>
+pr_merge() {
+  local ref="$1" strategy="${2:-squash}"
+  case "$(forge_detect)" in
+    github) _run gh pr merge "$ref" "--$strategy" ;;
+    gitlab) _run glab mr merge "$ref" "--$strategy" ;;
+    gitea)  echo "# gitea:pr_merge boundary (tea/API — Phase 2 follow-up)" ;;
+  esac
+}

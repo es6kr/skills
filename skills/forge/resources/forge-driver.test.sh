@@ -53,5 +53,33 @@ assert_eq "pr_create github draft" \
   "gh pr create --base main --head feat --title T --body B --draft" \
   "$(FORGE_OVERRIDE=github DRY_RUN=1 pr_create main feat T B draft)"
 
+# --- issue_create <title> <body> ---
+assert_eq "issue_create github" "gh issue create --title T --body B" \
+  "$(FORGE_OVERRIDE=github DRY_RUN=1 issue_create T B)"
+assert_eq "issue_create gitlab" "glab issue create --title T --description B" \
+  "$(FORGE_OVERRIDE=gitlab DRY_RUN=1 issue_create T B)"
+assert_eq "issue_create gitea" "tea issue create --title T --description B" \
+  "$(FORGE_OVERRIDE=gitea DRY_RUN=1 issue_create T B)"
+
+# --- issue_edit <ref> <body> ---
+assert_eq "issue_edit github" "gh issue edit R1 --body B" \
+  "$(FORGE_OVERRIDE=github DRY_RUN=1 issue_edit R1 B)"
+assert_eq "issue_edit gitlab" "glab issue update R1 --description B" \
+  "$(FORGE_OVERRIDE=gitlab DRY_RUN=1 issue_edit R1 B)"
+assert_eq "issue_edit gitea boundary" "# gitea:issue_edit boundary (tea/API — Phase 2 follow-up)" \
+  "$(FORGE_OVERRIDE=gitea DRY_RUN=1 issue_edit R1 B)"
+
+# --- pr_merge <ref> <squash|merge|rebase> ---
+assert_eq "pr_merge github squash" "gh pr merge R1 --squash" \
+  "$(FORGE_OVERRIDE=github DRY_RUN=1 pr_merge R1 squash)"
+assert_eq "pr_merge github merge" "gh pr merge R1 --merge" \
+  "$(FORGE_OVERRIDE=github DRY_RUN=1 pr_merge R1 merge)"
+assert_eq "pr_merge gitlab squash" "glab mr merge R1 --squash" \
+  "$(FORGE_OVERRIDE=gitlab DRY_RUN=1 pr_merge R1 squash)"
+
+# --- Gitea boundary (GitLab-first decision: gitea via tea/API is a follow-up) ---
+assert_eq "pr_merge gitea boundary" "# gitea:pr_merge boundary (tea/API — Phase 2 follow-up)" \
+  "$(FORGE_OVERRIDE=gitea DRY_RUN=1 pr_merge R1 squash)"
+
 if [ "$fail" -eq 0 ]; then echo "PASS: all forge-driver assertions"; else echo "FAILURES present"; fi
 exit $fail
