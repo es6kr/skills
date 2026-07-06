@@ -29,7 +29,7 @@ Failing any filter → route to other medium per the table below:
 | Project-bounded policy | workspace CLAUDE.md / `.claude/rules/` |
 | "Recommended" / "would be nice" | drop (rules enforce, not suggest) |
 | Deterministic + automatable | hook (rule is fallback only) |
-| **Wrong factual claim inside a curated wiki (Wiki-LLM) that Claude cites** | **Wiki-LLM medium** — edit `pages/**/*.md` + `log.md` `page-update` + commit. Bidirectional: fix Step 1 recurrence pre-check should also Grep the wiki for pattern re-emergence before authoring the correction |
+| **Wrong factual claim inside a curated wiki (Wiki-LLM) that Claude cites** | **Wiki-LLM medium** — edit `<workspace>/wiki/pages/**/*.md` + `<workspace>/wiki/log.md` `page-update` + commit. Bidirectional: fix Step 1 recurrence pre-check should also Grep the wiki for pattern re-emergence before authoring the correction |
 
 Zero Edit/Write **on the rule file** is allowed when memory + skill/hook is the chosen medium. Step 2 is complete when the chosen medium received its deliverable.
 
@@ -55,7 +55,7 @@ Priority (check in order — **stop at the first match**):
 | 3rd | **Rule** (`~/.agents/rules/`, `.claude/rules/`) | 3rd+ recurrence + 4-filter gate ALL pass | Add to existing rule section |
 | 4th | **Sub-agent / CLAUDE.md** (`.claude/agents/*.md`, project root) | Policy bound to a specific context (agent/project) | Add to agent description / project CLAUDE.md |
 | 5th | **Hook** (`settings.json` hooks) | 4th+ recurrence + deterministic pattern (grep/regex-judgeable) | Add PreToolUse/PostToolUse hook |
-| **Parallel (any stage)** | **Wiki-LLM / project domain knowledge store** (`<workspace>/wiki/pages/**`, RAG index, curated docs) | Wrong / oversimplified / outdated **domain claim** cited by wiki pages that Claude uses during Query. Not behavior — factual correctness of stored knowledge | Edit `pages/**/*.md` (correction) + amend `raw/*.md` frontmatter (source note) + add `log.md` `page-update` entry + commit. If a Lint procedure exists in `wiki/CLAUDE.md`, also propose a Lint rule strengthening |
+| **Parallel (any stage)** | **Wiki-LLM / project domain knowledge store** (`<workspace>/wiki/pages/**`, RAG index, curated docs) | Wrong / oversimplified / outdated **domain claim** cited by wiki pages that Claude uses during Query. Not behavior — factual correctness of stored knowledge | Edit `<workspace>/wiki/pages/**/*.md` (correction) + amend `<workspace>/wiki/raw/*.md` frontmatter (source note) + add `<workspace>/wiki/log.md` `page-update` entry + commit. If a Lint procedure exists in `<workspace>/wiki/CLAUDE.md`, also propose a Lint rule strengthening |
 
 **Why Rule is not 1st**: a rule consumes always-on token cost continuously. Adding a rule for every mistake inflates the context until you can no longer follow the rules themselves — a paradox. memory (feedback) costs 0 tokens + is reachable via search — the natural medium for 1st-2nd-recurrence learning. Rules are reserved for permanent protection patterns that passed the 4-filter gate.
 
