@@ -12,7 +12,7 @@ Review a PR's code changes and post structured review comments.
 
 This topic covers **human-initiated code review** — reading diffs, analyzing code quality, and posting findings.
 
-For **AI bot review consolidation** (CodeRabbit, Copilot) → use `/consolidate pr-review`.
+For **AI bot review consolidation** (CodeRabbit, Copilot) → use `/consolidate pr`.
 
 ## Procedure
 

@@ -1,5 +1,39 @@
 # Suggestion Patterns
 
+## Cross-cutting rule — Minor-or-below severity bundling across PRs (HARD STOP)
+
+**When composing next-action options after a PR is consolidated / merged, do NOT recommend addressing that PR's Minor/Nitpick deferred findings as a standalone follow-up (single-PR batch).** Minor-or-below severity findings should be bundled across related PRs, not surfaced per-PR.
+
+**Why**: Minor/Nitpick findings are documentation/style/rationale-class concerns whose cost of single-PR churn (branch + PR + review cycle × N) exceeds the value. Aggregating multiple PRs' Minor findings amortizes the review cycle over a larger batch. Applying per-PR to Minor findings pressures the user into micro-batches that they explicitly want to defer for cross-PR aggregation.
+
+**Applies to**: All "After PR" sections below (After PR fix commit push, After PR creation, After PR consolidate, After session wrap-up when a PR just merged).
+
+**Severity classification** (aligned with `consolidate/classify.md`):
+
+| Severity | Handling in next-action options |
+|----------|--------------------------------|
+| 🔴 Critical | Per-PR immediate action (block merge until resolved) |
+| 🟡 Important | Per-PR immediate action (recommended to resolve before merge) |
+| 🟢 **Minor** | **Cross-PR bundle** (aggregate across related PRs' deferred findings) |
+| ⚪ **Nitpick** | **Cross-PR bundle** (same as Minor) |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compose option "Address PR #\<N\> Minor #x/y/z follow-ups" as a next-action after a PR merge / consolidate | Omit single-PR Minor-only options. If Minor bundling is desired, offer "Bundle Minor findings across related PRs (fix_plan sweep)" with no specific PR in the label |
+| 2 | Batch 3-4 Minor findings from a single PR into a "quick documentation batch" as Recommended | Verify at least 2 related PRs' Minor findings exist. If only 1 PR has deferred Minor → defer to a later bundle round-up, not immediate action |
+| 3 | Interpret "close scope" (docs across sibling skills within one PR) as a reason to group per-PR Minors | Scope closeness within a single PR's Minors is not the bundling criterion. Cross-PR aggregation is |
+| 4 | Treat Important/Critical findings the same way (bundle across PRs) | Important/Critical = per-PR immediate action. Only Minor/Nitpick = cross-PR bundle |
+| 5 | Use per-PR Minor batch as a filler option to reach 4 slots | Better to have 3 diverse options than 4 with one violating this rule. Or find a genuinely diverse 4th (helper skill, broader task, verification-only) |
+
+### Self-check (every time before composing after-PR next-action options)
+
+1. Do any of the options mention "Minor" or "Nitpick" from a specific PR (by number)? → If yes, remove the single-PR Minor option
+2. If Minor bundling is a candidate, does it reference cross-PR aggregation (fix_plan sweep, `[DEFERRED] [REVIEW_FEEDBACK]` grep across all recent PRs)? → If no, rewrite
+3. Are Important/Critical findings from the current PR still surfaced as per-PR immediate action? → They should be (this rule affects only Minor/Nitpick)
+4. If only 1 PR has deferred Minor findings and no bundle exists yet, is the Minor option omitted entirely? → It should be. The candidate goes into fix_plan and waits for the next PR's Minor findings
+
 ## After code writing/modification
 
 ```typescript

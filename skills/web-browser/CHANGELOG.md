@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/es6kr/skills/compare/web-browser-v0.2.1...web-browser-v0.2.2) (2026-06-30)
+
+
+### Bug Fixes
+
+* **skills:** add procedural guards + standardize description scalar ([#66](https://github.com/es6kr/skills/issues/66)) ([fcc921f](https://github.com/es6kr/skills/commit/fcc921fba3928aad7421ecff888d5dcee5ae5655))
+
 ## [0.2.1](https://github.com/es6kr/skills/compare/web-browser-v0.2.0...web-browser-v0.2.1) (2026-06-19)
 
 

@@ -106,6 +106,14 @@ When the upgrade introduces content describing **external systems the skill does
 | "~/.claude/plugins/ is separated to avoid marketplace cache races" | separation rationale | AskUserQuestion: OS binary incompatibility / cache race / other |
 | "Bootstrap script lives in ~/.agents/ root" | script ownership | AskUserQuestion: script location and owner |
 
+## Quality-method routing (before Workflow step 1)
+
+Improving a skill's *content* is this topic's job; verifying the improvement
+*works* may need an external method. Same routing table as writer.md Step 0.5:
+quantitative output quality or trigger accuracy → `skill-creator`; behavioral
+compliance under pressure → `superpowers:writing-skills`; structure/lifecycle
+only → continue here. Skip silently if the routed skill is unavailable.
+
 ## Workflow
 
 ### 1. Identify Target Skill
@@ -142,26 +150,28 @@ AskUserQuestion {
 
 **Forbidden**: Immediately fixing upon discovery. Must only modify items selected after AskUserQuestion.
 
-### 3-1. Version Change Rule ⚠️ Required
+### 3-1. Version Change Rule ⚠️ Required (release-please owned)
 
-**Version bump rules** — note: Step 3's AskUserQuestion requirement always applies to **content modifications** before any version bump is considered. This rule governs the **version-bump act itself**, not the content edits that precede it.
+**When the skill's repo has release automation (a `release-please-config.json` / `.release-please-manifest.json` at the repo root, or equivalent semantic-release setup), version bumps are owned by that automation — NEVER edit the frontmatter `version:` field manually.**
 
-- **Patch** (0.1.1 → 0.1.2): the version-bump act may proceed without an additional AskUserQuestion (the Step 3 ask already approved the content change). Applies to topic content reinforcement, bug fixes, frontmatter tweaks.
-- **Minor** (0.1.x → 0.2.0): **AskUserQuestion required for the bump act** — new topic, feature change. The Step 3 ask covers the content; this second ask confirms the publish-worthy classification.
-- **Major** (0.x → 1.0): **AskUserQuestion required for the bump act** — compatibility break.
-- Local-only changes (not intended for publish) may keep the existing version regardless of change size.
+- The bump class is decided by the **conventional commit type**, not by a frontmatter edit:
+  - `fix(<skill>):` → patch (topic content reinforcement, bug fixes, sub-step additions)
+  - `feat(<skill>):` → minor (new top-level topic, feature)
+  - The release PR updates the manifest AND `SKILL.md` (via `extra-files` generic updater) — a manual frontmatter bump conflicts with or is overwritten by that flow
+- Your job in this step is therefore **commit-type selection**, not version editing. Verify with the repo's commit-type matrix (e.g., a `skills-publishing`-style project rule) when unsure whether a change is a topic addition (feat) or a sub-step reinforcement (fix)
+- Check for automation before deciding: `ls "$(git rev-parse --show-toplevel)/release-please-config.json"` from the skill directory
 
-**HARD STOP enforcement mechanism**:
+**Repos WITHOUT release automation (manual fallback)**:
 
-1. **Before any Edit call that modifies the frontmatter `version:` field, self-ask**: "Is this change a new topic addition / feature change / compatibility break?" — If yes, run `AskUserQuestion` first
-2. **Performing a Minor/Major bump without `AskUserQuestion` = this step incomplete** — if the user discovers it, re-enter Step 4 to revert and re-ask
-3. **Forbidden thinking: "new topic added = auto 0.1.x → 0.2.0"** — a new topic is one instance of minor, but the bump requires **explicit publish intent from the user**. Local-only changes keep the version
-4. **Default recommendation = "keep"** — unless the user explicitly says "I'm going to publish", keep the version
-5. **`AskUserQuestion` option format** (Recommended marker):
-   - `Keep version (no publish planned) (Recommended)` — default
-   - `Patch (0.1.x → 0.1.x+1)` — reinforcement / fix
-   - `Minor (0.1.x → 0.2.0)` — new topic / feature
-   - `Decide at publish time` — defer the decision
+- Patch: may proceed without an extra AskUserQuestion (the Step 3 ask already approved the content)
+- Minor/Major: **AskUserQuestion required for the bump act** — new topic / compatibility break needs explicit publish intent
+- Local-only changes keep the existing version regardless of size; default recommendation = "keep" unless the user states publish intent
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Edit frontmatter `version:` in a repo where release-please/semantic-release owns bumps | Pick the correct conventional commit type; let the release PR bump manifest + SKILL.md |
+| 2 | Treat the frontmatter version as the release source of truth | The manifest (`.release-please-manifest.json`) is authoritative; frontmatter may lag until the next release PR |
+| 3 | Skip the automation check because "it's just a patch" | Run the repo-root config check before any version-related decision |
 
 ### 3-2. Do & Don't Table Format (Recommended)
 

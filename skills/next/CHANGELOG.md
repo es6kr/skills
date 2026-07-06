@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.4](https://github.com/es6kr/skills/compare/next-v0.4.3...next-v0.4.4) (2026-07-03)
+
+
+### Bug Fixes
+
+* **skills:** patch bundle — consolidate/next/fix/skill-kit/github-flow ([3cb90cb](https://github.com/es6kr/skills/commit/3cb90cb7601f619b63518860bebfb693d58a7633))
+
+## [0.4.3](https://github.com/es6kr/skills/compare/next-v0.4.2...next-v0.4.3) (2026-06-30)
+
+
+### Bug Fixes
+
+* **skills:** add procedural guards + standardize description scalar ([#66](https://github.com/es6kr/skills/issues/66)) ([fcc921f](https://github.com/es6kr/skills/commit/fcc921fba3928aad7421ecff888d5dcee5ae5655))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/next-v0.4.1...next-v0.4.2) (2026-06-19)
 
 
