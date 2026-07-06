@@ -51,6 +51,8 @@ The AI review handling flow is procedure:
 1. Are you a requested reviewer? (`gh pr view --json reviewRequests`) → If Yes, ask Axis B only. If No, skip Step 5 → Step 7
 2. Are you building an Axis A option? → Don't. Proceed automatically to Step 7
 3. If a "Fix actionable items" or "Whether to post the Summary" option appears = violation
+5. Does the ask question text identify the subject PR (`PR #<N> (<owner>/<repo>)` + URL)? Nickname-only subject = violation
+4. **Is `AskUserQuestion` actually callable in this context?** If it errors "not enabled" / you are headless (`claude -p` / Ralph) → do NOT re-pose Axis B as text. Apply the severity default (Critical → REQUEST_CHANGES, else COMMENT only — never auto-APPROVE) and continue to Step 7 (see "AskUserQuestion unavailable → deterministic Formal Review default")
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -69,11 +71,13 @@ GH_TOKEN="$(gh auth token --user <account>)" \
 # Match against current `gh auth status` active account
 ```
 
+**Subject identification (HARD STOP)**: every Axis B / review-event ask MUST identify the subject PR explicitly — `PR #<N> (<owner>/<repo>)` plus the PR URL (the `PR #<N>` prefix form is also what ID-guard hooks accept — `<owner>/<repo>#<N>` alone is rejected) — in the question text. A session often carries multiple open PRs; a nickname-only subject ("the bundle PR", "this PR") makes the verdict ambiguous. When a guard hook rejects `#N` tokens, prefix them (`PR #N`) — never drop the identifier.
+
 If the current account appears in `reviewRequests`, present the Axis B ask (the only ask in Step 5 — Axis A has been removed per the HARD STOP above):
 
 ```javascript
 AskUserQuestion({
-  question: "Formal Review action (you are a requested reviewer)?",
+  question: "[PR #<N> (<owner>/<repo>) — <PR URL>] Formal Review action (you are a requested reviewer)?",
   options: [
     { label: "APPROVE", description: "Findings clean / Critical 0 / merge OK" },
     { label: "REQUEST_CHANGES", description: "Critical findings exist — block merge" },
@@ -92,7 +96,7 @@ AskUserQuestion({
 ```javascript
 // When AI Review Summary verdict = merge-recommendation
 AskUserQuestion({
-  question: "Formal Review action (Summary verdict = merge recommendation — Skip not allowed)?",
+  question: "[PR #<N> (<owner>/<repo>) — <PR URL>] Formal Review action (Summary verdict = merge recommendation — Skip not allowed)?",
   options: [
     { label: "APPROVE", description: "Findings clean / Critical 0 / merge OK — default for merge-recommendation verdict" },
     { label: "REQUEST_CHANGES", description: "Re-evaluation: Critical findings actually exist — block merge" },
@@ -103,13 +107,34 @@ AskUserQuestion({
 
 If the Summary verdict is non-merge (Critical findings exist, Test Plan incomplete, CI failing), keep all 4 options including Skip.
 
+#### AskUserQuestion unavailable → deterministic Formal Review default (HARD STOP)
+
+**When `AskUserQuestion` cannot be called — autonomous mode (`claude -p` / Ralph) OR the tool is disabled in the current context (returns "not enabled in this context") — do NOT stop and re-pose the Axis B question as plain chat text.** A text question is the forbidden medium (see `ask-user` guards) AND it stalls the workflow when a deterministic default already exists. Instead, **auto-apply the Formal Review default from the finding severity** and continue to Step 7:
+
+| Highest finding severity | Auto-applied Formal Review event | Reason |
+|--------------------------|----------------------------------|--------|
+| 🔴 Critical present (≥1) | **REQUEST_CHANGES** | Critical blocks merge — an autonomous reviewer must block, not pass |
+| No Critical (Important/Minor/clean) | **COMMENT only** | Post the review body without a merge-gating verdict. An autonomous reviewer must **never** self-grant APPROVE |
+
+**Never auto-APPROVE.** APPROVE grants merge authority and is a human decision; an autonomous/headless reviewer downgrades the merge-recommendation default (which would be APPROVE in interactive mode) to **COMMENT only**. The human merges (or explicitly APPROVEs later) at their discretion.
+
+Detection of unavailability: the `AskUserQuestion` call errors with "No such tool" / "not enabled in this context", OR the environment is headless (`claude -p` / Ralph `.ralph/` workspace). On any of these → skip the ask, compute the default from the table above, record the auto-applied event + reason in chat, and proceed to Step 7. The Summary's medium follows the auto-applied event exactly as if the user had chosen it.
+
+### Combined Don't / Do — Axis B (requested reviewer + tool-unavailable fallback)
+
+Rows 1-3 cover the tool-unavailable fallback; rows 4-8 cover the general Axis B requested-reviewer scenario.
+
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Post issue comment Summary and end, when you are a requested reviewer | Axis B is mandatory when you are a requested reviewer — answer Axis B before entering Step 6/7 |
-| 2 | Assume "Summary comment counts as APPROVE" | Issue comment ≠ Formal Review. GitHub merge gates check the `reviews` array, not issue comments |
-| 3 | Skip Axis B because findings are clean | Clean findings + requested reviewer = APPROVE (default), still requires the explicit POST |
-| 4 | Present Skip option when Summary verdict is merge-recommendation | Remove Skip option for merge-recommendation verdicts. Skip + merge-OK verdict = contradiction (reviewDecision unresolved) |
-| 5 | Post Summary verdict = "🟢 merge OK" but answer Axis B as Skip | Summary verdict and Formal Review action must align — merge-recommendation Summary mandates APPROVE/REQUEST_CHANGES/COMMENT |
+| 1 | `AskUserQuestion` errors "not enabled" → re-pose Axis B as a plain-text question and stop, waiting for the user | Tool unavailable → auto-apply the severity default (Critical → REQUEST_CHANGES, else COMMENT only) → continue to Step 7 in the same turn |
+| 2 | Auto-apply APPROVE because the verdict was merge-recommendation and the tool is unavailable | Autonomous reviewers never self-APPROVE. Merge-recommendation + no-Critical + tool-unavailable = **COMMENT only** (the human grants APPROVE) |
+| 3 | Treat "AskUserQuestion unavailable" as a hard blocker that ends the consolidate run | It is a fallback branch, not a blocker. The deterministic default keeps the run going |
+| 4 | Post issue comment Summary and end, when you are a requested reviewer | Axis B is mandatory when you are a requested reviewer — answer Axis B before entering Step 6/7 |
+| 5 | Assume "Summary comment counts as APPROVE" | Issue comment ≠ Formal Review. GitHub merge gates check the `reviews` array, not issue comments |
+| 6 | Skip Axis B because findings are clean | Clean findings + requested reviewer = APPROVE (default), still requires the explicit POST |
+| 7 | Present Skip option when Summary verdict is merge-recommendation | Remove Skip option for merge-recommendation verdicts. Skip + merge-OK verdict = contradiction (reviewDecision unresolved) |
+| 8 | Post Summary verdict = "🟢 merge OK" but answer Axis B as Skip | Summary verdict and Formal Review action must align — merge-recommendation Summary mandates APPROVE/REQUEST_CHANGES/COMMENT |
+| 9 | Ask with a nickname-only subject ("the bundle PR", "this PR") when the session has 1+ other open PRs | Question text opens with `[PR #<N> (<owner>/<repo>) — <URL>]` — the subject binding is part of the ask, not inferable context |
 
 ### Step 5 AskUserQuestion option drift forbidden
 
