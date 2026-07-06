@@ -1,0 +1,169 @@
+name: branch-tag-adjudication
+
+# Guards the next-feat / next-fix staging branches: every commit in a PR
+# targeting these branches must obey the tag/branch policy below.
+#
+# Policy summary:
+# - next-feat: feat commits allowed. fix / chore commits allowed ONLY when the
+#   same PR also contains a feat commit touching the same skill.
+# - next-fix: fix commits allowed. chore commits allowed ONLY when the same PR
+#   also contains a fix commit touching the same skill. feat is always REJECTED.
+# - Any commit touching skills/**/*.md with tag chore or docs is REJECTED —
+#   skill md changes must use fix: (or feat: when accompanied by a new topic
+#   file). Skill md = behaviour surface, not documentation.
+# - New-topic gate (advisory): a commit tagged feat that touches a skill dir
+#   should also add a new *.md file (A-status). Enforced downstream by the
+#   release-please split-policy already in release-please-validate.yml.
+
+on:
+  pull_request:
+    branches:
+      - next-feat
+      - next-fix
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  adjudicate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: echo "base=$BASE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Adjudicate each commit
+        env:
+          BASE_REF: ${{ steps.base.outputs.base }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          FAIL=0
+
+          # Extract conventional commit tag from a subject line.
+          # Recognised: feat / fix / perf / refactor / docs / chore / ci / test / style
+          # Anything else (or no tag prefix) becomes "other".
+          get_tag() {
+            printf '%s' "$1" \
+              | grep -oE '^(feat|fix|perf|refactor|docs|chore|ci|test|style)(\([^)]+\))?!?:' \
+              | grep -oE '^[a-z]+' \
+              || echo "other"
+          }
+
+          # We collect two things per commit:
+          # 1. SKILL_TAGS[sha__skill] = tag   (one entry per (commit, skill) pair)
+          # 2. PR_SKILL_HAS[skill__tag] = 1   (aggregated across the whole PR)
+          declare -A SKILL_TAGS
+          declare -A PR_SKILL_HAS
+
+          COMMITS=$(git log --format='%H' "$BASE_SHA..$HEAD_SHA")
+          if [ -z "$COMMITS" ]; then
+            echo "No commits in range — nothing to adjudicate."
+            exit 0
+          fi
+
+          for SHA in $COMMITS; do
+            SUBJECT=$(git log -1 --format='%s' "$SHA")
+            TAG=$(get_tag "$SUBJECT")
+
+            # Determine which skills this commit touches (skills/<name>/…).
+            SKILLS=$(git show --name-only --format='' "$SHA" \
+              | grep -oE '^skills/[^/]+' \
+              | sort -u \
+              || true)
+            if [ -z "$SKILLS" ]; then
+              # Commit touches only non-skill paths (root files, .github/, docs/,
+              # etc.). These do NOT trigger release-please skill bumps, so they
+              # pass without further checks regardless of branch.
+              continue
+            fi
+
+            for SKILL in $SKILLS; do
+              # Skill md guard: any md file under skills/<name>/ diffed by a
+              # chore/docs commit is rejected. Skill md = behaviour surface.
+              MD_TOUCHED=$(git show --name-only --format='' "$SHA" \
+                | grep -E "^${SKILL}/.*\.md$" \
+                || true)
+              if [ -n "$MD_TOUCHED" ] && { [ "$TAG" = "chore" ] || [ "$TAG" = "docs" ]; }; then
+                echo "::error::Commit $SHA touches skill md files with tag '$TAG'. Skill md is behaviour surface — changes must use 'fix:' or 'feat:'. Files:"
+                printf '  - %s\n' $MD_TOUCHED
+                FAIL=1
+              fi
+
+              SKILL_TAGS["${SHA}__${SKILL}"]="$TAG"
+              PR_SKILL_HAS["${SKILL}__${TAG}"]=1
+            done
+          done
+
+          # Second pass: enforce per-branch policy with same-skill exceptions.
+          for KEY in "${!SKILL_TAGS[@]}"; do
+            SHA="${KEY%%__*}"
+            SKILL="${KEY#*__}"
+            TAG="${SKILL_TAGS[$KEY]}"
+
+            case "$BASE_REF" in
+              next-feat)
+                case "$TAG" in
+                  feat)
+                    # Always OK — this is the intended tag for this branch.
+                    ;;
+                  fix|chore)
+                    # Allowed only when the same PR contains a feat commit for
+                    # the same skill (i.e. we are shipping a topic addition and
+                    # a fix/chore comes as a natural rider).
+                    if [ "${PR_SKILL_HAS[${SKILL}__feat]:-0}" != "1" ]; then
+                      echo "::error::next-feat branch: commit $SHA (skill=$SKILL, tag=$TAG) rejected. Same-skill feat commit not present in this PR."
+                      FAIL=1
+                    fi
+                    ;;
+                  *)
+                    echo "::error::next-feat branch: unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: feat (primary), fix/chore (as rider when feat present)."
+                    FAIL=1
+                    ;;
+                esac
+                ;;
+              next-fix)
+                case "$TAG" in
+                  fix)
+                    # Always OK.
+                    ;;
+                  chore)
+                    if [ "${PR_SKILL_HAS[${SKILL}__fix]:-0}" != "1" ]; then
+                      echo "::error::next-fix branch: commit $SHA (skill=$SKILL, tag=$TAG) rejected. Same-skill fix commit not present in this PR."
+                      FAIL=1
+                    fi
+                    ;;
+                  feat)
+                    echo "::error::next-fix branch: feat is not allowed. Move commit $SHA (skill=$SKILL) to a next-feat PR."
+                    FAIL=1
+                    ;;
+                  *)
+                    echo "::error::next-fix branch: unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: fix (primary), chore (as rider when fix present)."
+                    FAIL=1
+                    ;;
+                esac
+                ;;
+              *)
+                echo "::warning::branch-tag-adjudication triggered for unexpected base '$BASE_REF' — skipping."
+                ;;
+            esac
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            cat <<EOF
+          ::error::One or more commits violate the staging-branch tag policy.
+          Policy summary: next-feat accepts feat (fix/chore only as same-skill riders);
+          next-fix accepts fix (chore only as a same-skill rider; feat never);
+          skill md changes must be tagged fix: or feat: on either branch.
+          EOF
+            exit 1
+          fi
+          echo "OK: all commits pass branch-tag adjudication for base=$BASE_REF."

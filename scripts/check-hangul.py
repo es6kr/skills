@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -76,6 +77,53 @@ def _scan_dir(skill_dir: Path) -> list[tuple[Path, int, str]]:
     return matches
 
 
+def _tracked_skill_names(parent: Path) -> set[str] | None:
+    """Return the set of skill subdirs (immediate children of ``parent``) that
+    are tracked by git. Return None when git is unavailable or ``parent`` is
+    outside a git repo — the caller then falls back to scanning every subdir.
+
+    Only the FIRST path component under ``parent`` is used, so a single tracked
+    file inside ``skills/<name>/`` marks the whole skill as tracked.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "--", str(parent)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except (OSError, FileNotFoundError):
+        return None
+    if proc.returncode != 0:
+        return None
+
+    # git ls-files emits POSIX paths relative to the repo root. Normalise the
+    # parent to POSIX form and strip it as a prefix from each entry.
+    try:
+        parent_rel = parent.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        parent_rel = parent.as_posix()
+    prefix = parent_rel.rstrip("/") + "/"
+
+    tracked: set[str] = set()
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(prefix):
+            rel = line[len(prefix):]
+        elif "/" in line and parent.name and line.startswith(parent.name + "/"):
+            rel = line[len(parent.name) + 1:]
+        else:
+            continue
+        head = rel.split("/", 1)[0]
+        if head:
+            tracked.add(head)
+    return tracked
+
+
 def _resolve_targets(argv: list[str]) -> list[Path]:
     """Resolve CLI args into a list of skill directories to scan.
 
@@ -96,6 +144,18 @@ def _resolve_targets(argv: list[str]) -> list[Path]:
             if not subdirs:
                 print(f"No skill subdirs found under: {candidate}")
                 sys.exit(0)
+            # Tracked-only filter: when candidate lives inside a git repo,
+            # restrict to skill subdirs that are actually tracked. Untracked
+            # local-only skills (in-development, personal, or not yet published)
+            # are not subject to the publish-time hangul gate because they are
+            # not yet publishing surface. lint-frontmatter.sh applies the same
+            # tracked-skill filter for the sibling frontmatter check.
+            tracked = _tracked_skill_names(candidate)
+            if tracked is not None:
+                subdirs = [p for p in subdirs if p.name in tracked]
+                if not subdirs:
+                    print(f"No tracked skill subdirs to scan under: {candidate}")
+                    sys.exit(0)
             return subdirs
 
     # Explicit mode: validate every arg is a directory.
