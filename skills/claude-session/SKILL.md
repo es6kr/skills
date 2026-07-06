@@ -19,11 +19,11 @@ Integrated skill for managing Claude Code sessions.
 
 **When the first token of args does NOT match any topic in the Topics table below, do NOT silently fall back to `rename` (or any other topic) by matching argument-count heuristics.**
 
-The signature `<uuid> <text>` matches both `rename-session.sh <id> <title>` and several other session-content operations (`clean-profanity`, `repair`, `dedup`, `summarize`, etc.). Args alone are not enough to decide.
+The signature `<uuid> <text>` matches both `rename-session.sh <id> <title>` and several other session-content operations (`clean-profanity`, `repair`, `summarize`, etc.). Args alone are not enough to decide.
 
 Decision procedure:
 
-1. If args contain `<uuid>` followed by an **action verb / imperative phrase** (e.g., `<uuid> remove profanity`, `<uuid> remove X`, `<uuid> clean Y`, `<uuid> sanitize Z`), the user wants a session-content operation. Match against `clean-profanity`, `repair`, `dedup`, `summarize` by intent.
+1. If args contain `<uuid>` followed by an **action verb / imperative phrase** (e.g., `<uuid> remove profanity`, `<uuid> remove X`, `<uuid> clean Y`, `<uuid> sanitize Z`), the user wants a session-content operation. Match against `clean-profanity`, `repair`, `summarize` by intent.
 2. If args contain `<uuid>` followed by a **noun phrase / descriptive label** (e.g., `<uuid> "Auth refactor PR #42"`), the user likely wants `rename`.
 3. If intent is unclear, invoke `AskUserQuestion` listing candidate topics — never default to `rename`.
 
@@ -44,7 +44,6 @@ Decision procedure:
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
 | compress | AI-compress sessions via UTCP/code-mode | [compress.md](./compress.md) |
 | destroy | Delete current session and restart IDE | [destroy.md](./destroy.md) |
-| dual-sync | Sync project memory directory between WSL and Windows paths (hardlinks do not apply) | [dual-sync.md](./dual-sync.md) |
 | id | Look up current session ID (UUID) | [id.md](./id.md) |
 | import | Pipeline session data to other agents/skills | [import.md](./import.md) |
 | install | Register session-id-inject hook in settings.json | [install.md](./install.md) |
@@ -228,8 +227,9 @@ python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py <session_file
 # Multiple sessions
 python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py file1.jsonl file2.jsonl
 
-# Resolve UUID → path first
-find ~/.claude/projects -name "<uuid>.jsonl"
+# Resolve UUID → path first (glob catches both bare <uuid>.jsonl and
+# archived flat names like <project-key>_<uuid>.jsonl)
+find ~/.claude/projects -name "*<uuid>.jsonl"
 ```
 
 Replaces matched tokens with `****` in place. Patterns loaded from `data/profanity-patterns.json`. Back up before running; do not run on the live current session.

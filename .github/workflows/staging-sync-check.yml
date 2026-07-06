@@ -28,7 +28,15 @@ jobs:
       - name: Fetch staging branches
         run: |
           set -euo pipefail
-          git fetch origin main next-feat next-fix
+          # main always exists — fetch strictly. The staging branches may not
+          # exist yet, so fetch each individually and tolerate a missing ref;
+          # otherwise a single atomic fetch hard-fails before the per-branch
+          # "does not exist yet" check below can run.
+          git fetch origin main
+          for BRANCH in next-feat next-fix; do
+            git fetch origin "$BRANCH" 2>/dev/null \
+              || echo "::warning::origin/${BRANCH} does not exist yet — skipping."
+          done
 
       - name: Compute drift for each staging branch
         id: drift

@@ -46,7 +46,11 @@ echo "Checking staged .md/.sh files for Korean text:"
 echo "$STAGED_TEXT_FILES" | sed 's/^/  - /'
 
 FAIL=0
-for f in $STAGED_TEXT_FILES; do
+# Iterate line-by-line (here-doc, not a pipe, so FAIL survives in this shell).
+# `for f in $STAGED_TEXT_FILES` would word-split a staged path containing spaces
+# (e.g. `docs/release notes.md`) into two invalid entries.
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
   # Check the STAGED content (index), not the working tree — a partially
   # staged file must be judged by what would actually land in the commit.
   if git show ":$f" | "$PY" -c "
@@ -65,7 +69,9 @@ sys.exit(1 if hits else 0)
     FAIL=1
   fi
   rm -f /tmp/hangul_hits_$$
-done
+done <<EOF
+$STAGED_TEXT_FILES
+EOF
 
 if [ "$FAIL" -ne 0 ]; then
   echo ""

@@ -29,7 +29,7 @@ Use TodoWrite **before the first tool call** in the following cases:
 
 When calling `TaskUpdate(status: "completed")`, the response text MUST follow:
 
-```
+```text
 **{task title}** — {1-2 sentence change summary}
 ```
 
@@ -56,7 +56,7 @@ When the completion involves a commit, the report MUST also include:
 The commit method matters because amend requires a force push while a new commit ships with a regular push — the user needs the push strategy at a glance.
 
 Example:
-```
+```text
 **egov OIDC logout implementation** — Added OidcClientInitiatedLogoutSuccessHandler in SecurityConfig.java. New commit 199438c (deps-sso master). Not pushed.
 ```
 

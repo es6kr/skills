@@ -83,7 +83,7 @@ exit_code=0
 
 # Tracked-skill filter — mirrors check-hangul.py. Untracked local-only skills
 # (in-development, personal, or not yet published) are exempt from this
-# publish-time gate. See .claude/rules/release-please-scope.md.
+# publish-time gate because they are not yet publishing surface.
 declare -A TRACKED_SET=()
 if tracked_out=$(git ls-files "$SKILLS_DIR" 2>/dev/null); then
   while IFS= read -r line; do

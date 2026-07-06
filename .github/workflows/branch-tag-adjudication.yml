@@ -35,7 +35,9 @@ jobs:
           persist-credentials: false
 
       - id: base
-        run: echo "base=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: echo "base=$BASE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Adjudicate each commit
         env:
