@@ -290,6 +290,25 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | Actionable PENDING | ⏳ | 🔴 (PENDING ≠ Critical) |
 | Critical unresolved | 🔴 | ✅ (looks like no problem) |
 
+### Status ↔ Merge-Recommendation consistency (HARD STOP)
+
+**The per-finding Status column and the conclusion / Merge Recommendation must agree — derive the conclusion FROM the Status column, never write the two independently.** Status encodes blocking: `🔴 Pending` = blocks merge (fix first), `🟡/🟢 Deferred` = non-blocking (post-merge follow-up / no action). A finding cannot be both `Deferred` and the reason the merge is held.
+
+- Any finding `🔴 Pending` → conclusion ⏳ "Actionable Items PENDING / Not ready to merge", Merge Recommendation "Hold — address the Pending findings first".
+- Zero `🔴 Pending` (all Deferred / Rejected / Verified) → ✅ "Ready to merge"; if the Test Plan is unchecked, "Ready pending Test Plan" — the hold reason is the Test Plan (Step 7.5), NOT the findings.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Mark all findings `🟡 Deferred` then conclude "Hold — address the Important findings first" | If the Important findings block merge, set their Status `🔴 Pending`. If genuinely deferred, the conclusion cannot cite them as the merge blocker |
+| 2 | Write the Status column and the Merge Recommendation as independent fields | Derive the recommendation from the Status column: any `🔴 Pending` present = Hold; zero Pending = Ready |
+| 3 | Use an unchecked Test Plan as grounds to re-label `Deferred` findings as blockers in prose | Test Plan incompleteness blocks "Ready to merge" on its own — keep findings at their true Status, cite the Test Plan as the hold reason |
+
+**Self-check (before POSTing the Summary — consistency)**:
+
+1. Conclusion says "Hold" / "Not ready to merge" / cites findings to address first? → every finding it names as a blocker must be `🔴 Pending`, not `Deferred`.
+2. All findings `Deferred` / `Rejected` / `Verified` (zero `🔴 Pending`)? → conclusion must be ✅ "Ready to merge" (or "Ready pending Test Plan" when the Test Plan is unchecked), never "Hold to address the findings".
+3. Read the Status column and the Merge Recommendation together — is any finding both `Deferred` and the cited reason the merge is held? That is the contradiction; reconcile before POST.
+
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
 
 ### Source attribution column is MANDATORY (HARD STOP)
