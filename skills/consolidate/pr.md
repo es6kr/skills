@@ -35,7 +35,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 | 7 (Auto-Post AI Review Summary + Formal Review) + 7.5 (Status line) + 7.6 (Auto-register Deferred Findings) | [`post.md`](./post.md) | Auto-post the Summary (no user decision) + auto-register Findings to fix_plan `[REVIEW_FEEDBACK]` (defer by default) |
 | 8 (Post-Summary Next-Action Ask) | [`next.md`](./next.md) | Merge/fix-deferred/hold option ask (fix only on explicit user instruction at this step) |
 
-Entry order: Step 1 → 2 → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
+Entry order: Step 1 → 2 → **2.3** (human reviewer check — ask before proceeding if a human reviewer other than you is assigned) → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
 ## Step 1: Identify PR
 
@@ -56,6 +56,34 @@ Skip entirely if any of these are true:
 > **Bash exit code caveat**: `grep -c` returns exit code 1 when there are zero matches. When chaining multiple commands with `grep` last, add a `|| true` guard to prevent false-positive errors.
 
 If skipped, report the reason and stop.
+
+## Step 2.3: Human reviewer check (HARD STOP — ask before proceeding when another reviewer is assigned)
+
+**Before collecting reviews / dispatching the Internal Review, check whether a human reviewer (other than the acting account, excluding bots) is already a requested reviewer on the PR.** A human reviewer assignment signals the author wants that person's review — running an autonomous AI consolidate may be redundant or step on their role.
+
+```bash
+gh pr view <N> -R <owner>/<repo> --json reviewRequests \
+  --jq '[.reviewRequests[].login | select(. != "<acting-account>" and (test("coderabbit|copilot"; "i") | not))] | .[]'
+```
+
+If the result is non-empty (a human reviewer other than you is assigned), **AskUserQuestion before proceeding**, with options:
+- **Proceed with AI consolidate anyway** — the AI review supplements the human review
+- **Defer to the human reviewer** — skip AI consolidate; they will review
+- **Hold** — decide later
+
+Do not silently run the Internal Review + Summary when another human reviewer is assigned. The bot reviewer matrix (CodeRabbit/Copilot, Step 2.4) is a **separate** check — this gate is specifically about **human** requested reviewers.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | See `reviewRequests: ["<human>"]` (e.g. after `gh pr ready`) → run Internal Review + consolidate anyway | Check human reviewers first → if present, ask proceed vs defer vs hold |
+| 2 | Treat `reviewRequests` as relevant only to the bot reviewer matrix | Bot reviewers (Step 2.4) and human reviewers (this step) are separate. Human reviewer presence gates the whole consolidate |
+| 3 | "I am the author, so I run consolidate regardless of who else reviews" | Author running AI consolidate while a human reviewer is assigned = potential redundancy/overstep → ask |
+
+### Self-check (before Step 2.4 / Step 3 collect)
+
+1. Did you run the `reviewRequests` query and filter out the acting account + bots?
+2. Is the human-reviewer result non-empty? → If yes, did you AskUserQuestion (proceed/defer/hold) **before** any Internal Review dispatch or Summary post?
+3. If empty (only bots or just you) → proceed normally.
 
 ## Step 2.4: Copilot availability pre-check (HARD STOP — auto-fallback, no ask)
 
@@ -134,6 +162,18 @@ When consolidating multiple PRs and Copilot review requests are needed:
 |----------|---------------------|
 | First review (no prior review from this bot exists on the PR) | Autonomous — PR creation itself is the user trigger |
 | **Re-review** (≥1 prior review from this bot exists; new commit pushed) | **AskUserQuestion required** before any bot trigger |
+| **Re-review with NO new commits since the bot's last review evidence** | **Forbidden — no-op + noise.** CodeRabbit is an incremental reviewer and "does not re-review already reviewed commits". Nothing to trigger |
+
+### Review-completion state matrix (classify BEFORE any trigger decision)
+
+A bot review is judged complete/incomplete by these signals — misreading a completed state as "absent" is what causes redundant re-triggers:
+
+| State | Signal | Action |
+|-------|--------|--------|
+| **Completed — findings** | Walkthrough/summary comment + actionable inline comments, or formal review with findings | Proceed to collect |
+| **Completed — zero findings (terminal)** | CodeRabbit summary comment "**No actionable comments were generated in the recent review**" (walkthrough may be collapsed inside the same comment); Copilot COMMENTED review with no blocking items | **Review IS complete, verdict = 0 findings. Never re-trigger.** Proceed to collect/classify with a clean verdict |
+| **In progress** | Status check "Review in progress" / bot activity within ~10 min | Wait — poll, do not trigger |
+| **Absent** | No comment/review/status from the bot after PR ready + reasonable wait | Re-review policy above applies (first review = autonomous; otherwise ask) |
 
 "Bot trigger" includes:
 
@@ -145,12 +185,23 @@ When consolidating multiple PRs and Copilot review requests are needed:
 
 > **Placeholder note**: throughout this section, `<bot>` is a substitution token — replace it with the bot login substring (e.g., `coderabbit` for CodeRabbit, `copilot` for Copilot). Without substitution the `test("<bot>"; "i")` filter matches nothing.
 
-1. **First-vs-re-review classification** — count prior reviews from the target bot:
+1. **First-vs-re-review classification** — count prior review **evidence** (formal reviews AND comments) from the target bot:
    ```bash
-   gh pr view <N> -R <owner>/<repo> --json reviews \
-     --jq '[.reviews[] | select(.author.login | test("<bot>"; "i"))] | length'
+   gh pr view <N> -R <owner>/<repo> --json reviews,comments \
+     --jq '([.reviews[] | select(.author.login | test("<bot>"; "i"))] | length)
+         + ([.comments[] | select(.author.login | test("<bot>"; "i"))
+             | select(.body | test("walkthrough_start|summarize by coderabbit|No actionable comments"))] | length)'
    ```
    `0` = first review case (autonomy OK). `>0` = re-review case (ask required).
+
+   > **Why comments too**: CodeRabbit posts its review output as **issue comments** (walkthrough / summarize / zero-findings verdict), not formal reviews. A reviews-only count returns `0` on a fully completed CodeRabbit review → misclassifies a re-review as a first review → bypasses the ask gate.
+
+1.5. **New-commit check (re-review case)** — a re-review trigger is meaningful only if commits exist AFTER the bot's last review evidence:
+   ```bash
+   gh pr view <N> -R <owner>/<repo> --json commits,comments \
+     --jq '{lastCommit: ([.commits[].committedDate] | max), lastBotEvidence: ([.comments[] | select(.author.login | test("<bot>"; "i")) | .createdAt] | max)}'
+   ```
+   `lastCommit < lastBotEvidence` → **no new commits since the review — do NOT trigger** (incremental reviewers skip already-reviewed commits; the trigger is pure noise).
 
 2. **In-progress review check (mandatory in re-review case)** — confirm the bot is not already working:
    ```bash
@@ -176,6 +227,27 @@ When consolidating multiple PRs and Copilot review requests are needed:
 | 3 | Skip the in-progress check before re-requesting | In-progress check is mandatory. Active reviewer must not be re-triggered |
 | 4 | Re-trigger because the first review found N findings and all were fixed — re-review will be quick | Volume/quality of fix is irrelevant. Re-trigger autonomy is determined by user ask, not by perceived cost |
 | 5 | Treat slash commands (`/review`, `@coderabbitai review`) as not-a-trigger because they look conversational | Slash commands trigger the bot identically. Same ask rule applies |
+| 6 | Read "No actionable comments were generated in the recent review" as "review missing / walkthrough absent" → trigger a review | That message IS the completed review (terminal state, verdict 0 findings — see the state matrix above). Proceed to collect with a clean verdict |
+| 7 | Bot replies "does not re-review already reviewed commits" after a trigger → fire another trigger variant (`full review`, second comment, reviewer re-add) | That reply is a **terminal stop signal**. Zero further triggers — proceed with the existing review output |
+| 8 | Trigger a re-review when no commits exist after the bot's last review evidence | Run the new-commit check (self-check 1.5) first. No new commits = nothing for an incremental reviewer to review |
+
+**Enforcement hook**: `~/.agents/skills/hook-kit/resources/block-bot-re-trigger.sh` (PreToolUse:Bash) denies bot re-trigger commands when prior review evidence exists on the PR. After an explicit user approval via AskUserQuestion, prefix the command with `BOT_RETRIGGER_APPROVED=1` to pass the gate.
+
+### Rate-limit retrigger discipline (any bot rate-limit rejection)
+
+When a bot responds with a rate-limit rejection instead of a review (e.g., CodeRabbit "Review limit reached — **Next review available in:** N minutes"), triggering again is allowed only under this discipline:
+
+1. **Parse the deadline**: rejection comment `created_at` + N minutes → deadline. Do NOT treat N as approximate — windows are enforced to the second.
+2. **Retrigger no earlier than deadline + 60s margin.** A single computed retrigger per window.
+3. **On re-rejection, re-parse the REFRESHED comment**: the bot updates the same rejection comment with a new remaining time — the clock restarts from its `updated_at`. Never reuse the first estimate.
+4. **Poll with positive markers**: the refreshed comment no longer contains "Review limit reached", the walkthrough marker appears, or the review artifact count > 0. Negative predicates over multiline bodies (`grep -qv`) match almost anything and are always-true traps.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Trigger "roughly when the window should be open" without computing `created_at` + N | Compute the deadline from the rejection comment timestamp, add a 60s margin, then trigger once |
+| 2 | On re-rejection, keep waiting against the original estimate | Re-parse the refreshed rejection comment's "available in N minutes" from its `updated_at` |
+| 3 | Poll completion with a negative multiline grep (`grep -qv 'rate limited'`) | Poll for positive markers (limit text absent from the refreshed body / walkthrough present / reviews count > 0) |
+| 4 | Fire retriggers repeatedly until one sticks (burns external quota + PR timeline noise) | One computed retrigger per window; if state is uncertain, wait for the next poll cycle instead of triggering |
 
 ## Step 2.7: Checkout PR branch into a worktree (MANDATORY — all reviews)
 

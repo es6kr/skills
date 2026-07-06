@@ -12,6 +12,41 @@ For each feedback item, apply the **verify→evaluate→respond** pattern loaded
 2. **VERIFY**: Check against codebase reality — `grep` for actual usage, read the implementation being criticized
 3. **EVALUATE**: Is this technically sound for THIS codebase? YAGNI check — if the suggestion adds unused functionality, classify as Rejected
 
+> **The `receiving-code-review` load is justified ONLY by producing explicit validity verdicts (Step 4-0) — including ⚪ Rejected where warranted.** If a consolidate run defaults every finding to Deferred and produces zero Reject consideration, the skill load was decorative: the framework's core verb is "push back when wrong", not "defer everything". A Summary with no Reject path exercised does not need `receiving-code-review` at all.
+
+### Step 4-0: Validity verdict (MANDATORY — operationalize receiving-code-review, runs BEFORE 4-A/Severity)
+
+**Validity (valid vs reject) and timing (now vs defer) are SEPARATE axes. Every finding must get an explicit validity verdict FIRST.** Timing (immediate fix / Deferred) applies **only to findings already judged VALID**. A wrong / inapplicable finding is ⚪ **Rejected** — it must NOT be silently carried as "Deferred" (Defer is a timing decision for valid findings, never a substitute for the Reject validity verdict).
+
+Per finding, record one verdict:
+
+| Verdict | When | Next |
+|---------|------|------|
+| ✅ **VALID** | Verified correct for THIS codebase | → Step 4-A scope + Severity + timing (now/defer) |
+| ⚪ **REJECTED** | One of the Reject reasons below holds | → pushback track (reason mandatory; NOT carried into apply/defer groups) |
+
+**Reject reasons (any one ⇒ ⚪ Rejected — not Deferred):**
+
+1. **YAGNI** — adds unused functionality (grep confirms no caller / no need)
+2. **Technically inappropriate** — wrong for this stack/platform/version
+3. **Contradicts the author's deliberate or documented intent** — the PR/commit/issue shows the author intentionally chose the criticized structure (e.g., a deliberately-built merge/TDD structure, an explicit architectural decision). A reviewer preference against a deliberate author choice is Rejected, not Deferred
+4. **False premise** — VERIFY failed: the finding's factual claim is wrong (e.g., "PR introduced regression in X" but `git log <base>..HEAD -- X` is empty — see Step 4-A #7)
+5. **Already handled elsewhere** — the concern is covered by existing code/middleware/tests the reviewer missed
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Default a finding to `🟡 Deferred` without a validity verdict | Assign VALID or ⚪ REJECTED first. Defer only a VALID finding |
+| 2 | Carry a wrong / author-contradicting finding as "Deferred (author follow-up)" | A wrong finding is ⚪ Rejected with reason. Deferring it dumps invalid work on the author |
+| 3 | Produce a Summary where every finding is Deferred and none was Reject-considered | That means `receiving-code-review` was loaded but unused (decorative). Each finding's verdict must show the validity judgment was actually made |
+| 4 | Treat "Reject" as confrontational and soften to Defer | Reject with a one-line technical reason is the honest verdict the framework requires ("push back when wrong") |
+
+**Self-check (before Step 4-A / Severity / option construction):**
+
+1. Does **every** finding have an explicit VALID or ⚪ REJECTED verdict? (no finding reaches Severity/timing without it)
+2. For each ⚪ REJECTED, is exactly one Reject reason (1–5 above) cited in one line?
+3. Did you actively consider the Reject path for each finding — not just default to VALID→Defer? (If zero findings were even Reject-evaluated, re-run this step — the `receiving-code-review` load is otherwise decorative)
+4. Are any "Deferred" findings actually Reject candidates (wrong / contradicts author intent / false premise)? → reclassify to ⚪ Rejected
+
 ### Step 4-A: PR diff scope cross-check (MANDATORY before classifying deferred)
 
 **Before classifying any finding, cross-check the finding's file path against the result of `gh pr view <N> --json files` (the list of files this PR actually modified).** If the file referenced by the finding is **included in the PR diff, the "outside PR scope" label is forbidden** — classify it as an immediate fix candidate within the same PR.
