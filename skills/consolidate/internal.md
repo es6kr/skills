@@ -1,6 +1,6 @@
 # Internal Review Fallback + UI Capture Verification
 
-Internal Code Review fallback when external AI review is insufficient (CodeRabbit walkthrough-only — e.g., PRIVATE+Free, Copilot failure) + UI change PR capture attachment verification.
+Internal Code Review fallback when external AI review is insufficient — CodeRabbit walkthrough-only (e.g., PRIVATE+Free) or Copilot failure — + UI change PR capture attachment verification.
 
 Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Step 4.5.
 
@@ -86,7 +86,7 @@ Two gates: Step 5 (User Decision ask) and Step 7 (Summary post). Both forbid ent
 
 Before posting **either** the Step 5 AskUserQuestion **or** the Step 7 `## AI Review Summary`, run the following self-check:
 
-1. Was the state CodeRabbit walkthrough only (line-by-line blocked — e.g., PRIVATE+Free) or reviewer error? → If Yes, Step 3.5 trigger is satisfied
+1. Was the state CodeRabbit walkthrough only (line-by-line blocked — e.g., PRIVATE+Free), a reviewer error, or Copilot subscription unavailable (Step 2.4 auto-fallback)? → If Yes, Step 3.5 trigger is satisfied
 2. If trigger was satisfied, was a `## Internal Code Review` comment posted on the GitHub PR? → `gh api .../issues/{N}/comments | jq '.[] | select(.body | startswith("## Internal Code Review"))'`
 3. If the comment is absent → **forbid entering Step 5 or Step 7**. Return to the Step 3.5 procedure and post the comment first
 4. Does the comment body contain dual-label findings (Type | Severity) or their equivalent?
