@@ -30,6 +30,15 @@ fastest:
 | 3 | **wmux/cmux panel** | User-visible panel, interactive | `$WMUX` / `$CMUX_SESSION` set |
 | 4 | Playwright MCP | **Last resort** — invisible window, user cannot log in interactively | only when a persisted/automated session already exists (no fresh login needed) |
 
+**Managed-surface detection (HARD STOP — before treating `open <url>` as manual)**: on hosts where
+cmux/wmux wraps the system opener, `open <url>` prints a surface handle (e.g.
+`OK surface=surface:N pane=pane:M placement=reuse`). That output means the page opened in a
+**cmux-managed browser surface** — full automation is available via
+`cmux browser --surface <handle> snapshot|fill|click|eval`. Detect via (a) the printed handle in the
+`open` output, (b) `command -v cmux` / `command -v wmux`. Treating a managed surface as a plain
+manual browser and delegating post-login steps (form fill, Generate click, token copy) to the user
+violates the "Boundary: login wait vs token automation" table and the Phase 3-5 entry gate below.
+
 **Key rule**: Playwright MCP opens an **invisible** window — the user cannot complete an interactive
 login there. For any flow that needs a fresh user sign-in, prefer chrome-devtools (real session) or
 the user's default browser. Do not drive an interactive login through invisible Playwright.
@@ -231,12 +240,15 @@ Order 1 failure (most common: `eval` cross-origin or JS exception) → try Order
 | 2 | One snapshot returns minimal accessibility tree (form fields invisible) → "form not automatable" | `snapshot --interactive` or `snapshot --max-depth N` or CSS selector — extend probe before giving up |
 | 3 | "User can do it in 30 seconds, faster than backend automation" | Backend automation is the **mandatory contract** of credential-issue. Speed argument = boundary violation. The Phase 3-5 boundary table is not advisory |
 | 4 | Frame each automation attempt as "let me try one more thing" with user as fallback in the same response | The cascade is silent — try Orders 1→4 sequentially in **the same turn**, only emit a user-handoff request when Order 4 also fails |
+| 5 | Treat `open <url>` output containing `surface=`/`pane=` as a plain browser (no automation) and hand every token step to the user | The printed handle IS the automation entry point — reuse it: `cmux browser --surface <handle> snapshot --interactive` → `fill`/`click`/extract. One disconnected backend (e.g. chrome-devtools) does not prove "no automation" while cmux/wmux is present |
+| 6 | Drive token generation without verifying WHICH account the page session is logged in as | **Verify the logged-in identity BEFORE clicking Generate** (avatar menu snapshot / `meta[name=user-login]`) and again AFTER issuance (`gh api user` with the new token). Multi-account browsers issue under the wrong identity silently — a mis-issued credential costs a revoke + re-issuance round-trip |
+| 7 | Assume a CSS-selector `click` on a form submit button took effect because the command returned OK | Form submits often need the **snapshot-ref click** (`snapshot --interactive` → `click "@eN"`); verify the effect via URL change / API state, not the click return code |
 
 ## Self-check (before opening any browser for issuance)
 
 1. Is the credential already stored (skill data / memory / `.env` / secret store)? → If yes, skip to `handoff`.
 2. Can it be issued via API/SDK with a parent credential? → If yes, do that (no browser).
-3. Console-only? → Pick the backend: chrome-devtools (real session) > default browser > wmux/cmux > Playwright (only with an existing session).
+3. Console-only? → Pick the backend: chrome-devtools (real session) > default browser > wmux/cmux > Playwright (only with an existing session). **Probe every backend before concluding "no automation"**: `command -v cmux` / `command -v wmux`, and inspect the `open` output for a `surface=` handle (managed-surface detection above) — one disconnected MCP is not evidence that automation is absent.
 4. Does the flow need a fresh interactive login? → If yes, the backend MUST be user-visible. Never invisible Playwright.
 5. After collecting the credential, did you **complete step 6 Persist** (Service × Store matrix row matched + persist command executed + reuse path verified)? `handoff` runs only after Persist succeeds.
 6. **Login complete → token generation automation check**: once the user is signed in, did the backend drive the token-generation UI (navigate → fill → click "Create" → snapshot the token) instead of writing text instructions for the user to follow? If text instructions were written, that is a violation of the boundary in the table above unless the token is genuinely behind a masked / copy-only UI element.
@@ -266,6 +278,7 @@ Order 1 failure (most common: `eval` cross-origin or JS exception) → try Order
 |-------------------|---------------|----------------------------------------|---------|
 | `cloudflare-r2` / issue S3 token + public URL | ❌ console-only (Public Dev URL + token) | `https://dash.cloudflare.com/?to=/:account/r2/overview` → enable R2 → create bucket → Public Development URL → Manage R2 API Tokens | `aws s3 cp --endpoint-url https://<acct>.r2.cloudflarestorage.com` upload → public `https://pub-*.r2.dev/<key>` |
 | `github` / issue fine-grained PAT | ❌ security (UI-only) | `https://github.com/settings/personal-access-tokens/new` | `gh secret set` / git remote auth |
+| `github` / issue or edit classic PAT | ❌ security (UI-only) | `https://github.com/settings/tokens/new?scopes=<set>&description=<note>` — **decide the scope set per account-role BEFORE building the URL, from the caller environment's own scope-matrix rule** (which operations this account performs → which scopes). Never copy a previous case's `scopes=` prefill — a too-narrow token silently fails later operations (e.g. `workflow` missing blocks merging PRs that touch `.github/workflows/*`). Editing an existing classic PAT keeps its value (re-persist not needed) | `gh auth login --with-token` (keyring persist) |
 | `github` / create OAuth app | ❌ UI-only | `https://github.com/settings/developers` | store client id/secret in `vault kv put` |
 | `oci` / Customer Secret Key | ❌ console-only | OCI console → User → Customer Secret Keys | rclone/aws-cli S3 config |
 | `authentik` / akadmin API token | ✅ (terraform/API) | (only if console needed) | terraform var / `vault kv put` |
