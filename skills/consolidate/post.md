@@ -693,7 +693,7 @@ Among all actionable items from Step 4 classification:
 
 | Environment detection (based on CWD or workspace) | Medium | Format |
 |--------------------------------------|------|------|
-| `{workspace}/.ralph/fix_plan.md` exists | `.ralph/fix_plan.md` "On Hold" section | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action direction, location, PR #N}` |
+| `{workspace}/.ralph/fix_plan.md` exists | `.ralph/fix_plan.md` "On Hold" section (inserted **above** the trailing `## Completed`/`## REPEAT` — never at EOF) | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action direction, location, PR #N}` |
 | `{workspace}/checklist.md` exists (Ralph not used) | `checklist.md` | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action, PR #N}` |
 | Neither exists + GitHub Issue collaboration | New GitHub Issue | `gh issue create` — title `deferred from PR #N: {summary}`, finding details in body |
 | Neither exists + no collaboration medium | AskUserQuestion | "Where to register?" options (new `.ralph/fix_plan.md` / new `checklist.md` / Issue / skip registration) |
@@ -703,9 +703,12 @@ Among all actionable items from Step 4 classification:
 ### Registration procedure
 
 1. Read the medium file
-2. Locate the "On Hold" / "BLOCKED" section. If absent, add a new section in an appropriate position
+2. Locate the "On Hold" / "BLOCKED" section (or an existing active-work section: `TODO`, `Pending`, or the file's priority section)
+   - **If absent, insert a new `## On Hold` section ABOVE the trailing `## Completed` / `## REPEAT` sections — never append at end-of-file.** `## REPEAT` is invariantly the last section of `fix_plan.md` (owned by ralph `periodic.md`), so an EOF append silently nests the deferred block under `## REPEAT`, where it is mistaken for a periodic scheduled task
+   - Register the deferred items as `-` bullets inside that section. Do **not** create a dangling `###` heading after the last section's list items — a heading placed there becomes a child of whichever `##` section precedes it (i.e. `## REPEAT`)
 3. Add N deferred items in batch (Edit)
 4. Report the N registered items' medium file path in chat (user-verifiable)
+5. **Verify placement**: after the Edit, confirm the nearest preceding `##` heading of the registered items is an active-work section — NOT `## REPEAT` or `## Completed`. If it is one of those, the block landed in the wrong section — move it above the trailing sections
 
 ### Don't / Do table
 
@@ -717,6 +720,7 @@ Among all actionable items from Step 4 classification:
 | 4 | Autonomously decide "skip registration" in environments with no selected tracking medium | Decide medium via AskUserQuestion. Autonomous skip is forbidden |
 | 5 | **Post "Deferred Review Items" as a separate PR comment** | Deferred items go only to the tracking medium (checklist/checklist/Issue). **Posting as a separate PR comment is forbidden** — the Summary table's deferred notation is sufficient |
 | 6 | Only output the Step 8 option description promise without any registration action | If the option description promises "checklist.md [BLOCKED] registration", **execute that promise in advance in this step** |
+| 7 | Append the deferred block at end-of-file, or as an `###` heading after the last section — it nests under the trailing `## REPEAT` (periodic tasks) or `## Completed` | Insert as `-` bullets under an active-work section (`On Hold`/`BLOCKED`/`TODO`/`Pending`), or a new `## On Hold` section placed **above** `## Completed`/`## REPEAT`. `## REPEAT` holds only `- [REPEAT]` periodic items |
 
 ### Self-check (every time before entering Step 8)
 
@@ -724,6 +728,7 @@ Among all actionable items from Step 4 classification:
 2. Did the medium decision follow the environment detection table? (Autonomous assumption forbidden)
 3. Has registration to the medium file been completed? (verify via Read)
 4. Have you reported the number of registered items + medium path in chat?
+5. **Placement check**: is the nearest preceding `##` heading of the just-registered items an active-work section (not `## REPEAT` / `## Completed`)? `## REPEAT` is invariantly the last section — an EOF or `###` append nests there. If mis-placed, move above the trailing sections
 
 ## Next
 
