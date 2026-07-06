@@ -64,7 +64,8 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 | **Proceed** | Start execution as currently defined |
 | **Split** | Split the larger task into smaller sub-tasks |
 | **Merge** | Combine with another task into a single one |
-| **Hold** | Defer until another task completes (precedence dependency) |
+| **Hold** | Defer until another task completes (precedence dependency) — stays in the task list |
+| **Defer to checklist** | Move the task out of the task list into the checklist file (`fix_plan.md` hold section / `checklist.md`) — for external-wait / long-idle items that need cross-session persistence, not session tracking. Execution: see "Reverse direction — task → checklist demotion" below |
 | **Delete** | No longer needed |
 
 ### Don't / Do — environment-agnostic
@@ -75,6 +76,7 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 | 2 | Compress 5 items into a single ask | One independent question per item (Claude's `questions` array maxes at 4 — report the rest as "deferred") |
 | 3 | Bundle tasks under one ask via `multiSelect` | Each question independently decides the direction of its task |
 | 4 | Mark the first item `in_progress` without the direction ask | Step 3 may only be entered after Step 2 is complete |
+| 5 | Offer only "Hold (keep as task)" for external-wait items (user manual action / merge instruction / reply pending) | Include **Defer to checklist** in the option set — external-wait items belong in the checklist medium per "Medium separation principle" below. Hold keeps them polluting the task list across sessions |
 
 ### Per-environment ask method
 
@@ -143,6 +145,15 @@ The ask-medium ceiling (Claude `questions` max 4, Antigravity `ask.md` visibilit
 | 2 | Double-register BLOCKED items under the rationale "having it in the task list helps me not forget" | The checklist is reloaded every session, so it won't be forgotten. Duplicating the medium increases sync overhead |
 | 3 | Use `[BLOCKED]` as a task subject prefix | Use the checklist's `## Hold` section: `- [ ] [BLOCKED] <subject> (trigger: ...)` |
 | 4 | Report "BLOCKED still BLOCKED" on every `/wip` for external-wait tasks | If it is not in the task list, it is not a reporting target. When the response arrives, promote it from the checklist to a task |
+
+### Reverse direction — task → checklist demotion (Defer to checklist execution)
+
+The sync above defines promotion (checklist `[ ]` → task). The reverse — demotion — executes the Step 2 "Defer to checklist" decision:
+
+1. Append the item to the checklist file (`fix_plan.md` hold section / `checklist.md`): `- [ ] [BLOCKED] <subject> (trigger: <re-activation condition>)` — the trigger is mandatory, otherwise the item can never be promoted back
+2. Remove the task: `TaskUpdate(taskId, status: "deleted")` (Claude) / delete the line from `task.md` (Antigravity)
+3. Never leave the item in both media — duplicate medium = sync burden (same principle as Don't `#2` above)
+4. Report the demotion with the checklist path so the user knows where it went
 
 ### Ordering principle
 
