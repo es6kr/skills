@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/es6kr/skills/compare/web-browser-v0.2.2...web-browser-v0.2.3) (2026-07-07)
+
+
+### Bug Fixes
+
+* **fix,web-browser:** publish-scope edit gate + managed-surface backend detection ([2e28fc4](https://github.com/es6kr/skills/commit/2e28fc4d39953ee6a88f64bd8c8d20907ba01e39))
+* **skills:** review-feedback bundle — consolidate trigger wording + fix wiki paths ([784854e](https://github.com/es6kr/skills/commit/784854e3e07696ca8d16274215004488861862d1))
+
 ## [0.2.2](https://github.com/es6kr/skills/compare/web-browser-v0.2.1...web-browser-v0.2.2) (2026-06-30)
 
 

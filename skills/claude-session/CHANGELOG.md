@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/claude-session-v0.3.1...claude-session-v0.4.0) (2026-07-07)
+
+
+### Features
+
+* **brief,chezmoi,claude-session,todowrite:** add diff-required, clean-profanity, completion-report topics ([efd0ed0](https://github.com/es6kr/skills/commit/efd0ed06b7f7306c226c9ccb8a0083e60bf0ee83))
+
+
+### Bug Fixes
+
+* address CodeRabbit/Copilot review findings on release-process-reform ([a954017](https://github.com/es6kr/skills/commit/a9540172cf4e7cf111d3de85ae7b29815ff6d348))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/claude-session-v0.3.0...claude-session-v0.3.1) (2026-06-13)
 
 
