@@ -1,7 +1,7 @@
 ---
 name: claudify
 description: |
-  Agentic AI lifecycle: create + improve + persist. create - convert functionality into Claude Code automation (agent/skill/rule/hook/command) [SKILL.md], improve - self-improving loop: retrospect + hook/skill review + pattern detect [improve.md], persist - knowledge persistence: documentation + memory save [persist.md]. Use when "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", "self-improve", "claudify improve", "claudify persist".
+  Agentic AI lifecycle: create + improve + persist. create - convert functionality into Claude Code automation (agent/skill/rule/hook/command) [SKILL.md], background-polling - mandatory ScheduleWakeup/timeout polling discipline for 5min+ background dispatches [background-polling.md], improve - self-improving loop: retrospect + hook/skill review + pattern detect [improve.md], persist - knowledge persistence: documentation + memory save [persist.md]. Use when "agentify", "agentic", "automate this", "create an agent", "make a plugin", "make a skill", "self-improve", "claudify improve", "claudify persist", "background polling", "ScheduleWakeup".
 metadata:
   author: es6kr
   version: "0.1.2"
