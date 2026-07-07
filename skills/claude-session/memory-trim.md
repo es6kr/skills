@@ -18,6 +18,27 @@ loss as long as the linked file actually holds the detail.
 
 ## Procedure
 
+### Step 0: Media-separation check (HARD STOP — before any trimming)
+
+An over-budget index is not automatically a byte-trimming problem. **Measure
+the entry-type composition first**: behavior-correction records (feedback
+entries carrying violation cases, recurrence counts, incident detail) have a
+dedicated on-demand medium — the failed-attempts store
+(`~/.claude/skills/cleanup/data/failed-attempts.md`) — and do not have to
+occupy the always-on index at all.
+
+```bash
+# how much of the index is feedback/case-history pointers?
+grep -c '](feedback_' <memory-dir>/MEMORY.md          # line count
+grep '](feedback_' <memory-dir>/MEMORY.md | wc -c     # byte share
+```
+
+If feedback/case-history entries hold a large share of the index (rule of
+thumb: >30% of bytes), **propose relocating them to the failed-attempts
+medium before trimming hooks** — it frees more bytes and puts the content in
+its correct medium. Relocation deletes memory files, so candidate selection
+goes through user confirmation (same as Step 3).
+
 ### Step 1: Run the trim script
 
 ```bash
@@ -55,3 +76,10 @@ user before removing.
 | 2 | Delete stale entries autonomously to reclaim bytes | Deletion candidates go through user confirmation, every time |
 | 3 | Put memory content in the index to "save a file" | Index = one pointer line per memory. Content lives in the memory file |
 | 4 | Edit the index without a backup | The script writes `<file>.bak-trim`; keep it until the next session verifies recall quality |
+| 5 | Treat an over-budget index purely as a byte-trimming problem (cap tuning, more aggressive cuts) | Run Step 0 first — feedback/case-history entries route to the failed-attempts medium (on-demand), which frees the always-on index without shortening anything |
+
+## Self-check (every time the index is over budget)
+
+1. Did I measure the feedback/case-history share of the index (Step 0) before proposing any trim?
+2. If that share is large, does my proposal include the relocate-to-failed-attempts option — not just cap tuning?
+3. Are relocation/deletion candidates going through user confirmation?
