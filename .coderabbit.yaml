@@ -6,6 +6,8 @@ reviews:
   auto_review:
     auto_incremental_review: false
     enabled: true
+    # main-only auto-review: staging branches (next-feat/next-fix) and feature
+    # branches are intentionally excluded. Changes accumulate on staging and are
+    # reviewed once at the staging -> main merge PR to save review tokens.
     base_branches:
-      - develop
       - main

@@ -1,7 +1,7 @@
 ---
 name: claude-session
 description: |
-  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "worktree session", "session cleanup"
+  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "session list", "session search", "session classify", "session compress", "session migrate", "session move", "session repair", "session rename", "session split", "session purge", "session url", "session analyze", "session import", "session summarize", "session archive", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session"
 metadata:
   author: es6kr
   version: "0.1.5"
@@ -15,6 +15,24 @@ Integrated skill for managing Claude Code sessions.
 
 **When this skill is invoked with a topic specifier (e.g., `/claude-session id` or `Skill("claude-session", "id")`), load and follow only the matching topic file (`id.md`). Do not echo the Topics table or summarize other topics in the response.** The Topics table below is an index for invocations without a topic specifier — it is not user-facing output when a topic is named.
 
+### HARD STOP — unknown topic word + extra args
+
+**When the first token of args does NOT match any topic in the Topics table below, do NOT silently fall back to `rename` (or any other topic) by matching argument-count heuristics.**
+
+The signature `<uuid> <text>` matches both `rename-session.sh <id> <title>` and several other session-content operations (`clean-profanity`, `repair`, `summarize`, etc.). Args alone are not enough to decide.
+
+Decision procedure:
+
+1. If args contain `<uuid>` followed by an **action verb / imperative phrase** (e.g., `<uuid> remove profanity`, `<uuid> remove X`, `<uuid> clean Y`, `<uuid> sanitize Z`), the user wants a session-content operation. Match against `clean-profanity`, `repair`, `summarize` by intent.
+2. If args contain `<uuid>` followed by a **noun phrase / descriptive label** (e.g., `<uuid> "Auth refactor PR #42"`), the user likely wants `rename`.
+3. If intent is unclear, invoke `AskUserQuestion` listing candidate topics — never default to `rename`.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Route `<uuid> remove profanity` to `rename` because the arg signature matches `rename-session.sh <id> <title>` | "remove profanity" reads as action verb → route to `clean-profanity` (or AskUserQuestion if uncertain) |
+| 2 | Treat any non-topic-word trailing text as a title for rename | Classify text as verb-phrase (action) vs noun-phrase (title) first |
+| 3 | Silent fallback when no topic matches | AskUserQuestion: list 2–4 candidate topics that fit the apparent intent |
+
 ## Topics
 
 | Topic | Description | Guide |
@@ -22,6 +40,7 @@ Integrated skill for managing Claude Code sessions.
 | analyze | Session statistics, tool usage patterns, optimization insights | [analyze.md](./analyze.md) |
 | archive | Move a completed session out of the active project key to `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (flat naming, single backup root) | [archive.md](./archive.md) |
 | classify | Classify project sessions (delete/keep/extract) | [classify.md](./classify.md) |
+| clean-profanity | Sanitize profanity tokens in a session JSONL file (in-place replacement) | [clean-profanity.md](./clean-profanity.md) |
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
 | compress | AI-compress sessions via UTCP/code-mode | [compress.md](./compress.md) |
 | destroy | Delete current session and restart IDE | [destroy.md](./destroy.md) |
@@ -198,6 +217,24 @@ Dead session = 10 lines or fewer + no `"type":"assistant"` response.
 Script: `scripts/purge-dead-sessions.sh <project_name> [--delete]`
 
 [Detailed guide](./purge.md)
+
+### Clean Profanity (Sanitize Session Content)
+
+```bash
+# Single session
+python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py <session_file.jsonl>
+
+# Multiple sessions
+python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py file1.jsonl file2.jsonl
+
+# Resolve UUID → path first (glob catches both bare <uuid>.jsonl and
+# archived flat names like <project-key>_<uuid>.jsonl)
+find ~/.claude/projects -name "*<uuid>.jsonl"
+```
+
+Replaces matched tokens with `****` in place. Patterns loaded from `data/profanity-patterns.json`. Back up before running; do not run on the live current session.
+
+[Detailed guide](./clean-profanity.md)
 
 ### Repair (Session Recovery)
 

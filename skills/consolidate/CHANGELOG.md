@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.4](https://github.com/es6kr/skills/compare/consolidate-v0.3.3...consolidate-v0.3.4) (2026-07-07)
+
+
+### Bug Fixes
+
+* **consolidate:** add review-state matrix, rate-limit retrigger discipline, engine-selection rework ([ce55aca](https://github.com/es6kr/skills/commit/ce55aca440cd424c4195140acdc9019cb8097aae))
+* **consolidate:** address PR review findings — third trigger branch in self-check, example disambiguation ([294e0df](https://github.com/es6kr/skills/commit/294e0dffaf342da5ab7521681eb35ba0dff3be76))
+* **consolidate:** align internal-review trigger wording with visibility×tier matrix ([15584b3](https://github.com/es6kr/skills/commit/15584b37c7933bcf4815ef8950882903ba67fac3))
+* **consolidate:** require subject identification in review-event ask templates ([8b9d6d7](https://github.com/es6kr/skills/commit/8b9d6d76048dec5b2c18ebc2b2e8cc474e7d61c8))
+* **skills:** review-feedback bundle — consolidate trigger wording + fix wiki paths ([784854e](https://github.com/es6kr/skills/commit/784854e3e07696ca8d16274215004488861862d1))
+
 ## [0.3.3](https://github.com/es6kr/skills/compare/consolidate-v0.3.2...consolidate-v0.3.3) (2026-07-03)
 
 

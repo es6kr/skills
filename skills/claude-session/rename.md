@@ -11,6 +11,21 @@ Suggests and applies a name to a session.
 
 > ⚠️ A topic alias such as the literal word `name` in `/session name` is **not** a title — treat it as "no name specified" and start from step 1.
 
+#### Verb-phrase guard (HARD STOP)
+
+**When the supplied "name" reads as an action verb / imperative phrase, it is NOT a title.** Invoke `AskUserQuestion` to clarify intent before calling `rename-session.sh`. The script silently appends `custom-title`/`agent-name` records, so a misroute is invisible unless caught at dispatch time.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Accept `remove profanity` / `remove` / `clean` / `convert` / `remove X` / `clean X` / `sanitize Y` as a title and call `rename-session.sh` | These read as actions. `AskUserQuestion`: "Did you mean (a) set title to '<text>', or (b) run <action> on the session?" |
+| 2 | Match args by signature `<uuid> <text>` → rename without intent check | Several session operations take `<uuid> <param>`. Classify `<text>` as noun-phrase (title) or verb-phrase (action) first |
+| 3 | "User gave 2 args, so it must be rename" | Verb-phrase trailing args → route to the matching content operation (`clean-profanity`, `repair`, etc.). When unclear, AskUserQuestion |
+
+Verb-phrase detection cues (any one is sufficient):
+- Imperative ending: `redact`, `remove`, `clean`, `sanitize`, `fix`, `convert`, `delete`
+- Verb + object pattern: `remove profanity`, `clean transcripts`
+- Action noun in isolation: `profanity removal` (action noun) vs `profanity removal task #42` (label about an action — title OK)
+
 ### 1. Generate Name Candidates
 
 Analyze the conversation content and generate 2–4 name candidates.

@@ -154,9 +154,9 @@ def _resolve_targets(argv: list[str]) -> list[Path]:
             # Tracked-only filter: when candidate lives inside a git repo,
             # restrict to skill subdirs that are actually tracked. Untracked
             # local-only skills (in-development, personal, or not yet published)
-            # are not subject to the publish-time hangul gate. See
-            # ~/.agents/.claude/rules/release-please-scope.md "Staging branch
-            # flow" for the sibling policy applied to frontmatter lint.
+            # are not subject to the publish-time hangul gate because they are
+            # not yet publishing surface. lint-frontmatter.sh applies the same
+            # tracked-skill filter for the sibling frontmatter check.
             tracked = _tracked_skill_names(candidate)
             if tracked is not None:
                 subdirs = [p for p in subdirs if p.name in tracked]
