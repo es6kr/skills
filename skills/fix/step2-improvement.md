@@ -60,6 +60,28 @@ Priority (check in order — **stop at the first match**):
 
 **Why Rule is not 1st**: a rule consumes always-on token cost continuously. Adding a rule for every mistake inflates the context until you can no longer follow the rules themselves — a paradox. memory (feedback) costs 0 tokens + is reachable via search — the natural medium for 1st-2nd-recurrence learning. Rules are reserved for permanent protection patterns that passed the 4-filter gate.
 
+### `--local` scope routing (HARD STOP when flag set)
+
+When `/fix --local` is invoked, the 3rd-priority "Rule" row above **must not** target `~/.agents/rules/` (global). Instead resolve the innermost matching workspace/project rule directory:
+
+1. **Project-local**: `<repo>/.claude/rules/` — cwd is inside a git repo (`git rev-parse --show-toplevel` succeeds)
+2. **Workspace-local**: walk up from cwd to the nearest `.claude/rules/` (typically `<workspace-root>/.claude/rules/`). Workspace = a non-git parent containing multiple git projects
+3. **Neither present**: AskUserQuestion — "Create `.claude/rules/` at project or workspace?" — do NOT silently fall through to global `~/.agents/rules/`
+
+The choice between project vs workspace when **both** exist follows the `rule-management.md` location-plus-method dual-axis ask.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write to `~/.agents/rules/` despite `--local` because "the pattern feels universal" | `--local` = user's explicit opt-in for scoped protection. Universal claims that need global scope require dropping the flag |
+| 2 | Skip the ask when neither project nor workspace `.claude/rules/` exists | Ask before creating. Silent creation buries the location decision |
+| 3 | Add a hook to `~/.claude/hooks/` (global) as the enforcement side of a `--local` rule | Hook location follows the rule scope. Workspace/project-scoped rules pair with project-local hooks or in-repo scripts (`.githooks/`, `pre-commit`, etc.) |
+
+**Self-check (before Step 2 Edit under `--local`)**:
+1. Is `--local` set in the /fix invocation?
+2. Did you run `git rev-parse --show-toplevel` (project) and walk up for `.claude/rules/` (workspace)?
+3. Is the target file path under one of those two, and NOT under `~/.agents/rules/`?
+4. If the fix pairs a rule with an enforcement mechanism (hook, pre-commit script), does the enforcement side also live inside the scoped repo/workspace?
+
 **Use Do & Don't table format (MANDATORY for 2+ recurrences)**:
 When adding or strengthening rules, use the **Do & Don't table** instead of prose. Placing forbidden patterns (Don't) next to correct alternatives (Do) raises scan speed and compliance. For rules that have recurred 2+ times, switching to a table is required.
 
