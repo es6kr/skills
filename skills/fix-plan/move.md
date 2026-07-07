@@ -103,6 +103,65 @@ A top-level item may stay `[ ]` while a completed sub-tree under it moves to Com
 - Other unfinished sub-items remain
 - If the parent ends up with zero sub-items but still `[ ]` — confirm with the user via AskUserQuestion before deleting the parent
 
+## Completed-section size management (periodic archive)
+
+`move` only adds *into* `## Completed`; without periodic archiving the section
+grows unbounded and the tracker file bloats. Archive older Completed entries to a
+**local, receiver-independent** partition file on a period boundary. This is the
+default lifecycle for a plain `checklist.md` / `fix_plan.md` with no registered
+archive-receiver.
+
+### Period (config `completed-archive-period`)
+
+| Value | Partition file | Cadence |
+|-------|----------------|---------|
+| `monthly` (default) | `<tracker-dir>/.bak/<tracker-stem>-completed-YYYY-MM.md` | at month boundary |
+| `weekly` | `<tracker-dir>/.bak/<tracker-stem>-completed-YYYY-Www.md` (ISO week) | at ISO-week boundary |
+
+- `<tracker-stem>` = tracker basename without extension (`checklist`, `fix_plan`).
+- Set per tracker via `--completed-archive-period=weekly|monthly` (default `monthly`).
+- **Receiver-independent**: unlike the SKILL.md default-invocation archive-receiver
+  dispatch (which needs a registered `<skill>:<topic>` receiver and targets external
+  reports — weekly report / postmortem / RAG), this archives to a local `.bak/` file
+  with zero dependencies. When a receiver IS registered, prefer it; this is the fallback.
+
+### What moves vs stays
+
+- **Move**: every Completed entry whose `YYYY-MM-DD` timestamp is **before the current
+  period** (before this month / this ISO week). Appended (chronological ascending) to
+  the matching partition file and **removed** from the tracker's `## Completed`.
+- **Stay**: Completed entries within the current period remain in the tracker.
+- Result: the live tracker holds only the current period's Completed history; older
+  history lives in dated partition files under `.bak/`.
+
+### Procedure
+
+1. Determine the cutoff = start of the current period (month or ISO week) from a
+   **caller-supplied date** (this skill does not read the clock — pass the date in).
+2. Partition `## Completed` entries by their `YYYY-MM-DD` prefix: `< cutoff` → archive.
+3. `mkdir -p <tracker-dir>/.bak` if absent.
+4. Append archived entries (preserving chronological order) to the period partition
+   file; create it with an `# Archived Completed — <period>` header if new. Use `mv`-style
+   append (never delete the source lines until the append is confirmed).
+5. Remove the archived lines from the tracker's `## Completed`.
+6. Report: `N entries archived to <partition file>; tracker Completed now M entries`.
+
+### Trigger
+
+- **Period boundary** is the primary trigger — the first `move` / cleanup of a new
+  month (or ISO week) archives the *previous* period's Completed entries.
+- **Size safety net**: if `## Completed` exceeds ~40 entries or the tracker file exceeds
+  ~20 KB before a boundary, archive the previous period early.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Let `## Completed` grow unbounded across months | Archive prior-period entries to `.bak/` partition files on the period boundary |
+| 2 | Delete old Completed entries to shrink the file | **Move** (never delete) — the `.bak/` partition preserves the full history |
+| 3 | Require a registered archive-receiver for local size management | This `.bak/` path is receiver-independent; the receiver dispatch is a separate optional external-report path |
+| 4 | Dump the whole Completed history into one ever-growing partition | One partition file **per period** (`YYYY-MM` / `YYYY-Www`) |
+
 ## RAG dispatch (vendor-agnostic, body preservation)
 
 Move's **body-preservation step**. The Progress entry's body (sub-bullets, commit hashes, session IDs, verification details) is forwarded to the RAG receiver supplied via `--rag=<skill>:<topic>` dispatch. The receiver skill owns all storage details — endpoint, embedding model, collection naming, schema.
