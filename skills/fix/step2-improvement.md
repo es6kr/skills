@@ -213,6 +213,13 @@ Writing only a hook **specification** ("hook X to be implemented on Nth recurren
 - Do not perform Edit/Write (but **plan artifact .md saving is performed**)
 - **Stop here after Step 2** — do not proceed to Step 3 or 4
 - After reporting the plan, wait for user response. On "apply" approval, perform Edit/Write and proceed to Step 3
+- **"apply" approval = a SEPARATE, EXPLICIT user instruction to implement (e.g., "apply", "go", "implement it") issued AFTER the plan is reported.** An `AskUserQuestion` you issue during the plan phase (location, design axis, trade-off) refines the PLAN — its answer is **NOT** "apply" approval. After incorporating a sub-ask answer, re-report the updated plan and **STOP again**. Do not slide from "location decided" into Edit/Write/commit.
+- **Do not issue an execution-triggering ask during `--plan`.** The plan phase ends only when the user freely responds with an apply/implement instruction — never because an `AskUserQuestion` was answered.
+
+**Self-check (HARD STOP — before ANY Edit/Write/commit while `--plan` was set):**
+1. Did the user issue an EXPLICIT apply/implement instruction ("apply" / "go" / "implement it") *after* the plan was reported? → If no, **STOP** — you are still in the plan phase
+2. Am I about to treat a plan-refinement sub-ask answer (location, design axis, trade-off) as approval? → **Forbidden.** That answer refines the plan; re-report + STOP
+3. Did I save the plan artifact .md (path + 3-5 line summary only in chat)? → Required in `--plan` mode before any wait
 
 **Plan artifact .md saving (MANDATORY in `--plan` mode)** — applies the artifact-path rules:
 
@@ -240,6 +247,8 @@ Do not re-dump the entire plan body into chat — chat shows only path + 3-5 lin
 | 1 | Output --plan results only in chat and stop | Save .md to `.ralph/docs/generated/` or `.omc/plans/` and report the path |
 | 2 | Save the artifact but also dump the full plan body in chat | Chat = path + 3-5 line summary only |
 | 3 | Decide "it's just a draft, no need to save" | --plan = artifact. Always save |
+| 4 | Treat a mid-flow location / design / trade-off `AskUserQuestion` answer as "apply" approval and proceed to Edit/Write/commit | Sub-ask answer refines the plan → re-report + STOP. Execution needs a SEPARATE explicit apply/implement instruction |
+| 5 | Enter `--plan` and skip reading this topic, so the STOP + artifact rules never load | fix SKILL.md Step 2 mandates reading this topic before acting. The `--plan` STOP is also surfaced in SKILL.md's flag description for when the topic is not read |
 
 **Checkpoint (MANDATORY before proceeding to Step 3; in `--plan` mode, only after approval):**
 **Verify that the targets identified at every Why level (1~5) were actually modified before completing Step 2:**
