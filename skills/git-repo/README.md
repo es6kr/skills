@@ -5,7 +5,7 @@ Git repository and worktree management with SourceGit integration — clone via 
 ## Installation
 
 ```bash
-npx skills install git-repo
+npx skills add es6kr/skills --skill git-repo
 ```
 
 Browse on ClawHub: <https://clawhub.ai/skills/git-repo>
@@ -15,7 +15,7 @@ Browse on ClawHub: <https://clawhub.ai/skills/git-repo>
 `git-repo` depends on `commit-tidy`. Install it too:
 
 ```bash
-npx skills install commit-tidy
+npx skills add es6kr/skills --skill commit-tidy
 ```
 
 ## Usage

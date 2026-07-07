@@ -5,17 +5,17 @@ Claude Code skill authoring and management — create, lint, merge, upgrade, and
 ## Installation
 
 ```bash
-npx skills install skill-kit
+npx skills add es6kr/skills --skill skill-kit
 ```
 
 Browse on ClawHub: <https://clawhub.ai/skills/skill-kit>
 
 ### Peer skills
 
-`skill-kit` depends on `cc-plugin` (install via `npx skills install cc-plugin`) and `clawhub` (a companion skill for ClawHub publishing).
+`skill-kit` depends on `cc-plugin` and `clawhub` (a companion skill for ClawHub publishing). Install the published peer:
 
 ```bash
-npx skills install cc-plugin
+npx skills add es6kr/skills --skill cc-plugin
 ```
 
 ## Usage
