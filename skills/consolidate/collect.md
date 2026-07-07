@@ -18,7 +18,15 @@ Identify reviews from:
 - `coderabbitai[bot]` — CodeRabbit
 - `copilot[bot]` — GitHub Copilot
 - Other bots with `[bot]` suffix
+
+> **Bot login differs by API surface (poll/filter gotcha)**: GraphQL (`gh pr view --json reviews`) returns `author.login` WITHOUT the suffix (e.g. `copilot-pull-request-reviewer`), while REST (`gh api .../pulls/{N}/reviews`) returns `user.login` WITH it (e.g. `copilot-pull-request-reviewer[bot]`). An exact-match jq filter written for one surface silently matches nothing on the other — a completion poll can time out while the review has already arrived. Use a substring/`test()` match (e.g. `test("copilot")`) or match per surface.
 - **Human MEMBER/OWNER reviews and review-shaped comments (HARD STOP)** — enumerate every `reviews[]` entry whose `author.is_bot == false`, plus every `comments[]` entry whose `authorAssociation` is `MEMBER`/`OWNER`/`COLLABORATOR` AND whose body contains a review-style header (Code Review headers, `### Findings`, `### Issues`, `Critical`, `Important`, `Should fix`, `Must fix`, localized equivalents in any language). Each such reviewer (login) is a distinct **Source** that must be carried forward into the findings table — do not collapse them under "Internal Code Review". Query: `gh pr view <N> --json reviews,comments --jq '[.reviews[] | select(.author.is_bot==false) | {kind:"review", login:.author.login, body}] + [.comments[] | select(.authorAssociation == "MEMBER" or .authorAssociation == "OWNER" or .authorAssociation == "COLLABORATOR") | {kind:"comment", login:.author.login, body}]'`. Cross-check returned bodies for review-style headers before declaring a `comment` entry a review source.
+
+### Zero-findings completion state (do NOT treat as missing review)
+
+CodeRabbit's summary comment "**No actionable comments were generated in the recent review**" is a **completed review with verdict 0 findings** — the walkthrough is usually collapsed inside that same comment. It is NOT a rate-limit / pending / failure state, and it is NOT grounds for a re-review trigger (see `pr.md` Step 2.6 state matrix).
+
+Handling: record the reviewer in the matrix with verdict "no actionable findings" and continue to classify/post — `post.md` already supports a clean-reviewer row ("state 'No actionable findings' in the table if all reviewers are clean").
 
 ### Source-Specific Handling
 
