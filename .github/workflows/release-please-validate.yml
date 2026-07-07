@@ -42,18 +42,21 @@ jobs:
           fi
           echo "OK: bump-minor-pre-major = true"
 
-      - name: Verify bump-patch-for-minor-pre-major is true
+      - name: Verify bump-patch-for-minor-pre-major is false
         run: |
           set -euo pipefail
-          VALUE=$(jq -r '."bump-patch-for-minor-pre-major" // "null"' release-please-config.json)
-          if [ "$VALUE" != "true" ]; then
+          # NOTE: jq's // alternative operator treats false as empty, so
+          # `."key" // "null"` would turn a legitimate `false` into "null".
+          # Use tostring instead: false -> "false", missing key -> "null".
+          VALUE=$(jq -r '."bump-patch-for-minor-pre-major" | tostring' release-please-config.json)
+          if [ "$VALUE" != "false" ]; then
             cat <<EOF
-          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be true to keep pre-1.0 feat: bumps as patch (0.x.y -> 0.x.(y+1)) instead of minor (0.x+1.0). Note: fix: is already patch by default; this flag changes feat: behavior.
+          ::error file=release-please-config.json::"bump-patch-for-minor-pre-major" must be false so that pre-1.0 feat: bumps as minor (0.x.y -> 0.(x+1).0). This encodes the "new-topic = minor bump" policy: only feat commits (which land on the next-feat staging branch and represent a genuine skill topic addition) should raise the minor version. fix: remains patch by default.
           Current value: $VALUE
           EOF
             exit 1
           fi
-          echo "OK: bump-patch-for-minor-pre-major = true"
+          echo "OK: bump-patch-for-minor-pre-major = false"
 
   validate-new-component-versions:
     name: new-component initial version guard
@@ -106,8 +109,9 @@ jobs:
 
           if [ "$FAIL" -ne 0 ]; then
             cat <<EOF
-          One or more new manifest entries violate the initial-version policy.
-          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록".
+          One or more new manifest entries violate the initial-version policy:
+          every newly registered component must start at 0.0.0 so release-please
+          issues the first release from the first conventional commit.
           EOF
             exit 1
           fi
@@ -121,9 +125,16 @@ jobs:
           # whose squash subject became the merge commit. release-please then treated
           # the new 0.0.0 component as bumpable by that feat → pre-1.0 promotion → 1.0.0.
           #
-          # Hard-block the pattern: if this PR adds any new manifest entry, every
-          # commit between base..head must be a non-bumping type (chore/docs/ci/test/
-          # style/refactor). Any feat/fix in the same PR forces a split:
+          # The actual risk is the 1.0.0 jump, which only materializes when
+          #   (a) `bump-minor-pre-major` is not true in release-please-config.json, or
+          #   (b) a breaking-change commit (`type!:` subject or BREAKING CHANGE footer)
+          #       is present — that promotes to 1.0.0 regardless of the config flag.
+          # With bump-minor-pre-major=true and no breaking commits, a new-entry PR
+          # carrying feat/fix produces the normally desired first release
+          # (0.0.0 → 0.1.0 for feat, 0.0.1 for fix), so the pattern is allowed.
+          #
+          # Hard-block remains for the risky cases: if this PR adds a new manifest
+          # entry AND either risk (a) or (b) holds, force a split:
           #   - PR A (chore): register the new manifest entry + the new skill directory
           #   - PR B (feat or fix): the actual content change for that skill
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -162,8 +173,30 @@ jobs:
             exit 0
           fi
 
+          # Breaking-change commits promote a fresh 0.0.0 component straight to
+          # 1.0.0 even under bump-minor-pre-major=true — always a blocker here.
+          # (Avoid `jq '... // false'`: `//` swallows a literal false — compare
+          # against true explicitly instead.)
+          BREAKING_SUBJECTS=$(git log "$BASE_SHA..$HEAD_SHA" --pretty=format:'%s' \
+            | grep -E '^[a-z]+(\([^)]+\))?!: ' \
+            || true)
+          BREAKING_COMMITS=$(printf '%s\n%s\n' "$BREAKING_SUBJECTS" "$BODY_BREAKS" | grep -v '^$' | sort -u || true)
+          BUMP_MINOR_PRE_MAJOR=$(git show "$HEAD_SHA:release-please-config.json" 2>/dev/null \
+            | jq -r 'if ."bump-minor-pre-major" == true then "true" else "false" end' \
+            || echo "false")
+
+          if [ "$BUMP_MINOR_PRE_MAJOR" = "true" ] && [ -z "$BREAKING_COMMITS" ]; then
+            echo "OK: new manifest entries + non-breaking bump commits (feat/fix/perf) allowed —"
+            echo "bump-minor-pre-major=true caps the first release at 0.1.0 (feat) / 0.0.1 (fix)."
+            echo "New entries:"
+            echo "$NEW_KEYS"
+            echo "First-release-producing commits:"
+            echo "$BUMP_COMMITS"
+            exit 0
+          fi
+
           cat <<EOF
-          ::error::PR adds new manifest entries AND contains bump-producing commits (feat/fix/perf). This pattern causes release-please to immediately promote a fresh 0.0.0 component to 1.0.0 (or 0.1.0). Split into two PRs:
+          ::error::PR adds new manifest entries AND contains bump commits with a 1.0.0-jump risk (bump-minor-pre-major=$BUMP_MINOR_PRE_MAJOR, breaking commits: $(printf '%s' "$BREAKING_COMMITS" | grep -c . || true)). A fresh 0.0.0 component would be promoted to 1.0.0. Either drop the breaking marker, set bump-minor-pre-major=true, or split into two PRs:
             1. chore PR — register manifest entry (0.0.0) + add skill directory + non-bumping infra changes only
             2. feat/fix PR — actual content changes that should bump the new skill
 
@@ -173,7 +206,11 @@ jobs:
           Bumping commits found in this PR:
           $BUMP_COMMITS
 
-          See ~/.agents/.claude/rules/release-please-scope.md "신규 published skill 초기 version 등록" + "PR scope 외부 commit = bump cascade".
-          Reference incident: docs/generated/report-choco-1.0.0-overbump.md.
+          Breaking-change commits (promote 0.0.0 → 1.0.0 regardless of config):
+          ${BREAKING_COMMITS:-<none>}
+
+          Policy: a new component's first release must not be a 1.0.0 jump. With
+          bump-minor-pre-major=true and no breaking commits the combined pattern
+          is allowed (first release 0.1.0 / 0.0.1).
           EOF
           exit 1
