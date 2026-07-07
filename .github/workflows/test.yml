@@ -34,6 +34,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check-hangul.py skills
+      # The repo is PUBLIC and English-only: every tracked .md/.sh is publishing
+      # surface, not just skills/. A Korean workspace-local rule file under
+      # .claude/rules/ once slipped through the skills-only scan (2026-07-01).
+      - name: Korean check on tracked non-skills text files
+        run: |
+          set -eu
+          FAIL=0
+          # Read filenames line-by-line so a tracked path containing spaces is
+          # not word-split. Process substitution keeps the loop in this shell so
+          # FAIL survives to the exit below.
+          while IFS= read -r f; do
+            if grep -qP '[\x{AC00}-\x{D7A3}]' "$f"; then
+              echo "::error file=$f::Korean text found in tracked non-skills file"
+              grep -nP '[\x{AC00}-\x{D7A3}]' "$f" | head -3
+              FAIL=1
+            fi
+          done < <(git ls-files '*.md' '*.sh' | grep -v '^skills/')
+          exit "$FAIL"
 
   frontmatter-lint:
     name: SKILL.md Frontmatter Lint

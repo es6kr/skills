@@ -38,7 +38,7 @@ After confirming CI success, run this table sequentially — do not stop at "CI 
 | Condition | Action | Command |
 |-----------|--------|---------|
 | CI SUCCESS | **Check whether the AI Review Summary comment is posted** | `gh pr view <N> --json comments` → search for the user-authored AI Review Summary comment |
-| AI Review Summary **missing** | **Run `/consolidate pr-review` FIRST** — consolidate precedes Test Plan verification, which only runs after consolidate completes | `Skill("consolidate", "pr-review")` |
+| AI Review Summary **missing** | **Run `/consolidate pr` FIRST** — consolidate precedes Test Plan verification, which only runs after consolidate completes | `Skill("consolidate", "pr")` |
 | AI Review Summary **posted** (or consolidate-exempt PR) | Check the PR body Test Plan | `gh pr view <N> --json body` |
 | Test Plan has unchecked `- [ ]` items | Verify the unchecked items (deploy, Playwright, API call, etc.) → on pass, mark `- [x]` | `gh pr edit <N> --body` |
 | Test Plan fully `[x]` | Record CI success in `fix_plan.md` and check off the entry | Edit `fix_plan.md` |
@@ -82,7 +82,7 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
    gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --jq '.[] | select(.body | startswith("## AI Review Summary"))'
    ```
 
-2. **No Summary comment → unconditionally auto-invoke `/consolidate pr-review`**:
+2. **No Summary comment → unconditionally auto-invoke `/consolidate pr`**:
    - **If any AI review (CodeRabbit / Copilot / etc.) is present, consolidate is the default** — not optional
    - After consolidate, confirm the Summary comment was posted → continue to Step 3
    - **Forbidden**: asking the user a merge / apply option without the Summary. consolidate must run first
@@ -90,10 +90,11 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 3. **Summary comment exists → count 🔴 Critical (HARD STOP)**:
 
    ```bash
-   # Count 🔴 Critical entries in the Summary body
+   # Count 🔴 Critical entries in the Summary body.
+   # CROSS-PLATFORM (HARD STOP): NEVER `grep -c '🔴 Critical'` — Windows Git Bash emoji
+   # byte-matching returns false 0 (silent merge-gate bypass). Count inside jq (UTF-8 native):
    gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments \
-     --jq '.[] | select(.body | startswith("## AI Review Summary")) | .body' \
-     | grep -c '🔴 Critical'
+     --jq '[.[] | select(.body | startswith("## AI Review Summary")) | .body | [scan("🔴 Critical")] | length] | add // 0'
    ```
 
    - **🔴 Critical ≥ 1 → merge is absolutely forbidden**. Address the Critical items in code, then refresh the Summary before merging. "deferred" is not allowed — Critical items must be addressed
@@ -139,7 +140,7 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 |---|-------|-----|
 | 1 | Treat the "deferred" tag in the Summary table as registration | The Summary is a one-shot GitHub comment. Registration in a medium (fix_plan / checklist / Issue) must be verified separately |
 | 2 | Interpret "if deferred is stated, merge is allowed" as "merge regardless of medium registration" | Merge requires BOTH explicit deferred + medium registration |
-| 3 | On missing registration, ask the user "shall I register?" via options | `consolidate/pr-review.md` Step 7.6 handles auto-registration. Missing = consolidate-procedure violation → re-invoke consolidate, then re-verify |
+| 3 | On missing registration, ask the user "shall I register?" via options | `consolidate/post.md` Step 7.6 handles auto-registration. Missing = consolidate-procedure violation → re-invoke consolidate, then re-verify |
 | 4 | Treat a "we'll register when the user picks merge" promise as actual registration | A promise ≠ an action. Decide based on actual lines existing in the medium file |
 
 #### Self-check (every time, before merging)
@@ -163,7 +164,8 @@ gh pr view <PR_NUMBER> --json body --jq '.body' | node scripts/check-test-plan.j
 |-----------------|----------------------|
 | `[general]` | **Cannot merge** (HARD STOP, no exception) |
 | `[UI]` | **Cannot merge** (HARD STOP, no exception) |
-| `[post-merge]` | **Merge allowed** (but tracking-medium registration must be verified — procedure below) |
+| `[e2e]` | If the suite runs on **PR CI** → the CI check is the guard (**cannot merge** until green). If **deploy-branch-only** → treated like `[post-merge]` (merge allowed; tracking required) |
+| `[post-merge]` / `[deploy]` | **Merge allowed** (but tracking-medium registration must be verified — procedure below) |
 | No prefix (legacy) | Treated as `[general]` or `[UI]` — **cannot merge** |
 
 #### `[post-merge]` items — verify tracking-medium registration (HARD STOP)
@@ -487,7 +489,7 @@ gh pr merge <PR_NUMBER> --merge
   - Consequence of skipping: the epic body stays stale; on the next planning pass, "already implemented items" appear unfinished and cause duplicate work / confusion
 - **Deploy follow-up**: after merge, confirm with the user whether to run the related deploy workflow (infra automation, ArgoCD sync, etc.).
 - **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the five conditions to the user is a procedural violation.
-- **Post-hoc review for PRs merged without review** — run `/consolidate pr-review` for a post-hoc review, and if actionable items appear, ask via AskUserQuestion whether to register them in a follow-up PR or an existing issue.
+- **Post-hoc review for PRs merged without review** — run `/consolidate pr` for a post-hoc review, and if actionable items appear, ask via AskUserQuestion whether to register them in a follow-up PR or an existing issue.
 
 ## Recording evidence of merge-condition satisfaction (CRITICAL)
 
@@ -532,9 +534,11 @@ Right before authoring the merge-recommendation AskUserQuestion, verify all five
 gh pr checks <N> --json bucket -q '[.[] | .bucket] | group_by(.) | map({(.[0]): length}) | add'
 
 # 2. AI Review Summary — count of 🔴 Critical (forbid merge if ≥ 1)
-gh api repos/{owner}/{repo}/issues/<N>/comments \
-  --jq '.[] | select(.body | startswith("## AI Review Summary")) | .body' \
-  | grep -c '🔴 Critical' && echo "BLOCKED: Critical unresolved"
+# CROSS-PLATFORM (HARD STOP): count in jq (UTF-8 native), NOT `grep -c '🔴 Critical'`
+# (Windows Git Bash emoji byte-match → false 0 → silent merge-gate bypass).
+CRIT=$(gh api repos/{owner}/{repo}/issues/<N>/comments \
+  --jq '[.[] | select(.body | startswith("## AI Review Summary")) | .body | [scan("🔴 Critical")] | length] | add // 0')
+[ "$CRIT" -ge 1 ] && echo "BLOCKED: Critical unresolved ($CRIT)"
 
 # 2b. AI Review actionable status
 gh pr view <N> --json comments -q '.comments[] | select(.body | contains("actionable")) | .body' | head

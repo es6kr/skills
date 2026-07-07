@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.6](https://github.com/es6kr/skills/compare/fix-v0.3.5...fix-v0.3.6) (2026-07-07)
+
+
+### Bug Fixes
+
+* **fix,web-browser:** publish-scope edit gate + managed-surface backend detection ([2e28fc4](https://github.com/es6kr/skills/commit/2e28fc4d39953ee6a88f64bd8c8d20907ba01e39))
+* **fix:** qualify Wiki-LLM medium paths with the workspace wiki prefix ([a00b2f8](https://github.com/es6kr/skills/commit/a00b2f89636d2ec4779f7995712ffac22c1ed5ae))
+* **skills:** review-feedback bundle — consolidate trigger wording + fix wiki paths ([784854e](https://github.com/es6kr/skills/commit/784854e3e07696ca8d16274215004488861862d1))
+
 ## [0.3.5](https://github.com/es6kr/skills/compare/fix-v0.3.4...fix-v0.3.5) (2026-07-03)
 
 
