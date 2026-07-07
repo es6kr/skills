@@ -82,3 +82,20 @@ Skill("github-flow", "dependencies --blocking 300")
 - `plan-to-issue`: Used to generate the actual issue body/comment content
 - `dependencies`: Used to apply `blocked-by` / `blocking` relationships
 - `expand`: Used if the new finding should be merged into an in-progress PR/issue
+
+---
+
+## Branch verification before editing code on issue work (HARD STOP)
+
+**When making a code change tied to an issue number (#N), verify the current branch is the issue's branch BEFORE running Edit/Write.**
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Editing for #326 while on `feat/222-backchannel-logout` | `git branch --show-current` → issue number mismatch → create the issue branch first |
+| 2 | After registering a task via /wip, edit code without verifying branch | Register → `git branch --show-current` → for a github-flow project, ensure issue branch → Edit |
+| 3 | "It's a small fix, current branch is fine" thinking | Even a one-line change: a github-flow project requires the issue branch (MEMORY.md reference) |
+
+**Self-check (every time before Edit/Write)**:
+1. Does the current branch name include the in-flight issue number?
+2. If not, is this project github-flow? (check MEMORY.md)
+3. github-flow + issue number mismatch → `gh issue develop --name "<tag>/<issue-number>-<desc>"` or `git checkout -b` first, then work

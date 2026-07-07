@@ -50,7 +50,14 @@ NC = "\033[0m"
 HANGUL_RE = re.compile(f"[{chr(0xAC00)}-{chr(0xD7A3)}]")
 
 SCAN_EXTS = (".md", ".sh")
-MAX_MATCHES_PRINTED = 5
+
+# How many matched lines to print per skill. Override with MAX_MATCHES=N
+# (e.g. MAX_MATCHES=50) to see more context when a skill has many hits; a
+# non-integer value falls back to the default.
+try:
+    MAX_MATCHES_PRINTED = max(0, int(os.environ.get("MAX_MATCHES", "5")))
+except ValueError:
+    MAX_MATCHES_PRINTED = 5
 
 
 def _is_skill_dir(path: Path) -> bool:
