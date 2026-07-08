@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/github-flow-v0.4.3...github-flow-v0.5.0) (2026-07-07)
+
+
+### Features
+
+* **docxport:** promote initial registration to main ([8265ba3](https://github.com/es6kr/skills/commit/8265ba33b13ab6054c3595943d068f5c1c13625a))
+* **github-flow,next:** draft-PR default + sync remaining pr-review→pr topic refs ([ca64425](https://github.com/es6kr/skills/commit/ca644253c8b84b41f8a90d7869ac16fa8c7c7124))
+* **github-flow:** add epic-bundle topic row + [e2e]/[deploy] test plan prefixes + branch verification ([31d629f](https://github.com/es6kr/skills/commit/31d629fa405639995a53ec8296ff95f33672b435))
+* **skills:** drift sync bundle — cc-plugin/github-flow/wip/next/check-hangul ([ac5d15d](https://github.com/es6kr/skills/commit/ac5d15d7231e67b3b53cae3861bb6132a2f3beff))
+
 ## [0.4.3](https://github.com/es6kr/skills/compare/github-flow-v0.4.2...github-flow-v0.4.3) (2026-07-03)
 
 

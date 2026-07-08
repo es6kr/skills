@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/wip-v0.3.3...wip-v0.4.0) (2026-07-07)
+
+
+### Features
+
+* **docxport:** promote initial registration to main ([8265ba3](https://github.com/es6kr/skills/commit/8265ba33b13ab6054c3595943d068f5c1c13625a))
+* **skills:** drift sync bundle — cc-plugin/github-flow/wip/next/check-hangul ([ac5d15d](https://github.com/es6kr/skills/commit/ac5d15d7231e67b3b53cae3861bb6132a2f3beff))
+* **wip:** add Step 0 args classification, Step 3 loop continuation, and fix_plan task decomposition ([7e31c6f](https://github.com/es6kr/skills/commit/7e31c6f5e7e3536f4c2227a3ff6084aaef0547d2))
+
 ## [0.3.3](https://github.com/es6kr/skills/compare/wip-v0.3.2...wip-v0.3.3) (2026-06-30)
 
 
