@@ -347,6 +347,35 @@ mcp__code-mode__call_tool_chain({
 })
 ```
 
+## Virtualized Table Bulk Row Operations
+
+Virtualized tables (React-window/virtual-scroll UIs like Notion databases, large grids) only render rows near the current viewport into the DOM. This breaks the naive snapshot→ref→click loop in specific ways:
+
+### Symptom pattern
+- `browser_snapshot` frequently exceeds the token limit (50-70KB) and gets auto-saved to a file
+- Element refs go stale after 1-2 interactions because scrolling/re-render unmounts and remounts rows with new refs
+- `document.querySelectorAll` via `browser_evaluate` unreliably finds custom-rendered controls (checkboxes that aren't real `<input type="checkbox">`, or don't consistently match `[role="checkbox"]`)
+- Accessible-name-based locators collide when many elements share the same (often empty) label — `getByLabel('', {exact:true}).nth(N)` resolves ambiguously as the DOM shifts between calls
+
+### Procedure
+
+1. **Never assume one snapshot covers the whole dataset.** Scroll to top/middle/bottom (`el.scrollTop = ...` on the scrollable container) and snapshot at each position to cover the full row set — don't infer total row count from a single snapshot's visible rows.
+2. **When a snapshot exceeds the token limit and is saved to a file**, immediately grep/parse the saved file (`uv run python3 -c "import re; ..."` or `grep -n`) to extract element refs paired with their row content, rather than retrying the snapshot call hoping for a smaller result.
+3. **Extract a ref and click it immediately** — don't batch multiple snapshot→ref-extraction cycles before acting. A ref from an older snapshot is often stale by the time you get to it if the page re-rendered in between (scroll, a prior click, a dialog open/close).
+4. **After each click, verify the actual target was hit** — a successful tool call is not proof the intended row was selected. Query the live DOM state (e.g. elements with `aria-checked="true"` plus their closest row's text) and confirm it matches the intended row's content signature.
+5. **For bulk multi-select + destructive action** (e.g. select N rows → delete): click each target individually via a fresh ref each time, verify the running selection-count indicator after each batch (the UI's own "N selected" label, in whatever language it renders), then do a final content-level verification of every selected row **before** executing the action.
+6. **When distinguishing "old" vs "new" duplicate rows by content** (e.g. after a data merge produced duplicates), verify the first pair by comparing actual field content against a known-old-value signature, then confirm any assumed ordering pattern (e.g. "old always sorts first") holds before relying on it for the remaining pairs.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume one snapshot at the current scroll position shows the entire table | Scroll to top/middle/bottom and snapshot at each position to cover all rows |
+| 2 | Reuse a ref from a snapshot taken several actions ago | Extract ref → click immediately. If a click fails with "ref not found", re-snapshot and re-extract rather than retrying the same ref |
+| 3 | Trust "click tool returned success" as proof the intended row was selected | Query `aria-checked="true"` (or equivalent) plus closest row text after every click/batch, compare against expected content |
+| 4 | Execute a bulk delete/action right after reaching the target selection count | Verify selection count AND spot-check row content for every selected item before the destructive action |
+| 5 | Use `document.querySelectorAll(...)` text-match on custom UI controls and assume zero results means "not found" | Custom-rendered controls may not match simple DOM queries reliably — cross-check with the accessibility snapshot (which traverses non-standard DOM/shadow structures) before concluding an element doesn't exist |
+
 ## Error Handling
 
 If element not found:
