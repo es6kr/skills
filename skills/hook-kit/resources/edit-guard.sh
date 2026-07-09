@@ -351,7 +351,10 @@ check_fa_edit_without_rag_search() {
   rag_calls=$(python3 - "$transcript" <<'PYEOF' 2>/dev/null
 import json, re, sys
 path = sys.argv[1]
+# Medium 1: MCP find tool (mcp__<vendor>__*-find)
 pat = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-find$")
+# Medium 2: vendor script fallback when MCP is unavailable (e.g. qdrant-search.py, qdrant-import.py)
+vendor_pat = re.compile(r"qdrant-(search|import)\.py")
 count = 0
 with open(path, encoding="utf-8", errors="ignore") as fh:
     for line in fh:
@@ -363,8 +366,15 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
         c = msg.get("content")
         if isinstance(c, list):
             for b in c:
-                if isinstance(b, dict) and b.get("type") == "tool_use" and pat.match(b.get("name", "")):
+                if not isinstance(b, dict) or b.get("type") != "tool_use":
+                    continue
+                name = b.get("name", "")
+                if pat.match(name):
                     count += 1
+                elif name == "Bash":
+                    cmd = (b.get("input") or {}).get("command", "")
+                    if vendor_pat.search(cmd):
+                        count += 1
 print(count)
 PYEOF
 )
@@ -386,6 +396,8 @@ PYEOF
     echo "  1. Run a RAG semantic search via the registered MCP find tool"
     echo "     (e.g., mcp__<vendor>__qdrant-find / chroma-find / etc.)"
     echo "     with the recurrence pattern's core keywords. Then retry the Edit."
+    echo "  1b. MCP unavailable? Run the vendor script fallback instead"
+    echo "     (e.g., qdrant-search.py / qdrant-import.py) — also counts as RAG search."
     echo "  2. If you have verified via grep that the pattern is genuinely new,"
     echo "     include 'fix-rag-search-skipped' in the new section body."
     echo ""
