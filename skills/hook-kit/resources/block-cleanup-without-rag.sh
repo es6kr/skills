@@ -55,7 +55,7 @@ fi
 #   2. Bold line "**chunks added**" / "**qdrant**" / locale variant
 #   3. Header-like "### RAG" / "## RAG"
 HAS_RAG_ROW=0
-if echo "$RESPONSE" | grep -qE '\| .*(RAG|qdrant|chunks).*\|'; then
+if echo "$RESPONSE" | grep -qE '^\s*\|\s*\*{0,2}[^|]*(RAG|qdrant|3-C\.1)[^|]*\*{0,2}\s*\|.*(RAG|qdrant|chunks)'; then
   HAS_RAG_ROW=1
 elif echo "$RESPONSE" | grep -qE "\*\*.*($HG_CLEANUP_RAG_VISIBILITY).*\*\*"; then
   HAS_RAG_ROW=1
