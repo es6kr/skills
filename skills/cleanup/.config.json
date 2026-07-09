@@ -1,0 +1,7 @@
+{
+  "agentify": true,
+  "doc-recommend": true,
+  "infra-check": true,
+  "memory": true,
+  "weekly-report": true
+}
