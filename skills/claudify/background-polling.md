@@ -30,6 +30,7 @@ Mandatory active polling for long-running background work (HARD STOP).
 | 9 | Wait unchecked until the next user prompt after a background dispatch | **5+ min expected** → periodic checks via ScheduleWakeup. **10+ min** → both a command-level `timeout` and ScheduleWakeup |
 | 10 | Wait for a task-notification on a hung background task (a command without timeout never sends one) | Prevent hangs via mandatory timeouts + kill any process with `ps` etime of 1 hour+ immediately (see row 11) |
 | 11 | Run new commands while hung processes accumulate (PID pileup) | Right before every new background dispatch, scan with `ps -o pid,etime,command -ax \| awk 'NR==1 \|\| $2 ~ /-/'` for 1-hour+ processes. Report to the user + kill after confirmation |
+| 12 | Register a wakeup, then sit idle in the main session while a background agent runs | A wakeup covers hang recovery — it does not license idling. Drive other drivable pending tasks in the same turn; idling past the 5-minute prompt-cache TTL makes the completion wake-up re-read the full context uncached |
 
 ## ScheduleWakeup delay guide
 
@@ -50,6 +51,7 @@ Mandatory active polling for long-running background work (HARD STOP).
 4. About to end the turn with just "background in progress"? — Ask yourself whether ScheduleWakeup was registered right before that
 5. Multiple concurrent background tasks → one wakeup keyed to the latest-finishing task
 6. **Stale-process scan**: right before a new background dispatch, check for 1-hour+ processes with `ps -o pid,etime,command -ax | awk 'NR==1 || $2 ~ /-/'`. If found, report to the user and kill after confirmation
+7. **Main-session utilization**: are other pending tasks drivable while the background work runs? Drive them in the same turn — an end-of-turn idle is acceptable only when nothing else is drivable
 
 ## Self-check (after user-delegated CI/deploy, immediately before every response)
 
