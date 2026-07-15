@@ -18,12 +18,13 @@ def parse_args():
     return parser.parse_args()
 
 class Node:
-    def __init__(self, text, indent, is_list_item=False, checked=None, marker_type=None):
+    def __init__(self, text, indent, is_list_item=False, checked=None, marker_type=None, blocked_marker=False):
         self.text = text
         self.indent = indent
         self.is_list_item = is_list_item
         self.checked = checked
         self.marker_type = marker_type
+        self.blocked_marker = blocked_marker
         self.children = []
 
 def parse_line(line):
@@ -40,8 +41,12 @@ def parse_line(line):
             checked = False
             text = rest[3:].strip()
         elif rest.startswith("[BLOCKED"):
+            # Standard standalone marker ("- [BLOCKED] item") — unresolved for the
+            # descendants gate, but must round-trip with its original marker
+            # (never rewritten to "- [ ] [BLOCKED]").
             checked = False
             text = rest
+            return Node(text, indent, is_list_item=True, checked=checked, marker_type=marker, blocked_marker=True)
         else:
             text = rest
         return Node(text, indent, is_list_item=True, checked=checked, marker_type=marker)
@@ -88,7 +93,7 @@ def node_to_lines(node):
         if node.checked is True:
             marker = "- [x] "
         elif node.checked is False:
-            marker = "- [ ] "
+            marker = "- " if node.blocked_marker else "- [ ] "
         else:
             marker = node.marker_type
         indent_str = " " * node.indent
@@ -101,7 +106,7 @@ def node_to_lines(node):
             if n.checked is True:
                 c_marker = "- [x] "
             elif n.checked is False:
-                c_marker = "- [ ] "
+                c_marker = "- " if n.blocked_marker else "- [ ] "
             else:
                 c_marker = n.marker_type
             indent_str = " " * n.indent
@@ -316,15 +321,17 @@ def main():
     else:
         output_bytes = output_content.encode('utf-8')
 
-    # Backup original file
-    backup_path = file_path + ".bak"
+    # Backup original file — timestamped slot so a rerun cannot clobber the only good copy
+    backup_path = f"{file_path}.{datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
     with open(backup_path, 'wb') as f:
         f.write(raw)
     print(f"Backup created at {backup_path}")
 
-    # Write new file content
-    with open(file_path, 'wb') as f:
+    # Write new file content atomically — a crash mid-write must not truncate the live tracker
+    tmp_path = file_path + ".tmp"
+    with open(tmp_path, 'wb') as f:
         f.write(output_bytes)
+    os.replace(tmp_path, file_path)
     print(f"Updated {os.path.basename(file_path)} successfully.")
 
     # Write archives
@@ -342,7 +349,9 @@ def main():
         
         archived_lines = []
         if os.path.exists(archive_file):
-            with open(archive_file, 'r', encoding='utf-8') as af:
+            # utf-8-sig on read strips the BOM the write below prepends —
+            # plain utf-8 here stacked one more BOM per archive append.
+            with open(archive_file, 'r', encoding='utf-8-sig') as af:
                 existing = af.read()
             archived_lines.append(existing.rstrip())
         else:
