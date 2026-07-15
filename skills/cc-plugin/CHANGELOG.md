@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/cc-plugin-v0.4.2...cc-plugin-v0.5.0) (2026-07-07)
+
+
+### Features
+
+* **cc-plugin:** add troubleshoot topic + expand create guidance ([6df1e6e](https://github.com/es6kr/skills/commit/6df1e6e430d715cdd3adf87e525d5b0f4118e52f))
+* **docxport:** promote initial registration to main ([8265ba3](https://github.com/es6kr/skills/commit/8265ba33b13ab6054c3595943d068f5c1c13625a))
+* **skills:** drift sync bundle — cc-plugin/github-flow/wip/next/check-hangul ([ac5d15d](https://github.com/es6kr/skills/commit/ac5d15d7231e67b3b53cae3861bb6132a2f3beff))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/cc-plugin-v0.4.1...cc-plugin-v0.4.2) (2026-06-30)
 
 

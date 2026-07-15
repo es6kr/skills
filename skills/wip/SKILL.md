@@ -56,20 +56,56 @@ Emitting only a text summary without persistent recording does not satisfy `/wip
 
 ## /wip Entry Procedure (CRITICAL)
 
-`/wip` or "task cleanup + remaining work" invocations must follow the **3 steps in [resume.md](./resume.md)** in order. Skipping steps is forbidden:
+### Step 0 — args classification (HARD STOP, MANDATORY before Step 1)
 
-1. **Step 1 — Cleanup**: immediately delete stale completed/in_progress entries (no user confirmation required)
-2. **Step 2 — Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / delete
-3. **Step 3 — Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
+**Before dispatching to any topic, classify the args intent.** The `/wip` skill has two mutually-exclusive dispatch paths — resume workflow vs new-task registration — and the wrong choice wastes user time and misapplies the resume gate.
+
+Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then classify:
+
+| Signal | Mode | Dispatch |
+|--------|------|----------|
+| args contains **new-work instructions** (verbs like write / create / add / record / draft, referring to concrete deliverables), AND (existing tasks are 0 OR the new work is clearly independent) | **Registration mode** | Register new tasks via `TaskCreate` (Claude) / append lines to `task.md` (Antigravity). Skip resume workflow |
+| args empty, or contains **cleanup/resume keywords** only (cleanup / remaining / resume / continue), AND existing tasks ≥1 | **Resume mode** | Follow 3 steps in [resume.md](./resume.md) |
+| args contains **new-work instructions AND** existing tasks ≥1 with unclear direction | **Mixed mode** | (a) `TaskCreate` new work first, (b) then resume workflow on the combined list |
+| args contains new-work instructions AND 0 existing tasks | **Registration mode** (0-task early exit) | `TaskCreate` only. Do NOT enter resume Step 1 (nothing to clean) |
+
+**Self-check (before proceeding)** — answer all 5:
+
+1. Did I read the args verbatim and identify verbs? (new-work verbs = registration; cleanup verbs = resume)
+2. Did I call `TaskList` / read `task.md` to count existing tasks?
+3. If 0 tasks and args has new-work verbs → am I about to call `TaskCreate` **directly**, not resume Step 1?
+4. If mixed → am I calling `TaskCreate` first, then resume?
+5. If I cannot classify with confidence → am I calling `AskUserQuestion` before dispatching?
+
+### Step 1 — Resume workflow (only in Resume mode or Mixed mode's second phase)
+
+**Follow the 3 steps in [resume.md](./resume.md)** in order:
+
+1. **Cleanup**: immediately delete stale completed/in_progress entries (no user confirmation required)
+2. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / delete
+3. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
+
+### Step 1 (alt) — Registration path (Registration mode)
+
+1. Parse args into discrete work items (one per deliverable)
+2. `TaskCreate` (Claude) or append lines to `task.md` (Antigravity) — one entry per item
+3. If ≥2 items, `AskUserQuestion` for start priority; else mark the sole item `in_progress` and execute
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Enter resume Step 1 (Cleanup) blindly on every `/wip` invocation | Run Step 0 classification first. 0-task + new-work args = skip resume, go to Registration path |
+| 2 | Interpret "3 steps in resume.md must follow" as unconditional | The 3-step chain applies only when Resume mode is selected (Step 0). Registration mode has its own 3-step path (parse → register → execute) |
+| 3 | Force resume workflow onto args that request new deliverables | New-work verbs → Registration mode. Resume workflow does not apply to work that does not exist yet |
+| 4 | Skip `TaskList` before deciding mode | `TaskList` is the primary source for existing-task count. Guessing from context memory is unreliable |
+| 5 | Mixed mode: register new tasks + immediately mark in_progress without resume Step 2 direction ask on existing | Mixed mode: (a) register new, (b) then run resume on the combined list — old tasks may still need per-item direction |
 
 Environment implementations:
 - Claude Code → [claude.md](./claude.md) (TaskList/TaskCreate/AskUserQuestion)
 - Antigravity → [antigravity.md](./antigravity.md) (task.md + ask.md)
 
-**Violation history**:
-- **2026-05-03 (1st)**: With 5 pending tasks, `/wip` was invoked and only "which one first?" was asked — per-item direction (split/merge/delete) was skipped.
-- **2026-05-03 (2nd)**: With 6 completed entries lingering in TaskList, `/wip` asked per-item direction only for pending #20 — completed tasks were not cleaned up. User pointed out: completed tasks unrelated to the remaining ones must be cleaned. Step 1 (cleanup of completed/irrelevant tasks) was promoted to an explicit step.
-- **2026-05-20 (resume topic introduced)**: The "task cleanup + remaining work" natural-language trigger was split across cleanup Phase 0 and wip Step A — a single entry point was missing. The resume topic was introduced to unify them.
+**Prior violations**: see `~/.claude/skills/cleanup/data/failed-attempts.md` under keywords "wip resume dispatch", "wip cleanup skip", "wip registration vs resume".
 
 ## Quick Reference
 

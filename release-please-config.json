@@ -132,6 +132,16 @@
         }
       ]
     },
+    "skills/docxport": {
+      "package-name": "docxport",
+      "component": "docxport",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/dotfile": {
       "package-name": "dotfile",
       "component": "dotfile",
@@ -155,6 +165,16 @@
     "skills/fix-plan": {
       "package-name": "fix-plan",
       "component": "fix-plan",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
+    "skills/forge": {
+      "package-name": "forge",
+      "component": "forge",
       "extra-files": [
         {
           "type": "generic",

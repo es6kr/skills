@@ -23,6 +23,12 @@ Environment detection:
 2. `task.md` artifact exists or `appDataDir` context present → Antigravity
 3. If both, prefer Claude Code (TaskList is more reliable)
 
+## Precondition — Resume mode selected by SKILL.md Step 0
+
+**Do NOT enter this workflow blindly.** SKILL.md `/wip Entry Procedure -> Step 0` must have classified args as Resume mode (or Mixed mode second phase). Registration-mode invocations (new-work args + 0 tasks) skip this file entirely and go to `TaskCreate` directly.
+
+If you find yourself in this file with 0 existing tasks and args that request new deliverables (write / create / add / draft verbs), dispatch back to SKILL.md Step 0 and re-classify — you are in the wrong workflow.
+
 ## Step 1. Cleanup (FIRST — no user confirmation required)
 
 Remove stale items immediately. The goal is to take them out of the selectable list so the next step's context is not muddied.
@@ -97,6 +103,21 @@ Among the items decided as "Proceed" in Step 2, decide the start priority → ma
 |-------------|-----------|
 | Claude Code | `TaskUpdate(taskId, status: "in_progress")` → work → `TaskUpdate(status: "completed")` |
 | Antigravity | Change the matching line in `task.md` to `- [/]` → work → change to `- [x]` |
+
+### Loop continuation (HARD STOP — do not stop with a report mid-batch)
+
+Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | A sub-skill (github-flow/fix/…) returns → write a report → end the turn while other Proceed items are pending | Sub-skill return = control is back in the /wip loop. Mark that item done → start the next Proceed item in the same turn |
+| 2 | Treat "the item I just drove via a sub-skill" as the whole batch | Batch = all items marked Proceed in Step 2. One done ≠ batch done |
+| 3 | All Proceed items done → stop with a report | Batch exhausted → invoke `Skill("next")` for next-action options |
+
+**Self-check (every time a sub-skill returns OR an item is marked completed inside Step 3):**
+1. Are there Proceed items not yet driven? → Yes: start the next one in this turn (no report-and-stop)
+2. Batch exhausted? → invoke `Skill("next")` (not a bare report)
+3. A blocked item (waiting on a predecessor) is skipped, but skipping it does not satisfy the batch
 
 ### When there are 5 or more items
 

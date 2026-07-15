@@ -3,9 +3,11 @@ name: github-flow
 metadata:
   author: es6kr
   version: "0.1.0"
-depends-on: [code-workflow, web-browser]
+depends-on:
+  - code-workflow
+  - web-browser
 description: |
-  GitHub issue and PR workflow automation. Topics — dependencies (blocked-by/sub-issues via GraphQL), expand (expand-vs-split mid-work), identity-auth (owner-based gh account mapping + scope refresh + GH_TOKEN fallback), merge (CI+review check + no autonomous push), plan-to-issue (MD to issue body), pr (PR with test plan), push-guards (branch change ask, push rejection ask, force-push CI check, main/master push restriction), register (duplicate check + strategy), review (structured comments), review-apply (deferred review feedback apply), sanitize (HARD STOP personal data scan for PUBLIC repos), upstream-issue (external OSS feature/bug). Use when: "plan to issue", "issue register", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "PII", "expand PR", "blocked by", "addBlockedBy", "upstream issue", "review apply", "sub-issue", "addSubIssue", "gh auth", "owner identity", "force push", "push reject", "branch change forbid", "no autonomous push".
+  GitHub issue/PR workflow automation. Topics — dependencies (blocked-by/sub-issues via GraphQL), epic-bundle (deferred findings → Epic + sub-issues), expand (expand-vs-split mid-work), identity-auth (gh account map + scope refresh + GH_TOKEN fallback), merge (CI/review gates + no autonomous push), plan-to-issue (MD → issue body), pr (PR with test plan), push-guards (branch/push-reject/force-push/main-push), register (dup check + strategy), review (structured comments), review-apply (deferred feedback apply), sanitize (PUBLIC repo personal data scan), upstream-issue (external OSS feature/bug). Use when: "plan to issue", "issue register", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "PII", "expand PR", "blocked by", "epic bundle", "upstream issue", "review apply", "sub-issue", "gh auth", "force push", "push reject", "branch change forbid".
 ---
 
 # GitHub Flow
@@ -17,6 +19,7 @@ Convert plans, research, and implementation results into GitHub issues and PRs.
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | dependencies | Manage native Issue Relationships (blocked-by/blocking) via addBlockedBy/removeBlockedBy GraphQL mutations | [dependencies.md](./dependencies.md) |
+| epic-bundle | Bundle deferred review findings across multiple PRs into one Epic tracking issue (checklist + native sub-issues + epic label) | [epic-bundle.md](./epic-bundle.md) |
 | expand | Decide expand-vs-split when new findings emerge mid-work and update title/body | [expand.md](./expand.md) |
 | identity-auth | Owner-based gh account mapping for commit author identity + gh auth scope refresh + GH_TOKEN env fallback for org repo 404 | [identity-auth.md](./identity-auth.md) |
 | merge | CI success and AI review check then merge with commit cleanup, including pre-merge blockedBy verification | [merge.md](./merge.md) |
@@ -34,6 +37,9 @@ Convert plans, research, and implementation results into GitHub issues and PRs.
 ```text
 github-flow (issue/PR workflow)
   ├─→ plan-to-issue (issue body content)
+  ├─→ epic-bundle (deferred findings across PRs → one Epic issue)
+  │     ├─→ uses plan-to-issue (Epic body) + register (dup check) + dependencies (sub-issues)
+  │     └─→ receives from: consolidate next step (auto-suggest when deferred findings accumulate)
   ├─→ register (evaluate duplicates and decide strategy)
   ├─→ pr (PR body content + visual attachments)
   ├─→ review (post structured review comments)
