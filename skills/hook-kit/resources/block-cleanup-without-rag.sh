@@ -26,6 +26,11 @@ HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:-chunks added|qdrant}"
 
 INPUT=$(cat)
 
+# Transcript path feeds both the RESPONSE fallback below and the HAS_RAG_CALL
+# scan later — derive it unconditionally so the scan also works when the
+# payload carries a populated .response.
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+
 # Extract assistant message text from Stop event payload
 RESPONSE=$(echo "$INPUT" | jq -r '
   .response // .transcript // .assistant_message // empty
@@ -33,7 +38,6 @@ RESPONSE=$(echo "$INPUT" | jq -r '
 
 # Fallback: try parsing transcript-based payload (varies by Stop hook implementation)
 if [[ -z "$RESPONSE" ]]; then
-  TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
   if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
     # Read last assistant turn from transcript
     RESPONSE=$(tail -50 "$TRANSCRIPT_PATH" | jq -r 'select(.type=="assistant") | .message.content[]?.text? // empty' 2>/dev/null | tail -100)

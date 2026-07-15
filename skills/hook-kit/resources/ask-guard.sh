@@ -27,7 +27,11 @@ if [[ -f "$HG_DATA_FILE" ]]; then
 fi
 HG_ASK_ISSUE_PREFIX="${HG_ASK_ISSUE_PREFIX:-(PR|issue|pull)[[:space:]]*#[0-9]}"
 HG_ASK_FINDING_PREFIX="${HG_ASK_FINDING_PREFIX:-(Finding|Item|Section|Important|Nitpick|Critical|Comment|Walkthrough)[[:space:]]*#[0-9]}"
-HG_ASK_RETROSPECT_PR="${HG_ASK_RETROSPECT_PR:-(merged|MERGED|previously|prior)[^0-9]{0,20}#[0-9]}"
+# Brace quantifiers cannot live inside a ${VAR:-default} (the first `}` ends the
+# expansion and corrupts the regex) — assign this fallback with an explicit guard.
+if [[ -z "${HG_ASK_RETROSPECT_PR:-}" ]]; then
+  HG_ASK_RETROSPECT_PR='(merged|MERGED|previously|prior)[^0-9]{0,20}#[0-9]'
+fi
 HG_ASK_ACTIVE_MERGE_KO="${HG_ASK_ACTIVE_MERGE_KO:-}"
 HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this}"
 HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-merge|Merge|MERGE|Squash|squash}"
