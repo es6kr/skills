@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.3](https://github.com/es6kr/skills/compare/commit-tidy-v0.4.2...commit-tidy-v0.4.3) (2026-07-16)
+
+
+### Bug Fixes
+
+* **commit-tidy,fix:** content-over-operation subjects + --local rule scoping ([61ba092](https://github.com/es6kr/skills/commit/61ba0929587bfd74b1f0a081ff9b316846c24969))
+* **commit-tidy:** enforce staging discipline for plan-listed files ([27ef87d](https://github.com/es6kr/skills/commit/27ef87d640947c18488173f2d4eaf93d99b13887))
+* **commit-tidy:** require content-over-operation subjects for mechanical-operation commits ([7573954](https://github.com/es6kr/skills/commit/7573954c253d1d8bc47672d14f6a4267206ebe64))
+* **consolidate,fix-plan:** promote next-fix staging (review hardening + periodic archive) ([24726e9](https://github.com/es6kr/skills/commit/24726e99a5b2972f706d8749ea3a45cbc358984b))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/commit-tidy-v0.4.1...commit-tidy-v0.4.2) (2026-06-30)
 
 

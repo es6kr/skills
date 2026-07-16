@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.2](https://github.com/es6kr/skills/compare/skill-kit-v0.4.1...skill-kit-v0.4.2) (2026-07-16)
+
+
+### Bug Fixes
+
+* **consolidate,fix-plan:** promote next-fix staging (review hardening + periodic archive) ([24726e9](https://github.com/es6kr/skills/commit/24726e99a5b2972f706d8749ea3a45cbc358984b))
+* **skill-kit:** support script-driven triggers and compile priority ([3670224](https://github.com/es6kr/skills/commit/367022402afab29c9aabf7084989bc6cbddc0958))
+
+
+### Documentation
+
+* add install-guide READMEs for consolidate, git-repo, skill-kit ([380db80](https://github.com/es6kr/skills/commit/380db8070a60dbfe1be29d940a6740e1119db748))
+* add install-guide READMEs for consolidate, git-repo, skill-kit ([d9bec4b](https://github.com/es6kr/skills/commit/d9bec4bb17c294a40c373c376a2f22aa0d3c04f2))
+* correct skills install command (add, not install) + superpowers namespace ([ed8fb1a](https://github.com/es6kr/skills/commit/ed8fb1ab2cd251e2395363948104bd3d3915f010))
+
 ## [0.4.1](https://github.com/es6kr/skills/compare/skill-kit-v0.4.0...skill-kit-v0.4.1) (2026-07-03)
 
 
