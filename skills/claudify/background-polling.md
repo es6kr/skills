@@ -19,7 +19,7 @@ Mandatory active polling for long-running background work (HARD STOP).
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Dispatch a nohup detach, then wait for the next user prompt | Register ScheduleWakeup right after dispatch (delay = 30-50% of the expected duration) |
+| 1 | Dispatch a nohup detach, then wait for the next user prompt | Register ScheduleWakeup right after dispatch (delay per the ScheduleWakeup delay guide below; for durations the table does not cover, fall back to 30-50% of the expected duration) |
 | 2 | "It'll finish soon — I'll check on the next user prompt" | 5+ min work always gets a wakeup. Report proactively even if the user doesn't ask |
 | 3 | Report only once at completion/failure with no interim status | Report progress at the 50% and 100% marks |
 | 4 | Register a separate wakeup per background task (duplicates) | One wakeup keyed to the task that finishes last; check all tasks at that point |
@@ -27,9 +27,9 @@ Mandatory active polling for long-running background work (HARD STOP).
 | 6 | A stopped agent's result arrives late but duplicate work already started → ignore the result | Check the arrived result immediately and **stop the in-flight duplicate work** → switch to using the result |
 | 7 | Classify work the user said they'd run themselves (tag push + CI, external dispatch) as "tracking ended" | User-triggered automatic workflows can finish within 5-10 min. Check state via primary sources (`gh run list` / `gh release list` / external API) **immediately before composing the next response**. Never assert "in progress" from quoting the user's last message |
 | 8 | Call SSH/curl with `run_in_background: true` and no timeout options (relying on the tool `timeout` parameter) | The Bash tool `timeout` parameter is **foreground-only** (default 120s, max 600s). It does not apply to background → prefix the command itself with `timeout N <cmd>` (the Linux `timeout` utility). For SSH add `-o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3`; for curl add `-m 10` / `--max-time 10` |
-| 9 | Wait unchecked until the next user prompt after a background dispatch | **5+ min expected** → periodic checks via ScheduleWakeup. **10+ min** → both a command-level `timeout` and ScheduleWakeup |
+| 9 | Wait unchecked until the next user prompt after a background dispatch | **5+ min expected** → periodic checks via ScheduleWakeup (or an equivalent active `Monitor` loop — the fallback when the harness lacks ScheduleWakeup). **10+ min** → both a command-level `timeout` and ScheduleWakeup |
 | 10 | Wait for a task-notification on a hung background task (a command without timeout never sends one) | Prevent hangs via mandatory timeouts + kill any process with `ps` etime of 1 hour+ immediately (see row 11) |
-| 11 | Run new commands while hung processes accumulate (PID pileup) | Right before every new background dispatch, scan with `ps -o pid,etime,command -ax \| awk 'NR==1 \|\| $2 ~ /-/'` for 1-hour+ processes. Report to the user + kill after confirmation |
+| 11 | Run new commands while hung processes accumulate (PID pileup) | Right before every new background dispatch, scan the session's tracked background PIDs with `ps -o pid,etime,command -p <pid,...> \| awk 'NR==1 \|\| $2 ~ /-\|^[0-9]+:[0-9]{2}:[0-9]{2}$/'` for 1-hour+ processes (`etime` shows a `-` only at 1+ days; the second alternation catches hour-level). Report to the user + kill after confirmation — never sweep `ps -ax` system-wide into a kill decision |
 | 12 | Register a wakeup, then sit idle in the main session while a background agent runs | A wakeup covers hang recovery — it does not license idling. Drive other drivable pending tasks in the same turn; idling past the 5-minute prompt-cache TTL makes the completion wake-up re-read the full context uncached |
 
 ## ScheduleWakeup delay guide
@@ -46,11 +46,11 @@ Mandatory active polling for long-running background work (HARD STOP).
 1. **Timeout check (Bash run_in_background only)**: does the command start with a `timeout N <cmd>` prefix? — If not, do not dispatch; rewrite the command
    - If SSH is involved, also check `-o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3`
    - If curl is involved, check `-m 10` or `--max-time 10`
-2. Which row of the matrix does the dispatch match? — Agent/Bash (with timeout) run_in_background auto-notify. External nohup / CI / timeout-less Bash need active polling
-3. Is the expected duration 5+ minutes? — If yes, ScheduleWakeup is mandatory
+2. Which row of the matrix does the dispatch match? — Agent/Bash (with timeout) run_in_background auto-notify. External nohup / CI need active polling. Timeout-less background Bash is forbidden — rewrite the command per check 1 before dispatching
+3. Is the expected duration 5+ minutes? — If yes, ScheduleWakeup (or an equivalent active `Monitor` loop) is mandatory
 4. About to end the turn with just "background in progress"? — Ask yourself whether ScheduleWakeup was registered right before that
 5. Multiple concurrent background tasks → one wakeup keyed to the latest-finishing task
-6. **Stale-process scan**: right before a new background dispatch, check for 1-hour+ processes with `ps -o pid,etime,command -ax | awk 'NR==1 || $2 ~ /-/'`. If found, report to the user and kill after confirmation
+6. **Stale-process scan**: right before a new background dispatch, check the session's tracked background PIDs for 1-hour+ processes with `ps -o pid,etime,command -p <pid,...> | awk 'NR==1 || $2 ~ /-|^[0-9]+:[0-9]{2}:[0-9]{2}$/'`. If found, report to the user and kill after confirmation
 7. **Main-session utilization**: are other pending tasks drivable while the background work runs? Drive them in the same turn — an end-of-turn idle is acceptable only when nothing else is drivable
 
 ## Self-check (after user-delegated CI/deploy, immediately before every response)
