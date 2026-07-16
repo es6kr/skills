@@ -287,7 +287,7 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | Conclusion state | Emoji | Forbidden |
 |----------|--------|------|
 | Critical 0 + Ready to merge | ✅ | 🔴 (red is a "problem present" visual signal — attaching it for 0 count causes confusion) |
-| Actionable PENDING | ⏳ | 🔴 (PENDING ≠ Critical) |
+| Actionable PENDING / Incomplete Test Plan | ⏳ | 🔴 (PENDING ≠ Critical) |
 | Critical unresolved | 🔴 | ✅ (looks like no problem) |
 
 ### Status ↔ Merge-Recommendation consistency (HARD STOP)
@@ -305,9 +305,9 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 
 **Self-check (before POSTing the Summary — consistency)**:
 
-1. Conclusion says "Hold" / "Not ready to merge" / cites findings to address first? → every finding it names as a blocker must be `🔴 Pending`, not `Deferred`.
-2. All findings `Deferred` / `Rejected` / `Verified` (zero `🔴 Pending`)? → conclusion must be ✅ "Ready to merge" (or "Ready pending Test Plan" when the Test Plan is unchecked), never "Hold to address the findings".
-3. Read the Status column and the Merge Recommendation together — is any finding both `Deferred` and the cited reason the merge is held? That is the contradiction; reconcile before POST.
+1. Conclusion says "Hold" / "Not ready to merge" / cites findings to address first? → every finding it names as a blocker must be `🔴 Pending`, not `Deferred` or `Fixed`.
+2. All findings `Fixed` / `Deferred` / `Rejected` / `Verified` (zero `🔴 Pending`)? → conclusion must be ✅ "Ready to merge" (or "Ready pending Test Plan" with a `⏳` emoji when the Test Plan is unchecked), never "Hold to address the findings".
+3. Read the Status column and the Merge Recommendation together — is any finding both `Deferred`/`Fixed` and the cited reason the merge is held? That is the contradiction; reconcile before POST.
 
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
 

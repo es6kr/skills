@@ -20,6 +20,25 @@ done
 # --- 1. Collect triggers fields from all SKILL.md files ---
 declare -A TRIGGERS_BY_EVENT  # event -> trigger entries
 
+validate_trigger() {
+  local skill_dir="$1" skill="$2" action="$3" scriptpath="$4"
+  if [[ "$action" == "script" ]]; then
+    if [[ -z "$scriptpath" ]]; then
+      echo "ERROR: scriptpath is empty for skill '$skill'" >&2
+      exit 1
+    fi
+    if [[ "$scriptpath" == /* ]] || [[ "$scriptpath" == *..* ]]; then
+      echo "ERROR: scriptpath '$scriptpath' contains absolute path or path traversal (..) for skill '$skill'" >&2
+      exit 1
+    fi
+    local local_script_path="$skill_dir/$scriptpath"
+    if [[ ! -f "$local_script_path" ]]; then
+      echo "ERROR: script file '$local_script_path' not found for skill '$skill'" >&2
+      exit 1
+    fi
+  fi
+}
+
 scan_skills() {
   for skills_dir in "${SKILLS_DIRS[@]}"; do
     [[ -d "$skills_dir" ]] || continue
@@ -41,6 +60,7 @@ scan_skills() {
           if $in_frontmatter; then
             # end of frontmatter — save last trigger
             if [[ -n "$current_event" ]]; then
+              validate_trigger "$skill_dir" "$skill_name" "$current_action" "$current_script"
               save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script"
             fi
             break
@@ -63,6 +83,7 @@ scan_skills() {
         if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*event:[[:space:]]*(.*) ]]; then
           # save previous trigger
           if [[ -n "$current_event" ]]; then
+            validate_trigger "$skill_dir" "$skill_name" "$current_action" "$current_script"
             save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script"
           fi
           current_event="${BASH_REMATCH[1]}"
@@ -74,6 +95,7 @@ scan_skills() {
         if [[ "$line" =~ ^[a-zA-Z_-]+: ]] && ! [[ "$line" =~ ^[[:space:]] ]]; then
           # save last trigger
           if [[ -n "$current_event" ]]; then
+            validate_trigger "$skill_dir" "$skill_name" "$current_action" "$current_script"
             save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script"
           fi
           in_triggers=false
@@ -180,7 +202,7 @@ EXIT_CODE=\"\${EXIT_CODE:-0}\"
       # matcher may be an alternation (e.g. "Edit|Write") — use regex match, not literal ==
       [[ -n "$matcher" ]] && conditions+=("[[ \"\$TOOL_NAME\" =~ ^($matcher)\$ ]]")
       # pattern grep covers both Bash command and Edit/Write file_path
-      [[ -n "$pattern" ]] && conditions+=("echo \"\$COMMAND \$FILE_PATH\" | grep -qE \"$pattern\"")
+      [[ -n "$pattern" ]] && conditions+=("echo \"\$COMMAND \$FILE_PATH\" | grep -qE -- \"$pattern\"")
       [[ -n "$exit_code_filter" ]] && conditions+=("[[ \"\$EXIT_CODE\" == \"$exit_code_filter\" ]]")
 
       condition_start="if ${conditions[0]}"

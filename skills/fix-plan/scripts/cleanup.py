@@ -89,13 +89,21 @@ def extract_date(text):
 
 def node_to_lines(node):
     lines = []
-    if node.is_list_item:
-        if node.checked is True:
-            marker = "- [x] "
-        elif node.checked is False:
-            marker = "- " if node.blocked_marker else "- [ ] "
+    
+    def get_marker(n):
+        if n.checked is True:
+            bullet = n.marker_type.strip()
+            return f"{bullet} [x] "
+        elif n.checked is False:
+            if n.blocked_marker:
+                return n.marker_type
+            bullet = n.marker_type.strip()
+            return f"{bullet} [ ] "
         else:
-            marker = node.marker_type
+            return n.marker_type
+
+    if node.is_list_item:
+        marker = get_marker(node)
         indent_str = " " * node.indent
         lines.append(f"{indent_str}{marker}{node.text}")
     else:
@@ -103,12 +111,7 @@ def node_to_lines(node):
     
     def recurse(n):
         if n.is_list_item:
-            if n.checked is True:
-                c_marker = "- [x] "
-            elif n.checked is False:
-                c_marker = "- " if n.blocked_marker else "- [ ] "
-            else:
-                c_marker = n.marker_type
+            c_marker = get_marker(n)
             indent_str = " " * n.indent
             lines.append(f"{indent_str}{c_marker}{n.text}")
         else:
@@ -120,6 +123,31 @@ def node_to_lines(node):
     for child in node.children:
         recurse(child)
     return lines
+
+def node_to_one_line(node, strip_checkbox=True):
+    if node.is_list_item:
+        if strip_checkbox:
+            bullet = node.marker_type.strip()
+            if bullet.endswith('.'):
+                marker = f"{bullet} "
+            else:
+                marker = "- "
+        else:
+            if node.checked is True:
+                bullet = node.marker_type.strip()
+                marker = f"{bullet} [x] "
+            elif node.checked is False:
+                if node.blocked_marker:
+                    marker = node.marker_type
+                else:
+                    bullet = node.marker_type.strip()
+                    marker = f"{bullet} [ ] "
+            else:
+                marker = node.marker_type
+        indent_str = " " * node.indent
+        return f"{indent_str}{marker}{node.text}"
+    else:
+        return node.text
 
 def main():
     args = parse_args()
@@ -281,7 +309,7 @@ def main():
     # Generate new ## Completed lines
     completed_lines = [""]
     for entry in stay_completed:
-        completed_lines.extend(node_to_lines(entry["node"]))
+        completed_lines.append(node_to_one_line(entry["node"], strip_checkbox=True))
         completed_lines.append("") # blank line between items
 
     # Add the new ## Completed section before ## REPEAT or at the right place
@@ -347,24 +375,32 @@ def main():
         # Sort entries ascending for archives per move.md spec
         entries.sort(key=lambda x: x["date"])
         
+        existing_content = ""
         archived_lines = []
         if os.path.exists(archive_file):
             # utf-8-sig on read strips the BOM the write below prepends —
             # plain utf-8 here stacked one more BOM per archive append.
             with open(archive_file, 'r', encoding='utf-8-sig') as af:
-                existing = af.read()
-            archived_lines.append(existing.rstrip())
+                existing_content = af.read()
+            archived_lines.append(existing_content.rstrip())
         else:
             archived_lines.append(f"# Archived Completed — {period}\n")
             
+        added_count = 0
         for entry in entries:
-            archived_lines.extend(node_to_lines(entry["node"]))
+            # Idempotency check: check if the entry's unique text is already in the file.
+            if entry["node"].text in existing_content:
+                print(f"Skipping duplicate archive entry: {entry['node'].text}")
+                continue
+            line_to_add = node_to_one_line(entry["node"], strip_checkbox=True)
+            archived_lines.append(line_to_add)
             archived_lines.append("")
+            added_count += 1
             
         archive_content = "\n".join(archived_lines)
         with open(archive_file, 'w', encoding='utf-8-sig') as af:
             af.write(archive_content)
-        print(f"Archived {len(entries)} entries to {archive_file}")
+        print(f"Archived {added_count} entries to {archive_file} (skipped {len(entries) - added_count} duplicates)")
 
 if __name__ == "__main__":
     main()

@@ -130,7 +130,9 @@ archive-receiver.
 - **Receiver-independent**: unlike the SKILL.md default-invocation archive-receiver
   dispatch (which needs a registered `<skill>:<topic>` receiver and targets external
   reports — weekly report / postmortem / RAG), this archives to a local `.bak/` file
-  with zero dependencies. When a receiver IS registered, prefer it; this is the fallback.
+  with zero dependencies. Local archiving is mandatory for size-control on period
+  boundaries, and is run independently of (and in addition to) any registered external
+  receivers.
 
 ### What moves vs stays
 
@@ -144,14 +146,18 @@ archive-receiver.
 ### Procedure
 
 1. Determine the cutoff = start of the current period (month or ISO week) from a
-   **caller-supplied date** (this skill does not read the clock — pass the date in).
+   **caller-supplied date** (this skill does not read the clock — pass the date in;
+   the automated script defaults to the start of the current month via system clock if omitted).
 2. Partition `## Completed` entries by their `YYYY-MM-DD` prefix: `< cutoff` → archive.
 3. `mkdir -p <tracker-dir>/.bak` if absent.
-4. Append archived entries (preserving chronological order) to the period partition
-   file; create it with an `# Archived Completed — <period>` header if new. Use `mv`-style
-   append (never delete the source lines until the append is confirmed).
-5. Remove the archived lines from the tracker's `## Completed`.
-6. Report: `N entries archived to <partition file>; tracker Completed now M entries`.
+4. Group archived entries by their respective periods (e.g. YYYY-MM or YYYY-Www based on
+   their timestamp prefix) and route them to their respective partition files under `.bak/`.
+5. Append archived entries (preserving chronological order) to their matching period partition
+   file; create it with an `# Archived Completed — <period>` header if new. Implement an
+   idempotency check (only append if the entry's unique text is not already present in the
+   partition file) to make the append retry-safe.
+6. Remove the archived lines from the tracker's `## Completed` after the append is confirmed.
+7. Report: `N entries archived to matching partition files; tracker Completed now M entries`.
 
 ### Automated Script
 

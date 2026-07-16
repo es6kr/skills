@@ -182,7 +182,7 @@ After `[x]` checked, summarize to one line + move to Completed section. See [mov
 
 On a period boundary, move older `## Completed` entries to a local partition file so the tracker never bloats:
 
-```
+```text
 <tracker-dir>/.bak/<tracker-stem>-completed-YYYY-MM.md     # monthly (default)
 <tracker-dir>/.bak/<tracker-stem>-completed-YYYY-Www.md    # weekly (--completed-archive-period=weekly)
 ```
