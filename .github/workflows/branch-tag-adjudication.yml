@@ -12,8 +12,10 @@ name: branch-tag-adjudication
 #   skill md changes must use fix: (or feat: when accompanied by a new topic
 #   file). Skill md = behaviour surface, not documentation.
 # - New-topic gate (advisory): a commit tagged feat that touches a skill dir
-#   should also add a new *.md file (A-status). Enforced downstream by the
-#   release-please split-policy already in release-please-validate.yml.
+#   should also add a new *.md file (A-status). Advisory only — the
+#   release-please-validate workflow enforces new-component initial versions
+#   (0.1.0+) and blocks breaking markers on new-component PRs, not the
+#   feat-adds-a-topic-file coupling.
 
 on:
   pull_request:

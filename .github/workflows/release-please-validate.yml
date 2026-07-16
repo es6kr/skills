@@ -97,13 +97,26 @@ jobs:
           echo "New manifest entries:"
           echo "$NEW_KEYS"
 
+          # A breaking-change commit must not ride in on a new-component PR:
+          # while major=0, a breaking marker can push the component's first
+          # release, and the resulting git tag is immutable even if publish.yml
+          # later blocks the ClawHub publish. The removed split-policy step used
+          # to cover this; re-assert it narrowly here for new-component PRs.
+          if git log --format='%s%n%b' "$BASE_SHA..$HEAD_SHA" \
+               | grep -qE '^[a-z]+(\([^)]+\))?!:|BREAKING[ -]CHANGE:'; then
+            echo "::error file=.release-please-manifest.json::This PR registers new components ($NEW_KEYS) and also carries a breaking-change commit (type!: or BREAKING CHANGE:). A breaking marker on a pre-major (0.x) new component risks a 1.0.0 promotion whose git tag is immutable. Split the breaking change into a separate PR."
+            exit 1
+          fi
+
           # Policy: a new component must register at a pre-major version 0.1.0 or
           # higher (major = 0, minor >= 1) — never 0.0.0 and never >= 1.0.0.
           #
           # Why not 0.0.0: release-please promotes a fresh 0.0.0 component's first
           # `feat` straight to 1.0.0 even under bump-minor-pre-major=true (only a
-          # first `fix` is capped at 0.1.0). Proven in this repo: harness
-          # (0.0.0 + fix -> 0.1.0) vs docxport/forge (0.0.0 + feat -> 1.0.0).
+          # first `fix` is capped at 0.1.0). Observed in this repo: harness landed
+          # 0.1.0 via a first `fix`, while release-please *proposed* docxport/forge
+          # at 1.0.0 for a first `feat` in release PR #86 (corrected before merge —
+          # the landed tags are docxport-v0.1.0 / forge-v0.1.0).
           # Seeding at 0.1.0 removes the 0.0.0 bootstrap entirely: from 0.1.0
           # every feat is 0.(x+1).0, so the 1.0.0 jump cannot occur.
           #
@@ -111,8 +124,8 @@ jobs:
           FAIL=0
           while IFS= read -r KEY; do
             VERSION=$(jq -r --arg k "$KEY" '.[$k]' /tmp/head-manifest.json)
-            if ! printf '%s' "$VERSION" | grep -qE '^0\.[1-9][0-9]*\.[0-9]+$'; then
-              echo "::error file=.release-please-manifest.json::New entry '$KEY' must register at a pre-major version 0.1.0+ (major=0, minor>=1). Got: $VERSION. Seed the manifest at 0.1.0 — never 0.0.0 (release-please promotes a first feat from 0.0.0 to 1.0.0)."
+            if ! printf '%s' "$VERSION" | grep -qE '^0\.[1-9][0-9]*\.(0|[1-9][0-9]*)$'; then
+              echo "::error file=.release-please-manifest.json::New entry '$KEY' must register at a plain pre-major version 0.1.0+ (major=0, minor>=1, no leading zeros, no pre-release or build suffix). Got: $VERSION. Seed the manifest at 0.1.0 — never 0.0.0 (release-please promotes a first feat from 0.0.0 to 1.0.0)."
               FAIL=1
             fi
           done <<< "$NEW_KEYS"
