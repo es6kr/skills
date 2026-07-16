@@ -36,8 +36,9 @@ triggers:
 | `action` | Y | `suggest` (output marker, exit 0), `block` (block execution, exit 1), `inject` (systemMessage JSON, Stop only) |
 | `matcher` | optional | Tool name filter. Used only with PreToolUse/PostToolUse. Omit to match all tools |
 | `pattern` | optional | Matching pattern in command (regex). Used only with PostToolUse/PreToolUse |
-| `message` | Y | Message to pass to Claude. May include skill/topic invocation instructions |
+| `message` | Y (except `action: script`) | Message to pass to Claude. May include skill/topic invocation instructions. Not used by `action: script` (the resource script emits its own output) |
 | `exit_code_filter` | optional | Filter by success (0) / failure (non-0) in PostToolUse. Omit to match all exit codes |
+| `script` | Y for `action: script` | Path (relative to the skill directory) of a resource script that receives the hook's stdin and emits the decision, e.g. `resources/next-trigger.sh` |
 
 ### action Types
 
@@ -46,6 +47,24 @@ triggers:
 | `suggest` | Output `<skill-trigger>` marker. Claude decides whether to act | 0 | all |
 | `block` | Block execution + output reason | 1 | PreToolUse |
 | `inject` | Force inject as systemMessage JSON | JSON | Stop only |
+| `script` | Pipe the hook's stdin to `skills/<skill>/<script>`; if the script emits output, pass it through and exit (else fall through to lower-priority triggers) | script-defined | Stop (transcript/regex-driven triggers that can't be expressed declaratively) |
+
+### `action: script` — dispatching a skill-owned resource script
+
+Declarative `suggest`/`inject` can't express logic like "match the assistant's last message against a regex file". For those, point a Stop trigger at a resource script:
+
+```yaml
+triggers:
+  - event: Stop
+    action: script
+    script: resources/next-trigger.sh
+```
+
+The compiler emits a dispatcher branch that pipes the raw Stop-hook stdin into the script and, if it produces any output, prints it and exits. The script owns its full decision (e.g. a `{"decision":"block","reason":"…"}` envelope).
+
+**Stop dispatch priority**: within one `trigger-Stop.sh`, branches are ordered `script` > `suggest` > `block` > `inject`. So a transcript-matching `script` (fires only on match) is evaluated before a once-per-session `inject` fallback (e.g. cleanup). An `inject` that has already fired this session falls through instead of short-circuiting, so lower-priority… (there is none below inject) — in practice: script first, inject last.
+
+**Portability**: resource scripts must not depend on `python3` (on Windows Git Bash it is often the Microsoft Store stub and silently no-ops). Use `jq` (a hook-wide dependency) for JSON/JSONL parsing.
 
 ## Compilation Procedure
 

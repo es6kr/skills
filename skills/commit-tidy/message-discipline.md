@@ -247,6 +247,29 @@ Why: these files are **runtime instructions consumed by AI agents**. Adding / ed
 - skill/rule `.md` file but the change is purely typo / formatting / link fix — behavior unchanged → `docs:` + documentation verb OK
 - skill/rule `.md` external references / example text only (no rule / procedure change) → `docs:` OK
 
+## Content-over-operation subject (HARD STOP)
+
+**When a commit is produced BY a mechanical operation — translation, file move/rename, split, merge, encoding fix, formatting sweep — the subject must describe the CONTENT the diff delivers, not the operation that produced it.** The operation is at most a body footnote. In an English-enforced repo, "translate to English" is the norm being met, not the change's meaning; what the reader (and release automation) needs is *what topics/behaviors this commit adds or changes*.
+
+Why: release automation and changelog readers consume the subject as the change's semantic summary. An operation-framed subject ("translate remaining Korean lines") hides that the diff **adds new topics** — mis-tagging it `fix:` when new `A`-status topic files qualify it as `feat:`, and producing a changelog entry that tells users nothing.
+
+### Operation vs content framing
+
+| Operation performed | Wrong (operation subject) | Right (content subject) |
+|---------------------|---------------------------|-------------------------|
+| Translate local Korean drafts into tracked English topics | `fix(a,b,c): translate remaining Korean lines to English` | `feat(a,b,c): add <topic-x>, <topic-y> topics` (+ body note: "previously local-only Korean drafts; published in English") |
+| Move/rename topic files | `chore: move X to Y` | Tag/verb by what the move changes for consumers (`feat:` if surface changes, `refactor:` if behavior-preserving) |
+| Split an oversized topic | `chore: split big.md` | `refactor(skill): split <topic> into <a>/<b>` — or `feat:` if new procedure surface is added |
+| Formatting/encoding sweep | (subject OK as-is) | Operation subjects are acceptable ONLY when the diff is truly meaning-preserving (no `A`-status files, no rule/procedure change) |
+
+### Self-check (every time a mechanical operation produced the staged set)
+
+1. Run `git diff --cached --name-status` — not just `--name-only`. Any `A`-status `skills/**/*.md` files?
+2. `A`-status topic files present → the commit **adds topics**: `feat:` tag + subject enumerates the added topics
+3. No `A` files but rule/procedure text changed → `fix:`/`feat:` per the local override mapping; subject states the behavior change
+4. Truly meaning-preserving (typo/format/encoding only) → operation subject allowed
+5. Mention the operation ("translated from local Korean drafts") in the **body**, never as the subject
+
 ## Related topics
 
 - `staging-discipline` — runs BEFORE this (the staged set must be intentional before drafting a message)

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # rename-worktree.sh — git worktree rename (directory + metadata + branch)
-# Usage: rename-worktree.sh <repo> <old-name> <new-name> [--branch <branch>]
+# Usage: rename-worktree.sh <repo> <old-name> <new-name> [--branch <branch>] [--wt-base <dir>]
 #
-# <old-name>: directory name under .claude/worktrees/
-# <new-name>: new directory name
-# --branch:   branch to switch to (default: keep current branch)
+# <old-name>:  directory name under the worktree base
+# <new-name>:  new directory name
+# --branch:    branch to switch to (default: keep current branch)
+# --wt-base:   worktree base dir relative to <repo> (default: .claude/worktrees).
+#              Use e.g. --wt-base .worktrees for repos that keep worktrees at <repo>/.worktrees/
 
 set -euo pipefail
 
@@ -12,25 +14,29 @@ REPO="${1:?Usage: rename-worktree.sh <repo> <old-name> <new-name> [--branch <bra
 OLD="${2:?missing old-name}"
 NEW="${3:?missing new-name}"
 BRANCH=""
+WT_BASE_REL=".claude/worktrees"
 
 shift 3
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --branch) BRANCH="$2"; shift 2 ;;
+    --wt-base) WT_BASE_REL="${2#/}"; WT_BASE_REL="${WT_BASE_REL%/}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
 # Windows compatibility: git metadata files must contain Windows-style paths
-# (C:/...) not Unix-style (/c/...). Bash filesystem ops keep Unix paths.
+# (C:/...) not MSYS (/c/...) or WSL (/mnt/c/...). Bash filesystem ops keep Unix paths.
 if command -v cygpath >/dev/null 2>&1; then
   REPO_WIN="$(cygpath -m "$REPO")"
+elif command -v wslpath >/dev/null 2>&1 && [[ "$REPO" == /mnt/?/* ]]; then
+  REPO_WIN="$(wslpath -w "$REPO" | tr '\\' '/')"
 else
   REPO_WIN="$REPO"
 fi
 
-WT_BASE="$REPO/.claude/worktrees"
-WT_BASE_WIN="$REPO_WIN/.claude/worktrees"
+WT_BASE="$REPO/$WT_BASE_REL"
+WT_BASE_WIN="$REPO_WIN/$WT_BASE_REL"
 OLD_PATH="$WT_BASE/$OLD"
 NEW_PATH="$WT_BASE/$NEW"
 NEW_PATH_WIN="$WT_BASE_WIN/$NEW"

@@ -6,6 +6,15 @@ Entry: `Skill("consolidate", "collect ...")` or `pr.md` Workflow Step 3.
 
 ## Step 3: Collect AI Reviews
 
+Rather than running separate manual commands, run the consolidated collection script:
+
+```bash
+bash ~/.claude/skills/consolidate/scripts/collect.sh <repo> <pr_number> [account]
+# e.g., bash ~/.claude/skills/consolidate/scripts/collect.sh daegunsoftDev/turborepo-web 412 daegunjhy
+```
+
+If you prefer running individual commands manually:
+
 ```bash
 # PR review comments (inline)
 gh api repos/{owner}/{repo}/pulls/{number}/comments

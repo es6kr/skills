@@ -31,7 +31,7 @@ Top-level sections:
 | Section | Purpose | Behavior |
 |---------|---------|----------|
 | `## Progress` | Active and recently-completed items | Always present. Never empty — if no items, keep `(none)` placeholder |
-| `## Completed` | Historical one-line summaries | Append-only chronological. New entries inserted at sort position |
+| `## Completed` | Historical one-line summaries | Append-only chronological. New entries inserted at sort position. **Not unbounded** — older entries are periodically archived to `.bak/` partition files (see [move.md](./move.md) "Completed-section size management"); the live section holds only the current period |
 | `## Hold` (optional) | External-response BLOCKED items separate from active Progress | Used when Progress would otherwise be cluttered with un-actionable items |
 | `## Notes` | Project conventions, project-specific guard rails | Not modified by this skill |
 

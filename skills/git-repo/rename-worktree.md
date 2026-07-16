@@ -20,15 +20,18 @@ Rename an existing git worktree — both the directory and all internal metadata
 **One script call completes the rename** — no manual steps.
 
 ```bash
-bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh <repo> <old-name> <new-name> [--branch <branch>]
+bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh <repo> <old-name> <new-name> [--branch <branch>] [--wt-base <dir>]
 ```
 
 | Argument | Description | Example |
 |----------|-------------|---------|
 | `<repo>` | Main repository absolute path | `~/ghq/github.com/org/repo` |
-| `<old-name>` | Current directory name under `.claude/worktrees/` | `claude` |
+| `<old-name>` | Current directory name under the worktree base | `claude` |
 | `<new-name>` | New directory name | `chore-cleanup-pr17-leftovers` |
 | `--branch` | (optional) Branch to switch to. Checkout if local, create otherwise | `chore/cleanup-pr17-leftovers` |
+| `--wt-base` | (optional) Worktree base dir relative to `<repo>` (default `.claude/worktrees`). Set for repos that keep worktrees elsewhere (e.g. `.worktrees`) | `.worktrees` |
+
+Only the **worktree directory** base is affected by `--wt-base`. The `.git/worktrees/<name>` metadata location is auto-resolved from the worktree's `.git` pointer (see "Supported layouts"), so no metadata flag is needed.
 
 ### Examples
 
@@ -45,6 +48,13 @@ bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh \
   ~/ghq/github.com/myorg/webapp \
   old-feature \
   new-feature
+
+# Repo that keeps worktrees at <repo>/.worktrees/ (not .claude/worktrees/)
+bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh \
+  ~/ghq/github.com/myorg/turborepo-web \
+  old-feature \
+  new-feature \
+  --wt-base .worktrees
 ```
 
 ### Internal steps performed by the script
@@ -76,6 +86,7 @@ Use only when the script cannot run (permission issues, non-standard paths, etc.
 
 ## Key Principles
 
+- **Operation-state gate before any rename/reuse** — if the worktree's gitdir contains `CHERRY_PICK_HEAD`/`MERGE_HEAD`/`REBASE_HEAD`/`rebase-merge`/`rebase-apply`/`BISECT_LOG`, or `git status --porcelain` shows unmerged codes (`DU`/`UU`/`AA`…), an operation is mid-flight — **abort the rename and report to the user** (see `worktree.md` §2 Step 2.0)
 - **Always check for uncommitted changes first** — renaming metadata with dirty state risks data loss
 - **Update both directions**: metadata→worktree (`gitdir`) AND worktree→metadata (`.git` file)
 - **Paths must be absolute** in `gitdir` and `.git` files
