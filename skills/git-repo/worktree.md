@@ -28,7 +28,9 @@ ls .claude/worktrees/ 2>/dev/null   # Claude Code default path
 
 ```bash
 gitdir=$(git -C <W> rev-parse --git-dir)
-ls "$gitdir"/CHERRY_PICK_HEAD "$gitdir"/MERGE_HEAD "$gitdir"/REBASE_HEAD "$gitdir"/BISECT_LOG "$gitdir"/rebase-merge "$gitdir"/rebase-apply 2>/dev/null
+for f in CHERRY_PICK_HEAD MERGE_HEAD REBASE_HEAD BISECT_LOG rebase-merge rebase-apply; do
+  [ -e "$gitdir/$f" ] && echo "$gitdir/$f"
+done
 git -C <W> status --porcelain | grep -E '^(DD|AU|UD|UA|DU|AA|UU)'   # unmerged index entries
 git -C <W> diff --name-only --diff-filter=U                          # conflicted files
 ```
@@ -134,6 +136,7 @@ If branch mismatch → do NOT proceed with Write/Edit. Fix first (checkout or re
 | 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
 | 6 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
 | 7 | Classify "merged + ahead=0 + dirty" as abandoned leftovers | Run the operation-state gate first — a merged branch can host an in-progress cherry-pick applying new work on top |
+| 8 | Check multiple state files with one `ls fileA fileB fileC 2>/dev/null \|\| echo "no in-progress op"` call | `ls` returns nonzero if **any** argument is missing, even while printing the paths of the ones that DO exist — a partial hit still fires the `\|\|` fallback and prints a false "no in-progress op" alongside the real hit. Check each file individually (see the operation-state gate command above), and always re-read the raw stdout before trusting a fallback message (see failed-attempts.md "ls multi-arg false negative") |
 
 ## Inactive Worktree Count Limit (HARD STOP)
 
