@@ -1,7 +1,7 @@
 ---
 name: claude-session
 description: |
-  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), memory-trim (MEMORY.md index byte-budget trim), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session", "session cleanup", "memory trim", "MEMORY.md over budget"
+  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (UTCP/code-mode), destroy, dual-sync (Windows/WSL memory path mapping), install (hook), memory-trim (MEMORY.md index byte-budget trim), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session", "session cleanup", "memory trim", "MEMORY.md over budget", "dual sync", "WSL memory", "Windows memory path"
 metadata:
   author: es6kr
   version: "0.1.5"
@@ -44,6 +44,7 @@ Decision procedure:
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
 | compress | AI-compress sessions via UTCP/code-mode | [compress.md](./compress.md) |
 | destroy | Delete current session and restart IDE | [destroy.md](./destroy.md) |
+| dual-sync | Windows ↔ WSL project memory path mapping — keep both environments' memory in sync | [dual-sync.md](./dual-sync.md) |
 | id | Look up current session ID (UUID) | [id.md](./id.md) |
 | import | Pipeline session data to other agents/skills | [import.md](./import.md) |
 | install | Register session-id-inject hook in settings.json | [install.md](./install.md) |
