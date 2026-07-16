@@ -89,6 +89,7 @@ Identify the type of task just completed.
 2. Did I enumerate all 7 candidate discovery sources? → If skipped any, revisit before composing
 3. Do I have 4 options or did I stop at 2-3? → If <4 and candidates remain, add until 4 or exhausted
 4. Are options diverse (different action types: progress task / external follow-up / wrap-up / verify)? → If all 3 are the same family, broaden
+5. Does the completed work carry ≥2 discrete findings the user must disposition? → Per-finding questions first (see suggestion-patterns.md "After analysis / review producing multiple findings"), never one option bundling all findings
 
 ```typescript
 AskUserQuestion({

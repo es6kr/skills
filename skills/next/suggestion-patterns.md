@@ -103,6 +103,26 @@ cosmetic / style-only · already worked around · an external outage you cannot 
 3. Before proposing a fix, did I confirm the cause is self-fixable vs external via primary evidence? → external → track, don't ship a speculative fix
 4. Excluded class (cosmetic / local-test / external outage / user-deferred)? → normal option, do not force first
 
+## After analysis / review producing multiple findings (HARD STOP)
+
+**Precondition**: The just-completed work (code review, issue-comment analysis, audit, verification) produced **N ≥ 2 discrete findings** whose handling the user must decide — include in a comment, apply, correct, drop, or defer.
+
+**One question per finding — never bundle findings into one option.** Each finding is an independent decision axis. Packing N findings into a single option description ("post the review comment with all 4 findings") strips the user's per-finding authority: they can only take all-or-nothing. Automated ask-guards may not catch description-level bundling (descriptions are excluded from axis detection to avoid false positives), so this composition rule is the first line of defense.
+
+**Pattern (two-stage ask)**:
+
+1. **Per-finding call**: one question per finding via the `questions` array (max 4 questions per call; when N > 4, chunk into sequential calls of ≤4 — never drop the tail). Options per finding: `Include / Apply` · `Exclude / Drop` · `Defer` (+ auto "Other").
+2. **Disposition call**: after the per-finding answers arrive, ask the overall action (post the comment / record locally only / hold), composed from what the user selected. Phrase it without re-enumerating finding counts (a "N findings" token in a single question is itself a bundling signal).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | One option labeled "post comment with all N findings" | One question per finding first, disposition ask second |
+| 2 | `questions.length == 1` with the findings enumerated inside an option description | Split into the `questions` array — description-level bundling evades keyword/path axis detection |
+| 3 | Pre-deciding which findings are "obviously worth including" and bundling the rest | Obviousness is not a substitute for the user's per-finding decision |
+| 4 | Handling N > 4 by silently dropping low-priority findings | Chunk into sequential ≤4-question calls; every finding gets its own question |
+
+**Self-check (before any ask that disposes of analysis/review results)**: Did the completed work produce ≥2 discrete findings? → per-finding questions first, disposition second.
+
 ## After code writing/modification
 
 ```typescript
