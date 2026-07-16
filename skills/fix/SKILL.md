@@ -22,6 +22,13 @@ Activated when user gives feedback with "fix:" prefix. Finds the root cause of t
 ## Options
 
 - `--plan`: In Step 2, instead of modifying prompts directly, **emit only the modification plan** for user review before execution. Use for complex changes or changes spanning multiple files.
+- `--local`: Scope Step 2 rule modifications to the **workspace-local** or **project-local** rule directory only. Use when the rule applies to a specific workspace (e.g., `~/ghq/github.com/<org>/`) or a specific repo, not globally.
+  - Resolution order (Step 2 picks the innermost matching location):
+    1. **Project-local** — `<repo>/.claude/rules/` if cwd is inside a git repo
+    2. **Workspace-local** — nearest `.claude/rules/` walking up from cwd (typically `<workspace-root>/.claude/rules/`)
+    3. **Fallback** — if neither exists, ask the user whether to create one (do NOT silently fall through to global `~/.agents/rules/`)
+  - **Do not** write to `~/.agents/rules/` when `--local` is set. Global-rule cost is context-inflation on every session; `--local` opts into scoped protection.
+  - Rule-file location + strength still respect the `rule-management.md` location-plus-method dual-axis ask when the scope choice within the local set is ambiguous (project vs workspace).
 
 ## Topic Dispatch
 
