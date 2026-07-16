@@ -16,14 +16,30 @@ Grep fix_plan for `PR #N`, `Issue #N`, or bare `#N` near a known issue/PR keywor
 
 ### 2. Query GitHub state
 
-For each captured number:
+**Batch per repo (default — avoids the N-call loop)**: when a tracker references many numbers (≥3) in the same repo, query them in one call per artifact type instead of looping `gh pr view` per number. This respects the external-API repeat-call limit (3+ identical calls need justification) and is dramatically faster on large trackers:
+
+```bash
+# All referenced PRs of one repo in a single call
+gh pr list -R <owner>/<repo> --state all --limit 200 \
+  --json number,state,mergedAt,title \
+  --jq '.[] | select(.number|IN(41,44,45,47)) | "\(.number)\t\(.state)\t\(.mergedAt // "-")"'
+
+# All referenced issues of one repo in a single call
+gh issue list -R <owner>/<repo> --state all --limit 200 \
+  --json number,state,title \
+  --jq '.[] | select(.number|IN(23,150,436)) | "\(.number)\t\(.state)"'
+```
+
+Numbers absent from the batch output (older than the `--limit` window) fall back to per-item queries below.
+
+**Per-item fallback** (few numbers, or absent from the batch window):
 
 ```bash
 gh pr view <N> --json state,mergedAt -q '{state: .state, mergedAt: .mergedAt}'
 gh issue view <N> --json state,closedAt -q '{state: .state, closedAt: .closedAt}'
 ```
 
-(Try `gh pr view` first; on "not found" fall back to `gh issue view`. Both error → skip the entry.)
+(Try `gh pr view` first; on "not found" fall back to `gh issue view`. Both error → skip the entry. Note: a number can be a PR in one tracker line and an issue in another — the batch queries cover both artifact types separately, so run both when the reference kind is ambiguous.)
 
 ### 3. Auto-check rules
 

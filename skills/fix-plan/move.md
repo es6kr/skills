@@ -11,6 +11,13 @@ Move = **two artifacts from one `[x]` entry**:
 
 Keep the Completed file minimal — detailed steps, commit hashes, and session IDs **belong in RAG, not in the file**. The Completed line is a pointer; the body lives in RAG.
 
+**Completed Lifecycle Rule (HARD STOP)**: The `## Completed` section in the active tracker file is a **temporary holding area** only. It does not accumulate indefinitely.
+- **Cycle**: Completed item added → Archived to `.bak/` partition file (and index to RAG) at the end of the current period (weekly/monthly) → **Deleted permanently from the active tracker file**.
+- **Result**: The active `fix_plan.md` always stays compact. Leaving months of completed history in the active file is forbidden.
+- **Forbidden**: Do **not** manually insert one-line summaries at random locations (such as above `## REPEAT` or in active lists) to keep track of them. Once mapped to RAG or archived, they must be **deleted** from the active file.
+
+
+
 ```markdown
 # Before (Progress)
 - [x] proxy.ts basePath redirect fix → image build / deploy (2026-03-15 17:30 completed: Session xxxxxxxx, commit a1b2c3d4)
@@ -146,6 +153,20 @@ archive-receiver.
 5. Remove the archived lines from the tracker's `## Completed`.
 6. Report: `N entries archived to <partition file>; tracker Completed now M entries`.
 
+### Automated Script
+
+To automate the checklist parsing, subtree-move, and size archiving procedure, run the Python utility script included in the skill:
+
+```bash
+python3 ~/.claude/skills/fix-plan/scripts/cleanup.py [--file <path>] [--cutoff <YYYY-MM-DD>] [--period monthly|weekly] [--dry-run]
+```
+
+This script:
+1. Detects UTF-8 BOM encoding automatically.
+2. Extracts completed `[x]` items (including subtrees under active parents) and removes them from progress sections.
+3. Sorts completed entries chronologically descending under `## Completed`.
+4. Archives entries older than the cutoff date (defaults to the start of the current month) into `.bak/` partition files (`<tracker>-completed-YYYY-MM.md`).
+
 ### Trigger
 
 - **Period boundary** is the primary trigger — the first `move` / cleanup of a new
@@ -161,6 +182,8 @@ archive-receiver.
 | 2 | Delete old Completed entries to shrink the file | **Move** (never delete) — the `.bak/` partition preserves the full history |
 | 3 | Require a registered archive-receiver for local size management | This `.bak/` path is receiver-independent; the receiver dispatch is a separate optional external-report path |
 | 4 | Dump the whole Completed history into one ever-growing partition | One partition file **per period** (`YYYY-MM` / `YYYY-Www`) |
+| 5 | Only change status to `[x]` and defer moving to `## Completed` to the next turn | Move completed `[x]` items to the `## Completed` section immediately in the same turn with a one-line summary |
+| 6 | Keep detailed history (sub-steps, commit hashes, logs) in `fix_plan.md` | Preserve the detailed body in RAG (body-preservation) and keep only a high-level one-liner in the Completed section |
 
 ## RAG dispatch (vendor-agnostic, body preservation)
 
