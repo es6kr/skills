@@ -5,7 +5,7 @@
 # Action: Deny if same PR has CodeRabbit walkthrough_start marker but no `## Internal Code Review` comment
 #
 # Background: failed-attempts.md "Internal Code Review comment posting missing" (5+ recurrences) — comment posting missing.
-# pr-review.md Step 3.5.3 requires Internal Code Review comment posted BEFORE Step 7 Summary.
+# consolidate/internal.md Step 3.5.3 requires Internal Code Review comment posted BEFORE consolidate/post.md Step 7 Summary.
 # Rule strengthening alone failed; this hook automates the Step 3.5 gate.
 
 INPUT=$(cat)
@@ -125,7 +125,7 @@ State:
   - Internal Code Review comment: MISSING
   - About to POST: AI Review Summary
 
-pr-review.md Step 3.5.3 requires Internal Code Review comment posted BEFORE Step 7 Summary.
+consolidate/internal.md Step 3.5.3 requires Internal Code Review comment posted BEFORE consolidate/post.md Step 7 Summary.
 The "single combined comment" pattern (Internal fallback only) is deprecated — always 2 comments.
 
 Required action before retry:

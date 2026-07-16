@@ -25,8 +25,8 @@ if [[ -f "$HG_DATA_FILE" ]]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
 fi
-HG_ASK_ISSUE_PREFIX="${HG_ASK_ISSUE_PREFIX:-(PR|issue|pull)[[:space:]]*#[0-9]}"
-HG_ASK_FINDING_PREFIX="${HG_ASK_FINDING_PREFIX:-(Finding|Item|Section|Important|Nitpick|Critical|Comment|Walkthrough)[[:space:]]*#[0-9]}"
+HG_ASK_ISSUE_PREFIX="${HG_ASK_ISSUE_PREFIX:-(PR|issue|pull)[[:space:]]*#[0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]}"
+HG_ASK_FINDING_PREFIX="${HG_ASK_FINDING_PREFIX:-(Finding|Item|Section|Important|Nitpick|Critical|Comment|Walkthrough|Task)[[:space:]]*#[0-9]}"
 # Brace quantifiers cannot live inside a ${VAR:-default} (the first `}` ends the
 # expansion and corrupts the regex) — assign this fallback with an explicit guard.
 if [[ -z "${HG_ASK_RETROSPECT_PR:-}" ]]; then
@@ -34,12 +34,15 @@ if [[ -z "${HG_ASK_RETROSPECT_PR:-}" ]]; then
 fi
 HG_ASK_ACTIVE_MERGE_KO="${HG_ASK_ACTIVE_MERGE_KO:-}"
 HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this}"
-HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-merge|Merge|MERGE|Squash|squash}"
-HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time}"
+HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-\bmerge\b|\bMerge\b|\bMERGE\b|\bSquash\b|\bsquash\b}"
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/}"
 HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:-AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+}"
 HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅}"
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
+HG_ASK_RETROSPECT_CLOSE="${HG_ASK_RETROSPECT_CLOSE:-close deferred|deferred[^.]{0,15}close|cannot close|not close|closeable|becomes close}"
 HG_ASK_VERIFICATION_ATTESTATION="${HG_ASK_VERIFICATION_ATTESTATION:-gh pr (view|diff)|base=|pinned|counter only|verified|diff URL|issuecomment}"
+HG_ASK_PR_STRONG_KO="${HG_ASK_PR_STRONG_KO:-}"
+HG_ASK_PR_READY_KO="${HG_ASK_PR_READY_KO:-}"
 
 INPUT=$(cat)
 
@@ -197,7 +200,53 @@ check_merge_without_review() {
     fi
   fi
 
-  echo "$OPTIONS_BLOB" | grep -qE '#[0-9]+|PR[[:space:]]*#?[0-9]+' || return 0
+  echo "$OPTIONS_BLOB" | grep -qE '#[0-9]+|pull/[0-9]+' || return 0
+
+  # release-please bot-PR allowlist (issue #36).
+  # If EVERY PR referenced in the merge options is a bot-authored release PR,
+  # bypass both attestation gates — there is nothing for a human reviewer to
+  # inspect line-by-line on an automated version-bump PR.
+  #
+  # Allowlist match (PR qualifies if ANY clause holds):
+  #   - author.login  in { github-actions[bot], release-please[bot] }
+  #   - headRefName    starts with  release-please--
+  #
+  # Fail closed: if gh is unavailable/unauthenticated, the repo cannot be
+  # resolved, or any referenced PR lookup fails (404 / network), that PR is
+  # treated as NOT allowlisted and the existing gates run. Never fail open.
+  if command -v gh >/dev/null 2>&1; then
+    local rp_repo rp_prs rp_all=1 rp_seen=0 rp_n rp_view rp_author rp_headref
+    rp_repo="${GH_REPO:-$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)}"
+    rp_prs=$(echo "$OPTIONS_BLOB" \
+      | grep -oE '#[0-9]+|pull/[0-9]+' \
+      | grep -oE '[0-9]+' | sort -u)
+    if [[ -n "$rp_repo" && -n "$rp_prs" ]]; then
+      while IFS= read -r rp_n; do
+        [[ -z "$rp_n" ]] && continue
+        rp_seen=1
+        rp_view=$(gh pr view "$rp_n" --json author,headRefName \
+          -q '.author.login + "\t" + .headRefName' -R "$rp_repo" 2>/dev/null)
+        if [[ -z "$rp_view" ]]; then
+          rp_all=0; break          # lookup failure -> fail closed
+        fi
+        rp_author="${rp_view%%$'\t'*}"
+        rp_headref="${rp_view#*$'\t'}"
+        # gh pr view returns .author.login as "app/github-actions" for the
+        # GitHub App variant; webhook/API payloads use "github-actions[bot]".
+        # Match both forms (one-line additions for future bots).
+        case "$rp_author" in
+          "github-actions[bot]"|"release-please[bot]"|"app/github-actions"|"app/release-please") continue ;;
+        esac
+        case "$rp_headref" in
+          "release-please--"*) continue ;;
+        esac
+        rp_all=0; break            # a non-bot PR is present -> require attestation
+      done <<< "$rp_prs"
+      if [[ "$rp_seen" -eq 1 && "$rp_all" -eq 1 ]]; then
+        return 0                   # all referenced PRs are bot release PRs
+      fi
+    fi
+  fi
 
   # Gate 1: AI Review Summary attestation
   # Locale variants in data/hangul-patterns.regex (HG_ASK_SUMMARY_ATTESTATION).
@@ -210,7 +259,7 @@ Why blocked:
   - But no option text mentions "AI Review Summary ✅/posted" or quotes an issuecomment URL
 
 Required action (pick one before retrying):
-  1. Run /consolidate pr-review <N> first to post AI Review Summary, then re-issue the question
+  1. Run /consolidate pr <N> first to post AI Review Summary, then re-issue the question
   2. If Summary is already posted, include "AI Review Summary posted" in the option description
   3. Replace the merge option with a non-merge action (e.g., "verify only", "hold")
 
@@ -248,7 +297,20 @@ check_release_please_close() {
   [[ -z "$OPTIONS_BLOB" ]] && return 0
   echo "$OPTIONS_BLOB" | grep -qiE 'release-please|semantic-release|changesets' || return 0
   echo "$OPTIONS_BLOB" | grep -qiE "$HG_ASK_CLOSE_KEYWORDS" || return 0
-  echo "$OPTIONS_BLOB" | grep -qE '#[0-9]+|PR[[:space:]]*#?[0-9]+' || return 0
+
+  # Skip when close mentions are retrospective/deferred rather than active
+  # proposals ("publish/close deferred", "cannot close ... without a merged PR",
+  # or a discard-changes keyword). Mirror of the retrospective-merge guard in
+  # check_merge_without_review: when deferred/negated close mentions dominate
+  # (>= plain close mentions), there is no active close proposal to gate.
+  local plain_close retro_close
+  plain_close=$(echo "$OPTIONS_BLOB" | grep -ciE "$HG_ASK_CLOSE_KEYWORDS")
+  retro_close=$(echo "$OPTIONS_BLOB" | grep -ciE "$HG_ASK_RETROSPECT_CLOSE")
+  if [[ "$retro_close" -ge "$plain_close" ]]; then
+    return 0
+  fi
+
+  echo "$OPTIONS_BLOB" | grep -qE '#[0-9]+|pull/[0-9]+' || return 0
   echo "$OPTIONS_BLOB" | grep -qiE "$HG_ASK_VERIFICATION_ATTESTATION" && return 0
 
   cat >&2 <<'MSG'
@@ -389,28 +451,13 @@ MSG
 # ============================================================================
 # Check 6: Stateful infrastructure data-safety assertion guard
 # ============================================================================
-# Two sub-gates protect against irreversible data loss in stateful infra
-# (longhorn / PV / PVC / volume / replica / snapshot / etcd / vault):
-#
-#   (A) Destructive volume/replica operations presented as ask options.
-#       Operations such as PV recreate, volume delete, replica force-delete,
-#       snapshot purge, etc. risk irreversible data loss and MUST NOT be
-#       offered as casual user options.
-#
-#   (B) Data-safety assertions (no data loss / auto-recovery / salvage)
-#       about stateful resources WITHOUT primary-source state verification
-#       attestation (kubectl get replica/volume, spec.numberOfReplicas,
-#       status.robustness, replica count, primary-source verified).
-#
-# Patterns live in data/hangul-patterns.regex (locale-specific keywords
-# externalized per opensource.md "Public repo locale-specific patterns").
-# English-only fallbacks below keep this hook functional in environments
-# without the data file.
-HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:-longhorn|replica|PVC|persistentvolume|volume\.longhorn|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume}"
-HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:-PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume}"
-HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:-no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)}"
-HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:-kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*verified|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified}"
-
+# Two sub-gates:
+#   (A) Destructive volume/replica operations as options — outright deny.
+#       User mandate: "prevent data loss on recurrence — never put 'recreate the PV' in the options".
+#   (B) Data-safety claims (no data loss / auto-recovery / salvage) on stateful
+#       resources WITHOUT state-verification attestation (kubectl get / replica
+#       count / robustness / primary-source check) → deny.
+#       Recurrence pattern of "asserting external-tool behavior" extended to stateful infra.
 check_stateful_data_safety() {
   [[ -z "$OPTIONS_BLOB" ]] && return 0
 
@@ -420,7 +467,7 @@ check_stateful_data_safety() {
 DENIED: AskUserQuestion option proposes destructive operation on a stateful resource (PV/volume/PVC/replica/snapshot).
 
 Why blocked:
-  - One or more options contains a destructive verb (recreate / delete / wipe / purge / fresh volume) applied to a stateful resource.
+  - One or more options contains a destructive verb (recreate / delete / wipe / reset / purge / fresh volume) applied to a stateful resource.
   - Destructive stateful operations risk irreversible data loss and MUST NOT be presented as casual user options.
 
 Required action (pick one before retrying):
@@ -432,8 +479,9 @@ Required action (pick one before retrying):
      - Report the situation as text (no options)
      - Document the data-loss implication explicitly
      - Wait for the user to explicitly type the destructive command themselves
+  3. The user mandate: "never put 'recreate the PV' in the options" — destructive PV/volume operations are forbidden as ask options.
 
-Reference: failed-attempts.md "stateful destructive option in ask"
+Reference: failed-attempts.md "stateful destructive option in ask" + k3s.md "no data-loss-capable operation as an ask option"
 MSG
     exit 2
   fi
@@ -448,7 +496,7 @@ DENIED: AskUserQuestion claims data safety on a stateful resource without primar
 Why blocked:
   - Option references a stateful resource (longhorn / replica / PV / PVC / volume / snapshot / etcd / vault) AND
   - Option asserts data safety (no data loss / auto-recovery / salvage / safely delete) BUT
-  - No option text quotes state verification (kubectl get replica/volume, spec.numberOfReplicas, status.robustness, replica count, primary-source verified).
+  - No option text quotes state verification (kubectl get replica/volume, spec.numberOfReplicas, status.robustness, replica count, primary-source check).
 
 Why this matters:
   - "Auto-recovers from healthy replicas on node X" was asserted previously without checking that node X actually had replicas. Result: only 1 replica existed, on the failed node. Data was at risk before verification.
@@ -456,17 +504,84 @@ Why this matters:
 
 Required action (pick one before retrying):
   1. Run primary-source checks first, then include the result in the option description:
-     - kubectl -n <ns> get replica.longhorn.io -o jsonpath='{.items[*].spec.nodeID},{.items[*].status.currentState}'
-     - kubectl -n <ns> get volume.longhorn.io <vol> -o jsonpath='{.spec.numberOfReplicas}|{.status.robustness}'
-     - kubectl get pvc <pvc> -o jsonpath='{.status.phase}'
+     - `kubectl -n <ns> get replica.longhorn.io -o jsonpath='{.items[*].spec.nodeID},{.items[*].status.currentState}'`
+     - `kubectl -n <ns> get volume.longhorn.io <vol> -o jsonpath='{.spec.numberOfReplicas}|{.status.robustness}'`
+     - `kubectl get pvc <pvc> -o jsonpath='{.status.phase}'`
   2. Quote the verified state in option description (e.g., "verified: 2 replicas, 1 healthy on a1-1, robustness=degraded").
   3. If verification is not possible, do NOT claim data safety. State the risk explicitly instead.
 
-Reference: failed-attempts.md "stateful data-safety claim without verification"
+Reference: failed-attempts.md "stateful data-safety claim without verification" (4th recurrence of "asserting external-tool behavior") + k3s.md "stateful operations require primary-source verification"
 MSG
       exit 2
     fi
   fi
+}
+
+# ============================================================================
+# Check 7: PR-creation option without explicit draft marker
+# ============================================================================
+# Trigger: option proposes PR creation but description lacks 'draft' keyword.
+# Reference: github-flow/pr.md:15 "Draft default governs upstream asks too (HARD STOP)"
+# Failed-attempts entry: "next-suggestion ask option with 'create PR' — missing draft marker"
+#   - 1st: github-flow/pr.md:15 rule established
+#   - 2nd 2026-06-24: next/suggestion-patterns.md cross-ref added
+#   - 3rd 2026-06-28: hook escalation (this check)
+check_pr_creation_without_draft() {
+  [[ -z "$OPTIONS_BLOB" ]] && return 0
+
+  # PR-creation detection — split strong (imperative creation) vs weak (compound
+  # workflow mention) signals to avoid gray-zone false positives. A weak signal
+  # such as "worktree + PR" often only *describes* a branch-policy consequence
+  # ("branch-policy applies (feat/fix worktree + PR)") rather than proposing a PR
+  # be created — so it counts only when an imperative creation cue co-occurs.
+  local pr_strong_pattern="gh pr create|create PR|create a PR|creates a PR|open a PR|opens a PR|raise a PR|submit a PR${HG_ASK_PR_STRONG_KO:+|$HG_ASK_PR_STRONG_KO}"
+  local pr_weak_pattern='push.*\+.*PR|cherry-pick.*PR|worktree.*PR|branch.*\+.*PR'
+  local pr_creation_cue='create|creates|open a PR|opens a PR|raise a PR|submit a PR|make a PR|new PR'
+
+  local pr_proposes_creation=0
+  if echo "$OPTIONS_BLOB" | grep -qiE "$pr_strong_pattern"; then
+    pr_proposes_creation=1
+  elif echo "$OPTIONS_BLOB" | grep -qiE "$pr_weak_pattern" \
+       && echo "$OPTIONS_BLOB" | grep -qiE "$pr_creation_cue"; then
+    pr_proposes_creation=1
+  fi
+
+  [[ "$pr_proposes_creation" -eq 0 ]] && return 0
+
+  # Check if 'draft' keyword present in options (covers both creation paths and ready opt-out)
+  if echo "$OPTIONS_BLOB" | grep -qiE "draft|--ready"; then
+    return 0
+  fi
+
+  # Exception: user explicitly requested ready PR in recent turns
+  load_user_text
+  if echo "$USER_TEXT" | grep -qiE "ready PR|--ready|non-draft|non draft${HG_ASK_PR_READY_KO:+|$HG_ASK_PR_READY_KO}"; then
+    return 0
+  fi
+
+  cat >&2 <<'MSG'
+DENIED: AskUserQuestion option proposes PR creation without explicit 'draft' marker.
+
+Why blocked:
+  - One or more options contains PR creation verbs (gh pr create / create PR / cherry-pick + PR / worktree + PR) with a co-occurring creation cue, BUT
+  - The option description does not include 'draft' or '--ready' keyword AND
+  - No explicit user request for ready (non-draft) PR was detected in recent transcript.
+
+Per github-flow/pr.md:15 "Draft default governs upstream asks too (HARD STOP)":
+  - Every PR creation option must be labeled as "draft PR" by default
+  - A ready (non-draft) PR must be a separate option (e.g., "push + ready PR --ready"), never folded into a generic "create PR" label
+  - No explicit ready request → draft
+
+Required action (pick one before retrying):
+  1. Edit option label/description to include 'draft PR' explicitly (e.g., "Push + draft PR creation")
+  2. If both draft and ready paths are valid, present them as separate options:
+     - "Push + draft PR creation (default)"
+     - "Push + ready PR creation (--ready, autonomous review trigger)"
+  3. If the user explicitly requested a ready PR, paraphrase that in your text response before this AskUserQuestion call so the hook can detect it.
+
+Reference: failed-attempts.md "next-suggestion ask option with 'create PR' — missing draft marker" (3rd recurrence 2026-06-28) + github-flow/pr.md:15
+MSG
+  exit 2
 }
 
 # Execute checks in cost order
@@ -476,5 +591,6 @@ check_release_please_close
 check_vendor_leak
 check_supervisor_loop_recommend
 check_stateful_data_safety
+check_pr_creation_without_draft
 
 exit 0

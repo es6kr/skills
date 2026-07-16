@@ -21,14 +21,23 @@ if [ -f "$HG_DATA_FILE" ]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
 fi
-HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:-cleanup run|/cleanup|Session end|session end|End session}"
+# Strict cleanup-invocation markers only. Generic phrases like "End session" /
+# "session end" appear in option descriptions and prose unrelated to cleanup,
+# producing false positives. Use cleanup-specific phrases:
+#   - `/cleanup` (slash-command invocation)
+#   - `cleanup run` (skill ARGUMENTS)
+#   - `cleanup wrap-up` (run.md mandated wrap-up phrase)
+#   - header-form session-end report marker
+# Locale-specific marker variants (the wrap-up phrase and header marker in
+# non-English locales) live in data/hangul-patterns.regex (HG_CLEANUP_MARKERS).
+HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:-/cleanup|cleanup run|cleanup wrap-up}"
 HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:-chunks added|qdrant}"
 
 INPUT=$(cat)
 
-# Transcript path feeds both the RESPONSE fallback below and the HAS_RAG_CALL
-# scan later — derive it unconditionally so the scan also works when the
-# payload carries a populated .response.
+# Always extract TRANSCRIPT_PATH (needed for RAG-call detection later — not only
+# for RESPONSE fallback). Earlier version scoped this inside `if [[ -z "$RESPONSE" ]]`
+# which left TRANSCRIPT_PATH empty on the common path → HAS_RAG_CALL silently stayed 0.
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
 # Extract assistant message text from Stop event payload
@@ -37,11 +46,9 @@ RESPONSE=$(echo "$INPUT" | jq -r '
 ' 2>/dev/null)
 
 # Fallback: try parsing transcript-based payload (varies by Stop hook implementation)
-if [[ -z "$RESPONSE" ]]; then
-  if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
-    # Read last assistant turn from transcript
-    RESPONSE=$(tail -50 "$TRANSCRIPT_PATH" | jq -r 'select(.type=="assistant") | .message.content[]?.text? // empty' 2>/dev/null | tail -100)
-  fi
+if [[ -z "$RESPONSE" ]] && [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
+  # Read last assistant turn from transcript
+  RESPONSE=$(tail -50 "$TRANSCRIPT_PATH" | jq -r 'select(.type=="assistant") | .message.content[]?.text? // empty' 2>/dev/null | tail -100)
 fi
 
 if [[ -z "$RESPONSE" ]]; then
@@ -55,7 +62,12 @@ fi
 
 # Detect distinct RAG visibility row (must appear as a TABLE ROW or BOLD line,
 # not buried in prose). Heuristics:
-#   1. Markdown table row containing "RAG" + ("chunks" or locale variant)
+#   1. Markdown table row whose LABEL CELL (first cell after the leading |) is
+#      RAG-related — not just any cell in the row. A row labeled "BLOCKED" or
+#      "Commits" that happens to mention "qdrant"/"chunks" as a supporting
+#      detail must NOT satisfy this check (4th recurrence — a BLOCKED row
+#      containing a "qdrant readyz 200 ... N chunks" prose justification
+#      passed the old any-cell regex and buried the real count).
 #   2. Bold line "**chunks added**" / "**qdrant**" / locale variant
 #   3. Header-like "### RAG" / "## RAG"
 HAS_RAG_ROW=0
@@ -71,11 +83,16 @@ if [[ "$HAS_RAG_ROW" -eq 1 ]]; then
   exit 0
 fi
 
-# Detect that RAG store actually happened in this session (presence of qdrant-import / qdrant-store tool use)
-# If RAG was never invoked, the missing row is expected — exit silently.
+# Detect that RAG store actually happened in this session.
+# Match must be a tool_use entry (actual call), not prose mention/quoted skill body.
+# Without parsing entry types, plain `grep qdrant-import` matches assistant text
+# that merely cites the skill (e.g., quoting cleanup/run.md inline) — false positive.
 HAS_RAG_CALL=0
 if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
-  if grep -qE 'qdrant-import|qdrant-store|qdrant_store' "$TRANSCRIPT_PATH" 2>/dev/null; then
+  # Parse jsonl: select assistant tool_use entries → inspect Bash command + MCP tool name.
+  # Falls back silently if jq fails (HAS_RAG_CALL stays 0 = hook exits OK = no false block).
+  if jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | (.name + " " + (.input.command? // ""))' "$TRANSCRIPT_PATH" 2>/dev/null \
+       | grep -qE 'qdrant-import\.py|mcp__qdrant__|qdrant-store|qdrant_store' 2>/dev/null; then
     HAS_RAG_CALL=1
   fi
 fi

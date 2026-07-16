@@ -28,7 +28,7 @@ Install hook scripts from skill resources (source) to `~/.claude/hooks/` and reg
 
 Before deciding the owning skill (where resources/ lives), assess whether a plugin bundle is needed:
 
-1. **Identify the invoked skill** — which skill does this hook call/enforce?
+1. **Identify the invoked skill** — which skill does this hook call/enforce? Judge by **content** (what command/pattern does the hook check?), never by where the file currently sits. A hook file discovered already staged/created inside `hook-kit/resources/` (or any other skill's `resources/`) is not evidence that skill owns it — a `pm2 start`/`pm2 resurrect` guard belongs to `pm2`, a `semaphore` task guard belongs to `semaphore`, regardless of which directory it was first written into. If content-owner ≠ current directory, `mv` it to the owning skill's `resources/` before registering (same as the ORPHAN case below).
 2. **Assess coupling scope** — do that skill + its `depends-on` skills form a single deployable unit? (e.g., ask-user plugin's guards/question/secrets + enforcement hook bundle)
 
 | Decision | Branch |

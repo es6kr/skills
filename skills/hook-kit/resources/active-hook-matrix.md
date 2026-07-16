@@ -11,6 +11,7 @@ Reference data for AskUserQuestion callers — pre-check option label/descriptio
 | `block-vendor-in-generic-skill.sh` | Vendor name (qdrant / chroma / pinecone / mcp__\<vendor>__ / private IPs `192.168.*`, `10.0.*`) | Use abstract terms (`RAG store`, `<private-IP>`, `<internal-host>`), or have the vendor name in the immediately preceding user message |
 | `block-skill-language-mismatch.sh` | Korean text added to a skill body whose SKILL.md description is English (`.md` Edit) | Write in English, or include explicit citation rationale |
 | `block-axis-merged-ask.sh` | Same-category findings (Refactor/Tip/Minor, etc.) collapsed into a single question with N options | Use multi-select question for "select items to process" + separate question for processing method |
+| `block-manual-delegation-without-automation-check.sh` | Option label/description contains manual-delegation keyword (`manual` / `Console UI` / `browser to access` / `paste-token` and Korean equivalents) | Include automation-skill evidence in the same description: `<web-browser \| Playwright \| chrome-devtools \| wmux>` paired with `<unavailable \| disconnected \| tried \| failed \| login wall>` (or `no automation applicable — <reason>`) |
 
 (Matrix reflects matchers registered in `~/.claude/settings.json` `PreToolUse:AskUserQuestion`. Update this file when matchers change.)
 
@@ -26,7 +27,7 @@ Reference data for AskUserQuestion callers — pre-check option label/descriptio
 
 ## Self-check (before every AskUserQuestion call)
 
-1. Visually grep the entire label + description against the 5 hook block patterns above
+1. Visually grep the entire label + description against the 6 hook block patterns above
 2. On match → add the pass-condition keyword to description, or rewrite with abstract terms
 3. **Block avoidance = information-loss signal**: if failing the pass condition implies the ask itself is inappropriate (e.g., proposing a merge option when Test Plan isn't N/N), re-evaluate the ask itself rather than working around it
 4. One block cascade = signal the self-check was skipped. From the second cascade onward, re-read this matrix file
@@ -34,7 +35,7 @@ Reference data for AskUserQuestion callers — pre-check option label/descriptio
 ## Procedure
 
 1. After drafting the AskUserQuestion options array
-2. Iterate the 5 hook block patterns above and grep
+2. Iterate the 6 hook block patterns above and grep
 3. Fix matched options' description (add pass-condition keyword or abstract)
 4. Re-grep after fixes — confirm 0 matches before calling
 5. If a block still occurs after calling = this matrix is missing an entry → update (new hook may have been added to settings.json)

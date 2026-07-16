@@ -117,14 +117,23 @@ check_skill_language_mismatch() {
     *) return 0 ;;
   esac
 
+  # Path-based exemption: case-history data files are locale logs, not skill
+  # procedural body -- same exemption as check 1 (date stamps) and check 3
+  # (vendor refs) above. Missing here caused a false DENY on Korean-only
+  # failed-attempts.md entries (2026-07-16).
+  case "$FILE_PATH" in
+    */data/failed-attempts*.md|*/data/failed-hooks*.md|*/data/archive/*.md|*/data/case-studies/*.md)
+      return 0
+      ;;
+  esac
+
   resolve_skill_root
   [[ -z "$SKILL_ROOT" ]] && return 0
   [[ -f "$SKILL_ROOT/SKILL.md" ]] || return 0
 
   local desc
   desc=$(awk '
-    # YAML block scalar headers: |, |-, |+, >, >-, >+ (literal + folded, all chomping indicators)
-    /^description:[[:space:]]*[|>][-+]?[[:space:]]*$/ { in_block=1; next }
+    /^description:[[:space:]]*\|/ { in_block=1; next }
     in_block && /^[^[:space:]]/ { in_block=0 }
     in_block { print; next }
     /^description:/ { sub(/^description:[[:space:]]*/, ""); print; exit }
@@ -189,7 +198,7 @@ check_vendor_in_generic_skill() {
 
   # Skip vendor / infra-host skills (they ARE the receivers)
   case "$skill_name" in
-    es6kr|daegun-servers|daegun|semaphore|argocd|hook|deps-project|deps-wbs-sync|k3s|gitops-expert|cert-reflector-setup|hedgedoc|oci-resource|rclone|launchd-manager|win|macos|asdf-dev-env|package-manager)
+    es6kr|dgs|daegun|semaphore|argocd|hook|deps-project|deps-wbs-sync|k3s|gitops-expert|cert-reflector-setup|hedgedoc|oci-resource|rclone|launchd-manager|win|macos|asdf-dev-env|package-manager)
       return 0
       ;;
     omc-*|deps-*)
@@ -203,7 +212,7 @@ check_vendor_in_generic_skill() {
 
   # Pattern 1: Vendor Skill() invocation
   local p1
-  p1=$(echo "$NEW_CONTENT" | grep -nE 'Skill\("(es6kr|daegun-servers|daegun|semaphore|argocd|omc-[^"]+|deps-[^"]+)"' | head -3)
+  p1=$(echo "$NEW_CONTENT" | grep -nE 'Skill\("(es6kr|dgs|daegun|semaphore|argocd|omc-[^"]+|deps-[^"]+)"' | head -3)
   [[ -n "$p1" ]] && violations="${violations}[vendor Skill() invocation]\n${p1}\n"
 
   # Pattern 2: Private network IPs (RFC1918)
@@ -223,7 +232,10 @@ check_vendor_in_generic_skill() {
 
   # Pattern 5: Agent-specific slash commands without agent label
   local p5
-  p5=$(echo "$NEW_CONTENT" | grep -nE '(^|[^A-Za-z_/])/(reload-plugins|mcp|doctor|clear|compact|cost|model|status|theme|memory)([^A-Za-z0-9_-]|$)' | head -3)
+  # Preceding char must be a command position (SOL / whitespace / quote / paren /
+  # pipe / bracket) so REST path segments like commits/{sha}/status (preceded by
+  # '}') or api/v2/status (preceded by a digit) do not false-positive.
+  p5=$(echo "$NEW_CONTENT" | grep -nE '(^|[[:space:]"`(|[])/(reload-plugins|mcp|doctor|clear|compact|cost|model|status|theme|memory)([^A-Za-z0-9_-]|$)' | head -3)
   if [[ -n "$p5" ]]; then
     if ! echo "$NEW_CONTENT" | grep -qiE '\b(Claude[-[:space:]]?Code|Cursor|Antigravity|Codex|Gemini[-[:space:]]?CLI)\b'; then
       violations="${violations}[agent-specific slash command without agent label]\n${p5}\n"
