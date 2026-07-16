@@ -114,10 +114,12 @@ jobs:
 
             for SKILL in $SKILLS; do
               # Skill md guard: any md file under skills/<name>/ diffed by a
-              # chore/docs commit is rejected. Skill md = behaviour surface.
+              # chore/docs commit is rejected, except skill-root README.md /
+              # CHANGELOG.md (documentation, not behaviour surface — same
+              # scoping as the NON_DOC exemption above).
               MD_TOUCHED=$(git show --name-only --format='' "$SHA" \
                 | grep -E "^${SKILL}/.*\.md$" \
-                | grep -vE '/(README|CHANGELOG)\.md$' \
+                | grep -vE "^${SKILL}/(README|CHANGELOG)\.md$" \
                 || true)
               if [ -n "$MD_TOUCHED" ] && { [ "$TAG" = "chore" ] || [ "$TAG" = "docs" ]; }; then
                 echo "::error::Commit $SHA touches skill md files with tag '$TAG'. Skill md is behaviour surface — changes must use 'fix:' or 'feat:'. Files:"
