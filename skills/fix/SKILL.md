@@ -114,6 +114,20 @@ TodoWrite([
 
 ### 1. Root Cause Analysis (5-Why depth)
 
+**Environment Detection (MANDATORY)**: Before modifying any rules or settings file, detect the current platform via runtime environment variables:
+- **macOS**: Check `$__CFBundleIdentifier` — `com.google.antigravity` = Antigravity, `com.microsoft.VSCode` = VS Code, `com.todesktop.230313mzl4w4u92` = Cursor
+- **Windows**: Check `$env:ANTIGRAVITY_AGENT` — `1` = Antigravity. Also `$env:ANTIGRAVITY_EDITOR_APP_ROOT` for confirmation.
+
+Routing table by detected environment:
+- **Antigravity (Gemini)**:
+  - Permissions config: Guide user to edit `~/.gemini/config/config.json`. Do not edit it directly.
+  - Behavioral rules: Edit `~/.gemini/GEMINI.md`. Never touch shared `~/.agents/rules/` or Claude Code settings.
+- **Claude Code** (neither Antigravity env var is set):
+  - Permissions config: Edit `~/.claude/settings.json`.
+  - Behavioral rules: Edit `CLAUDE.md` or `.claude/rules/`.
+
+Do NOT use file-existence checks to detect the environment — both `.gemini/` and `.claude/` coexist on the same machine.
+
 **No trivial exception (HARD STOP)**: Even when the symptom is fixable with a 1-line change, 5-Why analysis and the entire step-by-step procedure are mandatory. Bypassing or skipping any steps (Step 0 to Step 4) when `/fix` is triggered is strictly forbidden. Even for "simple typos / encoding issues / minor file copies", the procedure must be executed step-by-step.
 
 | # | Don't | Do |
@@ -229,3 +243,4 @@ Report the fix (🔍 root cause / 🔧 improvement / 🔄 current fix / 📋 wra
 - **"Fixing right now" / "I know the cause, skip"** — Step 1 Why analysis cannot be skipped, whether recurrence or trivial. Recurrence = evidence that prior fix's Why was insufficient, so go **deeper**. "Fix right now" is not a procedure that exists in the fix skill
 - **Resume scope narrowing via auto-Reject classification** — When Resume produces an AskUserQuestion for option design, **all findings (Accept + Reject + Defer)** must appear as user-decidable options. Auto-Reject classification (`superpowers:receiving-code-review` "Push back when wrong" procedure) followed by excluding the Reject finding from options strips the user's override authority. The user typically phrases this as "fix them all together — why only X separately?". See consolidate/next.md "Reject finding option mandate" for the required option pattern (Accept-applied / Apply-ALL-override / Defer-all)
 - **Option outcome must be pre-verified for path-based or cross-cutting tooling** — When AskUserQuestion options change a tool's behavior whose outcome depends on **path-based** or **commit-history** analysis (release-please, semantic-release, changesets, dependabot config, CI matrix rules, etc.), the option author must **dry-run / simulate / enumerate the outcome** before presenting options to the user. The user's authority is "decide between simulated outcomes," not "pick the option label and discover the real outcome only after merge." If options A and B both produce the same real-world outcome (e.g., still bumps every package because a cross-cutting `feat(...)` commit touches every package's path), state that fact in the option descriptions or merge the options. Failing this verification means the user invests effort in choosing an option that does not change the eventual result, then has to fix it after seeing the unchanged outcome. Specifically for release-please: enumerate `git log <proposed-base>..HEAD -- skills/<package>/` for every package before committing to a `last-release-sha` choice — if any cross-cutting `feat(...)` commit (e.g., monorepo-wide annotation, config bump touching every package) sits in that window, the chosen base will not block bumps.
+- **Modifying files without environment detection**: Editing settings or rules files without detecting the active execution environment (e.g. editing Claude Code settings while under Antigravity, or editing shared `~/.agents/rules` workspace rules for out-of-scope/unrelated domains).
