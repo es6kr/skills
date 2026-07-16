@@ -6,7 +6,9 @@ Entry: `Skill("consolidate", "post ...")` or `pr.md` Workflow Step 7 / Step 7.5 
 
 ## Step 7: Post AI Review Summary + Formal Review
 
-**Always post a summary** (unless user chose "Skip" in Step 5).
+**Draft-PR gate (HARD STOP — re-check even on direct entry)**: `pr.md` Workflow Step 2 condition 4/5 skip draft and non-default-base-staging PRs before ever reaching this step — but `post.md` can also be entered directly (`Skill("consolidate", "post ...")`), bypassing that check. Before posting, re-verify: `gh pr view <NUMBER> --json isDraft --jq '.isDraft'`. If `true`, **stop — do not post**, and report the draft state instead. A Summary documenting the absence of review ("no findings", "no review needed for staging") is not an exception; it is the exact violation this gate exists to prevent.
+
+**Always post a summary** (unless user chose "Skip" in Step 5, or the draft gate above fired).
 The summary MUST include a detailed table of the findings, verification notes, and status.
 
 ### Interactive gate (when `--interactive` is on — literal or auto-activated by args)
