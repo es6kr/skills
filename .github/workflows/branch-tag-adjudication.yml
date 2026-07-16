@@ -16,6 +16,10 @@ name: branch-tag-adjudication
 #   release-please-validate workflow enforces new-component initial versions
 #   (0.1.0+) and blocks breaking markers on new-component PRs, not the
 #   feat-adds-a-topic-file coupling.
+# - Merge (history-join) commits are skipped: their combined diff is only the
+#   conflict resolution of parent commits that were already adjudicated, and
+#   they carry no conventional tag (a base-sync merge would otherwise be
+#   rejected as tag 'other').
 
 on:
   pull_request:
@@ -66,7 +70,7 @@ jobs:
           declare -A SKILL_TAGS
           declare -A PR_SKILL_HAS
 
-          COMMITS=$(git log --format='%H' "$BASE_SHA..$HEAD_SHA")
+          COMMITS=$(git log --no-merges --format='%H' "$BASE_SHA..$HEAD_SHA")
           if [ -z "$COMMITS" ]; then
             echo "No commits in range — nothing to adjudicate."
             exit 0
