@@ -3,6 +3,76 @@
 # Phase 1: Immediate block (dangerous command pattern matching)
 # Phase 2: Informational checks + conditional block (complex logic)
 # Exit codes: 0 = allow, 1 = soft block (BLOCK), 2 = hard block
+#
+# Self-test:  bash bash-guard.sh --test   (git FN/FP regression suite)
+
+# ── Self-test harness (MUST precede the stdin read below) ──
+if [ "${1:-}" = "--test" ]; then
+  SELF="$(realpath "$0")"
+  pass=0; fail=0
+  check() {  # check <BLOCK|ALLOW> <command>
+    local expect="$1" cmd="$2" rc got
+    CLAUDE_TOOL_INPUT="$(jq -n --arg c "$cmd" '{tool_input:{command:$c}}')" "$SELF" >/dev/null 2>&1
+    rc=$?
+    case "$rc" in 2|1) got=BLOCK;; *) got=ALLOW;; esac
+    if [ "$expect" = "$got" ]; then
+      pass=$((pass+1))
+    else
+      fail=$((fail+1)); printf 'FAIL  expected=%-5s got=%-5s :: %s\n' "$expect" "$got" "$cmd"
+    fi
+  }
+
+  # ── FN cases: destructive git that MUST be blocked (global-opt forms included) ──
+  check BLOCK 'git reset --hard'
+  check BLOCK 'git reset --hard HEAD~3'
+  check BLOCK 'git -C /srv/app reset --hard'
+  check BLOCK 'git -C /srv/app reset --hard origin/main'
+  check BLOCK 'git -c core.pager=cat reset --hard'
+  check BLOCK 'git --git-dir=/srv/app/.git reset --hard'
+  check BLOCK 'git -C /p -c a.b=c reset --hard'
+  check BLOCK 'sudo git reset --hard'
+  check BLOCK 'time git -C /p reset --hard'
+  check BLOCK 'bash -c "git reset --hard"'
+  check BLOCK "sh -c 'git -C /p reset --hard'"
+  check BLOCK 'ssh host "git -C /srv/app reset --hard"'
+  check BLOCK 'git -C /p push origin main --force'
+  check BLOCK 'git -C /p push --force-with-lease'
+  check BLOCK 'git -C /p push -f'
+  check BLOCK 'git -C /p clean -fd'
+  check BLOCK 'git -C /p branch -f main deadbeef'
+  check BLOCK 'git -C /p branch --force main deadbeef'
+  check BLOCK 'git -C /p stash drop'
+  check BLOCK 'git -C /p stash clear'
+  check BLOCK 'git -C /p checkout .'
+  check BLOCK 'git -C /p restore .'
+  check BLOCK 'git -C /p add -A'
+  check BLOCK 'git -C /p read-tree HEAD'
+  check BLOCK 'git -C /p commit --allow-empty -m x'
+  check BLOCK 'git -C /p merge --abort'
+  check BLOCK 'git    -C   /p    reset   --hard'
+  check BLOCK 'GIT -C /p RESET --HARD'
+  check BLOCK 'git -C "/path with space" reset --hard'
+  check BLOCK 'foo && git -C /p reset --hard'
+
+  # ── FP cases: mentions / safe commands that MUST be allowed ──
+  check ALLOW 'git status'
+  check ALLOW 'git -C /srv/app log --oneline -5'
+  check ALLOW 'git -C /p reset --soft HEAD~1'
+  check ALLOW 'git clean -n'
+  check ALLOW 'echo "git reset --hard undoes uncommitted work"'
+  check ALLOW "grep 'git reset --hard' /tmp/notes.md"
+  check ALLOW 'echo "run git -C /p reset --hard to wipe"'
+  check ALLOW 'printf "%s" "git push --force is dangerous"'
+  check ALLOW 'git commit -m "document git reset --hard behaviour"'
+  check ALLOW 'git commit -m "fix: git push --force guard"'
+  check ALLOW 'rg "git -C \S+ reset --hard" skills/'
+  check ALLOW "$(printf "cat <<'EOF'\ncase history: git push --force overwrites remote history\nEOF")"
+  check ALLOW "$(printf "tee -a /tmp/notes.md <<'EOF'\nexample: git reset --hard deletes work\nEOF")"
+  check BLOCK "$(printf "bash <<'EOF'\ngit push --force origin main\nEOF")"
+
+  printf '\n%d passed, %d failed\n' "$pass" "$fail"
+  [ "$fail" -eq 0 ]; exit
+fi
 
 INPUT="${CLAUDE_TOOL_INPUT:-$(cat)}"
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // .command // empty' 2>/dev/null)
@@ -46,28 +116,68 @@ echo "$COMMAND" | $GREP -qiP '\brm\b[^|;&]*\s(\./)?\.tmp/\*'           && block 
 echo "$COMMAND" | $GREP -qiP 'docker\s+volume\s+rm'    && block "docker volume rm permanently deletes volume data"
 echo "$COMMAND" | $GREP -qiP 'docker\s+rm\b'           && block "docker rm deletes the container. Check if stop is sufficient"
 
+# ── git destructive guards (global-option-aware + command-position aware) ──
+# FN fix: git accepts global options between `git` and the subcommand
+#         (`git -C <path> reset --hard`, `git -c x=y ...`, `git --git-dir=... ...`).
+#         GITPFX absorbs any run of leading option tokens so those forms are still caught.
+# FP fix: a git pattern quoted as a string arg (echo/grep "git reset --hard") must not trip.
+#         GIT_SCAN strips quoted literals ONLY when no subshell/remote executor is present;
+#         with bash -c / sh -c / ssh / eval / xargs the quoted git DOES execute, so we keep the
+#         raw command (default = block). The realistic FN (`git -C <path> reset --hard`, quoted
+#         path args included) stays fully covered by GITPFX. The only form stripping can miss is a
+#         quoted-*subcommand* invocation (`git "reset" "--hard"`), which no human/tool generates.
+GITPFX='\bgit(?:\s+-\S+(?:\s+[^-\s]\S*)?)*'
+if echo "$COMMAND" | $GREP -qiP '\b(?:ba|z|k)?sh\s+-c\b|\bssh\b|\beval\b|\bxargs\b'; then
+  GIT_SCAN="$COMMAND"
+else
+  # FP fix 2: heredoc bodies fed to PURE WRITERS (cat/tee) are document text, not
+  # commands — documentation quoting a destructive git command (e.g. a case-history
+  # entry) must not trip the guards. Heredocs feeding anything else (bash, python,
+  # a pipe into an interpreter) keep their body — it may execute. Runs BEFORE the
+  # quote-strip so the <<'MARKER' quotes are still intact for terminator extraction.
+  GIT_SCAN=$(printf '%s\n' "$COMMAND" | awk '
+    skip {
+      t=$0; sub(/^[ \t]+/, "", t)
+      if (t == term) skip=0
+      next
+    }
+    $0 ~ /^[ \t]*(cat|tee)[ \t]/ && $0 ~ /<</ {
+      s=$0
+      sub(/.*<<-?[ \t]*/, "", s)
+      gsub(/['\''"]/, "", s)
+      split(s, a, /[ \t<>|;&]/)
+      if (a[1] != "") { term=a[1]; skip=1 }
+      print
+      next
+    }
+    { print }
+  ')
+  GIT_SCAN=$(printf '%s' "$GIT_SCAN" | sed -E "s/'[^']*'//g" | sed -E 's/"[^"]*"//g')
+fi
+gitblock() { echo "$GIT_SCAN" | $GREP -qiP "${GITPFX}\s+$1" && block "$2"; }
+
 # Git history destruction
-echo "$COMMAND" | $GREP -qiP 'git\s+reset\s+--hard'    && block "git reset --hard deletes uncommitted work"
-echo "$COMMAND" | $GREP -qiP 'git\s+branch\s+[^|;&]*(?:-f\b|--force)' && block "git branch -f force-moves a branch ref, equivalent to reset --hard (previous commits on that ref become unreachable)"
-echo "$COMMAND" | $GREP -qiP 'git\s+push\s+.*--force'  && block "git push --force overwrites remote history"
-echo "$COMMAND" | $GREP -qiP 'git\s+push\s+.*-f\b'     && block "git push -f overwrites remote history"
+gitblock 'reset\s+--hard'                       "git reset --hard deletes uncommitted work"
+gitblock 'branch\s+[^|;&]*(?:-f\b|--force)'     "git branch -f force-moves a branch ref, equivalent to reset --hard (previous commits on that ref become unreachable)"
+gitblock 'push\s+.*--force'                     "git push --force overwrites remote history"
+gitblock 'push\s+.*-f\b'                        "git push -f overwrites remote history"
 
 # Git working directory destruction
-echo "$COMMAND" | $GREP -qiP 'git\s+clean\s+-.*f'      && block "git clean -f permanently deletes untracked files"
-echo "$COMMAND" | $GREP -qiP 'git\s+checkout\s+\.\s*$' && block "git checkout . discards all changes"
-echo "$COMMAND" | $GREP -qiP 'git\s+restore\s+\.\s*$'  && block "git restore . discards all changes"
-echo "$COMMAND" | $GREP -qiP 'git\s+stash\s+drop'      && block "git stash drop permanently deletes the stash"
-echo "$COMMAND" | $GREP -qiP 'git\s+stash\s+clear'     && block "git stash clear deletes all stashes"
+gitblock 'clean\s+-.*f'                         "git clean -f permanently deletes untracked files"
+gitblock 'checkout\s+\.\s*$'                    "git checkout . discards all changes"
+gitblock 'restore\s+\.\s*$'                     "git restore . discards all changes"
+gitblock 'stash\s+drop'                         "git stash drop permanently deletes the stash"
+gitblock 'stash\s+clear'                        "git stash clear deletes all stashes"
 
 # GitHub PR/Issue close (permanent history pollution)
 echo "$COMMAND" | $GREP -qiP 'gh\s+(pr|issue)\s+close'   && block "gh pr/issue close is forbidden without explicit user instruction. close/reopen history is permanently recorded on GitHub"
 
 # Git staging / other
-echo "$COMMAND" | $GREP -qiP 'git\s+add\s+-A'                && block "git add -A causes indiscriminate staging. Specify individual files"
-echo "$COMMAND" | $GREP -qiP 'git\s+add\s+\.\s*($|&&|\|)'    && block "git add . causes indiscriminate staging. Specify individual files"
-echo "$COMMAND" | $GREP -qiP 'git\s+read-tree'               && block "git read-tree destroys staged changes"
-echo "$COMMAND" | $GREP -qiP 'git\s+commit\s+--allow-empty'  && block "Empty commits risk being abused as CI/CD triggers"
-echo "$COMMAND" | $GREP -qiP 'git\s+merge\s+--abort'         && block "git merge --abort discards in-progress conflict resolution work"
+gitblock 'add\s+-A'                             "git add -A causes indiscriminate staging. Specify individual files"
+gitblock 'add\s+\.\s*($|&&|\|)'                 "git add . causes indiscriminate staging. Specify individual files"
+gitblock 'read-tree'                            "git read-tree destroys staged changes"
+gitblock 'commit\s+--allow-empty'               "Empty commits risk being abused as CI/CD triggers"
+gitblock 'merge\s+--abort'                      "git merge --abort discards in-progress conflict resolution work"
 
 # K3s / cluster destruction
 echo "$COMMAND" | $GREP -qiP 'curl.*get\.k3s\.io'       && block "k3s reinstall risks overwriting existing data"
