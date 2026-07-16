@@ -34,6 +34,75 @@
 3. Are Important/Critical findings from the current PR still surfaced as per-PR immediate action? → They should be (this rule affects only Minor/Nitpick)
 4. If only 1 PR has deferred Minor findings and no bundle exists yet, is the Minor option omitted entirely? → It should be. The candidate goes into fix_plan and waits for the next PR's Minor findings
 
+## Deferred-status overrides severity + pending-task precedence (HARD STOP)
+
+The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟡 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.
+
+Two independent errors this gate prevents: (a) surfacing a deferred-status finding as a discrete option, and (b) failing to pull the actual pending TaskList backlog as the primary candidate source. "There are tasks to finish — don't spend a next-action slot on a deferred item." Deferred findings aggregate into a late bundle (fix_plan sweep); they are never a slot-filler.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Surface a deferred-status Important/Critical finding (out-of-diff, fix_plan hold, postponed) as an individual next-action option | Deferred STATUS overrides severity → aggregate into a late bundle. Not an individual option, even at the bottom of the list |
+| 2 | Read "Important = per-PR immediate action" and surface an out-of-scope Important finding | "Per-PR immediate" applies only to findings IN the PR diff. Out-of-diff / postponed = deferred status = bundle + late |
+| 3 | Fill an option slot with a deferred finding when pending TaskList tasks exist | Pending backlog tasks are the candidates. Prefer 3 real options over a 4th deferred filler |
+| 4 | Anchor option discovery only on "this PR's follow-ups" (merge / deferred finding / cleanup) | Pull the actual pending TaskList backlog (Step 0.5) as primary candidates. The just-finished PR's deferred items are not the backlog |
+
+**Self-check (before composing next-action options after a PR)**:
+1. Is any option a finding deferred by STATUS (out-of-diff, fix_plan hold, postponed)? → Remove it; it goes to a late bundle regardless of severity
+2. Did I pull the actual pending TaskList backlog as candidates? → If the options are only "this PR's follow-ups", re-pull from TaskList
+3. Am I using a deferred finding as a slot-filler to reach 4? → Forbidden. 3 real backlog candidates beat 4 with a deferred filler
+
+## Operational-failure precedence (HARD STOP)
+
+The severity/deferral rules above govern **review findings inside a PR diff**. A different class — an **operational failure discovered mid-task** (a red CI run, a broken publish/deploy pipeline, a failing release cascade) — is NOT a co-equal option-diversity slot. When it meets the gate below, it takes **precedence**: make it the Recommended #1 option, or handle it before composing the diversity ask at all.
+
+This is about failures in the *system under work* (shared pipelines, released artifacts) that you discover while doing something else — distinct from the assistant's own tool-call errors.
+
+### Gate — SCOPE qualifier + at least one escalation test
+
+**SCOPE qualifier (entry condition)**: the failure sits on a **shared / production surface** — a released artifact, CI/CD, deploy, publish, or a pipeline other backlog tasks depend on. Excludes a single local test you just wrote, a scratch experiment, or a failure you intentionally induced.
+
+**Escalation tests (any ONE true → precedence)**:
+
+| # | Test | Question |
+|---|------|----------|
+| 1 | Accumulation | Does it repeat / worsen each cycle? (every release fails to publish) |
+| 2 | Blast radius | Does it affect multiple artifacts / downstream? (N releases unpublished) |
+| 3 | Blocks dependents | Does it gate other backlog tasks? |
+| 4 | Diagnostic decay | Does evidence degrade if deferred? (logs rotate, transient state) |
+| 5 | Irreversibility | Does continued operation risk irreversible harm? (an immutable bad publish) |
+
+### After the gate fires — self-fixability decides the ACTION (HARD STOP)
+
+A qualifying failure takes precedence, but "handle first" does NOT mean "blindly apply a fix." Verify where the cause lives first:
+
+| Locus | Action |
+|-------|--------|
+| **Self-fixable** (config / version pin / code in a repo you own) | Diagnose → propose the fix → apply (ask first when it touches shared CI) |
+| **External / server-side** (a dependency's API, a third-party outage) | Do NOT ship a speculative local fix. Track it (record with a re-activation trigger) + optionally report upstream. A CLI/version bump does not fix a server-side regression |
+
+Verify the locus with **primary evidence** (changelog, upstream issue tracker, version timeline) **before** editing anything. A speculative "bump the dependency" edit on a server-side cause wastes a shared-CI commit and does not resolve the failure.
+
+### De-prioritize (stays a normal option — NOT forced first)
+
+cosmetic / style-only · already worked around · an external outage you cannot self-fix (after the locus check → track, don't force-fix) · a failure the user explicitly deferred.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Surface a SCOPE+escalation failure (broken publish/deploy/CI cascade) as a co-equal, non-Recommended diversity option | Make it the Recommended #1 option, or handle it before composing the ask |
+| 2 | Apply the "4 diverse options" rule uniformly, treating a red production pipeline like a feature-progress task | Run this gate FIRST. A qualifying failure preempts the normal diversity flow |
+| 3 | Ship a speculative local fix (dependency bump, config tweak) before confirming the cause is self-fixable | Verify locus with primary evidence first. Server-side cause → track, not local-fix |
+| 4 | Force EVERY failure first (cosmetic lint, one local red test, external SaaS 5xx) | Only SCOPE + ≥1 escalation. De-prioritize the excluded classes |
+
+### Self-check (runs BEFORE the option-diversity rule)
+
+1. Did I discover any failure this turn (red CI, broken publish/deploy, failing cascade)? → If yes, run the gate
+2. SCOPE met (shared/production surface) AND ≥1 escalation test true? → If yes, it is Recommended #1 (or handled before the ask), not a diversity slot
+3. Before proposing a fix, did I confirm the cause is self-fixable vs external via primary evidence? → external → track, don't ship a speculative fix
+4. Excluded class (cosmetic / local-test / external outage / user-deferred)? → normal option, do not force first
+
 ## After code writing/modification
 
 ```typescript
