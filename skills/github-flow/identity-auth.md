@@ -148,3 +148,14 @@ Run these in order BEFORE asking the user:
 - `merge` — merge requires `repo` scope for write operations
 - `pr` — PR creation requires `repo` scope; check `dependencies` for `addBlockedBy` GraphQL mutations
 - `push-guards` — `gh run list` (used in force-push CI status check) requires `repo`, `workflow` scope
+
+## Self-review account switch (scripted)
+
+When a PR author must review their own PR, the review must post from a dedicated review account, then restore the acting account. `scripts/review-as.sh` implements the full register → switch → verify → POST → restore sequence in one call:
+
+```bash
+scripts/review-as.sh --repo <owner/repo> --pr <N> --reviewer <review-account> \
+  --acting <acting-account> --input <review-payload.json> [--skip-register]
+```
+
+The acting account is restored on every exit path (`trap EXIT`), preventing review-account leakage into follow-up commits/comments.
