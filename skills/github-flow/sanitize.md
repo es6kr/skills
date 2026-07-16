@@ -137,3 +137,121 @@ Linked from:
 - Ralph `PROMPT.md.template` and project-local `.ralph/PROMPT.md` inline rule
 
 Recorded violation pattern: a PUBLIC-repo issue contained user session UUIDs, raw metrics, and an external tool name verbatim — required sanitization after the fact.
+
+## PRIVATE repo = Korean default (HARD STOP)
+
+**`isPrivate: true` repositories: write issue title/body, PR title/body, comments, and commit messages in Korean by default.** This is the explicit inverse of the PUBLIC-English rule.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Write a PRIVATE repo PR title/body in English (following the commit message) | Write PR title and body in Korean. Even if the commit message is English, the PR title is separately Korean |
+| 2 | "Commit message is English, so PR title is naturally English too" reasoning | Per-medium language separation. Commit message follows git convention; PR title follows visibility rule |
+| 3 | Skip the visibility + language mapping self-check before `gh pr create --title "..."` | Run `gh repo view --json isPrivate` every time → apply the mapping table |
+| 4 | Decide the project uses an English convention and write PRIVATE PRs in English | Only write in English when the project's CLAUDE.md explicitly states an English PR convention |
+
+**Exceptions**: project CLAUDE.md/README explicitly requires English PRs; foreign collaborator/OSS contributor is involved (that PR/issue only); user explicitly instructs "in English".
+
+## Visibility 1st-source check before security decisions (HARD STOP)
+
+**Before applying or skipping any security rule (PUBLIC personal data ban / secret scan / IP exposure ban), confirm repo visibility with `gh repo view --json isPrivate` as a 1st-source check every time.** No inference or assumption.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Auto-assume "this repo is PUBLIC" and report IP/secret hardcoding as inappropriate (without checking) | `gh repo view <owner>/<repo> --json isPrivate -q '.isPrivate'` → apply/skip rules based on `true`/`false` |
+| 2 | "Was PUBLIC in a previous context/session, so must still be PUBLIC" assumption | Visibility can change (PUBLIC ↔ PRIVATE). Confirm before every security decision |
+| 3 | Apply PUBLIC rules to PRIVATE repos because of "GitHub exposure risk" general reasoning | PRIVATE = this section not enforced. IP/secret commits are allowed (though user/team policy may differ) |
+| 4 | Infer visibility from repo name pattern (e.g., "turborepo-web") or owner ("daegunsoftDev") | Naming patterns don't guarantee visibility. Always use `gh repo view` |
+
+## Cross-repo linkage direction: private→public OK, public→private FORBIDDEN (HARD STOP)
+
+**Referencing a PUBLIC repo from a PRIVATE repo commit/PR/issue/comment is allowed. The reverse direction (referencing a PRIVATE repo from a PUBLIC repo commit/PR/issue/comment) is forbidden.** PUBLIC repo content is permanently recorded by GitHub + external indexes (Google, Wayback Machine), permanently exposing the private repo's existence, name, and issue numbers.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | PUBLIC repo PR/commit body: `Closes private-org/private-repo#N` / `Relates to private-repo#N` | Tracking on the PRIVATE side only. PUBLIC PR body has only generic description (no PRIVATE issue mention) |
+| 2 | PUBLIC repo issue comment quoting a PRIVATE repo URL or name | PRIVATE side comment citing the PUBLIC PR URL (reverse direction). PUBLIC side references only itself |
+| 3 | "es6kr org is all ours, so cross-links are fine" assumption | PRIVATE = visibility=private. Outsiders can see PUBLIC repos — PRIVATE names exposed there = information leak. Same org ≠ visibility can be ignored |
+| 4 | PUBLIC repo commit message footer: `tracking: private-org/.tracking#1` | No tracking info in commit messages. Tracking is done from the PRIVATE side citing PUBLIC PR URLs (one-directional but sufficient) |
+
+### Self-check (before writing any commit/PR/issue/comment on a PUBLIC repo)
+
+1. Confirm target repo visibility: `gh repo view --json isPrivate -q '.isPrivate'`
+2. If `false` (PUBLIC), grep the body for PRIVATE references — abort + sanitize on any match:
+   ```bash
+   grep -E '<private-org>/<private-repo>|<private-org>\.[a-z]+|private-org-internal' <body>
+   ```
+3. PRIVATE repo name / issue number / PR number matched → remove from body or generalize ("internal tracking")
+4. Only post after sanitize + re-scan passes
+
+## Issue/PR Body Local-path and Internal Host Sanitize (HARD STOP — visibility-agnostic)
+
+**PRIVATE/PUBLIC regardless, in any repo with at least 1 external contributor: local workspace paths, internal hosts, and internal tool paths are forbidden in issue/PR/comment bodies.** Even PRIVATE issue bodies are visible to all collaborators → materials only the user can access (`.claude/rules/...`, `~/.claude/skills/...`, fix_plan.md etc.) are dead references + information leaks.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Issue body "## References" section cites `<workspace>/.claude/rules/<rule>.md` or `~/.claude/skills/...` | **Inline summarize** the rule content in the issue body (self-contained, no external reference). Rule file paths inside the same repo are OK (e.g., `.github/workflows/...`) |
+| 2 | Copy "Related rule: `<path>`" / "Reference: `<path>`" pattern verbatim from fix_plan to issue body | fix_plan.md ↔ issue body medium separation. fix_plan is user-only working file; issue body is visible to collaborators |
+| 3 | Cite internal RFC1918 IPs (`10.0.0.x`, `192.168.x.x`, `172.16-31.x.x`) or internal hosts (`EMC-WAS-1`, `deps-emc.*`) | Generalize ("internal Semaphore server") or env var placeholder (`$SEMAPHORE_URL`). If reproducibility needed, separate PRIVATE document |
+| 4 | Assume "PRIVATE so safe" and skip sanitize | PRIVATE = no external index protection. Collaborators (including external contributors) are exposed. Even 1 external member → this rule applies |
+| 5 | Skip 4-grep self-check before `gh issue create` | Apply 4-grep to body variable before every `gh issue create/edit/comment` call. On match → sanitize and retry |
+
+### 4-grep self-check (before every issue/PR body POST)
+
+```bash
+# 1. Local workspace paths (inaccessible to others)
+grep -E '<workspace-name>/\.claude/|<repo-name>/\.claude/rules/|~/\.claude/skills/|~/\.agents/|\.ralph/|\.omc/' <body>
+
+# 2. Internal RFC1918 IP / hosts
+grep -E '10\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|EMC-|deps-(emc|dts|epe|daegun)' <body>
+
+# 3. User home / personal path
+grep -E '/Users/[a-z]+|/home/[a-z]+|C:/Users/' <body>
+
+# 4. Internal tool names (externally unknowable)
+grep -iE 'Semaphore Template [0-9]+|Authentik blueprint|fix_plan\.md|failed-attempts\.md' <body>
+```
+
+1 or more match → sanitize and retry. No autonomous bypass.
+
+### Post-discovery
+
+If found in already-posted body: immediately overwrite with `gh issue edit --body <sanitized>` or `gh pr edit --body <sanitized>`. GitHub edit history is permanent but minimize view exposure by immediate correction. Must record in failed-attempts.md HOT.
+
+## GitHub Body Reference Notation (`#N`/SHA/URL/@mention) — HARD STOP
+
+GitHub converts SHA/`#N`/@mention/URL in body/comment/review to autolinks. Backtick wrapping makes inline code → autolink does not fire. Per-type: **bare** (autolink intended) / **backtick·plain** (block) / **sub-bullet** (readability).
+
+**Unified decision matrix**:
+
+| Identifier | Type | Notation | Reason |
+|------------|------|----------|--------|
+| `#172` | Real issue/PR reference | **bare** `#172` | autolink → jump to that page |
+| `#3` | Finding/item number (non-reference) | **backtick** `` `#3` `` or plain (`item 3`·`Important 3`) | bare creates unwanted issue/PR autolink → permanent timeline backref |
+| Commit SHA (7+ chars) | commit reference | **bare** `de59590` | autolink → commit page |
+| `@DrumRobot` | user mention | **bare** (backtick forbidden) | backtick invalidates mention |
+| `https://github.com/...` | full URL | **bare** | autolink + preview |
+| `(PR #371 Important #3, …)` | title suffix multi/supplemental ref | **separate `- ` sub-bullet** | inline embeds autolink titles into body text, reducing readability |
+
+**Cross-repo reference** — bare `#N`·SHA only autolink **within the same repo**. Different repo requires `owner/repo` prefix:
+
+| Target | GitHub | GitLab |
+|--------|--------|--------|
+| commit | `owner/repo@<sha>` | `ns/project@<sha>` |
+| issue | `owner/repo#<id>` | `ns/project#<id>` |
+| PR / MR | `owner/repo#<id>` | `ns/project!<id>` (`!` — not `#`) |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Backtick SHA/URL/mention `` `de59590` `` | Write bare — autolink + preview/notification |
+| 2 | Finding/item number bare (`Important #3`) | Backtick `` `#3` `` or plain |
+| 3 | "#number/SHA is identifier so backtick" reasoning | Actual reference → bare. Non-reference number → backtick |
+| 4 | Title suffix `(PR #371 Important #3, …)` inline | Separate sub-bullet |
+| 5 | "Local doc·chat so notation doesn't matter" | bare↔backtick·sub-bullet is medium-agnostic |
+
+**Self-check (before every ref output — Edit/Write/chat)**: ① scan `#[0-9]+` → real issue/PR=bare, finding=backtick ② SHA/`@user`/URL in backtick → correct to bare ③ title suffix multi/supplemental inline → split into sub-bullet
+
+**Exception — backtick justified**: inside code block / inline code identifier (file path·function) / shell command containing SHA (`git show de59590`)
+
+

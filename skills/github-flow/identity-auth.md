@@ -159,3 +159,25 @@ scripts/review-as.sh --repo <owner/repo> --pr <N> --reviewer <review-account> \
 ```
 
 The acting account is restored on every exit path (`trap EXIT`), preventing review-account leakage into follow-up commits/comments.
+
+## PAT Scope Assignment Don't / Do (HARD STOP)
+
+Acting accounts (DrumRobot / daegunjhy) canonical scope set = `repo,read:org,workflow,gist,copilot,read:packages` (6). Special-purpose accounts (daegunsoft-web review-only) use purpose-minimum set.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Add `read:packages` alone on GHCR pull denied | 5-scope combined refresh — avoid repeated browser auth |
+| 2 | `gh auth refresh` manual guide only | Call `web-browser/credential-issue` topic first (auto auth). Manual guide is fallback |
+| 3 | Add scopes outside the matrix (over-grant) | Matrix 5 scopes + explicitly needed extras only |
+| 4 | Skip scope matrix check on new operation | Check matrix every time → if missing, add to this rule |
+| 5 | Run `gh auth login`/`refresh` without `-s` (only grants default `gist,read:org,repo`) | Always specify `-s` 5-scope — missing `workflow` on merge/push blocks `.github/workflows/*` changes |
+| 6 | Copy-paste browser PAT issue/edit URL from a previous case (`scopes=repo,read:org` re-use) | Check "account × required operation" against matrix before each issue — acting account uses `scopes=repo,read:org,workflow,gist,copilot,read:packages` prefill |
+
+### Self-check (before any scope-modifying gh auth command)
+
+1. Is this an acting account (DrumRobot/daegunjhy)? → 6-scope set required
+2. Is this a special-purpose account? → purpose-minimum set only
+3. Is a browser PAT being issued? → All 6 scopes must be listed (PAT has no implicit scopes)
+4. Is this a `gh auth refresh`? → Use `-s repo,read:org,workflow,copilot,read:packages` (gist is already a gh OAuth default)
+5. Was `write:packages` needed? → Separate explicit issue (not included in canonical set)
+

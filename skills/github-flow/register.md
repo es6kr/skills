@@ -12,15 +12,30 @@ Before creating a new GitHub issue, evaluate the existing issue landscape to dec
 
 ### Step 1: Duplicate & Related Search
 
-Search for existing issues using keywords from the current task/plan:
+Search for existing issues using keywords from the current task/plan. **A single narrow-keyword search is not sufficient — search at least 2 angles**:
 
 ```bash
-gh issue list --search "<keywords>" --json number,title,state
+# Angle 1: feature-specific keywords (e.g., "end-session", "cache scope")
+gh issue list --search "<feature keywords>" --json number,title,state
+# Angle 2: domain keywords (e.g., "logout", "SSO", "build") — broader net
+gh issue list --search "<domain keywords>" --json number,title,state
+```
+
+Additionally, reuse **issues already surfaced in this session** (earlier search outputs, epic bodies, fix_plan references) as related candidates — a zero-hit keyword search does not erase what the session already saw.
+
+**Emit a related-candidates table before deciding the strategy** (mandatory — this is the forcing function that keeps the "related" half of this step from silently degrading into "no match"):
+
+```markdown
+| # | Issue/PR | Relation | Link action |
+|---|----------|----------|-------------|
+| #N | <title> | same domain (logout) | Relates to #N |
+| owner/repo#M | <title> | prerequisite PR | reference in body |
+| — | (none found — searched: <angles used>) | — | state explicitly |
 ```
 
 - **Exact Match (OPEN)**: Stop. Report the issue URL to the user.
-- **Related/Overlapping Match**: Note the issue number for Step 2.
-- **No Match**: Proceed to create a new issue (Step 2).
+- **Related/Overlapping Match**: Note the issue number for Step 2 **and carry it into the issue body as `Relates to #N`** (cross-repo: `owner/repo#N`).
+- **No Match**: Only after ≥2 angles + session-context scan came up empty. Proceed to create a new issue (Step 2) and state the searched angles.
 
 ### Step 2: Registration Strategy Decision
 
@@ -76,6 +91,14 @@ Skill("github-flow", "dependencies --blocking 300")
 | 3 | Split a coherent change into "micro-issues" | Use the `expand` topic to keep the scope coherent |
 | 4 | Choose the Sub-issue strategy and only add a `- #N` text link in the body | Create the native relationship via the `addSubIssue` GraphQL mutation (see the `dependencies` topic's Sub-issue Procedure) |
 | 5 | Update only the parent body after `gh issue create` and stop there | `gh issue create` → `addSubIssue` → parent body update (all three steps are required) |
+| 6 | Treat a zero-hit narrow keyword search as "no related issues" and skip the related-linking half of Step 1 | Search ≥2 angles (feature + domain keywords) + scan session-known issues, emit the related-candidates table, then decide |
+| 7 | Drop the source plan's prerequisite PR / cross-repo references while composing the body | Carry every prerequisite (`owner/repo#N`) and related item from the plan header into the issue body References section |
+
+### Self-check (right before `gh issue create`, every time)
+
+1. Was the related-candidates table emitted in this session's output? If not, go back to Step 1.
+2. Does the body contain ≥1 reference (`Relates to #N`, `owner/repo#N` prerequisite, or parent Epic)? If zero, is there an explicit "no related items (searched: <angles>)" statement backed by the table?
+3. Does the source plan/draft declare a prerequisite (Depends on / base PR / precondition line in the header)? If yes, is it present in the body?
 
 ## Topic Dependencies
 
