@@ -106,12 +106,12 @@ def main():
     jobs = []  # (title, body, date, source_file)
     if args.cut_dir:
         cut = Path(args.cut_dir)
-        for e in json.loads((cut / "index.json").read_text()):
-            body = (cut / e["file"]).read_text()
+        for e in json.loads((cut / "index.json").read_text(encoding="utf-8")):
+            body = (cut / e["file"]).read_text(encoding="utf-8")
             jobs.append((e["title"], body, e.get("date", ""), args.source_file))
     for f in args.backfill or []:
         fp = Path(f)
-        for title, body, date in sections_of(fp.read_text()):
+        for title, body, date in sections_of(fp.read_text(encoding="utf-8")):
             jobs.append((title, body, date, fp.name))
 
     if args.skip_existing:
