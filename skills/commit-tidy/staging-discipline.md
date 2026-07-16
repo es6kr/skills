@@ -33,6 +33,7 @@ The one exception: a new project's very first import commit, or a user-requested
 | 2 | `rules/*.md` auto-committed without user instruction | Edits to `rules/` require **both** an explicit user `add` instruction **and** an explicit commit-message instruction. Do not let them ride along on another commit |
 | 3 | `agents/*.md`, `docs/` auto-committed | Same rule — only on explicit user instruction |
 | 4 | "I'll notice if the intended file isn't in the commit, then fix it" thinking | **Pre-commit visual check of the full staged list is the only first-line defense.** Post-commit correction requires `git reset` / `git rebase` |
+| 5 | A plan's "Files to modify" table lists a sensitive-dir file (`rules/`, `.claude/rules/`), so batch-`git add` it as "intended" | **Plan membership does not waive the gate.** Sensitive-dir files in a plan batch still require the explicit user `add` instruction — and an untracked sensitive file being newly tracked (create-mode) is the highest-risk case: check its language and audience (workspace-local Korean rules never belong in a PUBLIC repo commit) |
 
 ### Self-check (every time before `git commit`)
 
