@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.3](https://github.com/es6kr/skills/compare/git-repo-v0.4.2...git-repo-v0.4.3) (2026-07-16)
+
+
+### Bug Fixes
+
+* **consolidate,fix-plan:** promote next-fix staging (review hardening + periodic archive) ([24726e9](https://github.com/es6kr/skills/commit/24726e99a5b2972f706d8749ea3a45cbc358984b))
+* **git-repo:** gate worktree reuse on active operation state ([542f236](https://github.com/es6kr/skills/commit/542f2366682214fed869ec3f5776eb5017b114fb))
+
+
+### Documentation
+
+* add install-guide READMEs for consolidate, git-repo, skill-kit ([380db80](https://github.com/es6kr/skills/commit/380db8070a60dbfe1be29d940a6740e1119db748))
+* add install-guide READMEs for consolidate, git-repo, skill-kit ([d9bec4b](https://github.com/es6kr/skills/commit/d9bec4bb17c294a40c373c376a2f22aa0d3c04f2))
+* correct skills install command (add, not install) + superpowers namespace ([ed8fb1a](https://github.com/es6kr/skills/commit/ed8fb1ab2cd251e2395363948104bd3d3915f010))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/git-repo-v0.4.1...git-repo-v0.4.2) (2026-06-25)
 
 

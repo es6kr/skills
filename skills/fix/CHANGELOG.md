@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.7](https://github.com/es6kr/skills/compare/fix-v0.3.6...fix-v0.3.7) (2026-07-16)
+
+
+### Bug Fixes
+
+* **commit-tidy,fix:** content-over-operation subjects + --local rule scoping ([61ba092](https://github.com/es6kr/skills/commit/61ba0929587bfd74b1f0a081ff9b316846c24969))
+* **consolidate,fix-plan:** promote next-fix staging (review hardening + periodic archive) ([24726e9](https://github.com/es6kr/skills/commit/24726e99a5b2972f706d8749ea3a45cbc358984b))
+* **fix:** add --local option scoping Step 2 rule edits to workspace/project rules ([0975195](https://github.com/es6kr/skills/commit/09751956b7bfac9bcf145568d9c760f6dd393260))
+* **fix:** make --plan STOP explicit — sub-ask answer is not apply-approval ([0b4d392](https://github.com/es6kr/skills/commit/0b4d3924fb8785735971fdfb267827ddf40973a7))
+* **fix:** require environment detection before rule modifications ([8ab91ea](https://github.com/es6kr/skills/commit/8ab91ea2ca9f5463f3c9d766c97a4d074b6d5cad))
+
 ## [0.3.6](https://github.com/es6kr/skills/compare/fix-v0.3.5...fix-v0.3.6) (2026-07-07)
 
 
