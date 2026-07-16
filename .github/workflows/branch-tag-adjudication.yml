@@ -20,6 +20,12 @@ name: branch-tag-adjudication
 #   conflict resolution of parent commits that were already adjudicated, and
 #   they carry no conventional tag (a base-sync merge would otherwise be
 #   rejected as tag 'other').
+# - Doc-file exemption: skills/<name>/README.md and CHANGELOG.md are
+#   documentation, not behaviour surface. A docs/chore commit whose skill-path
+#   files are ALL such doc files is skipped (docs/chore trigger no
+#   release-please bump), and the skill-md guard ignores these files. fix/feat
+#   commits touching them remain subject to the branch tag policy because they
+#   do drive release bumps.
 
 on:
   pull_request:
@@ -92,11 +98,26 @@ jobs:
               continue
             fi
 
+            # Doc-file exemption: a docs/chore commit whose skill-path files are
+            # ALL README.md / CHANGELOG.md is documentation-only — no
+            # release-please bump, no policy relevance. fix/feat commits are NOT
+            # exempted here (they bump versions and must obey the branch policy).
+            if [ "$TAG" = "docs" ] || [ "$TAG" = "chore" ]; then
+              NON_DOC=$(git show --name-only --format='' "$SHA" \
+                | grep -E '^skills/' \
+                | grep -vE '^skills/[^/]+/(README|CHANGELOG)\.md$' \
+                || true)
+              if [ -z "$NON_DOC" ]; then
+                continue
+              fi
+            fi
+
             for SKILL in $SKILLS; do
               # Skill md guard: any md file under skills/<name>/ diffed by a
               # chore/docs commit is rejected. Skill md = behaviour surface.
               MD_TOUCHED=$(git show --name-only --format='' "$SHA" \
                 | grep -E "^${SKILL}/.*\.md$" \
+                | grep -vE '/(README|CHANGELOG)\.md$' \
                 || true)
               if [ -n "$MD_TOUCHED" ] && { [ "$TAG" = "chore" ] || [ "$TAG" = "docs" ]; }; then
                 echo "::error::Commit $SHA touches skill md files with tag '$TAG'. Skill md is behaviour surface — changes must use 'fix:' or 'feat:'. Files:"
