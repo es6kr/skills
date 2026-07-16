@@ -29,22 +29,45 @@ Environment detection:
 
 If you find yourself in this file with 0 existing tasks and args that request new deliverables (write / create / add / draft verbs), dispatch back to SKILL.md Step 0 and re-classify — you are in the wrong workflow.
 
-## Step 1. Cleanup (FIRST — no user confirmation required)
+## Step 1. Cleanup (`completed` auto only — `pending` deletion always requires user confirmation, HARD STOP)
 
 Remove stale items immediately. The goal is to take them out of the selectable list so the next step's context is not muddied.
 
+**HARD STOP — pending deletion is a user-decision area**: `completed` items are auto-deleted. `pending` items require `AskUserQuestion` confirmation regardless of label. Autonomous "stale/unrelated" reclassification is forbidden.
+
 ### Deletion targets
 
-| Status | Deletion condition |
-|--------|--------------------|
-| `completed` | Completed tasks have no tracking value in the next session (their summary is already reflected in persistent files such as fix_plan.md) |
-| `in_progress` (residue from a prior session) | `in_progress` from before the compact is meaningless due to broken context |
-| `pending` (unrelated) | Stale items unrelated to other pending entries or new work |
+| Status | Sub-category | Deletion action |
+|--------|--------------|-----------------|
+| `completed` | — | **Auto-delete** (no confirmation) — completed tasks have no tracking value in the next session (their summary is already reflected in persistent files such as fix_plan.md) |
+| `in_progress` (residue from a prior session) | — | **Auto-delete** — `in_progress` from before the compact is meaningless due to broken context |
+| `pending` "actionable now" | Immediately actionable, autonomously executable | Keep (target of Step 2 direction ask) |
+| `pending` "waiting on external" | Any label indicating a review/blocked/host-delegated/PR-merge-pending/user-decision-pending state (locale-agnostic — e.g. English `[REVIEW_PENDING]` / `[BLOCKED]`, or the equivalent in the workspace's local language) | **Not a deletion target** — keep. Consider migrating to checklist medium |
+| `pending` "obsolete/unrelated" | Clearly unrelated or long-abandoned (e.g., not mentioned in 3+ sessions, related feature removed) | **Delete ONLY after user confirmation** — present candidate list via `AskUserQuestion` and delete only on explicit approval |
 
-### Do NOT delete
+### Do NOT delete (HARD STOP — no autonomous classification)
 
+- **`pending` items — delete forbidden without explicit user target, regardless of status/label**
+  - The word "unrelated" is not a vocabulary the assistant may autonomously classify by. When classification is needed, present the candidate list via `AskUserQuestion` and delete only on explicit approval
+  - Any label indicating a review/blocked/host-delegated state explicitly signals "waiting on external" → not a deletion target (locale-agnostic — recognize the equivalent label in the workspace's local language, not only English)
 - The user has explicitly asked to "keep completed tasks"
 - Tasks that belong to **an in-flight fix procedure** such as the `fix-*` series
+
+### Don't / Do — pending deletion judgment
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Receive a "delete stale tasks" instruction and autonomously classify pending tasks as stale before deleting | Pending always requires user confirmation. Present the candidate list via `AskUserQuestion` with explicit deletion approval per item |
+| 2 | Reclassify labels that indicate a review-pending or blocked state as "unrelated" | These labels are explicit "waiting on external" states → never stale. Auto-exclude from deletion targets |
+| 3 | Justify pending deletion via the "cleanup is no user confirmation required" clause | That clause applies only to `completed` + `in_progress` residue. Pending is a separate flow |
+| 4 | Delete 4+ items in bulk without per-item judgment rationale | Verify each task's status / label / most-recently-mentioned session before deletion → report to user and get approval |
+
+### Self-check (every time before executing a task-deletion command)
+
+1. Do the deletion candidates include any `pending` status? — If yes, `AskUserQuestion` is immediately mandatory
+2. Do any `pending` candidates carry a label indicating review/blocked/host-delegated state (in any language)? — If yes, exclude from deletion targets and report "this item is waiting on external, so keeping it" to the user
+3. Is the user's instruction ambiguous vocabulary such as "delete stale"? — Present the candidate list and request explicit approval. "What counts as stale" is a user decision
+4. Have per-item judgment rationale been reported to the user? — Blanket "all 4 are stale" is forbidden
 
 ### Per-environment commands
 
@@ -108,18 +131,20 @@ Among the items decided as "Proceed" in Step 2, decide the start priority → ma
 
 ### Loop continuation (HARD STOP — do not stop with a report mid-batch)
 
-Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report.
+Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report. Delegating an item to a **background agent** (`run_in_background`) also returns control immediately — the dispatch itself is not a reason to stop.
 
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | A sub-skill (github-flow/fix/…) returns → write a report → end the turn while other Proceed items are pending | Sub-skill return = control is back in the /wip loop. Mark that item done → start the next Proceed item in the same turn |
 | 2 | Treat "the item I just drove via a sub-skill" as the whole batch | Batch = all items marked Proceed in Step 2. One done ≠ batch done |
 | 3 | All Proceed items done → stop with a report | Batch exhausted → invoke `Skill("next")` for next-action options |
+| 4 | Dispatch a background agent for one item → end the turn "waiting for the agent" while other pending/follow-up items are drivable | Background dispatch returns control to the loop at once — drive the next drivable item in the same turn (the agent's completion re-invokes the session by itself). Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached |
 
 **Self-check (every time a sub-skill returns OR an item is marked completed inside Step 3):**
 1. Are there Proceed items not yet driven? → Yes: start the next one in this turn (no report-and-stop)
 2. Batch exhausted? → invoke `Skill("next")` (not a bare report)
 3. A blocked item (waiting on a predecessor) is skipped, but skipping it does not satisfy the batch
+4. A background agent is running → are other pending/follow-up items drivable now? Drive them in this turn; an idle wait is acceptable only when nothing else is drivable
 
 ### When there are 5 or more items
 
