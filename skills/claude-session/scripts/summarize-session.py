@@ -23,7 +23,7 @@ def summarize_session(project_name: str, session_id: str, limit: int = 50):
         sys.exit(1)
 
     count = 0
-    with open(session_file, "r") as f:
+    with open(session_file, "r", encoding="utf-8", errors="surrogatepass") as f:
         for line in f:
             if count >= limit:
                 break

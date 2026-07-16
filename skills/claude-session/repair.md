@@ -4,7 +4,7 @@ Detects and repairs structural issues in session JSONL files.
 
 ## Quick Start
 
-**Primary method — fully automated via `scripts/repair-session.py`** (backup → dedup → 400 error removal → orphan tool_result removal → chain repair → validation, all in one):
+**Primary method — fully automated via `scripts/repair-session.py`** (backup → dedup → 400 error removal → orphan tool_result removal → chain repair → orphan parent repair → validation, all in one):
 
 ```bash
 # Repair a specific session
@@ -107,7 +107,47 @@ grep -o '"id":"msg_[^"]*"' session.jsonl | sort | uniq -c | sort -rn | head -10
 - `requestId` is often also identical
 - progress type entries can repeat thousands of times with identical content
 
-### 6. Invalid Surrogate Pair (Broken Unicode)
+### 6. Orphan Parent UUID
+
+A message's `parentUuid` field is set to a value that **does not match any other message's `uuid`** in the same file. The field exists and is non-null, so the field-presence check (`has("parentUuid") | not`) misses it entirely.
+
+**Symptoms**:
+- Chain tracking errors despite the file passing the "missing `parentUuid` field" validation
+- Session viewer rendering gaps (the parent reference dangles)
+- Common after dedup: when `dedup-session.py` removes a duplicate, its dependents may still point at the removed UUID
+
+**Causes**:
+- Post-dedup leftovers — the removed message's UUID is still referenced by surviving children
+- Syncthing/manual edits that delete a message but leave references
+- Split operations that move a message without updating downstream references
+
+**Detection**:
+```bash
+# Python — cross-reference all parentUuid values against the UUID set
+python3 - <<'EOF'
+import json, sys
+path = sys.argv[1]
+uuids = set()
+records = []
+with open(path, encoding='utf-8') as f:
+    for i, line in enumerate(f, 1):
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        records.append((i, obj))
+        if obj.get('uuid'):
+            uuids.add(obj['uuid'])
+for i, obj in records:
+    parent = obj.get('parentUuid')
+    if parent is not None and parent not in uuids:
+        print(f"L{i}: uuid={obj.get('uuid','?')[:8]} parent={parent[:8]} type={obj.get('type')}")
+EOF
+```
+
+**Fix**: Replace the orphan `parentUuid` with the immediately preceding message's `uuid` (same fallback as missing-field repair). `scripts/repair-session.py` handles this in pass [6/7] automatically.
+
+### 7. Invalid Surrogate Pair (Broken Unicode)
 
 A line contains a malformed `\uXXXX\uXXXX` UTF-16 surrogate pair (e.g., a high surrogate without a matching low surrogate). The session file itself becomes invalid JSON.
 
@@ -193,9 +233,10 @@ If no ID argument **and** the hook injection is missing (rare — hook misconfig
    - If found, check error message: `grep '"isApiErrorMessage":true' session.jsonl | jq -r '.message.content[0].text' | head -3`
    - `Invalid signature in thinking block` → run thinking block removal first (see §3)
    - `unexpected tool_use_id` → orphan tool_result issue
-3. **Detect broken chains** — jq query
-4. **Detect orphan tool_results** — jq query
-5. **Detect duplicate UUIDs** — jq query
+3. **Detect broken chains** — jq query (missing `parentUuid` field)
+4. **Detect orphan parent UUIDs** — Python cross-reference (parentUuid value not present as any uuid)
+5. **Detect orphan tool_results** — jq query
+6. **Detect duplicate UUIDs** — jq query
 
 **Important**: If duplicate message.ids are found, **run dedup first** before the remaining checks. Other check results are unreliable while duplicates are present.
 
@@ -551,6 +592,28 @@ jq -s '[.[1:] | .[] |
          (has("parentUuid") | not))
 ] | length' session.jsonl
 # Result: 0
+
+# 2b. Check orphan parent UUIDs (parentUuid value not present in file)
+python3 - <<'EOF' session.jsonl
+import json, sys
+uuids = set()
+records = []
+with open(sys.argv[1], encoding='utf-8') as f:
+    for line in f:
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        records.append(obj)
+        if obj.get('uuid'):
+            uuids.add(obj['uuid'])
+orphans = sum(
+    1 for obj in records
+    if (p := obj.get('parentUuid')) is not None and p not in uuids
+)
+print(f"orphan parents: {orphans}")
+EOF
+# Result: orphan parents: 0
 
 # 3. Check orphan tool_results (re-run detection query above)
 # Result: []

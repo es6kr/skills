@@ -33,8 +33,14 @@ find_session_file() {
     local session_id="$1"
     local file="$SESSION_DIR/${session_id}.jsonl"
     if [ ! -f "$file" ]; then
-        # Search across all projects
+        # Search across all projects (cross-project fallback)
         file=$(find "$PROJECTS_DIR" -name "${session_id}.jsonl" 2>/dev/null | head -1)
+        if [ -n "$file" ] && [ -f "$file" ]; then
+            # Notify caller that fallback was used so cross-project writes are not silent.
+            # stderr so stdout still returns just the path (preserves caller contract).
+            echo "Cross-project fallback: session not in current project ($SESSION_DIR)" >&2
+            echo "                        found in: $file" >&2
+        fi
     fi
     echo "$file"
 }
@@ -64,8 +70,21 @@ set_title() {
     jq -nc --arg title "$title" --arg sid "$session_id" \
         '{"type":"agent-name","agentName":$title,"sessionId":$sid}' >> "$session_file"
 
+    # Read-back verification: the last custom-title record must equal the requested title.
+    # Catches silent failures (permission, disk full, jq malformed output, wrong file).
+    local verified
+    verified=$(get_current_title "$session_file")
+    if [ "$verified" != "$title" ]; then
+        echo "ERROR: read-back verification failed" >&2
+        echo "  expected: $title" >&2
+        echo "  got:      $verified" >&2
+        echo "  file:     $session_file" >&2
+        exit 1
+    fi
+
     echo "Title set: $title"
-    echo "Session: $session_id"
+    echo "Session:   $session_id"
+    echo "File:      $session_file"
 }
 
 show_title() {
@@ -85,6 +104,7 @@ show_title() {
     else
         echo "(no title)"
     fi
+    echo "File:  $session_file"
 }
 
 list_sessions() {
