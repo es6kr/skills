@@ -55,7 +55,7 @@ The browser agent is reserved for **situations CLI cannot handle** (e.g., comple
    - `gh auth status` → identify the `Active account` line. It must equal `<expected gh account>`
    - `gh api user --jq '.login'` → the response login must equal `<expected gh account>`
    - SSH-only repos: `ssh -T git@github.com 2>&1 | grep -oE 'Hi [^!]+!'` → the matched name must equal `<expected gh account>`
-4. Mismatch → `gh auth switch --user <expected>` (or inject `GH_TOKEN="$(gh auth token --user <expected>)"`), and for SSH ensure `core.sshCommand` or `ssh-add -l` points to the key registered on `<expected gh account>`
+4. Mismatch → `gh auth switch --user <expected>` (or `scripts/gh-as.sh <expected> <gh-args...>` — wraps the `GH_TOKEN="$(gh auth token --user <expected>)"` injection), and for SSH ensure `core.sshCommand` or `ssh-add -l` points to the key registered on `<expected gh account>`
 5. **Only after Steps 3-4 pass** → run `git push` or `gh pr create`
 6. If push already happened with the wrong identity → the PR `author` is immutable. Options: (a) close the wrong-author PR + reopen from the correct account on a fresh branch; (b) accept the wrong author (PR `author` shows on the PR forever)
 
@@ -132,6 +132,8 @@ Run these in order BEFORE asking the user:
    ```
 
    If this succeeds, your scope / membership is fine — it was a gh CLI internal issue, no user intervention needed.
+
+   **Shorthand**: `scripts/gh-as.sh <account> <gh-args...>` wraps this exact pattern — use it instead of repeating the `GH_TOKEN="$(gh auth token --user ...)"` prefix by hand. Example: `scripts/gh-as.sh <account> repo view <org>/<repo>`.
 4. **Org membership confirmation**: if steps 1-3 all fail with 404, ask the user about membership status
 
 ## Self-check (before any gh-auth-requiring command)
