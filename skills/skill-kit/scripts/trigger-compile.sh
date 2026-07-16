@@ -8,6 +8,7 @@ SETTINGS="$HOME/.claude/settings.json"
 SKILLS_DIRS=("$HOME/.claude/skills")
 DRY_RUN=false
 LIST_ONLY=false
+SEP=$'\x1f'   # field separator — unit-separator (0x1F) to avoid collision with '|' inside matcher/pattern values
 
 for arg in "$@"; do
   case "$arg" in
@@ -32,7 +33,7 @@ scan_skills() {
       # Extract triggers block from frontmatter
       local in_frontmatter=false
       local in_triggers=false
-      local current_event="" current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code=""
+      local current_event="" current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code="" current_script=""
 
       while IFS= read -r line; do
         # frontmatter boundary
@@ -40,7 +41,7 @@ scan_skills() {
           if $in_frontmatter; then
             # end of frontmatter — save last trigger
             if [[ -n "$current_event" ]]; then
-              save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code"
+              save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script"
             fi
             break
           fi
@@ -62,10 +63,10 @@ scan_skills() {
         if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*event:[[:space:]]*(.*) ]]; then
           # save previous trigger
           if [[ -n "$current_event" ]]; then
-            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code"
+            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script"
           fi
           current_event="${BASH_REMATCH[1]}"
-          current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code=""
+          current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code="" current_script=""
           continue
         fi
 
@@ -73,7 +74,7 @@ scan_skills() {
         if [[ "$line" =~ ^[a-zA-Z_-]+: ]] && ! [[ "$line" =~ ^[[:space:]] ]]; then
           # save last trigger
           if [[ -n "$current_event" ]]; then
-            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code"
+            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script"
           fi
           in_triggers=false
           continue
@@ -82,6 +83,8 @@ scan_skills() {
         # parse attributes
         if [[ "$line" =~ ^[[:space:]]+action:[[:space:]]*(.*) ]]; then
           current_action="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+matcher:[[:space:]]*\"(.*)\" ]]; then
+          current_matcher="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^[[:space:]]+matcher:[[:space:]]*(.*) ]]; then
           current_matcher="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^[[:space:]]+pattern:[[:space:]]*\"(.*)\" ]]; then
@@ -94,6 +97,10 @@ scan_skills() {
           current_message="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^[[:space:]]+exit_code_filter:[[:space:]]*(.*) ]]; then
           current_exit_code="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+script:[[:space:]]*\"(.*)\" ]]; then
+          current_script="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+script:[[:space:]]*(.*) ]]; then
+          current_script="${BASH_REMATCH[1]}"
         fi
 
       done < "$skill_file"
@@ -102,8 +109,8 @@ scan_skills() {
 }
 
 save_trigger() {
-  local skill="$1" event="$2" action="$3" matcher="$4" pattern="$5" message="$6" exit_code="$7"
-  local entry="$skill|$action|$matcher|$pattern|$message|$exit_code"
+  local skill="$1" event="$2" action="$3" matcher="$4" pattern="$5" message="$6" exit_code="$7" script="${8:-}"
+  local entry="${skill}${SEP}${action}${SEP}${matcher}${SEP}${pattern}${SEP}${message}${SEP}${exit_code}${SEP}${script}"
   # prevent duplicates
   local existing="${TRIGGERS_BY_EVENT[$event]:-}"
   if [[ "$existing" == *"$entry"* ]]; then
@@ -118,9 +125,10 @@ list_triggers() {
   echo ""
   for event in "${!TRIGGERS_BY_EVENT[@]}"; do
     echo "[$event]"
-    while IFS='|' read -r skill action matcher pattern message exit_code; do
+    while IFS="$SEP" read -r skill action matcher pattern message exit_code script; do
       [[ -z "$skill" ]] && continue
       printf "  %-20s action=%-8s" "$skill" "$action"
+      [[ -n "$script" ]] && printf " script=%s" "$script"
       [[ -n "$matcher" ]] && printf " matcher=%s" "$matcher"
       [[ -n "$pattern" ]] && printf " pattern=\"%s\"" "$pattern"
       echo ""
@@ -133,22 +141,35 @@ list_triggers() {
 generate_dispatcher() {
   local event="$1"
   local entries="${TRIGGERS_BY_EVENT[$event]}"
+  # order terminal actions by priority: script > suggest > block > inject (fallback last),
+  # so a matching script/regex trigger surfaces its decision before the once-per-session inject
+  if [[ -n "$entries" ]]; then
+    local _ranked="" _l _act _r
+    while IFS= read -r _l; do
+      [[ -z "$_l" ]] && continue
+      _act=$(printf '%s' "$_l" | cut -d"$SEP" -f2)
+      case "$_act" in script) _r=0 ;; suggest) _r=1 ;; block) _r=2 ;; inject) _r=3 ;; *) _r=4 ;; esac
+      _ranked+="${_r}${SEP}${_l}"$'\n'
+    done <<< "$entries"
+    entries=$(printf '%s' "$_ranked" | sort -t"$SEP" -k1,1n -s | cut -d"$SEP" -f2-)
+  fi
   local output_file="$HOOKS_DIR/trigger-${event}.sh"
   local timestamp
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   local script="#!/bin/bash
-# AUTO-GENERATED by skill-toolkit trigger compiler
-# DO NOT EDIT — regenerate with: /skill-toolkit trigger compile
+# AUTO-GENERATED by skill-kit trigger compiler
+# DO NOT EDIT — regenerate with: /skill-kit trigger compile
 # Generated: $timestamp
 
 INPUT=\$(cat)
 TOOL_NAME=\$(echo \"\$INPUT\" | jq -r '.tool_name // empty' 2>/dev/null)
 COMMAND=\$(echo \"\$INPUT\" | jq -r '.tool_input.command // empty' 2>/dev/null)
+FILE_PATH=\$(echo \"\$INPUT\" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 EXIT_CODE=\"\${EXIT_CODE:-0}\"
 "
 
-  while IFS='|' read -r skill action matcher pattern message exit_code_filter; do
+  while IFS="$SEP" read -r skill action matcher pattern message exit_code_filter scriptpath; do
     [[ -z "$skill" ]] && continue
 
     local condition_start="" condition_end=""
@@ -156,8 +177,10 @@ EXIT_CODE=\"\${EXIT_CODE:-0}\"
     # build matcher/pattern condition
     if [[ -n "$matcher" ]] || [[ -n "$pattern" ]] || [[ -n "$exit_code_filter" ]]; then
       local conditions=()
-      [[ -n "$matcher" ]] && conditions+=("[[ \"\$TOOL_NAME\" == \"$matcher\" ]]")
-      [[ -n "$pattern" ]] && conditions+=("echo \"\$COMMAND\" | grep -qE \"$pattern\"")
+      # matcher may be an alternation (e.g. "Edit|Write") — use regex match, not literal ==
+      [[ -n "$matcher" ]] && conditions+=("[[ \"\$TOOL_NAME\" =~ ^($matcher)\$ ]]")
+      # pattern grep covers both Bash command and Edit/Write file_path
+      [[ -n "$pattern" ]] && conditions+=("echo \"\$COMMAND \$FILE_PATH\" | grep -qE \"$pattern\"")
       [[ -n "$exit_code_filter" ]] && conditions+=("[[ \"\$EXIT_CODE\" == \"$exit_code_filter\" ]]")
 
       condition_start="if ${conditions[0]}"
@@ -188,18 +211,27 @@ exit 1
 "
         ;;
       inject)
-        script+="# prevent infinite loop: block only once per session
+        script+="# fire once per session; if already fired, fall through to lower-priority triggers
 FIRE_FLAG=\"\$HOME/.claude/data/trigger-stop-${skill}\"
-if [[ -f \"\$FIRE_FLAG\" ]]; then
+if [[ ! -f \"\$FIRE_FLAG\" ]]; then
+  mkdir -p \"\$HOME/.claude/data\"
+  touch \"\$FIRE_FLAG\"
+  jq -n '{
+    \"decision\": \"block\",
+    \"reason\": \"$skill trigger\",
+    \"systemMessage\": \"$message\"
+  }'
   exit 0
 fi
-mkdir -p \"\$HOME/.claude/data\"
-touch \"\$FIRE_FLAG\"
-jq -n '{
-  \"decision\": \"block\",
-  \"reason\": \"$skill trigger\",
-  \"systemMessage\": \"$message\"
-}'
+"
+        ;;
+      script)
+        script+="# dispatch to skill-owned resource script; pass Stop-hook stdin through
+_out=\$(printf '%s' \"\$INPUT\" | bash \"\$HOME/.claude/skills/${skill}/${scriptpath}\" 2>/dev/null || true)
+if [[ -n \"\$_out\" ]]; then
+  printf '%s\n' \"\$_out\"
+  exit 0
+fi
 "
         ;;
     esac
@@ -236,7 +268,7 @@ register_hooks() {
     # collect matchers for PostToolUse/PreToolUse
     if [[ "$event" == "PostToolUse" ]] || [[ "$event" == "PreToolUse" ]]; then
       local matchers=()
-      while IFS='|' read -r skill action m pattern message exit_code; do
+      while IFS="$SEP" read -r skill action m pattern message exit_code script; do
         [[ -n "$m" ]] && matchers+=("$m")
       done <<< "${TRIGGERS_BY_EVENT[$event]}"
 
