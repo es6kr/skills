@@ -287,8 +287,27 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | Conclusion state | Emoji | Forbidden |
 |----------|--------|------|
 | Critical 0 + Ready to merge | ✅ | 🔴 (red is a "problem present" visual signal — attaching it for 0 count causes confusion) |
-| Actionable PENDING | ⏳ | 🔴 (PENDING ≠ Critical) |
+| Actionable PENDING / Incomplete Test Plan | ⏳ | 🔴 (PENDING ≠ Critical) |
 | Critical unresolved | 🔴 | ✅ (looks like no problem) |
+
+### Status ↔ Merge-Recommendation consistency (HARD STOP)
+
+**The per-finding Status column and the conclusion / Merge Recommendation must agree — derive the conclusion FROM the Status column, never write the two independently.** Status encodes blocking: `🔴 Pending` = blocks merge (fix first), `🟡/🟢 Deferred` = non-blocking (post-merge follow-up / no action). A finding cannot be both `Deferred` and the reason the merge is held.
+
+- Any finding `🔴 Pending` → conclusion ⏳ "Actionable Items PENDING / Not ready to merge", Merge Recommendation "Hold — address the Pending findings first".
+- Zero `🔴 Pending` (all Deferred / Rejected / Verified) → ✅ "Ready to merge"; if the Test Plan is unchecked, "Ready pending Test Plan" — the hold reason is the Test Plan (Step 7.5), NOT the findings.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Mark all findings `🟡 Deferred` then conclude "Hold — address the Important findings first" | If the Important findings block merge, set their Status `🔴 Pending`. If genuinely deferred, the conclusion cannot cite them as the merge blocker |
+| 2 | Write the Status column and the Merge Recommendation as independent fields | Derive the recommendation from the Status column: any `🔴 Pending` present = Hold; zero Pending = Ready |
+| 3 | Use an unchecked Test Plan as grounds to re-label `Deferred` findings as blockers in prose | Test Plan incompleteness blocks "Ready to merge" on its own — keep findings at their true Status, cite the Test Plan as the hold reason |
+
+**Self-check (before POSTing the Summary — consistency)**:
+
+1. Conclusion says "Hold" / "Not ready to merge" / cites findings to address first? → every finding it names as a blocker must be `🔴 Pending`, not `Deferred` or `Fixed`.
+2. All findings `Fixed` / `Deferred` / `Rejected` / `Verified` (zero `🔴 Pending`)? → conclusion must be ✅ "Ready to merge" (or "Ready pending Test Plan" with a `⏳` emoji when the Test Plan is unchecked), never "Hold to address the findings".
+3. Read the Status column and the Merge Recommendation together — is any finding both `Deferred`/`Fixed` and the cited reason the merge is held? That is the contradiction; reconcile before POST.
 
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
 
@@ -296,7 +315,9 @@ Only include reviewers that actually posted reviews on this PR, and only include
 
 **The findings table MUST include a `Source` (or `Reviewer`) column attributing every row to the exact reviewer login it came from** — coderabbitai, copilot, @human-login (e.g., @reviewer-login), Internal Code Review, etc. Composing a findings table with only `# | Severity | Type | Location | Summary` columns strips the audit trail and conflates findings from multiple reviewers into an anonymous pool.
 
-**Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
+**Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and **real** PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
+
+**Finding/item-number references — the inverse direction (HARD STOP)**: bare `#N` is autolink-correct **only for a real PR/issue reference**. A finding **item number** — a reference to a row of the findings table or to a reviewer's numbered comment, e.g. a narrative line like `Notable: #2 and #3 sit inside the CI workflows` — is NOT a PR/issue reference. Written bare, GitHub autolinks it to the unrelated PR/issue of that number **in the same repo**, creating a permanent false timeline backref that comment editing cannot remove. Wrap every finding/item number in backticks (`` `#2` ``, `` `#14/#15` ``) or reword to a non-`#` form (`finding 2`, `row 2`). This applies everywhere in the Summary body — the findings table cells, the `Notable`/conclusion narrative, and any inline prose — not just the Source column. Direction summary: **real PR/issue/SHA/@mention → bare (autolink ON); finding/item number → backtick (autolink OFF)**.
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -306,6 +327,7 @@ Only include reviewers that actually posted reviews on this PR, and only include
 | 4 | Merge two findings from different sources into one row "to deduplicate" | Keep one row per (source × finding). If two reviewers raised the same finding, write two rows with the same `Location` + `Summary` but distinct `Source`. Deduplication belongs in the chat narrative, not in the table |
 | 5 | Wrap @mentions / SHAs / URLs in backticks in the Source cell or anywhere in the Summary body (e.g., `` `@octocat` ``, `` `de59590` ``, `` `https://...` ``) | Write them bare so GitHub autolinks fire: `@octocat`, `de59590`, `https://github.com/...`. Bot logins (coderabbitai, copilot) are bot identifiers, not human mentions — write them bare without the `@` prefix |
 | 6 | Append role/qualifier parentheses to the Source cell (e.g., `@octocat (MEMBER review)`, `@octocat (OWNER)`) | The `@id` already identifies the reviewer — no role qualifier needed. Source cell carries only the bare identifier: `@octocat`, `coderabbitai`, `Internal Code Review` |
+| 7 | Reference a finding by bare `#N` in the `Notable`/conclusion narrative or any cell (e.g., `Notable: #2 and #3`, `#14/#15 correctly flag ...`) — autolinks to the unrelated PR/issue #N in the repo (permanent false backref) | Backtick every finding/item number: `` `#2` ``, `` `#14/#15` ``, or reword to `finding 2` / `row 2`. Only a **real** PR/issue reference stays bare |
 
 **Self-check (every time before POSTing the Summary)**:
 
@@ -315,6 +337,7 @@ Only include reviewers that actually posted reviews on this PR, and only include
 4. Is every row's `Source` cell populated with the exact reviewer login (not blank, not "AI", not "external")?
 5. If a finding was raised by two reviewers independently, are both rows present?
 6. Scan the entire body — does any `@username`, 7+ hex SHA, or full URL sit inside backticks? If yes, unwrap to bare so GitHub autolink fires (per the `git.md` autolink rule)
+7. Scan the entire body for bare `#[0-9]+` (grep `#[0-9]` sitting outside backticks — the `Notable`/conclusion narrative is the usual offender). For each match decide: **real** PR/issue reference (keep bare, autolink desired) or finding/item number (wrap in backticks / reword — autolink must be suppressed)? A bare finding number silently autolinks to the wrong PR/issue in the repo
 
 ## 7-A. Issue comment Summary (when unified POST does NOT apply)
 

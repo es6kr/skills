@@ -7,6 +7,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 - After PR creation, when AI reviews are complete
 - User says "review check", "CodeRabbit review", "AI review", "review consolidate"
 - **Not** for human reviewer feedback — this is AI bot review only
+- **Not** for dependabot / bot-authored dependency-bump PRs — consolidate is skipped by principle (Step 2 skip condition 0)
 
 ## Role Terminology Definitions (HARD STOP — avoid confusion in conversation/comments)
 
@@ -35,7 +36,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 | 7 (Auto-Post AI Review Summary + Formal Review) + 7.5 (Status line) + 7.6 (Auto-register Deferred Findings) | [`post.md`](./post.md) | Auto-post the Summary (no user decision) + auto-register Findings to fix_plan `[REVIEW_FEEDBACK]` (defer by default) |
 | 8 (Post-Summary Next-Action Ask) | [`next.md`](./next.md) | Merge/fix-deferred/hold option ask (fix only on explicit user instruction at this step) |
 
-Entry order: Step 1 → 2 → **2.3** (human reviewer check — ask before proceeding if a human reviewer other than you is assigned) → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
+Entry order: Step 1 → 2 → **2.3** (duplicate-review check, three axes — submitted human reviews + pending requests + foreign AI Summary; ask before proceeding on any hit) → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
 ## Step 1: Identify PR
 
@@ -49,6 +50,7 @@ gh pr list --head "$(git branch --show-current)" --json number,title --jq '.[0]'
 
 Skip entirely if any of these are true:
 
+0. **Bot-authored dependency-bump PR (HARD STOP — skip by principle)**: `gh pr view <NUMBER> --json author --jq '.author.login'` matches a dependency bot (`dependabot`, `renovate`, etc.) → the entire consolidate flow is skipped. CI green + the bot's own compatibility data + the lockfile-consistency gate ARE the verification — no worktree checkout, no CLI/agent review, no Internal Review, no Summary, no Formal Review. The merge decision goes directly to the user with CI/lockfile attestation instead of an AI Review Summary. **Override**: run consolidate on such a PR only when the user explicitly requests a review of it (e.g., a major-version bump they want inspected).
 1. **CI failing**: `gh pr checks <NUMBER> --json state --jq '[.[] | select(.state != "SUCCESS")] | length'` > 0
 2. **Reviews not complete**: CodeRabbit summary comment not yet posted (check for "<!-- walkthrough_start -->")
 3. **Already summarized**: `gh pr view <NUMBER> --comments` contains "AI Review Summary"
@@ -57,37 +59,78 @@ Skip entirely if any of these are true:
 
 If skipped, report the reason and stop.
 
-## Step 2.3: Human reviewer check (HARD STOP — ask before proceeding when another reviewer is assigned)
+## Step 2.3: Duplicate-review check (HARD STOP — three axes, ask before proceeding on any hit)
 
-**Before collecting reviews / dispatching the Internal Review, check whether a human reviewer (other than the acting account, excluding bots) is already a requested reviewer on the PR.** A human reviewer assignment signals the author wants that person's review — running an autonomous AI consolidate may be redundant or step on their role.
+**Before collecting reviews / dispatching the Internal Review, check whether someone outside your own gh-authenticated account set is already involved as a reviewer on the PR — on any of three axes.** A hit on any axis signals the author wants (or already has) that person's review — running an autonomous AI consolidate would be redundant or step on their role.
+
+"Me / us" = every account listed by `gh auth status` (acting account + review proxies). Bots (CodeRabbit / Copilot / actions / dependabot) are excluded — they belong to the Step 2.4 bot matrix, not this gate.
 
 ```bash
+# my authenticated accounts (portable — no hardcoded names)
+MY=$(gh auth status 2>&1 | grep -oiE 'account [A-Za-z0-9_-]+' | awk '{print tolower($2)}' | sort -u | tr '\n' '|' | sed 's/|$//')
+BOTS='coderabbit|copilot|github-actions|dependabot|\[bot\]|-bot$'
+
+# axis 1 — submitted reviews by someone else (submission EMPTIES reviewRequests — check reviews[] first)
+gh pr view <N> -R <owner>/<repo> --json reviews \
+  --jq ".reviews[].author.login" | grep -viE "^(${MY})$|${BOTS}" | sort -u
+
+# axis 2 — pending requested reviewers (assigned but not yet submitted)
 gh pr view <N> -R <owner>/<repo> --json reviewRequests \
-  --jq '[.reviewRequests[].login | select(. != "<acting-account>" and (test("coderabbit|copilot"; "i") | not))] | .[]'
+  --jq ".reviewRequests[].login" | grep -viE "^(${MY})$|${BOTS}" | sort -u
+
+# axis 3 — AI Review Summary / Internal Code Review comment authored by someone else
+gh pr view <N> -R <owner>/<repo> --json comments \
+  --jq '.comments[] | select(.body | test("AI Review Summary|Internal Code Review|Internal Review";"i")) | .author.login' \
+  | grep -viE "^(${MY})$|${BOTS}" | sort -u
 ```
 
-If the result is non-empty (a human reviewer other than you is assigned), **AskUserQuestion before proceeding**, with options:
-- **Proceed with AI consolidate anyway** — the AI review supplements the human review
-- **Defer to the human reviewer** — skip AI consolidate; they will review
+If **any** axis is non-empty, **AskUserQuestion before proceeding**, with options:
+- **Proceed with AI consolidate anyway** — the AI review supplements the existing/expected review
+- **Defer to the existing reviewer** — skip AI consolidate; their review stands
 - **Hold** — decide later
 
-Do not silently run the Internal Review + Summary when another human reviewer is assigned. The bot reviewer matrix (CodeRabbit/Copilot, Step 2.4) is a **separate** check — this gate is specifically about **human** requested reviewers.
+Do not silently run the Internal Review + Summary on any axis hit. The bot reviewer matrix (CodeRabbit/Copilot, Step 2.4) is a **separate** check — this gate is specifically about **humans and foreign accounts**.
+
+**Autonomous / dispatched context**: a dispatched autonomous session has no ask medium, so this gate must run **pre-dispatch in the host session** (the dispatching orchestrator may wrap the three axes in a script that exits CLEAR/BLOCK). A "Step 2.3 cleared" pre-baked waiver in the dispatch instruction is valid only when it quotes that pre-dispatch gate's CLEAR verdict for the same PR; otherwise the session must run the queries above itself and treat any hit as a terminal blocker (report and stop — no Summary post).
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | See `reviewRequests: ["<human>"]` (e.g. after `gh pr ready`) → run Internal Review + consolidate anyway | Check human reviewers first → if present, ask proceed vs defer vs hold |
-| 2 | Treat `reviewRequests` as relevant only to the bot reviewer matrix | Bot reviewers (Step 2.4) and human reviewers (this step) are separate. Human reviewer presence gates the whole consolidate |
-| 3 | "I am the author, so I run consolidate regardless of who else reviews" | Author running AI consolidate while a human reviewer is assigned = potential redundancy/overstep → ask |
+| 1 | See `reviewRequests: []` and conclude "no reviewer involved" | Submission removes the reviewer from `reviewRequests` — axis 1 (`reviews[]`) catches already-submitted reviews. Run all three axes |
+| 2 | Hardcode account names ("not daegunjhy") in the filter | Derive "me" from `gh auth status` — portable across machines and account changes |
+| 3 | Treat `reviewRequests` as relevant only to the bot reviewer matrix | Bot reviewers (Step 2.4) and human/foreign reviewers (this step) are separate. Any axis hit gates the whole consolidate |
+| 4 | "I am the author, so I run consolidate regardless of who else reviews" | Author running AI consolidate while another reviewer is involved = potential redundancy/overstep → ask |
+| 5 | Skip axis 3 because "comments are not reviews" | A foreign AI Review Summary means another operator's consolidate already ran — a second Summary duplicates and may contradict it |
 
 ### Self-check (before Step 2.4 / Step 3 collect)
 
-1. Did you run the `reviewRequests` query and filter out the acting account + bots?
-2. Is the human-reviewer result non-empty? → If yes, did you AskUserQuestion (proceed/defer/hold) **before** any Internal Review dispatch or Summary post?
-3. If empty (only bots or just you) → proceed normally.
+1. Did you run all **three** axis queries with the `gh auth status`-derived account filter (acting account + proxies + bots excluded)?
+2. Is any axis non-empty? → If yes, did you AskUserQuestion (proceed/defer/hold) **before** any Internal Review dispatch or Summary post? (Autonomous session: any hit = terminal blocker — report and stop)
+3. If all three axes are empty (only bots or just you) → proceed normally.
 
 ## Step 2.4: Copilot availability pre-check (HARD STOP — auto-fallback, no ask)
 
-**GitHub Copilot Code Review is a paid subscription as of 2025.** Without an active subscription on the acting account or the repo's organization, adding `copilot-pull-request-reviewer` as a reviewer fails silently or returns 422. **Check availability BEFORE Step 2.5 sequential trigger or Step 2.6 re-review trigger. On unavailable → automatically route to Internal Review Fallback (Step 3.5) WITHOUT AskUserQuestion.**
+**GitHub Copilot Code Review is a paid subscription as of 2025.** Without an active subscription on the acting account or the repo's organization, adding `copilot-pull-request-reviewer` as a reviewer fails silently or returns 422. **Run Step 2.4.0 (existing-review check) FIRST; only when no Copilot review already exists do you check availability BEFORE Step 2.5 sequential trigger or Step 2.6 re-review trigger. On unavailable (and no existing review) → automatically route to Internal Review Fallback (Step 3.5) WITHOUT AskUserQuestion.**
+
+### Step 2.4.0: Existing Copilot review check FIRST (HARD STOP — precedes availability detection)
+
+**Before running any billing/availability signal, check whether a completed Copilot review ALREADY EXISTS on this PR.** The availability pre-check answers "can I *request* a new Copilot review?" (billing/subscription) — it does NOT answer "is there a Copilot review to *collect*?" (existence on the PR). A review may already be present (triggered by the author's account, a repo-level Copilot setting, or a prior session) even when the acting account's billing endpoints return 404 / seat 0. Treating billing-unavailable as "no Copilot review to collect" silently skips an existing review.
+
+```bash
+# Both API surfaces — GraphQL drops the [bot] suffix, REST keeps it (see collect.md surface caveat)
+gh pr view <N> -R <owner>/<repo> --json reviews \
+  --jq '[.reviews[] | select(.author.login | test("copilot"; "i"))] | length'
+gh api repos/<owner>/<repo>/pulls/<N>/reviews \
+  --jq '[.[] | select(.user.login | test("copilot"; "i"))] | length'
+```
+
+- Result `≥1` → **a Copilot review exists. It is a Step 3 collect target regardless of billing.** Skip the billing-based availability detection + auto-fallback below; record Copilot as a present reviewer in the Summary matrix and collect its findings (review body + inline comments via `.../pulls/<N>/comments`) in Step 3. Internal Review (Step 3.5) may still run as an independent second perspective, but Copilot is NOT "unavailable".
+- Result `0` → no existing Copilot review → proceed to the availability detection below (which decides whether to *request* one).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run billing signals first → 404 / seat 0 → declare "Copilot unavailable" → auto-fallback, skipping the existing Copilot review already on the PR | Check for an existing Copilot review FIRST. Present → collect it (billing is moot). Absent → then run billing to decide whether to request one |
+| 2 | Equate "acting account's billing = unavailable" with "no Copilot review to collect" | Billing = can-I-request. Existence-on-PR = is-there-one-to-collect. A review triggered under the author's account / repo setting exists independent of the acting account's seat |
+| 3 | Query only `gh pr view --json reviews` (GraphQL, no suffix) and miss the REST-surface login | Copilot login differs by API surface (`copilot-pull-request-reviewer` vs `...[bot]`). Use a `test("copilot"; "i")` substring match on both surfaces |
 
 ### Availability detection (primary-source signals — confirm via at least one)
 
@@ -125,6 +168,7 @@ When Step 2.4 concludes "not available", **route DIRECTLY into Step 3.5 Internal
 
 ### Self-check (every time before Step 2.5/2.6 entry)
 
+0. **Did you run Step 2.4.0 (existing-Copilot-review check) FIRST, before any billing signal?** A review already present on the PR = collect target regardless of billing → skip availability detection + auto-fallback for that reviewer. Billing decides only whether to *request* a NEW review when none exists.
 1. Did you run signal 1 (`/user/copilot_billing`) in this consolidate session?
 2. If signal 1 returned 404/error → did you check signal 2 (org billing) when the repo is under an org?
 3. If signal 1+2 both indicate unavailable → did you skip Step 2.5/2.6 and route DIRECTLY into Step 3.5?

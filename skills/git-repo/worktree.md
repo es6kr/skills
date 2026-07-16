@@ -24,7 +24,22 @@ ls .claude/worktrees/ 2>/dev/null   # Claude Code default path
 
 ### 2. Identify inactive candidates
 
-A worktree is **inactive** (reuse candidate) if any of:
+**Step 2.0 — Operation-state gate (HARD STOP, runs before any classification)**: an in-progress git operation disqualifies a worktree from inactive classification regardless of merge status. Check per candidate `<W>`:
+
+```bash
+gitdir=$(git -C <W> rev-parse --git-dir)
+ls "$gitdir"/CHERRY_PICK_HEAD "$gitdir"/MERGE_HEAD "$gitdir"/REBASE_HEAD "$gitdir"/BISECT_LOG "$gitdir"/rebase-merge "$gitdir"/rebase-apply 2>/dev/null
+git -C <W> status --porcelain | grep -E '^(DD|AU|UD|UA|DU|AA|UU)'   # unmerged index entries
+git -C <W> diff --name-only --diff-filter=U                          # conflicted files
+```
+
+Any hit → the worktree is **mid-operation** (cherry-pick/merge/rebase/bisect — likely the user's active surgery):
+- It is NOT an inactive candidate; exclude it from reuse/discard options entirely
+- Its dirty files are the **operation's payload**, not leftovers — never offer "discard", "stash", or "resolve DU via `git add`" for them
+- Report the operation to the user (`MERGE_MSG` names the commit being applied) and let them decide
+- **Unmerged status codes (`DU`/`UU`/`AA`/…) in `status --porcelain` always mean an unfinished conflicted operation — never plain dirt.** Treating them as ordinary dirty files is the failure mode (see failed-attempts.md "cherry-pick in progress misclassified as abandoned")
+
+A worktree that passed the gate is **inactive** (reuse candidate) if any of:
 
 | Condition | How to check |
 |-----------|-------------|
@@ -117,6 +132,8 @@ If branch mismatch → do NOT proceed with Write/Edit. Fix first (checkout or re
 | 3 | Create worktree in `.worktrees/` | Use `.claude/worktrees/` |
 | 4 | Start coding without branch verification | `git branch --show-current` before any Write/Edit |
 | 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
+| 6 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
+| 7 | Classify "merged + ahead=0 + dirty" as abandoned leftovers | Run the operation-state gate first — a merged branch can host an in-progress cherry-pick applying new work on top |
 
 ## Inactive Worktree Count Limit (HARD STOP)
 

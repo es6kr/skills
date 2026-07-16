@@ -30,8 +30,19 @@ Inputs:
 - `BRANCH` — the branch this worktree should be on
 
 ```bash
-# Windows-form absolute paths (git metadata files are not MSYS-path aware)
-to_win() { command -v cygpath >/dev/null 2>&1 && cygpath -m "$1" || echo "$1"; }
+# Windows-form absolute paths (git metadata files are not MSYS- or WSL-path aware)
+# MSYS (Git Bash): cygpath -m → C:/...
+# WSL: wslpath -w → C:\... (then forward-slashed)
+# Plain Linux/Mac: echo unchanged
+to_win() {
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -m "$1"
+  elif command -v wslpath >/dev/null 2>&1 && [[ "$1" == /mnt/?/* ]]; then
+    wslpath -w "$1" | tr '\\' '/'
+  else
+    echo "$1"
+  fi
+}
 GITDIR_W="$(to_win "$GITDIR")"
 WT_W="$(to_win "$WT")"
 
@@ -68,7 +79,7 @@ git -C "$WT" log --oneline -1         # correct HEAD
 | 1 | `git worktree add` onto a populated directory | Create the metadata by hand (it accepts an existing tree) |
 | 2 | Move/copy files to "set up" the worktree | Only create `.git` + admin metadata — leave the tree untouched |
 | 3 | `git read-tree HEAD` to fix the index | `git reset HEAD -- .` — rebuilds from HEAD without destroying working files |
-| 4 | Write MSYS paths (`/c/Users/...`) into gitdir/`.git` | Use `cygpath -m` → `C:/Users/...`; git resolves the Windows form |
+| 4 | Write MSYS (`/c/Users/...`) or WSL (`/mnt/c/Users/...`) paths into gitdir/`.git` | Convert via `to_win()` (cygpath in MSYS, wslpath in WSL) → `C:/Users/...`. Git resolves the Windows form, MSYS/WSL forms break in other shells |
 | 5 | Skip the `worktree list` pre-check | Always check first — registering a duplicate corrupts the admin dir |
 
 ## Notes
