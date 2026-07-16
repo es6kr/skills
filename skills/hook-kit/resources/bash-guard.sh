@@ -70,12 +70,38 @@ if [ "${1:-}" = "--test" ]; then
   check ALLOW "$(printf "tee -a /tmp/notes.md <<'EOF'\nexample: git reset --hard deletes work\nEOF")"
   check BLOCK "$(printf "bash <<'EOF'\ngit push --force origin main\nEOF")"
 
+  check_bg() {  # check_bg <BLOCK|ALLOW> <command>  (run_in_background: true)
+    local expect="$1" cmd="$2" rc got
+    CLAUDE_TOOL_INPUT="$(jq -n --arg c "$cmd" '{tool_input:{command:$c, run_in_background:true}}')" "$SELF" >/dev/null 2>&1
+    rc=$?
+    case "$rc" in 2|1) got=BLOCK;; *) got=ALLOW;; esac
+    if [ "$expect" = "$got" ]; then
+      pass=$((pass+1))
+    else
+      fail=$((fail+1)); printf 'FAIL(bg) expected=%-5s got=%-5s :: %s\n' "$expect" "$got" "$cmd"
+    fi
+  }
+
+  # ── background time-bound guard ──
+  check_bg BLOCK 'git push origin main'
+  check_bg BLOCK 'gh run watch 12345'
+  check_bg BLOCK 'ssh host "docker ps"'
+  check_bg ALLOW 'timeout 120 git push origin main'
+  check_bg ALLOW 'cd /repo && timeout 300 gh pr create --draft'
+  check_bg ALLOW 'curl --max-time 30 http://example.com'
+  check_bg ALLOW 'curl -m 10 http://example.com'
+  check_bg ALLOW 'ssh -o ConnectTimeout=10 host uptime'
+  # foreground: same commands must stay allowed (tool timeout param governs)
+  check ALLOW 'git push origin main'
+  check ALLOW 'gh run watch 12345'
+
   printf '\n%d passed, %d failed\n' "$pass" "$fail"
   [ "$fail" -eq 0 ]; exit
 fi
 
 INPUT="${CLAUDE_TOOL_INPUT:-$(cat)}"
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // .command // empty' 2>/dev/null)
+RUN_BG=$(echo "$INPUT" | jq -r '.tool_input.run_in_background // false' 2>/dev/null)
 [ -z "$COMMAND" ] && exit 0
 
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
@@ -98,6 +124,17 @@ soft_block() { BLOCKS+="BLOCK: ${1}\n"; }
 # ══════════════════════════════════════════════
 # Phase 1: Immediate block (simple patterns)
 # ══════════════════════════════════════════════
+
+# Background dispatch without a command-level time bound
+# (claudify/background-polling.md HARD STOP: the Bash tool `timeout` parameter does
+#  NOT apply to run_in_background — a hung command is never notified. A time bound
+#  inside the command itself is mandatory: `timeout N <cmd>` prefix, curl -m/--max-time,
+#  or ssh ConnectTimeout.)
+if [ "$RUN_BG" = "true" ]; then
+  if ! echo "$COMMAND" | $GREP -qP '(^|[;&|(]\s*|\s)(g?timeout)\s+(-[a-zA-Z-]+\s+)*[0-9]|--max-time[= ]|(^|\s)-m\s*[0-9]+|ConnectTimeout'; then
+    block "run_in_background without a command-level time bound. The tool timeout parameter does not apply to background — prefix with 'timeout N <cmd>' (or add curl --max-time / ssh -o ConnectTimeout)"
+  fi
+fi
 
 # System / file destruction
 echo "$COMMAND" | $GREP -qiP '\brm\s+-rf\s+/'          && block "rm -rf / is extremely dangerous"
