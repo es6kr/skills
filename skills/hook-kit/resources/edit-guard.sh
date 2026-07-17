@@ -33,10 +33,10 @@ HG_EDIT_STUB_MARKERS="${HG_EDIT_STUB_MARKERS:-location pointer|Use .* instead|^t
 # repo never embeds real internal hostnames. The git-ignored data file supplies
 # HG_EDIT_HOST_TOKENS; when absent it falls back to a pattern that never matches
 # (internal-domain detection no-ops gracefully rather than leaking tokens here).
-HOST_DATA_FILE="$(dirname "$0")/../data/host-patterns.regex"
-if [[ -f "$HOST_DATA_FILE" ]]; then
+HG_HOST_DATA_FILE="$(dirname "$0")/../data/host-patterns.regex"
+if [[ -f "$HG_HOST_DATA_FILE" ]]; then
   # shellcheck source=/dev/null
-  . "$HOST_DATA_FILE"
+  . "$HG_HOST_DATA_FILE"
 fi
 HG_EDIT_HOST_TOKENS="${HG_EDIT_HOST_TOKENS:-_NEVER_MATCH_INTERNAL_HOST_}"
 
