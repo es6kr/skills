@@ -191,7 +191,7 @@ Recorded violation pattern: a PUBLIC-repo issue contained user session UUIDs, ra
 |---|-------|----|
 | 1 | Issue body "## References" section cites `<workspace>/.claude/rules/<rule>.md` or `~/.claude/skills/...` | **Inline summarize** the rule content in the issue body (self-contained, no external reference). Rule file paths inside the same repo are OK (e.g., `.github/workflows/...`) |
 | 2 | Copy "Related rule: `<path>`" / "Reference: `<path>`" pattern verbatim from fix_plan to issue body | fix_plan.md ↔ issue body medium separation. fix_plan is user-only working file; issue body is visible to collaborators |
-| 3 | Cite internal RFC1918 IPs (`10.0.0.x`, `192.168.x.x`, `172.16-31.x.x`) or internal hosts (`EMC-WAS-1`, `deps-emc.*`) | Generalize ("internal Semaphore server") or env var placeholder (`$SEMAPHORE_URL`). If reproducibility needed, separate PRIVATE document |
+| 3 | Cite internal RFC1918 IPs (`10.0.0.x`, `192.168.x.x`, `172.16-31.x.x`) or internal hosts (`<internal-app-server>`, `<internal-host-prefix>.*`) | Generalize ("internal Semaphore server") or env var placeholder (`$SEMAPHORE_URL`). If reproducibility needed, separate PRIVATE document |
 | 4 | Assume "PRIVATE so safe" and skip sanitize | PRIVATE = no external index protection. Collaborators (including external contributors) are exposed. Even 1 external member → this rule applies |
 | 5 | Skip 4-grep self-check before `gh issue create` | Apply 4-grep to body variable before every `gh issue create/edit/comment` call. On match → sanitize and retry |
 
