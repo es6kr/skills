@@ -52,7 +52,7 @@ Manage hooks and script files in `~/.claude/settings.json`. Includes resource (s
 
 ```
 Source of Truth                    Active (installed)
-skills/hook/resources/*.sh    ←→  ~/.claude/hooks/*.sh
+skills/hook-kit/resources/*.sh ←→  ~/.claude/hooks/*.sh
 ```
 
 Changes must be reflected on the opposite side. `/hook edit` handles this automatically.
@@ -137,7 +137,7 @@ The marker only reaches the LLM if the event surfaces stdout to the transcript (
 | Hook type | Owning skill | resources location |
 |-----------|-------------|-------------------|
 | Domain-specific (e.g., openclaw, semaphore, ralph related) | Corresponding domain skill | `<domain-skill>/resources/*.sh` |
-| General/system (Bash guard, session management, validation) | **hook skill** | `~/.claude/skills/hook/resources/*.sh` |
+| General/system (Bash guard, session management, validation) | **hook skill** | `~/.claude/skills/hook-kit/resources/*.sh` |
 
 **Principles**:
 - Every `~/.claude/hooks/*.sh` must have been installed from some skill's `resources/` — orphan hooks are forbidden

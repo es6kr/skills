@@ -55,7 +55,8 @@ if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
   fi
 fi
 
-# Warn (non-blocking) — exit 1 with stderr message becomes a system reminder
+# Warn — PostToolUse surfaces the stderr message to the model only on exit 2
+# (exit 1 is a non-blocking error and stays hidden).
 cat >&2 <<EOF
 [block-research-plan-without-rag] $FILE_PATH
 
@@ -70,4 +71,4 @@ Required action (pick one):
 
 RAG store is mandatory before archiving to .bak/ (prevents permanent data loss).
 EOF
-exit 1
+exit 2
