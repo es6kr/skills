@@ -278,6 +278,14 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
 
     fixed_chains = 0
     final_lines = []
+    # Null-rooted repairs: a non-null parentUuid that resolve_parent could not map to
+    # any surviving ancestor (ancestry truly lost — see resolve_parent docstring).
+    # Tracked with line/uuid so the caller can disclose exactly WHERE history
+    # connectivity was severed, instead of only reporting an aggregate count (a repair
+    # landing on a user-visible message, e.g. a compact-boundary marker, means real
+    # data is missing from the file — not a defect this repair introduced, but a fact
+    # worth surfacing rather than folding into a blanket "Validation: PASS").
+    null_roots = []
 
     for i, (line, data) in enumerate(zip(unique_lines, unique_data)):
         if data is None or not data.get('uuid'):
@@ -305,6 +313,8 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
             new_parent = None
 
         if new_parent != current_parent:
+            if new_parent is None and current_parent is not None:
+                null_roots.append({'uuid': own_uuid, 'line': i + 1, 'old_parent': current_parent})
             data = dict(data)
             data['parentUuid'] = new_parent
             final_lines.append(json.dumps(data, ensure_ascii=False))
@@ -317,6 +327,7 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
         'unique_lines': len(final_lines),
         'duplicates_by_type': duplicates_by_type,
         'fixed_chains': fixed_chains,
+        'null_roots': null_roots,
     }
 
     if not dry_run:
@@ -357,6 +368,13 @@ def main():
         print("\nRemoved by type:")
         for t, c in sorted(result['duplicates_by_type'].items(), key=lambda x: -x[1]):
             print(f"  {t}: {c}")
+
+    if result.get('null_roots'):
+        print(f"\n[WARN] {len(result['null_roots'])} chain repair(s) had NO recoverable ancestor "
+              f"(history above these lines is genuinely missing from this file, not caused by this "
+              f"repair — inspect before declaring the session fully repaired):")
+        for nr in result['null_roots']:
+            print(f"  line {nr['line']}: uuid={nr['uuid'][:8]} (was parent={nr['old_parent'][:8]}, not found in file)")
 
     if not dry_run and 'output_file' in result:
         print(f"\nSaved: {result['output_file']}")
