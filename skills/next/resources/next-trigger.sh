@@ -5,6 +5,16 @@
 # a skill-trigger marker so that the LLM invokes the `next` skill in its
 # follow-up response.
 #
+# Besides the keyword scan, two blind-spot guards fire unconditionally:
+#   1. Tool-call-only ending — the last assistant message has zero text blocks
+#      (e.g. the turn ended on a bare ScheduleWakeup call). No text = no report
+#      to the user AND the keyword scan can never match, so this is always a
+#      defect signal.
+#   2. Waiting-turn ending — the last assistant message registered a
+#      ScheduleWakeup (polling/wait handoff). Control returns to the user for a
+#      long window, so follow-up options are due even without a completion
+#      keyword.
+#
 # Trigger condition: Stop hook fires when Claude finishes a response.
 # Input (stdin): JSON { session_id, transcript_path, stop_hook_active }
 # Output (stdout): on match, a JSON Stop-hook decision object of the form
@@ -23,19 +33,12 @@ set -euo pipefail
 
 INPUT="$(cat)"
 
-TRANSCRIPT=$(printf '%s' "$INPUT" | python3 -c 'import json,sys
-try:
-    d = json.load(sys.stdin)
-    print(d.get("transcript_path",""))
-except Exception:
-    print("")' 2>/dev/null || echo "")
+# JSON parsing uses jq (a hook-wide dependency — the trigger dispatchers all use it).
+# Do NOT use `python3` here: on Windows Git Bash `python3` is often the Microsoft
+# Store stub, which silently no-ops and leaves this hook permanently dormant.
+TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")
 
-STOP_HOOK_ACTIVE=$(printf '%s' "$INPUT" | python3 -c 'import json,sys
-try:
-    d = json.load(sys.stdin)
-    print("true" if d.get("stop_hook_active") else "false")
-except Exception:
-    print("false")' 2>/dev/null || echo "false")
+STOP_HOOK_ACTIVE=$(printf '%s' "$INPUT" | jq -r 'if .stop_hook_active then "true" else "false" end' 2>/dev/null || echo "false")
 
 # Prevent infinite loops: do not re-trigger when this hook itself caused the stop
 if [[ "$STOP_HOOK_ACTIVE" == "true" ]]; then
@@ -51,49 +54,50 @@ fi
 # blocks). We must concatenate ALL text blocks of the LAST message — not overwrite
 # with each block, which captures only the trailing fragment (often non-completion).
 # See ~/.agents/rules/failed-attempts.md "Hook last_text missed multiple text-blocks".
-LAST_TEXT=$(python3 - "$TRANSCRIPT" <<'PY' 2>/dev/null || echo ""
-import json, sys
-path = sys.argv[1]
-last_blocks = []
-current_blocks = []
-last_uuid = None
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        for raw in f:
-            raw = raw.strip()
-            if not raw:
-                continue
-            try:
-                obj = json.loads(raw)
-            except Exception:
-                continue
-            if obj.get("type") != "assistant":
-                continue
-            uuid = obj.get("uuid", "")
-            # Each assistant JSONL line = a discrete message turn. Accumulate every text block
-            # within this message, then commit to last_blocks when a NEW message arrives.
-            if uuid != last_uuid:
-                if current_blocks:
-                    last_blocks = current_blocks
-                current_blocks = []
-                last_uuid = uuid
-            msg = obj.get("message", {}) or {}
-            content = msg.get("content", []) or []
-            for c in content:
-                if isinstance(c, dict) and c.get("type") == "text":
-                    t = c.get("text", "")
-                    if t:
-                        current_blocks.append(t)
-        # Final commit if file ends mid-message
-        if current_blocks:
-            last_blocks = current_blocks
-except Exception:
-    pass
-print("\n".join(last_blocks))
-PY
-)
+# jq pipeline (python3-free — see note above). Stage 1 (`jq -R 'fromjson? // empty'`)
+# tolerantly parses each JSONL line, skipping any malformed line (mirrors the old
+# per-line try/except). Stage 2 slurps, takes the LAST assistant message's uuid, and
+# concatenates every text block across assistant lines sharing that uuid — so a single
+# response split into multiple text blocks (between tool_use blocks) is fully captured.
+LAST_TEXT=$(jq -R 'fromjson? // empty' "$TRANSCRIPT" 2>/dev/null | jq -rs '
+  [ .[] | select(.type == "assistant") ] as $a
+  | if ($a | length) == 0 then ""
+    else
+      ($a | last | .uuid // "") as $u
+      | [ $a[] | select((.uuid // "") == $u) | (.message.content // [])[] | select(.type == "text") | .text ]
+      | join("\n")
+    end
+' 2>/dev/null || echo "")
 
-if [[ -z "$LAST_TEXT" ]]; then
+# Tool names used by the last assistant message (same uuid group) — needed for
+# the waiting-turn guard below.
+LAST_TOOLS=$(jq -R 'fromjson? // empty' "$TRANSCRIPT" 2>/dev/null | jq -rs '
+  [ .[] | select(.type == "assistant") ] as $a
+  | if ($a | length) == 0 then ""
+    else
+      ($a | last | .uuid // "") as $u
+      | [ $a[] | select((.uuid // "") == $u) | (.message.content // [])[] | select(.type == "tool_use") | .name ]
+      | join(",")
+    end
+' 2>/dev/null || echo "")
+
+# Blind-spot guard 1 — tool-call-only ending (no final text at all).
+# A turn that stops without any user-facing text is always a reporting defect:
+# the final message must carry the report. Empty text also means the keyword
+# scan below can never fire, so this exact case (e.g. ending on a bare
+# ScheduleWakeup call) silently bypassed the trigger before this guard.
+# The LAST_TOOLS check distinguishes a genuine tool-call-only message from an
+# empty/assistant-less transcript (both yield empty LAST_TEXT).
+if [[ -z "$LAST_TEXT" && -n "$LAST_TOOLS" ]]; then
+  echo '{"decision":"block","reason":"<skill-trigger name=\"next\">Turn ended with a tool-call-only message (no final text). Emit a final status report for the user; if a task batch completed or control returns to the user (e.g. waiting on CI/wakeup), invoke the `next` skill to offer follow-up options.</skill-trigger>"}'
+  exit 0
+fi
+
+# Blind-spot guard 2 — waiting-turn ending: the final message registered a
+# ScheduleWakeup (polling/wait handoff). Control returns to the user for a long
+# window, so follow-up options are due even without a completion keyword.
+if [[ ",${LAST_TOOLS}," == *",ScheduleWakeup,"* ]]; then
+  echo '{"decision":"block","reason":"<skill-trigger name=\"next\">Waiting-turn detected (ScheduleWakeup registered in the final message). Ensure a final status report was given, then invoke the `next` skill to offer interim follow-up options while waiting.</skill-trigger>"}'
   exit 0
 fi
 
