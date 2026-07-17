@@ -101,6 +101,7 @@ Use only when the script cannot run (permission issues, non-standard paths, etc.
 | `fatal: <path> is already registered` | old metadata not fully renamed | Remove old entry, re-register |
 | worktree shows `prunable` after rename | metadata file paths are Unix-style on Windows | Rewrite `.git` and `.git/worktrees/<name>/gitdir` with `C:/...` paths, then `git worktree repair` |
 | `ERROR: metadata directory not found at <repo>/.git/worktrees/<name>` in a bare-with-worktree layout | Older script revision hardcoded `<repo>/.git/worktrees` and did not resolve from the worktree `.git` pointer | Script now derives `GIT_WT_BASE` from `dirname(gitdir)` of the worktree's `.git` file — pull the latest skill version |
+| Directory + metadata renamed successfully but branch is unchanged (`git branch --show-current` still shows `<old>`) | `--branch <target>` is already checked out in another worktree — the final `git checkout <branch>` step fails after the mv steps already succeeded, and the script does not roll back | Check out under a differently-named local branch instead: `git -C <renamed-worktree> checkout -b <local-name>-tmp origin/<target>`, do the work there, then push its content to the target ref: `git push origin <local-name>-tmp:<target>` (see failed-attempts.md "rename-worktree.sh partial failure") |
 
 ### Windows path compatibility (2026-05-21 fix)
 
