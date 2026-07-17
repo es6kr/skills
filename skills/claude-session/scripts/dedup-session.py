@@ -220,6 +220,16 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
                 fixed_chains += 1
             else:
                 final_lines.append(line)
+        # A mid-file explicit parentUuid == null is a legitimate chain ROOT, not a
+        # break to repair. Claude Code re-roots the chain at every compact/resume
+        # boundary: the isCompactSummary node's parent is a `system` node written
+        # with parentUuid: null. Corruption never emits an explicit null — only a
+        # missing field or a dangling pointer — so an explicit null must be
+        # preserved. Bridging it to the previous line would splice pre-compact
+        # history onto post-compact history (repair.md §"Repair Broken Chain":
+        # "parentUuid: null is normal — do not touch").
+        elif current_parent is None:
+            final_lines.append(line)
         # Subsequent messages must point to the previous message
         elif current_parent != expected_parent:
             data['parentUuid'] = expected_parent
