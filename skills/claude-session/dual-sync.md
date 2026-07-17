@@ -9,9 +9,9 @@ Claude Code uses different project memory paths depending on the runtime environ
 | WSL | `-mnt-c-Users-{USER}-{rest}` | `~/.claude/projects/-mnt-c-Users-{USER}-{rest}/memory/` |
 | Windows | `c--Users-{USER}-{rest}` | `/mnt/c/Users/{USER}/.claude/projects/c--Users-{USER}-{rest}/memory/` |
 
-Example (turborepo-web):
-- WSL: `/home/dgs/.claude/projects/-mnt-c-Users-DAEGUNSOFT-ghq-github-com-daegunsoftDev-turborepo-web/memory/`
-- Windows: `/mnt/c/Users/DAEGUNSOFT/.claude/projects/c--Users-DAEGUNSOFT-ghq-github-com-daegunsoftDev-turborepo-web/memory/`
+Example (`{org}/{repo}`):
+- WSL: `/home/{wsl-user}/.claude/projects/-mnt-c-Users-{USER}-ghq-github-com-{org}-{repo}/memory/`
+- Windows: `/mnt/c/Users/{USER}/.claude/projects/c--Users-{USER}-ghq-github-com-{org}-{repo}/memory/`
 
 ## Sync Procedure
 
@@ -22,14 +22,14 @@ Example (turborepo-web):
 
 ## vibe-kanban Worktree Memory (Volatile)
 
-When running inside a vibe-kanban worktree (`~/.local/Temp/vibe-kanban/worktrees/`), the Claude Code project key is generated from the **temporary path** (e.g., `C--Users-DAEGUN-1-AppData-Local-Temp-vibe-kanban-worktrees-...`).
+When running inside a vibe-kanban worktree (`~/.local/Temp/vibe-kanban/worktrees/`), the Claude Code project key is generated from the **temporary path** (e.g., `C--Users-{USER}-AppData-Local-Temp-vibe-kanban-worktrees-...`).
 
 - Memory under that path becomes **orphaned and effectively lost** when the worktree is deleted
 - When saving memory inside a worktree session, always write to the **main project memory path**
 
 ```
 # Worktree memory (X — volatile)
-~/.claude/projects/C--Users-DAEGUN-1-AppData-Local-Temp-vibe-kanban-worktrees-.../memory/
+~/.claude/projects/C--Users-{USER}-AppData-Local-Temp-vibe-kanban-worktrees-.../memory/
 
 # Main project memory (O — persistent)
 ~/.claude/projects/c--Users-{USER}-ghq-github-com-{org}-{repo}/memory/
