@@ -10,6 +10,10 @@ description: |
   Suggest next actions after completing any task. Auto-invocation via Stop hook (`resources/next-trigger.sh`) using JSON `decision:"block"` (registered in the settings.json Stop array). Fires when assistant response contains completion keywords (locale patterns in `data/*.regex`).
   stall-detect - detect stalled follow-up steps and invoke /fix [stall-detect.md], ask-gates - recording-skip / decision-deferral forced-ask / TaskList primary-source / current-work confirmation gates [ask-gates.md], suggestion-patterns - per-context "After X" next-action option templates [suggestion-patterns.md].
   Use when "next action", "what next", "stall", "stuck", "not progressing", "follow-up missing" is mentioned.
+triggers:
+  - event: Stop
+    action: script
+    script: resources/next-trigger.sh
 ---
 
 # Next Action Suggester
@@ -73,7 +77,7 @@ Identify the type of task just completed.
 | Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) |
 | Recent commits awaiting CI | `gh run list --limit 5` for pending CI watch |
 | fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) |
-| Session wrap-up | `/cleanup` if multiple tasks done + no immediate user follow-up |
+| Session wrap-up | `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage ≥ 50% (see suggestion-patterns.md "Context-usage gate") |
 | Other (free text) | Auto-provided by AskUserQuestion |
 
 | # | Don't (forbidden) | Do (correct alternative) |
@@ -110,6 +114,8 @@ AskUserQuestion({
 ### Step 3: Register and execute selected action(s)
 
 **If 2 or more actions are selected, register each via TaskCreate and execute sequentially.** If only 1 is selected, execute it directly.
+
+**Background dispatch does not end the turn (HARD STOP)**: delegating a selected action to a background agent (`Agent` spawn — background or mailbox-returning) hands control straight back — it is NOT a turn-ending event. Scan the remaining selected/pending tasks and drive the next independent one **in the same turn**; "execute sequentially" governs result-consumption order, not idle waiting. Idle-waiting for the agent is acceptable only when nothing else is drivable. Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached. Same rule as wip/resume.md Step 3 (background-dispatch row).
 
 ## Suggestion Patterns
 

@@ -407,6 +407,21 @@ options: [
 
 **Precondition**: The session's core work is complete and the user signals wrap-up intent (explicit wrap-up keyword such as "wrap up", "cleanup", "end session"), or only asset cleanup (file moves, doc updates) remains. At least one pending/in_progress task remains for carryover.
 
+### Context-usage gate (HARD STOP — before offering ANY wrap-up/cleanup option, in any ask)
+
+A session-cleanup / retrospective / wrap-up option — including as a diversity slot inside a regular next-action ask — may be offered only when at least one of these holds:
+
+1. The user explicitly signaled wrap-up intent (wrap-up keyword, or 2+ consecutive declines of other follow-ups), or
+2. The injected context-usage signal (a `Context usage: ... (NN%)` line in hook additionalContext, when the environment provides one) reports **≥ 50%**.
+
+When neither holds, omit the cleanup/wrap-up option entirely — fill the slot with another discovery-source candidate or present fewer options. Cleanup value scales with session fullness; offering it early pressures a premature session boundary the user did not ask for.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Use "Session wrap-up" as a generic slot filler at low context usage | Check the injected context-usage line first; below the threshold with no user signal, pick a different candidate |
+| 2 | Estimate session fullness from work volume ("many tasks were completed") | Only the injected context-usage signal or an explicit user statement counts as evidence of fullness |
+| 3 | Treat the absence of the signal as permission to offer cleanup | No signal + no user intent = no cleanup option (conservative fallback on environments without the injection hook) |
+
 **Step 0.5 required — Read TaskList directly to identify pending entries**:
 
 ```bash
