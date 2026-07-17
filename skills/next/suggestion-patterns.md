@@ -412,7 +412,7 @@ options: [
 A session-cleanup / retrospective / wrap-up option — including as a diversity slot inside a regular next-action ask — may be offered only when at least one of these holds:
 
 1. The user explicitly signaled wrap-up intent (wrap-up keyword, or 2+ consecutive declines of other follow-ups), or
-2. The injected context-usage signal (a `Context usage: ... (NN%)` line in hook additionalContext, when the environment provides one) reports **≥ 50%**.
+2. The injected context-usage signal (a `Context usage: ... (NN%)` line in hook additionalContext, when the environment provides one) reports **≥ 45%**.
 
 When neither holds, omit the cleanup/wrap-up option entirely — fill the slot with another discovery-source candidate or present fewer options. Cleanup value scales with session fullness; offering it early pressures a premature session boundary the user did not ask for.
 

@@ -77,7 +77,7 @@ Identify the type of task just completed.
 | Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) |
 | Recent commits awaiting CI | `gh run list --limit 5` for pending CI watch |
 | fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) |
-| Session wrap-up | `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage ≥ 50% (see suggestion-patterns.md "Context-usage gate") |
+| Session wrap-up | `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage ≥ 45% (see suggestion-patterns.md "Context-usage gate") |
 | Other (free text) | Auto-provided by AskUserQuestion |
 
 | # | Don't (forbidden) | Do (correct alternative) |
