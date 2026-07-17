@@ -199,7 +199,7 @@ def _resolve_surviving_ancestor(parent: Optional[str],
 
 def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]],
                           removed_parents: Optional[Dict[str, Optional[str]]] = None
-                          ) -> Tuple[List[Tuple[str, Optional[dict]]], int]:
+                          ) -> Tuple[List[Tuple[str, Optional[dict]]], int, List[dict]]:
     """Repair messages whose parentUuid points to a non-existent UUID.
 
     Cross-references parentUuid values against the set of all message UUIDs in the
@@ -210,6 +210,11 @@ def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]],
     Never re-links to the immediately preceding file-order message: file order is not
     chain order, and bridging across a compact/resume boundary re-attaches pre-compact
     history to the active chain, inflating the effective context.
+
+    Returns (result, fixed_count, null_roots) — null_roots lists {uuid, line, old_parent}
+    for every resolution that landed on None (ancestry truly lost), so the caller can
+    disclose exactly where history connectivity was severed instead of only reporting
+    an aggregate count.
     """
     removed_parents = removed_parents or {}
 
@@ -220,8 +225,9 @@ def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]],
 
     fixed = 0
     result = []
+    null_roots: List[dict] = []
 
-    for line, data in messages:
+    for i, (line, data) in enumerate(messages):
         if data is None or not data.get('uuid'):
             result.append((line, data))
             continue
@@ -233,6 +239,8 @@ def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]],
             parent = data.get('parentUuid')
             if parent is not None and parent not in all_uuids:
                 resolved = _resolve_surviving_ancestor(parent, all_uuids, removed_parents)
+                if resolved is None:
+                    null_roots.append({'uuid': data['uuid'], 'line': i + 1, 'old_parent': parent})
                 data = dict(data)
                 data['parentUuid'] = resolved
                 line = json.dumps(data, ensure_ascii=False)
@@ -240,7 +248,7 @@ def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]],
 
         result.append((line, data))
 
-    return result, fixed
+    return result, fixed, null_roots
 
 
 def validate(messages: List[Tuple[str, Optional[dict]]]) -> dict:
@@ -413,8 +421,22 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     print(f"[5/7] Broken chain repair: {chain_fixed}")
 
     # Step 6: repair orphan parent UUIDs (parentUuid value points to nonexistent message)
-    messages, orphan_parent_fixed = repair_orphan_parents(messages, removed_parents)
+    messages, orphan_parent_fixed, orphan_null_roots = repair_orphan_parents(messages, removed_parents)
     print(f"[6/7] Orphan parent repair: {orphan_parent_fixed}")
+
+    # Combine null-root disclosures from dedup's Pass 6 and this pass — every line where
+    # a dangling parentUuid could not be traced to any surviving ancestor (data genuinely
+    # missing from the file, not something this repair caused). In --dry-run mode dedup's
+    # in-memory fix is never swapped into `messages` (only the real run does that), so the
+    # same dangling parent can be caught by both passes — dedupe by uuid to report each
+    # affected message once regardless of mode.
+    null_roots = list({nr['uuid']: nr for nr in (list(dedup_result.get('null_roots', [])) + orphan_null_roots)}.values())
+    if null_roots:
+        print(f"\n[WARN] {len(null_roots)} chain repair(s) had NO recoverable ancestor "
+              f"(history above these lines is genuinely missing from this file — inspect "
+              f"before declaring the session fully repaired):")
+        for nr in null_roots:
+            print(f"  line {nr['line']}: uuid={nr['uuid'][:8]} (was parent={nr['old_parent'][:8]}, not found in file)")
 
     # Chain-topology regression check: a topology-preserving repair keeps the leaf and
     # must not balloon the active-chain length. A ballooned hop count means pre-boundary
@@ -455,6 +477,7 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
         'orphan_removed': orphan_removed,
         'chain_fixed': chain_fixed,
         'orphan_parent_fixed': orphan_parent_fixed,
+        'null_roots': null_roots,
         'validation': validation,
     }
 
@@ -490,6 +513,13 @@ def main():
     ok = all(v[k] == 0 for k in v)
     status = "PASS" if ok else "FAIL"
     print(f"\nValidation: {status}")
+
+    if result.get('null_roots'):
+        print(f"\nNOTE: Validation PASS means the file is now structurally sound (no dangling "
+              f"references), NOT that all history is reachable — {len(result['null_roots'])} "
+              f"line(s) above have a new root because their true ancestor is missing from this "
+              f"file (see [WARN] above). Do not report this repair as \"complete\" without also "
+              f"disclosing those line/uuid pairs to the user.")
 
 
 if __name__ == '__main__':
