@@ -160,7 +160,7 @@ Recorded violation pattern: a PUBLIC-repo issue contained user session UUIDs, ra
 | 1 | Auto-assume "this repo is PUBLIC" and report IP/secret hardcoding as inappropriate (without checking) | `gh repo view <owner>/<repo> --json isPrivate -q '.isPrivate'` → apply/skip rules based on `true`/`false` |
 | 2 | "Was PUBLIC in a previous context/session, so must still be PUBLIC" assumption | Visibility can change (PUBLIC ↔ PRIVATE). Confirm before every security decision |
 | 3 | Apply PUBLIC rules to PRIVATE repos because of "GitHub exposure risk" general reasoning | PRIVATE = this section not enforced. IP/secret commits are allowed (though user/team policy may differ) |
-| 4 | Infer visibility from repo name pattern (e.g., "turborepo-web") or owner ("daegunsoftDev") | Naming patterns don't guarantee visibility. Always use `gh repo view` |
+| 4 | Infer visibility from repo name pattern (e.g., a "…-web" app repo) or from the owner org name | Naming patterns don't guarantee visibility. Always use `gh repo view` |
 
 ## Cross-repo linkage direction: private→public OK, public→private FORBIDDEN (HARD STOP)
 
