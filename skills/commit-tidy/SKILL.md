@@ -233,6 +233,37 @@ Read each matched file. If a local mapping exists (e.g., "new topic = `feat:`, i
 
 See `message-discipline.md` → "Working-tree-specific commit-type override (HARD STOP)" for the full self-check.
 
+### Step 4.6: Prior-merge regression check (HARD STOP — before presenting the split as ready)
+
+**Before declaring a split "confirmed / ready to execute", check whether any staged file's skill was already the subject of a merged PR — especially a squash-merged one.** A squash-merge collapses individual commits (including "address review findings" fix commits) into one commit on the base branch. Staged changes that touch the same files can silently regress a bug that a findings-application commit already fixed, and a structural/pattern-scan diff will not reveal it.
+
+```bash
+# has this skill already got a merged PR? (repo-specific owner/repo)
+gh pr list -R <owner>/<repo> --state merged --search "<skill-name>" --json number,title,mergedAt,baseRefName
+
+# resolve the actual base (do not assume origin/main — staging repos use next-feat/next-fix)
+gh pr view <N> -R <owner>/<repo> --json baseRefName -q '.baseRefName'
+
+# if the PR had multiple commits before merge, list them — findings-application
+# commits are recognizable by "review findings" / "internal review" / "address feedback"
+gh api repos/<owner>/<repo>/pulls/<N>/commits --jq '.[] | {sha: .sha[0:7], message: .commit.message}'
+```
+
+Diff the staged content against the **actual resolved base ref** (not an assumed default) — and read the **full** diff, not a `head -N` or `grep`-filtered slice:
+
+```bash
+git diff origin/<actual-base> -- <file>
+```
+
+For any hunk that overlaps a findings-application commit's touched lines, and for any changed logic that is testable (regex assignment, conditional branch, script behavior), **execute the changed line(s)** to confirm behavior — a diff read is not a substitute for running the code.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Conclude "purely additive, no regression" from `grep -E '^\+##'` / `head -100` pattern-scan of a diff | Read the full diff line by line; treat any hunk overlapping a findings-application commit's region as requiring explicit re-verification |
+| 2 | Diff staged changes against `origin/main` when the actual PR base was a staging branch (`next-feat`/`next-fix`) | Resolve the actual merge base via `gh pr view --json baseRefName` first, then diff against that ref |
+| 3 | Declare "no regression" without executing/testing the changed logic | Run the actual code path (`bash -c`, a grep match test, a unit test) before asserting correctness |
+| 4 | Present a split as "confirmed / ready to execute" before this check has run on every touched skill | This check is part of split-readiness — gate Step 5 (and any user-facing "ready" claim) on it passing |
+
 ### Step 5: Execute split (if requested)
 
 Use HEREDOC (`git commit -F -`) so the body and optional footer land in the commit message exactly as drafted. Per `message-discipline.md`, single `-m "<subject>"` invocations are reserved for the rare subject-only acceptable cases (typo / routine dep bump).
