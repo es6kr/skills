@@ -31,10 +31,10 @@ Verb-phrase detection cues (any one is sufficient):
 Analyze the conversation content and generate 2–4 name candidates.
 
 **Naming rules:**
-- **Length**: 20–40 characters recommended
-- **Format**: `<topic> + <key action>` (e.g. `feat/76-auth-history + SSO deployment validation`)
+- **Length**: **≤30 characters**, short and simple. The name is also written as the **`agent-name`** record (the identifier shown in the session/agent list and used for multi-agent addressing, e.g. `wmux-web-browser-ui-test`) — a long or complex name makes a poor agent identifier.
+- **Format**: a **single topic slug** — the one dominant theme, not a full task description (e.g. `skills-bare-worktree`, `git-repo-to-bare`). Do NOT chain multiple clauses with `+`; pick the single most representative topic.
 - **Language**: English preferred; technical terms in English
-- **Avoid**: dates, unnecessary words like "session" or "task"
+- **Avoid**: dates, unnecessary words like "session"/"task", **compound multi-clause names, and `+`-chained enumerations of several tasks**
 
 ### 2. Apply the Name
 
@@ -50,6 +50,8 @@ Session name suggestions:
 
 `/rename` is a Claude Code built-in command — cannot be invoked via Bash or Skill tool.
 The user copies and pastes the desired `/rename ...` line.
+
+> **Keep candidates short (≤30 chars, single slug).** `/rename` updates BOTH the `custom-title` and the `agent-name` record — the chosen name becomes the agent identifier too, so a long compound name (`A + B + C`) is a poor fit. Suggest concise single-topic slugs.
 
 | # | Don't | Do |
 |---|-------|-----|

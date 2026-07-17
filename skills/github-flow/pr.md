@@ -633,8 +633,9 @@ PR creation is stateless. There is no automation that detects review arrival. So
 | 5 | AskUserQuestion option description does not mention PR creation, but PR is created anyway | Publish actions not explicitly stated in option description require separate ask |
 | 6 | **Open PR(s) already in flight, but a new axis (new branch + push + PR) is added as an option, imposing simultaneous-handling burden** | **Before composing options, run `gh pr list --state open` as primary source. If 1+ open PRs exist, ask "handle existing PR first vs start new axis" as a separate question first** — including the new axis in option description is itself a burden |
 | 7 | "User selected option whose description mentions 'PR creation', so OK" — ignoring other in-flight PRs | Option description coverage is the single-PR-context rule (#5). Adding a multi-PR axis is a separate decision point **before options are even presented**. Option description inclusion ≠ multi-PR axis agreement |
+| 8 | "The user already approved 'push + draft PR' in a prior ask, so the open-PR axis check is moot" — rationalizing the scan away at creation time | A prior approval covers the **single-PR flow shape only**. The `gh pr list --state open` scan runs **at creation time, every time** — if 1+ open PRs surface (especially same-author), pause and surface the in-flight count before creating. Prior approval ≠ axis-check exemption |
 
-**Self-check (every time before `gh pr create` / new branch push)**:
+**Self-check (every time before `gh pr create` / new branch push — runs even when the user already approved PR creation in a prior ask)**:
 1. Did the user **explicitly** say "create PR", "register PR", "open PR", etc.?
 2. Or does the AskUserQuestion option description selected by the user **explicitly** mention PR creation?
 3. **Confirm via `gh pr list --state open` as primary source** — is there 1+ open PR in flight?

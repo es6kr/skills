@@ -25,8 +25,11 @@ Read the plan/research file and identify:
 | Implementation checklist | Body | `- [ ]` checkbox list |
 | Verification plan | Body | Table: feature / procedure / expected result |
 | Changed file summary | Body | Table: file / change description |
+| **Plan header references (prerequisite PRs, related issues, base plans)** | **Body — References section** | `Relates to #N` / `owner/repo#N` (cross-repo) |
 | Open questions (undecided items) | **Comment** | Numbered list with context |
 | Progress updates | **Comment** | Timestamped note |
+
+**Reference carry rule (HARD STOP)**: the plan header's prerequisite / related lines (e.g., "Depends on", "base PR", "precondition: owner/repo#N") are trackable references, not internal paths — they MUST survive into the issue body's References section. Step 3 sanitization strips internal file paths; it must never strip cross-repo PR/issue references. An issue body with zero references requires the register topic's related-candidates table to justify it.
 
 ### Step 3: Sanitize Internal Paths
 

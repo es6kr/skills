@@ -12,6 +12,20 @@ import sys
 from pathlib import Path
 
 
+def strip_lone_surrogates(s: str) -> str:
+    """Drop lone UTF-16 surrogate code points (U+D800..U+DFFF).
+
+    json.loads of an escaped \\uXXXX lone surrogate yields a str char in this
+    range; json.dumps(ensure_ascii=False) then keeps it, and writing to a utf-8
+    stream raises UnicodeEncodeError ('surrogates not allowed'). Astral chars are
+    single code points in Python str, so any char in this range is corruption —
+    safe to drop, leaving valid utf-8 output (Korean etc. preserved).
+    """
+    if not any(0xD800 <= ord(c) <= 0xDFFF for c in s):
+        return s
+    return ''.join(c for c in s if not 0xD800 <= ord(c) <= 0xDFFF)
+
+
 def get_content_richness(data: dict) -> int:
     """Calculate content richness score for a message (higher is better)"""
     if not data:
@@ -93,7 +107,7 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
     # Pass 1: load all messages
     messages = []
 
-    with open(session_file, 'r', encoding='utf-8') as f:
+    with open(session_file, 'r', encoding='utf-8', errors='surrogatepass') as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -220,6 +234,16 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
                 fixed_chains += 1
             else:
                 final_lines.append(line)
+        # A mid-file explicit parentUuid == null is a legitimate chain ROOT, not a
+        # break to repair. Claude Code re-roots the chain at every compact/resume
+        # boundary: the isCompactSummary node's parent is a `system` node written
+        # with parentUuid: null. Corruption never emits an explicit null — only a
+        # missing field or a dangling pointer — so an explicit null must be
+        # preserved. Bridging it to the previous line would splice pre-compact
+        # history onto post-compact history (repair.md §"Repair Broken Chain":
+        # "parentUuid: null is normal — do not touch").
+        elif current_parent is None:
+            final_lines.append(line)
         # Subsequent messages must point to the previous message
         elif current_parent != expected_parent:
             data['parentUuid'] = expected_parent
@@ -242,7 +266,9 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
         output_file = Path(str(session_file) + '.dedup')
         with open(output_file, 'w', encoding='utf-8') as f:
             for line in final_lines:
-                f.write(line + '\n')
+                # json.dumps(ensure_ascii=False) may emit lone surrogates from
+                # corrupted source escapes — strip them so utf-8 write never crashes.
+                f.write(strip_lone_surrogates(line) + '\n')
         result['output_file'] = str(output_file)
 
     return result

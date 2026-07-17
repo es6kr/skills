@@ -25,7 +25,9 @@ dedup_session = _mod.dedup_session
 def load_lines(session_file: Path) -> List[Tuple[str, Optional[dict]]]:
     """Load JSONL file as a list of (raw_line, parsed_data) tuples"""
     messages = []
-    with open(session_file, 'r') as f:
+    # encoding='utf-8' is mandatory on Windows (default is cp949 → UnicodeDecodeError).
+    # errors='surrogatepass' tolerates pre-existing lone-surrogate bytes without crashing.
+    with open(session_file, 'r', encoding='utf-8', errors='surrogatepass') as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -154,15 +156,64 @@ def repair_chains(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tupl
     return result, fixed
 
 
+def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tuple[str, Optional[dict]]], int]:
+    """Repair messages whose parentUuid points to a non-existent UUID.
+
+    Cross-references parentUuid values against the set of all message UUIDs
+    in the file. If parentUuid is set (non-null) but does not match any
+    message's uuid, replace it with the immediately preceding message's uuid
+    (same fallback as repair_chains).
+
+    Detects post-dedup leftovers and Syncthing/manual-edit damage that
+    the field-presence check in repair_chains misses.
+    """
+    all_uuids = set()
+    for _, d in messages:
+        if d and d.get('uuid'):
+            all_uuids.add(d['uuid'])
+
+    fixed = 0
+    result = []
+    prev_uuid = None
+
+    for line, data in messages:
+        if data is None or not data.get('uuid'):
+            result.append((line, data))
+            continue
+
+        msg_type = data.get('type', '')
+        is_sidechain = data.get('isSidechain', False)
+
+        if not is_sidechain and msg_type not in _SKIP_CHAIN_TYPES:
+            parent = data.get('parentUuid')
+            if parent is not None and parent not in all_uuids and prev_uuid is not None:
+                data = dict(data)
+                data['parentUuid'] = prev_uuid
+                line = json.dumps(data, ensure_ascii=False)
+                fixed += 1
+
+        prev_uuid = data.get('uuid')
+        result.append((line, data))
+
+    return result, fixed
+
+
 def validate(messages: List[Tuple[str, Optional[dict]]]) -> dict:
-    """Validate: duplicate message.id==0, orphan tool_results, broken chains, JSON validity"""
-    # Check for duplicate message.id (id==0)
+    """Validate: duplicate message.id==0, orphan tool_results, broken chains,
+    orphan parent UUIDs, JSON validity"""
     msg_id_zero_count = 0
     tool_use_ids = set()
     orphan_tool_results = 0
     broken_chains = 0
+    orphan_parents = 0
     invalid_json = 0
     prev_uuid = None
+
+    # Pre-pass: collect all UUIDs for orphan-parent cross-reference
+    all_uuids = set()
+    for _, d in messages:
+        if d and d.get('uuid'):
+            all_uuids.add(d['uuid'])
 
     for line, data in messages:
         if data is None:
@@ -197,12 +248,16 @@ def validate(messages: List[Tuple[str, Optional[dict]]]) -> dict:
                     ]
                     orphan_tool_results += len(orphans)
 
-        # Check for broken chains
+        # Check for broken chains and orphan parent UUIDs
         if data.get('uuid') and not data.get('isSidechain'):
             msg_type = data.get('type', '')
             if msg_type not in _SKIP_CHAIN_TYPES:
-                if prev_uuid is not None and 'parentUuid' not in data:
+                if 'parentUuid' not in data and prev_uuid is not None:
                     broken_chains += 1
+                else:
+                    parent = data.get('parentUuid')
+                    if parent is not None and parent not in all_uuids:
+                        orphan_parents += 1
 
         prev_uuid = data.get('uuid')
 
@@ -210,6 +265,7 @@ def validate(messages: List[Tuple[str, Optional[dict]]]) -> dict:
         'duplicate_message_id_zero': msg_id_zero_count,
         'orphan_tool_results': orphan_tool_results,
         'broken_chains': broken_chains,
+        'orphan_parents': orphan_parents,
         'invalid_json': invalid_json,
     }
 
@@ -229,9 +285,9 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     if not dry_run:
         bak_file = Path(str(session_file) + '.bak')
         shutil.copy2(session_file, bak_file)
-        print(f"[1/6] Backup: {bak_file}")
+        print(f"[1/7] Backup: {bak_file}")
     else:
-        print(f"[1/6] Backup: (dry-run, skipped)")
+        print(f"[1/7] Backup: (dry-run, skipped)")
 
     # Step 2: dedup
     dedup_result = dedup_session(session_file, dry_run=dry_run)
@@ -241,9 +297,9 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     if not dry_run and 'output_file' in dedup_result:
         dedup_file = Path(dedup_result['output_file'])
         os.replace(dedup_file, session_file)
-        print(f"[2/6] dedup: {dedup_removed} duplicates removed, {dedup_fixed_chains} chains repaired -> applied")
+        print(f"[2/7] dedup: {dedup_removed} duplicates removed, {dedup_fixed_chains} chains repaired -> applied")
     else:
-        print(f"[2/6] dedup: {dedup_removed} duplicates removed, {dedup_fixed_chains} chains repaired (dry-run)")
+        print(f"[2/7] dedup: {dedup_removed} duplicates removed, {dedup_fixed_chains} chains repaired (dry-run)")
 
     # Reload file after dedup
     if not dry_run:
@@ -254,29 +310,36 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
 
     # Step 3: remove 400 errors
     messages, error_removed = remove_400_errors(messages)
-    print(f"[3/6] 400 error removal: {error_removed} (error lines + preceding user messages)")
+    print(f"[3/7] 400 error removal: {error_removed} (error lines + preceding user messages)")
 
     # Step 4: remove orphan tool_results
     messages, orphan_removed = remove_orphan_tool_results(messages)
-    print(f"[4/6] Orphan tool_result removal: {orphan_removed}")
+    print(f"[4/7] Orphan tool_result removal: {orphan_removed}")
 
-    # Step 5: repair broken chains
+    # Step 5: repair broken chains (missing parentUuid field)
     messages, chain_fixed = repair_chains(messages)
-    print(f"[5/6] Broken chain repair: {chain_fixed}")
+    print(f"[5/7] Broken chain repair: {chain_fixed}")
 
-    # Step 6: validate
+    # Step 6: repair orphan parent UUIDs (parentUuid value points to nonexistent message)
+    messages, orphan_parent_fixed = repair_orphan_parents(messages)
+    print(f"[6/7] Orphan parent repair: {orphan_parent_fixed}")
+
+    # Step 7: validate
     validation = validate(messages)
-    print(f"[6/6] Validation:")
+    print(f"[7/7] Validation:")
     print(f"  duplicate message.id=0: {validation['duplicate_message_id_zero']}")
     print(f"  orphan tool_results: {validation['orphan_tool_results']}")
     print(f"  broken chains: {validation['broken_chains']}")
+    print(f"  orphan parents: {validation['orphan_parents']}")
     print(f"  JSON parse errors: {validation['invalid_json']}")
 
     final_count = len(messages)
 
     # Save results
-    if not dry_run and (error_removed > 0 or orphan_removed > 0 or chain_fixed > 0):
-        with open(session_file, 'w') as f:
+    if not dry_run and (error_removed > 0 or orphan_removed > 0
+                        or chain_fixed > 0 or orphan_parent_fixed > 0):
+        # Symmetric with load_lines: utf-8 + surrogatepass for round-trip on Windows.
+        with open(session_file, 'w', encoding='utf-8', errors='surrogatepass') as f:
             for line, _ in messages:
                 f.write(line + '\n')
 
@@ -288,6 +351,7 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
         'error_removed': error_removed,
         'orphan_removed': orphan_removed,
         'chain_fixed': chain_fixed,
+        'orphan_parent_fixed': orphan_parent_fixed,
         'validation': validation,
     }
 
