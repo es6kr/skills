@@ -1,5 +1,7 @@
 # Antigravity WIP Tracking
 
+> ⚠️ **STALE — needs verification (flagged 2026-07-06).** The "AskUserQuestion emulation via `ask.md`" guidance below was written when the Antigravity agent had **no** native `AskUserQuestion` tool. Per the user, Antigravity **later added a native `AskUserQuestion` tool** (distinct from the Gemini CLI, which still lacks it). Before relying on the `ask.md` emulation, **verify the current Antigravity toolset** — if a native `AskUserQuestion` exists, prefer it and update this doc via `/skill-kit upgrade`. Do not treat the emulation steps below as authoritative until re-verified.
+
 Track in-session work progress using the `task.md` artifact file.
 
 ## Role & Principle
