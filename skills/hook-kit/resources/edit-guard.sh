@@ -29,6 +29,17 @@ fi
 HG_EDIT_HANGUL_RANGE="${HG_EDIT_HANGUL_RANGE:-[!-~]_NEVER_MATCH}"
 HG_EDIT_STUB_MARKERS="${HG_EDIT_STUB_MARKERS:-location pointer|Use .* instead|^type: *stub$|^stub: *true$|^pointer: *true$}"
 
+# Internal-host detection tokens are externalized the same way so the public
+# repo never embeds real internal hostnames. The git-ignored data file supplies
+# HG_EDIT_HOST_TOKENS; when absent it falls back to a pattern that never matches
+# (internal-domain detection no-ops gracefully rather than leaking tokens here).
+HOST_DATA_FILE="$(dirname "$0")/../data/host-patterns.regex"
+if [[ -f "$HOST_DATA_FILE" ]]; then
+  # shellcheck source=/dev/null
+  . "$HOST_DATA_FILE"
+fi
+HG_EDIT_HOST_TOKENS="${HG_EDIT_HOST_TOKENS:-_NEVER_MATCH_INTERNAL_HOST_}"
+
 INPUT=$(cat)
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
@@ -222,7 +233,7 @@ check_vendor_in_generic_skill() {
 
   # Pattern 3: Internal domains
   local p3
-  p3=$(echo "$NEW_CONTENT" | grep -nE '\b(es6\.kr|EMC-WAS|EMC-WEB|deps-emc|deps-dts|gitea\.es6|daegunsoft\.com)\b' | head -3)
+  p3=$(echo "$NEW_CONTENT" | grep -nE "\\b(${HG_EDIT_HOST_TOKENS})\\b" | head -3)
   [[ -n "$p3" ]] && violations="${violations}[internal domain]\n${p3}\n"
 
   # Pattern 4: Vendor MCP servers
