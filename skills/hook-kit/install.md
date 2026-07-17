@@ -157,7 +157,7 @@ Register the installed script in the settings.json hooks section:
 - Always active across all projects → `~/.claude/hooks/` + `~/.claude/settings.json`
 - Workspace/project-specific → `<workspace>/.claude/hooks/` + `<workspace>/.claude/settings.local.json`. Command must use `$CLAUDE_PROJECT_DIR/.claude/hooks/...` format
 
-**Violation case**: `~/ghq/github.com/daegunsoftDev/.claude/settings.local.json` registered with `"command": "bash .claude/hooks/block-compound-commands.sh"`. Hook fails with "No such file or directory" on every Bash call when cwd changes to `turborepo-web/`. User reported "hook skill improvement and fix" → install.md got HARD STOP path format rule + audit.md got settings.local.json + relative-path auto-detection.
+**Violation case**: `~/ghq/github.com/<org>/.claude/settings.local.json` registered with `"command": "bash .claude/hooks/block-compound-commands.sh"`. Hook fails with "No such file or directory" on every Bash call when cwd changes to a sub-project (e.g. `<repo>/`). User reported "hook skill improvement and fix" → install.md got HARD STOP path format rule + audit.md got settings.local.json + relative-path auto-detection.
 
 ### 5. Verify
 
@@ -219,9 +219,9 @@ rmdir <workspace>/.claude/hooks/   # remove if empty (or use /rmdirs skill)
 
 ### Example
 
-`~/ghq/github.com/daegunsoftDev/.claude/hooks/block-compound-commands.sh` was registered workspace-only, causing hook failures when cwd changed to a sub-project. Since global scope was intended:
+`~/ghq/github.com/<org>/.claude/hooks/block-compound-commands.sh` was registered workspace-only, causing hook failures when cwd changed to a sub-project. Since global scope was intended:
 
-1. `mv ~/ghq/.../daegunsoftDev/.claude/hooks/block-compound-commands.sh ~/.claude/skills/hook/resources/`
+1. `mv ~/ghq/github.com/<org>/.claude/hooks/block-compound-commands.sh ~/.claude/skills/hook/resources/`
 2. `cp ~/.claude/skills/hook/resources/block-compound-commands.sh ~/.claude/hooks/`
 3. `chmod +x ~/.claude/hooks/block-compound-commands.sh`
 4. Add entry to `~/.claude/settings.json` PreToolUse:Bash matcher

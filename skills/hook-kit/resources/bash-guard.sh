@@ -109,6 +109,17 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 # ── Common functions ──
 if command -v ggrep &>/dev/null; then GREP=ggrep; else GREP=grep; fi
 
+# Verify the resolved grep supports PCRE (-P). BSD/macOS grep does not; without a
+# working -P the destructive-command checks below ("$GREP -qiP … && block") exit
+# with an error and the "&&" short-circuits — the guard fails OPEN, silently
+# allowing rm -rf /, git reset --hard, etc. Fail CLOSED instead: a broken safety
+# guard must be loud, not silently bypassed. (No-op on hosts with GNU grep/ggrep.)
+if ! printf 'x' | $GREP -qP 'x' 2>/dev/null; then
+  echo "[Safety Hook] bash-guard: '$GREP' lacks PCRE (-P) support — the destructive-command guard cannot run." >&2
+  echo "Install GNU grep so a 'ggrep' with -P is on PATH (macOS: brew install grep). Blocking until fixed." >&2
+  exit 2
+fi
+
 block() {
   echo "[Safety Hook] BLOCKED: $1" >&2
   echo "Attempted command: $COMMAND" >&2

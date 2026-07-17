@@ -15,7 +15,7 @@
 # decision:block, no message) — a routine reap is not worth interrupting the
 # turn for. Fails open on any error (never blocks Stop).
 #
-# Safety — three joint criteria, all must hold before a process is killed:
+# Safety — four joint criteria, all must hold before a process is killed:
 #   1. Command matches the exact harness wrapper signature
 #      (shell-snapshots/snapshot-zsh) — a signature no real user process
 #      would ever incidentally match, so blast radius is contained to
@@ -28,6 +28,12 @@
 #   3. Process state starts with 'S' (sleeping/idle) — a genuinely
 #      still-computing process (state 'R') is never touched, regardless of
 #      age.
+#   4. No live child process — a leaked wrapper has already finished its
+#      payload and hangs on the trailing cwd-tracking builtin (no child),
+#      whereas a LIVE background job's wrapper still has its running payload
+#      as a child and is ALSO in state 'S' (blocked in wait()). State alone
+#      (criterion 3) cannot tell them apart, so a childless-wrapper gate is
+#      required to never reap an actively-running background job.
 #
 # Input (stdin): JSON { session_id, transcript_path, stop_hook_active }
 # Output (stdout): always empty — this hook never surfaces a message.
@@ -77,6 +83,12 @@ ps -eo pid=,stat=,etime=,command= 2>/dev/null | while IFS= read -r line; do
   esac
 
   [[ "$secs" -lt "$THRESHOLD_SECONDS" ]] && continue
+
+  # Liveness check (criterion 4) — never reap a wrapper that still has a live
+  # child: that child is a running background payload, so the wrapper's 'S'
+  # state is active-wait, not a leak. A leaked wrapper finished its payload and
+  # hangs on a builtin, so it has no children.
+  [[ -n "$(pgrep -P "$pid" 2>/dev/null)" ]] && continue
 
   kill "$pid" 2>/dev/null || true
 done
