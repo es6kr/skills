@@ -1,5 +1,9 @@
 # Suggestion Patterns
 
+## Cross-cutting rule — PR/issue references in options require the full URL (HARD STOP)
+
+**When any option disposes of a PR or issue, expose the clickable full URL (`https://github.com/<owner>/<repo>/pull/<N>`) in the question text or that option's description.** A bare "PR #N" — even with the repo name attached — is insufficient: the ask is a self-contained decision UI, and the user must be able to open and inspect the PR before deciding, without hunting through scroll-back. Applies to every "After PR" pattern below. Enforced by the `block-tasklist-id-in-conversation.sh` PR-URL gate (a PR reference with no PR URL anywhere in the questions payload is denied). Recurrence history: see failed-attempts.md (grep "bare PR").
+
 ## Cross-cutting rule — Minor-or-below severity bundling across PRs (HARD STOP)
 
 **When composing next-action options after a PR is consolidated / merged, do NOT recommend addressing that PR's Minor/Nitpick deferred findings as a standalone follow-up (single-PR batch).** Minor-or-below severity findings should be bundled across related PRs, not surfaced per-PR.
