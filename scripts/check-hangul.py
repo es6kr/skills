@@ -65,14 +65,22 @@ def _is_skill_dir(path: Path) -> bool:
     return (path / "SKILL.md").is_file()
 
 
-def _scan_dir(skill_dir: Path) -> list[tuple[Path, int, str]]:
-    """Return a list of (file, line_number, line_text) for every line with Hangul."""
+def _scan_dir(skill_dir: Path, tracked_files: set[Path] | None = None) -> list[tuple[Path, int, str]]:
+    """Return a list of (file, line_number, line_text) for every line with Hangul.
+
+    When ``tracked_files`` is given (resolved paths from ``git ls-files``), only
+    those files are scanned — untracked working files and gitignored locale data
+    (e.g. a skill's ``data/`` dir) are not publish material and must not trip
+    the gate. ``None`` (not in a git repo) falls back to scanning everything.
+    """
     matches: list[tuple[Path, int, str]] = []
     for root, _dirs, files in os.walk(skill_dir):
         for name in files:
             if not name.endswith(SCAN_EXTS):
                 continue
             file_path = Path(root) / name
+            if tracked_files is not None and file_path.resolve() not in tracked_files:
+                continue
             try:
                 with file_path.open("r", encoding="utf-8", errors="replace") as fh:
                     for lineno, line in enumerate(fh, start=1):
@@ -82,6 +90,38 @@ def _scan_dir(skill_dir: Path) -> list[tuple[Path, int, str]]:
                 print(f"WARN: could not read {file_path}: {exc}", file=sys.stderr)
     matches.sort(key=lambda m: (str(m[0]), m[1]))
     return matches
+
+
+def _tracked_files(*roots: Path) -> set[Path] | None:
+    """Return resolved paths of git-tracked files under ``roots``, or None when
+    git is unavailable / outside a repo (caller falls back to scanning all)."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "-z", "--", *[str(r) for r in roots]],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except (OSError, FileNotFoundError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        repo_root = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", check=False,
+        ).stdout.strip()
+        base = Path(repo_root) if repo_root else Path.cwd()
+    except (OSError, FileNotFoundError):
+        base = Path.cwd()
+    return {
+        (base / entry).resolve()
+        for entry in proc.stdout.split("\0")
+        if entry.strip()
+    }
 
 
 def _tracked_skill_names(parent: Path) -> set[str] | None:
@@ -179,10 +219,11 @@ def _resolve_targets(argv: list[str]) -> list[Path]:
 def main(argv: list[str]) -> int:
     targets = _resolve_targets(argv)
     has_hangul = False
+    tracked = _tracked_files(*targets) if targets else None
 
     for skill_dir in targets:
         name = skill_dir.name or str(skill_dir)
-        matches = _scan_dir(skill_dir)
+        matches = _scan_dir(skill_dir, tracked)
         if matches:
             has_hangul = True
             print(f"{RED}✗{NC} {name} — {len(matches)} Korean lines found")
