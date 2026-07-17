@@ -4,8 +4,10 @@ name: branch-tag-adjudication
 # targeting these branches must obey the tag/branch policy below.
 #
 # Policy summary:
-# - next-feat: feat commits allowed. fix / chore commits allowed ONLY when the
-#   same PR also contains a feat commit touching the same skill.
+# - next-feat: feat commits allowed. fix / chore commits allowed when the same
+#   PR also contains a feat commit touching the same skill, OR when the skill
+#   already has a feat commit merged into next-feat's history (shipped in an
+#   earlier PR, possibly not yet cascaded to main).
 # - next-fix: fix commits allowed. chore commits allowed ONLY when the same PR
 #   also contains a fix commit touching the same skill. feat is always REJECTED.
 # - Any commit touching skills/**/*.md with tag chore or docs is REJECTED —
@@ -68,6 +70,32 @@ jobs:
               | grep -oE '^(feat|fix|perf|refactor|docs|chore|ci|test|style)(\([^)]+\))?!?:' \
               | grep -oE '^[a-z]+' \
               || echo "other"
+          }
+
+          # Whether a skill already has a feat commit merged into the base
+          # branch's history (i.e. it shipped in an earlier PR before this
+          # one, possibly not yet cascaded to main). Lets a fix/chore rider
+          # ride on a feat that already landed, not just one bundled in the
+          # same PR. Cached per skill since the second pass may re-check the
+          # same skill across multiple commits.
+          declare -A MERGED_FEAT_CACHE
+          skill_has_merged_feat() {
+            local skill="$1"
+            if [ -n "${MERGED_FEAT_CACHE[$skill]+x}" ]; then
+              [ "${MERGED_FEAT_CACHE[$skill]}" = "1" ]
+              return
+            fi
+            local found=0
+            local sha subject tag
+            while read -r sha subject; do
+              tag=$(get_tag "$subject")
+              if [ "$tag" = "feat" ]; then
+                found=1
+                break
+              fi
+            done < <(git log --format='%H %s' "$BASE_SHA" -- "$skill")
+            MERGED_FEAT_CACHE["$skill"]="$found"
+            [ "$found" = "1" ]
           }
 
           # We collect two things per commit:
@@ -145,11 +173,14 @@ jobs:
                     # Always OK — this is the intended tag for this branch.
                     ;;
                   fix|chore)
-                    # Allowed only when the same PR contains a feat commit for
-                    # the same skill (i.e. we are shipping a topic addition and
-                    # a fix/chore comes as a natural rider).
-                    if [ "${PR_SKILL_HAS[${SKILL}__feat]:-0}" != "1" ]; then
-                      echo "::error::next-feat branch: commit $SHA (skill=$SKILL, tag=$TAG) rejected. Same-skill feat commit not present in this PR."
+                    # Allowed when the same PR contains a feat commit for the
+                    # same skill (i.e. we are shipping a topic addition and a
+                    # fix/chore comes as a natural rider), OR when the skill
+                    # already has a feat commit merged into next-feat's
+                    # history (a fix/chore rider on a feat that shipped in an
+                    # earlier PR, before cascading to main).
+                    if [ "${PR_SKILL_HAS[${SKILL}__feat]:-0}" != "1" ] && ! skill_has_merged_feat "$SKILL"; then
+                      echo "::error::next-feat branch: commit $SHA (skill=$SKILL, tag=$TAG) rejected. No feat commit for '$SKILL' in this PR, and none found already merged into next-feat."
                       FAIL=1
                     fi
                     ;;
