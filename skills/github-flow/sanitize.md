@@ -202,7 +202,7 @@ Recorded violation pattern: a PUBLIC-repo issue contained user session UUIDs, ra
 grep -E '<workspace-name>/\.claude/|<repo-name>/\.claude/rules/|~/\.claude/skills/|~/\.agents/|\.ralph/|\.omc/' <body>
 
 # 2. Internal RFC1918 IP / hosts
-grep -E '10\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|EMC-|deps-(emc|dts|epe|daegun)' <body>
+grep -E '10\.[0-9]+\.[0-9]+\.[0-9]+|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|<internal-host-prefix>' <body>
 
 # 3. User home / personal path
 grep -E '/Users/[a-z]+|/home/[a-z]+|C:/Users/' <body>
