@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/todowrite-v0.4.0...todowrite-v0.5.0) (2026-07-17)
+
+
+### Features
+
+* promote next-feat to main (hook-kit, github-flow, claude-session, todowrite, claudify, cleanup) ([7c598eb](https://github.com/es6kr/skills/commit/7c598ebdbfdb21cf421e8f814ea1a2513ad27a58))
+* **todowrite:** add conversation-id, fix-plan-sync, media-separation topics ([5e520ae](https://github.com/es6kr/skills/commit/5e520ae5834fb8d550865535092dc6534612cf32))
+* **todowrite:** add priority-prefix topic ([#80](https://github.com/es6kr/skills/issues/80)) ([9ff13f7](https://github.com/es6kr/skills/commit/9ff13f7db4ffb1db1ac6e3bace4aff0bf7c495d1))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/todowrite-v0.3.0...todowrite-v0.4.0) (2026-07-07)
 
 

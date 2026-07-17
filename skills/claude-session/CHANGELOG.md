@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/claude-session-v0.4.0...claude-session-v0.5.0) (2026-07-17)
+
+
+### Features
+
+* **claude-session:** add dual-sync topic ([35b33c8](https://github.com/es6kr/skills/commit/35b33c8a900e0d019b6cf9aae8f503c2ad23964e))
+* **claude-session:** add media-separation gate to memory-trim topic ([94bd22f](https://github.com/es6kr/skills/commit/94bd22fb501dec3f6feecf74dc54225aca563ace))
+* **claude-session:** add memory-trim topic + trim-memory-index script ([abc92cc](https://github.com/es6kr/skills/commit/abc92cc70249aaaa67c350e8f0347bc0da740f32))
+* **claude-session:** memory-trim topic + trim-memory-index script ([0b9f4aa](https://github.com/es6kr/skills/commit/0b9f4aaece421741444c0f93d239c875a21976a8))
+* promote next-feat to main (hook-kit, github-flow, claude-session, todowrite, claudify, cleanup) ([7c598eb](https://github.com/es6kr/skills/commit/7c598ebdbfdb21cf421e8f814ea1a2513ad27a58))
+
+
+### Bug Fixes
+
+* **claude-session:** genericize dual-sync memory-path example ([32ddd60](https://github.com/es6kr/skills/commit/32ddd60259189f9e8ba0dbe3482f42bc5fcd9015))
+* **claude-session:** harden repair/rename/dedup session scripts ([9be0298](https://github.com/es6kr/skills/commit/9be0298078b5ee97ac30bcd904842c870e706712))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/claude-session-v0.3.1...claude-session-v0.4.0) (2026-07-07)
 
 
