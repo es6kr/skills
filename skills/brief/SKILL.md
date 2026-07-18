@@ -15,3 +15,4 @@ Compose plain text messages to share with team members.
 | Topic | Description |
 |-------|-------------|
 | [compose](compose.md) | Take a situation/context and produce a plain text message ready for chat |
+| [email](email.md) | Email draft formatting rules — Markdown constraints for Outlook/Hanmail compatibility |
