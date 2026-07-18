@@ -90,12 +90,15 @@ After cleanup, scan the remaining items (`pending` + `in_progress`). For any tas
 
 ### Recovery procedure
 
+**Step 0 — primary-source check for externally-verifiable completion (HARD STOP)**: if the task's completion produces an external, non-rewindable side-effect — a pushed branch, an open/merged PR, a deployed image, an archived/published file — query that side-effect **before** reading any checklist: `gh pr view <N> --json state,mergedAt` / `gh pr list --head <branch>` / `git ls-remote --heads origin <branch>` / `gh run list` / `ls <archived-path>`. If it shows the work is already done, the task is **completed** regardless of what `fix_plan` / `checklist` text says. A rewind or compact reverts tracker text and TaskList status but never the external effect, so the tracker can read "awaiting / remaining" on already-finished work. Mark it completed and do not surface it as remaining in Step 2.
+
 1. Locate the checklist media: `fix_plan.md` / `checklist.md` (workspace root or the project's tracker directory), plus any file the task subject names
 2. Grep the task's key noun(s) in those files → Read only the matching section (Why / How / `[BLOCKED]` label / trigger / progress notes)
 3. Map the recovered state into Step 2:
 
 | Recovered checklist state | Step 2 handling |
 |---------------------------|-----------------|
+| External side-effect present (PR pushed/open/merged, branch on origin, file archived) but checklist reads `[ ]` / "awaiting" | **Primary source wins** — the checklist text is stale (rewind/compact desync). Mark the task completed; do NOT present it as remaining |
 | `[x]` completed in checklist | Completion-sync candidate — mark the task completed/deleted instead of asking direction |
 | `[ ] [BLOCKED]` with trigger | Default option = Defer to checklist (or drop the duplicate task if already recorded there) |
 | `[ ]` open with Why/How recorded | Quote the recorded Why/How in the option description so the user decides from facts |
@@ -106,15 +109,17 @@ After cleanup, scan the remaining items (`pending` + `in_progress`). For any tas
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Compose the Step 2 direction ask from the bare task subject when its state is not verifiable in context | Grep/Read the checklist media first; embed the recovered state in the option descriptions |
-| 2 | Ask the user "what was this task about?" when fix_plan/checklist already records it | The tracker is the primary source — recover first, ask direction second |
+| 2 | Ask the user "what was this task about?" when fix_plan/checklist already records it | The tracker records intent — but for externally-verifiable completions the external side-effect (gh/git/fs) is the authoritative state; check it first, then recover the rest from the tracker, ask direction last |
+| 5 | Trust `fix_plan` / `checklist` `[ ]` / "awaiting" text for a task with an external side-effect (PR / branch / deploy / archived file) | Verify the side-effect at its primary source (`gh pr view`, `git ls-remote`, `gh run list`, `ls`) first — a rewind/compact can leave the tracker stale while GitHub/filesystem show the work already done |
 | 3 | Skip the lookup because "the compact summary probably covers it" | The summary is lossy. Post-compact, any task not explicitly re-verified counts as context-opaque |
 | 4 | Read every checklist end-to-end for every task | Targeted Grep by task keywords → Read only the matching sections |
 
 ### Self-check (before composing the Step 2 ask)
 
 1. For each remaining item: can I state its current status from in-context evidence? — If no, it is context-opaque → run the recovery procedure
-2. Did any recovered state show `[x]` / `[BLOCKED]`? — Apply the mapping table before including the item in the ask
-3. Do my Step 2 option descriptions carry recovered facts (not subject-line paraphrases)?
+2. Does any remaining item have an external side-effect (pushed branch, PR, deploy, archived/published file)? — If yes, I ran Step 0 and verified it at its primary source (`gh`/`git`/`fs`) before calling it remaining, NOT from `fix_plan` text alone
+3. Did any recovered state show `[x]` / `[BLOCKED]` / a completed side-effect? — Apply the mapping table (primary-source row first) before including the item in the ask
+4. Do my Step 2 option descriptions carry recovered facts (not subject-line paraphrases)?
 
 ## Step 2. Per-item direction ask
 
