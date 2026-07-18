@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "bare convert", "multi-account clone", "core.sshCommand", "Repository not found", "worktree create" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), conflict-dry-run (isolated worktree merge/cherry-pick test), credential-helper (per-org HTTPS token pin for multi-account), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "multi-account clone", "core.sshCommand", "Repository not found", "credential helper", "wrong account", "worktree create", "merge conflict test", "cherry-pick dry run" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -28,6 +28,8 @@ Git repository management and SourceGit GUI client integration.
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | clone | ghq get with automatic SourceGit registration (multi-account support) | [clone.md](./clone.md) |
+| conflict-dry-run | test merge/cherry-pick applicability in an isolated worktree, without touching the main working tree | [conflict-dry-run.md](./conflict-dry-run.md) |
+| credential-helper | pin a per-org GitHub token for HTTPS remotes (fixes recurring `Repository not found` from active-account mismatch); HTTPS counterpart to ssh-key | [credential-helper.md](./credential-helper.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
@@ -53,6 +55,8 @@ worktree-register (shared metadata register/relink mechanism)
   └─← to-bare (link the working tree after a regular→bare conversion)
 
 to-bare  ←inverse→  to-ghq (formerly `migrate`)
+
+ssh-key (SSH multi-account)  ──counterpart──  credential-helper (HTTPS multi-account)
 ```
 
 ## Worktree decision tree (HARD STOP — every time a worktree is needed)
@@ -62,11 +66,18 @@ to-bare  ←inverse→  to-ghq (formerly `migrate`)
 ### Flow
 
 1. `git -C <repo> worktree list` to enumerate existing worktrees
-2. Identify inactive candidates:
+2. **Operation-state gate (HARD STOP — before any inactive classification)**: for each candidate worktree `<W>`, check for an in-progress git operation:
+   ```bash
+   gitdir=$(git -C <W> rev-parse --git-dir)
+   ls "$gitdir"/CHERRY_PICK_HEAD "$gitdir"/MERGE_HEAD "$gitdir"/REBASE_HEAD "$gitdir"/BISECT_LOG "$gitdir"/rebase-merge "$gitdir"/rebase-apply 2>/dev/null
+   git -C <W> status --porcelain | grep -E '^(DD|AU|UD|UA|DU|AA|UU)'   # unmerged index entries
+   ```
+   Any hit = a cherry-pick/merge/rebase/bisect is **mid-flight** (likely the user's active operation) → the worktree is **NOT an inactive candidate**, its dirty files are the operation's payload (never offer discard / `git add` resolution / stash), and reuse is forbidden — report to the user instead. Merge-status heuristics (branch merged + ahead=0) do NOT override this gate. (see failed-attempts.md "cherry-pick in progress misclassified as abandoned")
+3. Identify inactive candidates (only among worktrees that passed the gate):
    - **Merged-PR worktrees** (commit hash equals the base branch's merge commit)
    - **Stale fix/refactor branch worktrees** (confirm with the user)
-3. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
-4. If no inactive worktree exists or the user opts for new → `git worktree add`
+4. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
+5. If no inactive worktree exists or the user opts for new → `git worktree add`
 
 ### New-commit-start trigger (HARD STOP — paired with git.md)
 
@@ -136,10 +147,11 @@ git status (check for other changes)
 ### Self-check (before any worktree work)
 
 1. Did you call `git -C <repo> worktree list`?
-2. Does any worktree in the output match (a) the same commit as HEAD or (b) a merge commit hash? → inactive candidate
-3. If inactive candidates exist, include both the new-add option and the reuse option in AskUserQuestion
-4. **Is the Recommended marker attached to the reuse option?** (apply the "Recommended placement rule" table)
-5. Use new-add only when 0 inactive candidates exist OR the user explicitly chose new
+2. **Did you run the operation-state gate (Flow step 2) on every candidate?** A worktree with `CHERRY_PICK_HEAD`/`MERGE_HEAD`/`REBASE_HEAD` or unmerged status codes (DU/UU/AA…) is mid-operation → excluded from candidates, no discard/stash options for its files
+3. Does any gated worktree match (a) the same commit as HEAD or (b) a merge commit hash? → inactive candidate
+4. If inactive candidates exist, include both the new-add option and the reuse option in AskUserQuestion
+5. **Is the Recommended marker attached to the reuse option?** (apply the "Recommended placement rule" table)
+6. Use new-add only when 0 inactive candidates exist OR the user explicitly chose new
 
 ### Typical failure mode
 
