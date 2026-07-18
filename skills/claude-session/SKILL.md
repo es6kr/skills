@@ -1,11 +1,11 @@
 ---
-depends-on: [utcp]
 name: claude-session
 description: |
   Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (UTCP/code-mode), destroy, install (hook), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "session list", "session search", "session classify", "session compress", "session migrate", "session move", "session repair", "session rename", "session split", "session purge", "session url", "session analyze", "session import", "session summarize", "session archive", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session"
 metadata:
   author: es6kr
   version: "0.1.5"
+depends-on: [utcp]
 ---
 
 # Session
