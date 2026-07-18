@@ -6,10 +6,10 @@
 
 Move = **two artifacts from one `[x]` entry**:
 
-1. **Body → RAG receiver** (vendor-agnostic dispatch — see "RAG dispatch" section below). Full Progress entry body (sub-bullets, commit hashes, session IDs, verification logs) is stored externally for semantic recall.
+1. **Body → RAG receiver** (vendor-agnostic dispatch — see "RAG dispatch" section below). Full Progress entry body (sub-bullets, commit hashes, session IDs, model name, verification logs) is stored externally for semantic recall.
 2. **Summary → Completed section**. One-line chronological summary (verb + result) replaces the moved entry in the file.
 
-Keep the Completed file minimal — detailed steps, commit hashes, and session IDs **belong in RAG, not in the file**. The Completed line is a pointer; the body lives in RAG.
+Keep the Completed file minimal — detailed steps, commit hashes, session IDs, and model name **belong in RAG, not in the file**. The Completed line is a pointer; the body lives in RAG.
 
 **Completed Lifecycle Rule (HARD STOP)**: The `## Completed` section in the active tracker file is a **temporary holding area** only. It does not accumulate indefinitely.
 - **Cycle**: Completed item added → Archived to `.bak/` partition file (and index to RAG) at the end of the current period (weekly/monthly) → **Deleted permanently from the active tracker file**.
@@ -20,7 +20,7 @@ Keep the Completed file minimal — detailed steps, commit hashes, and session I
 
 ```markdown
 # Before (Progress)
-- [x] proxy.ts basePath redirect fix → image build / deploy (2026-03-15 17:30 completed: Session xxxxxxxx, commit a1b2c3d4)
+- [x] proxy.ts basePath redirect fix → image build / deploy (2026-03-15 17:30 completed: Session xxxxxxxx, model claude-sonnet-4-6, commit a1b2c3d4)
   - proxy.ts `new URL` × 5 fixed **complete**
   - callback/route.ts, logout/route.ts edited **complete**
   - Dockerfile ARG BASE_PATH added **complete**
@@ -42,7 +42,7 @@ Keep the Completed file minimal — detailed steps, commit hashes, and session I
 | Deduplicate | If a similar entry already exists in Completed, update it instead of adding a duplicate |
 | Sort order | Completed is **chronological ascending**. Insert at sort position |
 | Timestamp | `YYYY-MM-DD HH:mm —` prefix required. **`HH:mm` mandatory** |
-| Reference | Do NOT include commit hashes or session IDs. These are cataloged in RAG. If applicable, keep only the PR or Issue number (e.g. `(PR #N)`). |
+| Reference | Do NOT include commit hashes, session IDs, or model name. These are cataloged in RAG. If applicable, keep only the PR or Issue number (e.g. `(PR #N)`). |
 | No `[x]` marker | Completed uses `-` followed by a space (no checkbox) |
 
 ## PR-level item
