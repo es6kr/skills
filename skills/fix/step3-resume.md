@@ -179,6 +179,25 @@ Do not use a different medium than what the user reported as a detour. Reproduce
 
 (Case history: a verification reported "complete" after checking only login + dashboard load, while the user-reported API itself still reproduced the error — see failed-attempts.md "verification scope reduction".)
 
+**Forbid declaring the primary ask "unrecoverable"/done and pivoting to a secondary deliverable before exhausting known recovery avenues (HARD STOP)**:
+
+When the user's concrete ask is "get X back" / "make Y work again" (data recovery, restoring a broken state, undoing a loss) and a first pass of checks comes up empty, do not declare it "irrecoverable" and move the conversation to a secondary deliverable (a tooling improvement so it won't happen again, a commit, a PR, a doc) as if that discharges the ask. A secondary deliverable is real work, but it is not a substitute progress report for an open primary ask — and moving straight into further tool actions (commit/push/PR) right after a partial-effort "unrecoverable" conclusion reads to the user as abandoning their actual problem for busywork.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run 1-2 checks (e.g. grep one directory, diff one backup), find nothing, declare "genuinely unrecoverable", then pivot to fixing the tool/process | Enumerate every recovery avenue you already know exists (RAG/semantic index, other synced machines/sync-conflict copies, other backup mechanisms) and actually run each one before concluding "unrecoverable" |
+| 2 | Write the recovery-avenue list into a rule/skill as "only check this if the user asks for more" | If you know a channel might hold the answer, try it now, in the same turn — don't gate it behind a future explicit ask. Deferring your own known checks to "if user asks" reproduces the same partial-effort pattern the user is angry about |
+| 3 | Treat "I improved the tool so this discloses better next time" as resolving this turn's ask | Ship the tooling fix if warranted, but state plainly, separately, and first: "the recovery avenues I checked (list them) all came up empty for THIS session — here's what's still possible / here's what's truly gone" |
+| 4 | After a user gets angry that "the problem isn't solved," respond by explaining the git/PR actions you just took | Respond by doing more recovery work (or, if genuinely exhausted, restating precisely what was tried and why nothing more can be tried) — not by re-justifying the secondary deliverable |
+
+**Self-check (every time before declaring something unrecoverable / done)**:
+1. What is the user's literal, concrete ask? (not the reframed/tooling version of it)
+2. List every recovery avenue you are aware could exist for this class of problem (RAG/semantic search, other machines, other backup mechanisms, alternate reconstruction paths) — did you actually run all of them, or only the first 1-2 that came to mind?
+3. Are you about to pivot to a secondary deliverable (tooling fix, commit, PR, doc) while the primary ask's channel list is only partially checked? → Finish the channel list first
+4. Does your next message lead with the primary ask's status, or does it lead with the secondary deliverable? → Primary ask status must come first, plainly
+
+(Case history: after confirming a session's compact-boundary parentUuid was already unrecoverable via 2 local checks, this deliverable pivoted straight to a tooling-disclosure fix, commit, push, and draft PR without ever checking the RAG/Qdrant index for the same session's pre-break content — the user's actual ask was still open. See failed-attempts.md "premature unrecoverable declaration + pivot to secondary deliverable".)
+
 **Step 3 mandatory self-questions (MANDATORY before marking fix-2 complete)**:
 1. Did Why analysis identify a "skipped intermediate step"? → If yes, that step is fix-2's **immediate execution target**
 2. Can that step **run standalone now (stateless)?** → If yes, run it unconditionally. "Original work is done, skip" is a violation
