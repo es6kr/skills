@@ -76,6 +76,46 @@ Remove stale items immediately. The goal is to take them out of the selectable l
 | Claude Code | `TaskList` → identify deletion targets → call `TaskUpdate(taskId, status: "deleted")` for each |
 | Antigravity | Read `task.md` → identify lines to delete → remove those lines via `replace_file_content` |
 
+## Step 1.5. Checklist state recovery — context-opaque tasks (MANDATORY before Step 2)
+
+After cleanup, scan the remaining items (`pending` + `in_progress`). For any task whose current state **cannot be verified from the in-context conversation** — post-compact resume, an item inherited from a prior session, or a subject referencing work not visible in context — recover its state from the checklist media (`fix_plan.md` / `checklist.md`) **before composing the Step 2 ask**. Do not guess from the bare task subject, and do not ask the user to re-explain what the tracker already records.
+
+### Trigger — a task is context-opaque when any of these hold
+
+| Signal | Example |
+|--------|---------|
+| Session resumed from a compact and the task predates the summary | Subject references a PR / file / decision absent from visible context |
+| The subject alone does not tell whether the work is done, partial, or blocked | "deploy verification", "sync branch policy" with no in-context trail |
+| The subject cites an artifact not read this session | "fix_plan item: ...", "PR follow-up" with no PR state in context |
+
+### Recovery procedure
+
+1. Locate the checklist media: `fix_plan.md` / `checklist.md` (workspace root or the project's tracker directory), plus any file the task subject names
+2. Grep the task's key noun(s) in those files → Read only the matching section (Why / How / `[BLOCKED]` label / trigger / progress notes)
+3. Map the recovered state into Step 2:
+
+| Recovered checklist state | Step 2 handling |
+|---------------------------|-----------------|
+| `[x]` completed in checklist | Completion-sync candidate — mark the task completed/deleted instead of asking direction |
+| `[ ] [BLOCKED]` with trigger | Default option = Defer to checklist (or drop the duplicate task if already recorded there) |
+| `[ ]` open with Why/How recorded | Quote the recorded Why/How in the option description so the user decides from facts |
+| Not found in any checklist | Say so in the ask ("no checklist trace") — the user may hold context the tracker lacks |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compose the Step 2 direction ask from the bare task subject when its state is not verifiable in context | Grep/Read the checklist media first; embed the recovered state in the option descriptions |
+| 2 | Ask the user "what was this task about?" when fix_plan/checklist already records it | The tracker is the primary source — recover first, ask direction second |
+| 3 | Skip the lookup because "the compact summary probably covers it" | The summary is lossy. Post-compact, any task not explicitly re-verified counts as context-opaque |
+| 4 | Read every checklist end-to-end for every task | Targeted Grep by task keywords → Read only the matching sections |
+
+### Self-check (before composing the Step 2 ask)
+
+1. For each remaining item: can I state its current status from in-context evidence? — If no, it is context-opaque → run the recovery procedure
+2. Did any recovered state show `[x]` / `[BLOCKED]`? — Apply the mapping table before including the item in the ask
+3. Do my Step 2 option descriptions carry recovered facts (not subject-line paraphrases)?
+
 ## Step 2. Per-item direction ask
 
 After Step 1, ask the direction for each remaining incomplete item (`pending` + `in_progress`).
@@ -139,6 +179,7 @@ Step 3 is a **loop**, not a single action. After each "Proceed" item completes �
 | 2 | Treat "the item I just drove via a sub-skill" as the whole batch | Batch = all items marked Proceed in Step 2. One done ≠ batch done |
 | 3 | All Proceed items done → stop with a report | Batch exhausted → invoke `Skill("next")` for next-action options |
 | 4 | Dispatch a background agent for one item → end the turn "waiting for the agent" while other pending/follow-up items are drivable | Background dispatch returns control to the loop at once — drive the next drivable item in the same turn (the agent's completion re-invokes the session by itself). Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached |
+| 5 | Treat multiSelect-unselected ask items as "declined" → declare drivable=0 and idle through a long background wait | Unselected multiSelect items are **deferred, not declined** — they are the first fill candidates for an idle window (drive risk-free local ones; re-ask gated ones). When genuinely nothing is drivable and the expected wait exceeds the cache window, never arm one long silent watcher — use short cycles (`timeout` ≤ 240 s, end → notify → re-arm). Enforced by the idle-wait Stop hook (`block-idle-wait-without-short-cycle.sh`) |
 
 **Self-check (every time a sub-skill returns OR an item is marked completed inside Step 3):**
 1. Are there Proceed items not yet driven? → Yes: start the next one in this turn (no report-and-stop)
@@ -203,6 +244,9 @@ Execution tasks (work to do now) come **first (top)**, hold tasks last. Because 
 Step 1: Cleanup (immediate, no ask)
   ├─ Claude: TaskList → TaskUpdate(status:"deleted") × N
   └─ Antigravity: task.md → replace_file_content
+  ↓
+Step 1.5: Checklist state recovery (context-opaque tasks only)
+  └─ Grep/Read fix_plan.md / checklist.md → feed recovered state into Step 2
   ↓
 Step 2: Per-item direction ask
   ├─ Claude: AskUserQuestion (questions array, 1 question per task, max 4)

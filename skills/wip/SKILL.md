@@ -1,5 +1,6 @@
 ---
 name: wip
+depends-on: [next]
 description: |
   Track in-session work progress. Register steps for 3+ step tasks, update status per step, handle completion/abort.
   On /wip invocation, when remaining tasks exist, AskUserQuestion is required for the per-item direction (proceed / split / merge / hold / defer-to-checklist / delete) — asking only about start priority is forbidden.
@@ -82,8 +83,9 @@ Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then 
 **Follow the 3 steps in [resume.md](./resume.md)** in order:
 
 1. **Cleanup**: immediately delete stale completed/in_progress entries (no user confirmation required)
-2. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / defer-to-checklist / delete
-3. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
+2. **Checklist state recovery** (Step 1.5): for tasks whose state cannot be verified from the in-context conversation (post-compact / inherited items), Grep/Read `fix_plan.md` / `checklist.md` to recover their state before asking
+3. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / defer-to-checklist / delete
+4. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
 
 ### Step 1 (alt) — Registration path (Registration mode)
 
@@ -111,7 +113,7 @@ Environment implementations:
 
 ### Resume (environment-agnostic)
 
-`/wip` or "task cleanup + remaining work" → Step 1 cleanup → Step 2 per-item direction ask → Step 3 execute. Per-environment tooling lives in claude / antigravity.
+`/wip` or "task cleanup + remaining work" → Step 1 cleanup → Step 1.5 checklist state recovery (context-opaque tasks) → Step 2 per-item direction ask → Step 3 execute. Per-environment tooling lives in claude / antigravity.
 
 See [detailed guide](./resume.md).
 
