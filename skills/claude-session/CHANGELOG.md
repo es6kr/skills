@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/claude-session-v0.5.0...claude-session-v0.5.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **claude-session,consolidate,next:** promote next-fix staging ([902cfa5](https://github.com/es6kr/skills/commit/902cfa57de68d9f5487425b524ffa4441f81f302))
+* **claude-session:** declare depends-on utcp ([#121](https://github.com/es6kr/skills/issues/121)) ([377ea9c](https://github.com/es6kr/skills/commit/377ea9cf86eb9dd89ea2abf7443d291301bd6656))
+* **claude-session:** disclose null-rooted orphan-parent repairs in session repair ([#118](https://github.com/es6kr/skills/issues/118)) ([6f01ffc](https://github.com/es6kr/skills/commit/6f01ffcb1056527bee3c82123f401ff46b91daba))
+* **claude-session:** preserve chain topology in session repair dedup ([#108](https://github.com/es6kr/skills/issues/108)) ([0ae92cf](https://github.com/es6kr/skills/commit/0ae92cfff1f5d1b6dd387dcd2a83437bc589e265))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/claude-session-v0.4.0...claude-session-v0.5.0) (2026-07-17)
 
 

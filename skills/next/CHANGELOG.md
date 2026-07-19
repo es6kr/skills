@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/next-v0.5.0...next-v0.5.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **claude-session,consolidate,next:** promote next-fix staging ([902cfa5](https://github.com/es6kr/skills/commit/902cfa57de68d9f5487425b524ffa4441f81f302))
+* **next:** add operational-failure precedence gate to suggestion-patterns ([448e3ca](https://github.com/es6kr/skills/commit/448e3caf688b0eb37c2bd5281c3c28640378ec8e))
+* **next:** add populated-backlog precedence gate to ask-gates Step 0.7 ([5e01f88](https://github.com/es6kr/skills/commit/5e01f886b167ddce8fb871d077195cd45295cc69))
+* **next:** operational-failure + populated-backlog precedence gates ([45a5b11](https://github.com/es6kr/skills/commit/45a5b1153f37e30d32d1350b86a64c8da03ffb20))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/next-v0.4.4...next-v0.5.0) (2026-07-07)
 
 
