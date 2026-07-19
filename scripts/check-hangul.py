@@ -68,7 +68,9 @@ def _is_skill_dir(path: Path) -> bool:
 def _scan_dir(skill_dir: Path) -> list[tuple[Path, int, str]]:
     """Return a list of (file, line_number, line_text) for every line with Hangul."""
     matches: list[tuple[Path, int, str]] = []
-    for root, _dirs, files in os.walk(skill_dir):
+    for root, dirs, files in os.walk(skill_dir):
+        if "data" in dirs:
+            dirs.remove("data")
         for name in files:
             if not name.endswith(SCAN_EXTS):
                 continue

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # local-to-staging-pr.sh — cherry-pick a commit from the local branch to a
-# staging branch (next-feat/next-fix) feature branch, push, and open a draft PR.
+# staging branch (next-feat/next-fix) feature branch, and print manual commands to push and open a draft PR.
 #
 # Encodes the es6kr/skills "2-tier review model" flow (see the
 # agents-local-branch-nopush.md workspace rule's staging-flow procedure):
@@ -55,7 +55,10 @@ else
 fi
 
 if [[ -z "$BRANCH_OVERRIDE" ]]; then
-  SLUG=$(echo "$SUBJECT" | sed -E 's/^[a-z]+(\([a-z0-9_-]+\))?:\s*//' | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed -E 's/-+/-/g; s/^-|-$//g' | cut -c1-40)
+  SLUG=$(echo "$SUBJECT" | sed -E 's/^[a-z]+(\([a-z0-9_-]+\))?:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed -E 's/-+/-/g; s/^-|-$//g' | cut -c1-40)
+  if [[ -z "$SLUG" ]]; then
+    SLUG="pr-cherry-pick-${SHA:0:7}"
+  fi
   BRANCH="${TAG}/${SLUG}"
 else
   BRANCH="$BRANCH_OVERRIDE"
@@ -91,20 +94,33 @@ if [[ -d "$WT_DIR" ]]; then
   exit 1
 fi
 
+CLEANUP_REQUIRED=0
+cleanup_worktree() {
+  if [[ -d "${WT_DIR:-}" ]] && [[ "${CLEANUP_REQUIRED:-0}" -eq 1 ]]; then
+    echo "Cleaning up dangling worktree at $WT_DIR..." >&2
+    git worktree remove "$WT_DIR" --force 2>/dev/null || true
+    git branch -D "$BRANCH" 2>/dev/null || true
+  fi
+}
+trap cleanup_worktree EXIT INT TERM
+
+CLEANUP_REQUIRED=1
 git worktree add "$WT_DIR" -b "$BRANCH" "origin/$BASE"
 
 # LC_ALL=C forces English git output regardless of the local git locale
 # config, so the empty-cherry-pick detection below doesn't need a localized
 # string match.
+CP_FAILED=0
 CP_OUTPUT=$(LC_ALL=C git -C "$WT_DIR" cherry-pick "$SHA" 2>&1) || CP_FAILED=1
 echo "$CP_OUTPUT"
-if [[ "${CP_FAILED:-0}" -eq 1 ]]; then
+if [[ "$CP_FAILED" -eq 1 ]]; then
   if echo "$CP_OUTPUT" | grep -qE 'previous cherry-pick is now empty'; then
     echo "" >&2
     echo "Commit $SHA is already applied on origin/$BASE (empty cherry-pick) — nothing to do." >&2
     git -C "$WT_DIR" cherry-pick --abort 2>/dev/null || true
-    git -C "$REPO" worktree remove "$WT_DIR" --force
-    git -C "$REPO" branch -D "$BRANCH"
+    CLEANUP_REQUIRED=1 # Ensure removal
+    cleanup_worktree
+    CLEANUP_REQUIRED=0
     exit 0
   fi
   echo "" >&2
@@ -112,16 +128,17 @@ if [[ "${CP_FAILED:-0}" -eq 1 ]]; then
   echo "  git -C $WT_DIR add <resolved-files>" >&2
   echo "  git -C $WT_DIR cherry-pick --continue" >&2
   echo "  git -C $WT_DIR push -u origin $BRANCH   # push manually after resolving" >&2
+  # Keep worktree intact for manual resolution
+  CLEANUP_REQUIRED=0
   exit 1
 fi
 
+CLEANUP_REQUIRED=0
 echo "== cherry-pick clean"
 
-# Korean-text check mirrors the repo's pre-commit hook (defense in depth —
-# the hook already ran during cherry-pick's internal commit, this just
-# surfaces the result before push).
-if grep -rlP '[\x{AC00}-\x{D7A3}]' "$WT_DIR" --include='*.md' --include='*.sh' 2>/dev/null | grep -v '/data/'; then
-  echo "WARNING: Korean text detected outside data/ — push will likely be rejected by the pre-commit hook." >&2
+# Korean-text check (surfaces any Korean text before you push).
+if ! python3 "$REPO/scripts/check-hangul.py" "$WT_DIR/skills" >/dev/null 2>&1; then
+  echo "WARNING: Korean text detected outside data/ — push will likely be rejected by the pre-commit/pre-push hooks." >&2
 fi
 
 chmod +x "$WT_DIR/.githooks/pre-commit" 2>/dev/null || true

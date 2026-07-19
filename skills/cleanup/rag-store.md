@@ -78,7 +78,7 @@ RAG store is not a single tool but a **multi-medium fallback chain** — one med
 
 ### Purpose-fit priority for 3-C.1 session-chunk import (HARD STOP — not a plain availability fallback)
 
-**The (1)→(2)→(3)→(4) order above is an availability fallback chain, not a purpose-fit ranking.** For **3-C.1 whole-session import specifically**, a purpose-built session-importer script (medium 2) is the correct tool **even when medium (1) is available** — check for it FIRST, not as a fallback.
+**The (1)→(2)→(3)→(4) order above is an availability fallback chain, not a purpose-fit ranking.** For **3-C.1 whole-session import specifically**, a purpose-built session-importer script (medium 2) is the correct tool **even when medium (1) is available** — check for it FIRST, not as a fallback (see [run.md](file:///Users/david/.agents/skills/cleanup/run.md#L418) for the 3-C.1 "Availability check" HARD STOP).
 
 A generic `mcp__<vendor>__*-store` MCP call (medium 1) writes one arbitrary text blob with whatever metadata schema the caller supplies. It has no per-turn structure (no `session_id`/`turn_id`/`message_uuid`/`parent_uuid`/`timestamp` fields), no idempotent re-import (re-running upserts a fresh blob instead of skipping already-stored turns), and no dedupe against prior partial imports (e.g., a hook that already imported most of the session mid-conversation). Calling it for 3-C.1 produces a shallow, non-idempotent, hand-summarized substitute — not an actual session import.
 
@@ -90,14 +90,14 @@ A generic `mcp__<vendor>__*-store` MCP call (medium 1) writes one arbitrary text
 
 | # | Don't | Do |
 |---|-------|-----|
-| 20 | See a generic MCP `*-store` tool listed as available (ToolSearch / ambient reminder) and call it directly for 3-C.1 because it's the first thing found | Run the detection procedure above first — a purpose-built session-importer script outranks the generic MCP tool for whole-session import, regardless of which is discovered first |
-| 21 | Treat "1 MCP store call succeeded" as equivalent to "session imported" in the wrap-up report | If a purpose-built importer exists but wasn't used, report the MCP call honestly as a single ad-hoc summary chunk — not as session-level import coverage |
-| 22 | Assume no prior import exists because this is "the first RAG store this session" | A purpose-built importer is typically idempotent and hook-driven — it may have already imported most of the session incrementally. Run its dry-run/check mode before assuming 0 existing chunks |
+| 1 | See a generic MCP `*-store` tool listed as available (ToolSearch / ambient reminder) and call it directly for 3-C.1 because it's the first thing found | Run the detection procedure above first — a purpose-built session-importer script outranks the generic MCP tool for whole-session import, regardless of which is discovered first |
+| 2 | Treat "1 MCP store call succeeded" as equivalent to "session imported" in the wrap-up report | If a purpose-built importer exists but wasn't used, report the MCP call honestly as a single ad-hoc summary chunk — not as session-level import coverage |
+| 3 | Assume no prior import exists because this is "the first RAG store this session" | A purpose-built importer is typically idempotent and hook-driven — it may have already imported most of the session incrementally. Run its dry-run/check mode before assuming 0 existing chunks |
 
 **Self-check (immediately before any 3-C.1 call)**:
 1. Does any locally installed skill declare a session-JSONL-import topic? (grep Topics tables / skill descriptions for "session" + "import"/"qdrant"/"vector" keywords)
-2. If yes → use that script, not the generic MCP store tool, even if the MCP tool is readily available
-3. If the script supports dry-run/check mode, run it first to see existing coverage before assuming this is a fresh import
+2. If yes, use that script, not the generic MCP store tool, even if the MCP tool is readily available
+3. If yes, and the script supports dry-run/check mode, run it first to check coverage before assuming 0 existing chunks
 
 ### Medium (4) — local durable pending-import queue (HARD STOP — server-down ≠ info lost)
 

@@ -120,7 +120,14 @@ def analyze(path, cutoff, relaxed=False):
         later_body = bool(title_date and latest and latest > title_date)
         old = (title_date or latest or "9999") < cutoff
         blocked = (recur or hook) and not resolved
-        hook_paths = sorted(set(HOOK_PATH.findall(s)))
+        hook_paths = []
+        if hook:
+            for m in HOOK_FUTURE.finditer(s):
+                start = max(0, m.start() - 150)
+                end = min(len(s), m.end() + 150)
+                window = s[start:end]
+                hook_paths.extend(HOOK_PATH.findall(window))
+        hook_paths = sorted(set(hook_paths))
         hook_paths_exist = {p: _hook_path_exists(p) for p in hook_paths}
         # only meaningful for the false-negative case this feature targets: an
         # unresolved-per-regex hook obligation that already has an implemented file
@@ -214,7 +221,7 @@ def main():
     # HOT rows kept blocked solely by an unresolved hook obligation, where a
     # referenced hook path already exists on disk — likely false negatives
     # (RESOLVED wording didn't match, but the file is there).
-    blocked_hook = [r for r in rows if r["hook"] and not r["resolved"] and r["hook_paths"]]
+    blocked_hook = [r for r in rows if r["hook"] and not r["resolved"] and not r["recur"] and r["hook_paths"]]
     fneg = [r for r in blocked_hook if r["hook_false_negative"]]
     if blocked_hook:
         print(

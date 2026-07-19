@@ -93,7 +93,7 @@ jobs:
                 found=1
                 break
               fi
-            done < <(git log --format='%H %s' "$BASE_SHA" -- "$skill")
+            done < <(git log --format='%H %s' "$BASE_SHA" -- "$skill/")
             MERGED_FEAT_CACHE["$skill"]="$found"
             [ "$found" = "1" ]
           }
