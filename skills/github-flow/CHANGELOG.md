@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/github-flow-v0.5.0...github-flow-v0.6.0) (2026-07-17)
+
+
+### Features
+
+* **github-flow:** add auth-scope, commit-message-discipline topics + review-as.sh script ([907d730](https://github.com/es6kr/skills/commit/907d7307de59725bd15af0a6a64ca4906406242e))
+* **github-flow:** add gh-as.sh wrapper for command-scoped gh account switching ([#97](https://github.com/es6kr/skills/issues/97)) ([cd043ed](https://github.com/es6kr/skills/commit/cd043ed54ed5aaa351e65dbe804fededc1842556))
+* promote next-feat to main (hook-kit, github-flow, claude-session, todowrite, claudify, cleanup) ([7c598eb](https://github.com/es6kr/skills/commit/7c598ebdbfdb21cf421e8f814ea1a2513ad27a58))
+
+
+### Bug Fixes
+
+* **github-flow:** genericize private-org name in sanitize.md example ([0acc74a](https://github.com/es6kr/skills/commit/0acc74abc3aeee4de086e4a099b458759b74dda0))
+* **github-flow:** harden identity-auth/merge/plan-to-issue/pr/register/sanitize topics ([3458595](https://github.com/es6kr/skills/commit/3458595fbacf8bf21eb474c60f721c5111753291))
+* **github-flow:** per-ref evidence gate for mixed-result push output ([ed2d643](https://github.com/es6kr/skills/commit/ed2d6438f64d1a3bc4ce0166717b72b164cdf309))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/github-flow-v0.4.3...github-flow-v0.5.0) (2026-07-07)
 
 
