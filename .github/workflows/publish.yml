@@ -150,15 +150,27 @@ jobs:
           #   (a) Latest pointer matches $VERSION (normal forward bump), OR
           #   (b) The version exists anywhere in the metadata page (corrective
           #       lower-version publish; latest stays on the higher historical).
-          OUT=$(clawhub inspect "$SLUG")
-          if echo "$OUT" | grep -qF "Latest: $VERSION"; then
-            echo "OK: latest pointer advanced to $VERSION"
-            exit 0
-          fi
-          if echo "$OUT" | grep -qE "(^|[^.0-9])$(echo "$VERSION" | sed 's/\./\\./g')([^.0-9]|$)"; then
-            echo "OK: $VERSION present in registry (latest pointer kept on higher historical version — known SemVer-monotonic behavior)"
-            exit 0
-          fi
-          echo "::error::Version $VERSION not found in registry for $SLUG"
+          #
+          # We retry the verification in a loop to account for eventual consistency
+          # and caching in the ClawHub registry inspect endpoint.
+          echo "Verifying publish of $SLUG@$VERSION on ClawHub..."
+          MAX_RETRIES=6
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES: Running clawhub inspect $SLUG..."
+            OUT=$(clawhub inspect "$SLUG")
+            if echo "$OUT" | grep -qF "Latest: $VERSION"; then
+              echo "OK: latest pointer advanced to $VERSION"
+              exit 0
+            fi
+            if echo "$OUT" | grep -qE "(^|[^.0-9])$(echo "$VERSION" | sed 's/\./\\./g')([^.0-9]|$)"; then
+              echo "OK: $VERSION present in registry (latest pointer kept on higher historical version — known SemVer-monotonic behavior)"
+              exit 0
+            fi
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Version $VERSION not yet visible in registry. Sleeping 10s before retry..."
+              sleep 10
+            fi
+          done
+          echo "::error::Version $VERSION not found in registry for $SLUG after $MAX_RETRIES attempts"
           echo "$OUT"
           exit 1
