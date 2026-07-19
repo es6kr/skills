@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.6](https://github.com/es6kr/skills/compare/consolidate-v0.3.5...consolidate-v0.3.6) (2026-07-19)
+
+
+### Bug Fixes
+
+* **claude-session,consolidate,next:** promote next-fix staging ([902cfa5](https://github.com/es6kr/skills/commit/902cfa57de68d9f5487425b524ffa4441f81f302))
+* **consolidate:** extend Step 2.3 to three-axis duplicate-review check ([8b07965](https://github.com/es6kr/skills/commit/8b0796549215d4abb0fa349f4d5c5ba361aada88))
+* **consolidate:** skip AI Review Summary posting on draft PRs ([#99](https://github.com/es6kr/skills/issues/99)) ([fa7987a](https://github.com/es6kr/skills/commit/fa7987ab4a082e86e546161279b638f0a3be50c0))
+
 ## [0.3.5](https://github.com/es6kr/skills/compare/consolidate-v0.3.4...consolidate-v0.3.5) (2026-07-16)
 
 
