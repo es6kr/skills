@@ -5,6 +5,7 @@ description: |
 metadata:
   author: es6kr
   version: "0.1.5"
+depends-on: [utcp]
 ---
 
 # Session

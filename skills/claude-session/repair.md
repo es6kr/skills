@@ -145,7 +145,12 @@ for i, obj in records:
 EOF
 ```
 
-**Fix**: Replace the orphan `parentUuid` with the immediately preceding message's `uuid` (same fallback as missing-field repair). `scripts/repair-session.py` handles this in pass [6/7] automatically.
+**Fix**: Resolve the orphan `parentUuid` to the nearest **surviving ancestor** — follow the removed-node chain (a message this repair deleted → its own parent) until a message that still exists, or set `null` (a new root) when the ancestry is truly lost. **Never** re-link to the immediately preceding *file-order* message (see "File order ≠ chain order" below). `scripts/repair-session.py` handles this in pass [6/7] automatically (`_resolve_surviving_ancestor`); `scripts/dedup-session.py` does the same in its own Pass 6 (`resolve_parent`).
+
+**Disclosure requirement (HARD STOP — do not report "repair complete" without this)**: when the ancestry is truly lost, both scripts print a `[WARN] N chain repair(s) had NO recoverable ancestor` block listing the affected `line`/`uuid`/`old_parent` — this is a genuine, pre-existing hole in the session's history (the true ancestor is missing from the file itself, not something the repair caused), and it is **irrecoverable from this file alone**. `Validation: PASS` only certifies structural soundness (no dangling references) — it says nothing about whether all history is chain-reachable. Before reporting a repair as complete:
+1. If the `[WARN]` block is non-empty, quote the affected line/uuid list to the user — do not fold it into a blanket "repair complete" / "Validation: PASS" summary.
+2. Cross-reference each affected line against nearby messages for a native compact-boundary marker (a `type: "user"` message whose entire `message.content` is the CLI's own locale-specific "compacted" notice, e.g. the English "Compacted" or its localized equivalent) or other user-visible content. If one lands there, explicitly tell the user that history above that point is genuinely missing from the file, that this predates the repair (verifiable against the `.bak` backup), and that it is not something the repair introduced or can restore.
+3. Only after this disclosure — and only if the user asks for further recovery — investigate whether the lost content is retrievable through an out-of-band channel (RAG/Qdrant index if this session was ever ingested, another host's Syncthing copy, Time Machine, etc.). None of these are guaranteed; state plainly when no such copy exists.
 
 ### 7. Invalid Surrogate Pair (Broken Unicode)
 
@@ -260,7 +265,15 @@ Script: [scripts/dedup-session.py](./scripts/dedup-session.py)
 
 #### Repair Broken Chain
 
-Set the `parentUuid` of the damaged message to the `uuid` of the immediately preceding message.
+**File order ≠ chain order (HARD invariant).** Do NOT rewrite a message's `parentUuid` to the previous *file-order* message. Claude Code sessions interleave sidechains (subagents), compact/resume boundaries, and branch points, so the true parent (`parentUuid`) frequently differs from the preceding line. Force-linearizing the chain to file order splices unrelated history into one mega-chain — it changes the effective leaf/root and re-attaches pre-compact history onto post-compact history, **inflating the active context** ("the context sizes merge across the compact boundary"). Measured on a real 30k-line session, the old force-sequential rebuild rewrote 6056 `parentUuid`s (3265 with a still-valid parent) and grew the leaf's active chain from ~70 to 10343 hops.
+
+Correct handling per message:
+- `parentUuid == null` → keep (chain ROOT / compact boundary — never bridge)
+- parent points to a surviving `uuid` → keep exactly (valid parent)
+- parent was a deduplicated / removed copy → resolve to the nearest **distinct surviving ancestor** (walk the dropped-copy remap / removed-node chain, stepping out of the message's own streaming group to avoid a self-loop)
+- parent truly gone → set `null` (a new root), never bridge to the file-order-previous line
+
+`scripts/dedup-session.py` Pass 6 (`resolve_parent`) and `scripts/repair-session.py` (`repair_orphan_parents` / `_resolve_surviving_ancestor`) implement this. `repair-session.py` also emits a `[WARN]` when a repair changes the active leaf or balloons the active-chain hop count — the regression signal for this class of bug.
 
 #### Repair Orphan Tool Result
 
@@ -303,10 +316,15 @@ Session: {session_id}
 | 78 | a129f842 | assistant |
 | 120 | b234c567 | user |
 
+### Null-rooted orphan parents (irrecoverable — needs disclosure, not silence: 1)
+| Line | UUID | Old parent (not found in file) |
+|------|------|--------------------------------|
+| 17697 | 91a6a600 | f34c0f68 |
+
 Run without --dry-run to apply fixes.
 ```
 
-**Note**: The first user message (Line 2) in a broken chain is excluded because `parentUuid: null` is normal.
+**Note**: The first user message (Line 2) in a broken chain is excluded because `parentUuid: null` is normal. The "Null-rooted orphan parents" table is different from a normal broken-chain fix — it lists messages whose true ancestor could not be found ANYWHERE in the file (see repair-session.py / dedup-session.py's `[WARN] N chain repair(s) had NO recoverable ancestor` output). This table is present whether or not `--dry-run` is used; it must be surfaced to the user, not summarized away as "0 broken chains".
 
 **Execute mode**:
 ```
@@ -317,6 +335,19 @@ Run without --dry-run to apply fixes.
 - Removed orphan tool_results: 1
 - Removed duplicate UUIDs: 3
 - Total messages: 150 → 146
+- Validation: PASS (structurally sound — see caveat below if any null-rooted lines exist)
+```
+
+**If the script's `[WARN] N chain repair(s) had NO recoverable ancestor` block is non-empty**, append this section — do not omit it even when validation otherwise shows PASS:
+
+```
+### ⚠️ Irrecoverable history gap(s): N
+
+| Line | UUID | Old parent | Note |
+|------|------|------------|------|
+| 17697 | 91a6a600 | f34c0f68 | true ancestor not found anywhere in this file — pre-dates this repair |
+
+History above these line(s) is disconnected from the active chain and this repair cannot restore it (the ancestor data is missing from the file, not merely mis-linked). Confirmed pre-existing by comparing against `{session_id}.jsonl.bak`. If one of these lines is a compact-boundary marker (the CLI's own "compacted" notice), rewinding past that point is not possible via this file.
 ```
 
 ## Diagnostic Queries
@@ -654,6 +685,7 @@ jq empty session.jsonl && echo "Valid JSON"
 5. **Delete orphan tool_results** — manual line removal in steps 3–4 can create new orphans
 6. **Repair broken chains** — line deletions in steps 3–5 break the chain; detect with jq query then repair
 7. Always run validation queries after repair
+8. **Check the `[WARN] N chain repair(s) had NO recoverable ancestor` output** — `Validation: PASS` only means no dangling references remain, not that every message's full history is chain-reachable. Report any such lines to the user explicitly (see "Detectable Issues" §6 disclosure requirement and the "Output Results" template above) instead of a blanket "repair complete"
 
 ### Cautions
 - Deleting orphan tool_results can affect conversation flow

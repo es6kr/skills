@@ -20,7 +20,8 @@
 
 | Topic / skill | Identification signal | Skip ask? |
 |---------------|----------------------|-----------|
-| `/ralph fix-plan` (add/move/check) | User message: `fix-plan`, `fix_plan`, "record in checklist" | ✅ Skip |
+| `/ralph fix-plan` **add / move / check only** | User message: `fix-plan`, `fix_plan`, "record in checklist" | ✅ Skip |
+| `/ralph fix-plan` **priority / triage / sync** | User message: `fix-plan priority`, "triage", "prioritize blocked" | ❌ **NOT skip** — triage surfaces immediate-action candidates (top-N selfable). Route the start decision to `Skill("wip")`, not skip and not `next` single-select (see Step 0.4 "Surfacing/triage → wip delegation") |
 | `/archive`, `/safe-delete` | User message: `archive`, `delete`, `move to .bak` | ✅ Skip |
 | `/todo`, `/todowrite` add/move | User message: `todo add`, `task register` | ✅ Skip |
 | `/wip` start/register | User message: `wip`, "track progress" | ⚠️ Conditional (multi-step task → ask allowed) |
@@ -49,9 +50,10 @@
 ### How to skip (procedure)
 
 1. Determine skip target via Step 0.3 self-check
-2. If skip-target, do not proceed to Step 0.5/0.7 (TaskList check, user-work confirmation)
-3. Report completion as plain text only (no AskUserQuestion call)
-4. If Stop hook re-triggers next skill, re-evaluate the same skip judgment
+2. **Run Step 0.4 first — skip never bypasses it (HARD STOP)**: even a confirmed skip-target must pass through Step 0.4's decision-deferral scan. If the report defers a decision as prose (e.g. "start decision is yours" / "the start decision awaits your instruction"), Step 0.4 **overrides** the skip and forces the ask. Only after Step 0.4 finds no deferred decision does the skip stand.
+3. If skip-target **and** Step 0.4 clean, do not proceed to Step 0.5/0.7 (TaskList check, user-work confirmation)
+4. Report completion as plain text only (no AskUserQuestion call)
+5. If Stop hook re-triggers next skill, re-evaluate the same skip judgment
 
 ### Case history
 
@@ -75,6 +77,7 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 | "whether to X is …" left unanswered | "whether to commit/PR is up to you", "the decision is yours" |
 | "your call / up to you / you decide" | "your call", "your decision", "up to you" |
 | "next step is X (if you want)" | "the next step is X if you want", "let me know to proceed" |
+| **Locale deferral phrases** (start/proceed/decision + awaiting/deferred, in the session language) | see `data/*.regex` deferral block — e.g. "the start decision awaits your instruction", "proceeding awaits your call" and their locale equivalents |
 
 ### Don't / Do table
 
@@ -90,6 +93,21 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 2. If yes → an `AskUserQuestion` is **required** for that decision. Do not end on the text.
 3. Is the decision a real branch (≥2 executable options)? Compose those as options + Other.
 4. This gate **overrides** Step 0.3 skip: even right after a recording/management topic, a deferred decision forces the ask.
+
+### Surfacing/triage → `wip` delegation (HARD STOP — route target, not just "ask")
+
+When the deferred decision is **"which of N surfaced candidates to start"** (the output of a triage / surfacing topic — `fix-plan priority`, a candidate list, a "top-N actionable" report), the forced ask is **not** a `next` single-select "what next?". Route it to `Skill("wip")` — the surfaced candidates are multi-item work needing task registration + per-item direction (proceed / split / hold), which is wip's resume procedure. This generalizes the cleanup→wip rule ([[feedback_cleanup_wip_not_next]]) to every surfacing topic.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Triage surfaced top-3 candidates → end with "start decision is yours" (prose) | Call `Skill("wip")` → its resume procedure asks per-candidate direction |
+| 2 | Triage → `next` single-select "pick one to start (Recommended)" | Surfaced candidates = multi-item. `next` single-select strips the split/hold/multi axes. Use `wip` |
+| 3 | Triage = recording topic → Step 0.3 skip → no ask at all | Triage surfaces actionable candidates = decision branch. Step 0.4 override forces the ask; route = `wip` |
+
+**Self-check (before ending any triage / surfacing / candidate-list report)**:
+1. Did the just-completed work surface ≥1 actionable candidate for the user to potentially start?
+2. If yes → the start decision is a real axis. Do not defer as prose (Step 0.4) and do not skip (Step 0.3).
+3. Is it multi-item / needs per-item direction? → `Skill("wip")`. Single reversible next-step only? → `next` ask.
 
 Otherwise → proceed to Step 0.5.
 
@@ -121,6 +139,29 @@ Otherwise → proceed to Step 0.5.
 ## Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
 
 **Before composing options, if any of the following conditions apply, ask the user "what are you currently working on / waiting for" FIRST. Do not bake assumptions into option descriptions.**
+
+### Precedence gate — populated pending backlog ≠ unclear current work (HARD STOP, fires FIRST)
+
+**A non-empty pending TaskList means work exists. Whenever Step 0.5's TaskList read returns ≥1 pending task, the "no work to do" / "nothing to resume" / "current activity unclear" framings are FORBIDDEN — the backlog IS the work.** This gate fires BEFORE the trigger conditions below: even when the Stop hook auto-invoked `next` after a resume/assigned task completed (or the resume turned out to be a no-op / already-done), a populated backlog is NOT an "unclear current activity" situation. Unclear-activity handling (the trigger table below) applies only when the backlog is empty or genuinely ambiguous (e.g., 2+ in_progress with no clear pending queue).
+
+| Signal | Wrong response (forbidden) | Correct response |
+|--------|---------------------------|------------------|
+| Assigned/resume task done + pending TaskList ≥1 | "Nothing to resume — tell me what to work on" (frames backlog as empty) | Backlog is the work → `Skill("wip", "resume")` for per-item direction, OR autonomously proceed with the top actionable item (report the choice) |
+| Stop hook auto-invoked next + pending TaskList ≥1 | Apply the "ask what you're working on (unclear)" path | Multi-item backlog = wip resume territory (per-item proceed/split/hold), not a "what are you working on" confusion ask |
+| Long gap / stale resume + pending TaskList ≥1 | "A week passed, current work is hard to determine" | Time gap does not empty the backlog. Reconcile pending tasks against reality (active worktrees, fix_plan), then engage — never declare emptiness |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Equate "the single assigned/resume task is complete" with "no work exists" | Read TaskList (Step 0.5). Pending ≥1 → work exists. Never emit "no work"/"nothing to resume" |
+| 2 | Use the "unclear current activity → what are you working on" path when a concrete pending backlog is visible | Visible backlog = activity is NOT unclear. Route to wip resume (per-item direction) or autonomous-proceed |
+| 3 | Frame a stale-resume (long gap, assigned task done) as "current work hard to determine" | Reconcile the pending backlog against reality, then engage. Don't declare emptiness |
+
+**Self-check (before applying any Step 0.7 trigger)**:
+1. Did Step 0.5's TaskList read return ≥1 pending task? → If yes, the "no work"/"unclear activity" framings are forbidden. Route to wip resume or autonomous-proceed
+2. Am I about to say "nothing to resume" / "no work" / "current activity unclear" while a pending backlog exists? → Stop. The backlog is the work
+3. Is this a multi-item backlog needing per-item direction? → `Skill("wip", "resume")`, not a `next` "what next?" single-select
+
+(Same failure class as the Ralph "`[RALPH_TODO]`-only, ignore plain `- [ ]` checklist backlog → 'no actionable work' false exit" recurrence in failed-attempts.md — a narrow "actionable work" definition producing a false "no work" conclusion despite a real backlog.)
 
 ### Trigger conditions
 

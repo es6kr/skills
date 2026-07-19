@@ -7,7 +7,7 @@ Reference data for AskUserQuestion callers — pre-check option label/descriptio
 | Hook | Block trigger pattern | Pass condition |
 |------|----------------------|----------------|
 | `block-merge-without-review.sh` | `merge` / `Merge` / `Squash` combined with `PR #N` | Option description must include `AI Review Summary posted (<URL>)` or `AI Review Summary ✅` **AND** `Test Plan N/N ✅` (or `Test Plan all [x]`) |
-| `block-tasklist-id-in-conversation.sh` | `#NN` standalone (without PR/issue prefix) | Use `PR #NN` / `issue #NN` prefix or subject keyword (e.g., "Web-PR-346 verification") |
+| `block-tasklist-id-in-conversation.sh` | (a) `#NN` standalone (without PR/issue prefix) (b) any PR reference (`PR #N` / `PR N`) with no PR URL anywhere in the questions payload | (a) Use `PR #NN` / `issue #NN` prefix or subject keyword (e.g., "Web-PR-346 verification") (b) include the full `https://github.com/<o>/<r>/pull/<N>` URL in the question text or an option description |
 | `block-vendor-in-generic-skill.sh` | Vendor name (qdrant / chroma / pinecone / mcp__\<vendor>__ / private IPs `192.168.*`, `10.0.*`) | Use abstract terms (`RAG store`, `<private-IP>`, `<internal-host>`), or have the vendor name in the immediately preceding user message |
 | `block-skill-language-mismatch.sh` | Korean text added to a skill body whose SKILL.md description is English (`.md` Edit) | Write in English, or include explicit citation rationale |
 | `block-axis-merged-ask.sh` | Same-category findings (Refactor/Tip/Minor, etc.) collapsed into a single question with N options | Use multi-select question for "select items to process" + separate question for processing method |

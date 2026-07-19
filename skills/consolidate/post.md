@@ -6,7 +6,9 @@ Entry: `Skill("consolidate", "post ...")` or `pr.md` Workflow Step 7 / Step 7.5 
 
 ## Step 7: Post AI Review Summary + Formal Review
 
-**Always post a summary** (unless user chose "Skip" in Step 5).
+**Draft-PR gate (HARD STOP — re-check even on direct entry)**: `pr.md` Workflow Step 2 condition 4/5 skip draft and non-default-base-staging PRs before ever reaching this step — but `post.md` can also be entered directly (`Skill("consolidate", "post ...")`), bypassing that check. Before posting, re-verify: `gh pr view <NUMBER> --json isDraft --jq '.isDraft'`. If `true`, **stop — do not post**, and report the draft state instead. A Summary documenting the absence of review ("no findings", "no review needed for staging") is not an exception; it is the exact violation this gate exists to prevent.
+
+**Always post a summary** (unless user chose "Skip" in Step 5, or the draft gate above fired).
 The summary MUST include a detailed table of the findings, verification notes, and status.
 
 ### Interactive gate (when `--interactive` is on — literal or auto-activated by args)
@@ -30,6 +32,13 @@ If `--interactive` is off, proceed directly to medium decision + POST (determini
 Plain `## AI Review Summary` is forbidden. The link form above is required.
 
 **Caller retitle does NOT touch this Summary title (HARD STOP)**: a caller "rename the review → X" instruction scopes to the **Code Review comment** (Step 3.5.3 / `internal.md` "Caller-supplied custom title contract") — NEVER this Summary. The Summary heading stays `## AI Review Summary — [receiving-code-review](...)`. The two comments must not share the "Summary" token: the Code Review comment's heading must contain **no** "Summary" (e.g. `## Code Review — [requesting-code-review](...)`), this Summary comment owns "Summary" exclusively.
+
+### Update Promotion PR Body with Cumulative Commits (HARD STOP)
+
+When consolidating a promotion PR (e.g., `next-fix` or `next-feat` -> `main`), if new commits have been merged into the promotion branch since the PR was created, the PR body (description) must be updated to keep the curated list of commits and files in sync.
+
+1. Enumerate all commits on the branch that are not yet on the base branch (e.g., `git log origin/main..origin/next-fix --oneline`).
+2. Edit the PR body via `gh pr edit <NUMBER> --body-file <file>` with the updated commit list and affected files.
 
 ### Pre-Summary gate — Code Review comment MUST already exist (HARD STOP — visible even if internal.md was skipped)
 
@@ -766,6 +775,7 @@ Among all actionable items from Step 4 classification:
 3. Has registration to the medium file been completed? (verify via Read)
 4. Have you reported the number of registered items + medium path in chat?
 5. **Placement check**: is the nearest preceding `##` heading of the just-registered items an active-work section (not `## REPEAT` / `## Completed`)? `## REPEAT` is invariantly the last section — an EOF or `###` append nests there. If mis-placed, move above the trailing sections
+6. **Promotion PR Body check**: If the PR is a staging promotion PR, did you update the PR body/description with the latest commit list?
 
 ## Next
 
