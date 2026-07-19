@@ -325,6 +325,7 @@ git -C <worktree> merge --abort   # always abort — do not commit a merge into 
 ```
 
 Report the conflicting files in the Summary so the author can rebase. **Do not resolve another author's conflict** (branch ownership: only the PR author resolves — see `~/.agents/rules/git.md` "Branch ownership" rule).
+**Exception for Staging Promotion PRs (e.g. next-fix / next-feat)**: If all blocking/ready PRs are already merged, and the promotion PR is conflicting with `main`, the operator should resolve the conflict by merging `origin/main` (or the base branch) into the promotion branch, resolving the conflicts, and pushing the update to origin.
 
 ### Don't / Do
 
@@ -332,7 +333,7 @@ Report the conflicting files in the Summary so the author can rebase. **Do not r
 |---|-------|-----|
 | 1 | Review only from `gh pr diff` with no local checkout | Check out the PR branch into a worktree first; the code-reviewer reads real files + runs tests |
 | 2 | `git worktree add` a fresh worktree every review | Use the git-repo `worktree` topic — reuse inactive / merged-PR worktrees first (decision tree) |
-| 3 | Resolve a CONFLICTING PR's conflict in the worktree | Detect + report conflicting files. Branch ownership: only the author resolves |
+| 3 | Resolve a CONFLICTING PR's conflict in the worktree (except for staging promotion PRs) | Detect + report conflicting files. Branch ownership: only the author resolves (unless it is a staging promotion PR with all blockers merged) |
 | 4 | `git worktree remove` after every review | Leave it for git-repo to reuse next review. Do not delete blindly |
 | 5 | Skip the worktree when external AI review is already sufficient | Worktree is mandatory for **all** reviews — it enables CONFLICTING detection + local verification regardless of external AI completeness |
 

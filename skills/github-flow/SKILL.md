@@ -7,7 +7,7 @@ depends-on:
   - code-workflow
   - web-browser
 description: |
-  GitHub issue/PR workflow automation. Topics — dependencies (blocked-by/sub-issues via GraphQL), epic-bundle (deferred findings → Epic + sub-issues), expand (expand-vs-split mid-work), identity-auth (gh account map + scope refresh + GH_TOKEN fallback), merge (CI/review gates + no autonomous push), plan-to-issue (MD → issue body), pr (PR with test plan), push-guards (branch/push-reject/force-push/main-push), register (dup check + strategy), review (structured comments), review-apply (deferred feedback apply), sanitize (PUBLIC repo personal data scan), upstream-issue (external OSS feature/bug). Use when: "plan to issue", "issue register", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "PII", "expand PR", "blocked by", "epic bundle", "upstream issue", "review apply", "sub-issue", "gh auth", "force push", "push reject", "branch change forbid".
+  GitHub issue/PR workflow automation. Topics — auth-scope (gh CLI priority + account mapping + batch scope refresh + 404 checklist), commit-message-discipline (commit message authoring + amend refresh + PUBLIC English enforcement), dependencies (blocked-by/sub-issues via GraphQL), epic-bundle (deferred findings → Epic + sub-issues), expand (expand-vs-split mid-work), identity-auth (gh account map + scope refresh + GH_TOKEN fallback), merge (CI/review gates + no autonomous push), plan-to-issue (MD → issue body), pr (PR with test plan), push-guards (branch/push-reject/force-push/main-push), register (dup check + strategy), review (structured comments), review-apply (deferred feedback apply), sanitize (PUBLIC repo personal data scan), upstream-issue (external OSS feature/bug). Use when: "plan to issue", "issue register", "create PR", "PR body", "code review", "merge PR", "PR squash", "sanitize", "PII", "expand PR", "blocked by", "epic bundle", "upstream issue", "review apply", "sub-issue", "gh auth", "force push", "push reject", "branch change forbid", "auth scope", "account mapping", "scope refresh", "commit message", "PUBLIC repo English".
 ---
 
 # GitHub Flow
@@ -18,6 +18,8 @@ Convert plans, research, and implementation results into GitHub issues and PRs.
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| auth-scope | gh CLI priority + account mapping + batch scope refresh + org-repo 404 checklist | [auth-scope.md](./auth-scope.md) |
+| commit-message-discipline | Commit message authoring, message update on amend, PUBLIC repo English enforcement, git operation type continuity, verb selection (`.md` as source code) | [commit-message-discipline.md](./commit-message-discipline.md) |
 | dependencies | Manage native Issue Relationships (blocked-by/blocking) via addBlockedBy/removeBlockedBy GraphQL mutations | [dependencies.md](./dependencies.md) |
 | epic-bundle | Bundle deferred review findings across multiple PRs into one Epic tracking issue (checklist + native sub-issues + epic label) | [epic-bundle.md](./epic-bundle.md) |
 | expand | Decide expand-vs-split when new findings emerge mid-work and update title/body | [expand.md](./expand.md) |

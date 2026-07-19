@@ -415,7 +415,6 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     # Nodes this repair deleted -> their parent, so dangling pointers bridge past them
     # to a surviving ancestor instead of a file-order-previous message.
     removed_parents = {**removed_parents_400, **removed_parents_orphan}
-
     # Step 5: repair broken chains (missing parentUuid field)
     messages, chain_fixed = repair_chains(messages)
     print(f"[5/7] Broken chain repair: {chain_fixed}")
@@ -448,7 +447,6 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     if before_hops > 0 and after_hops > max(before_hops * 3, before_hops + 200):
         print(f"  [WARN] active chain inflated: {before_hops} -> {after_hops} hops "
               f"(possible pre-boundary history spliced into active context)")
-
     # Step 7: validate
     validation = validate(messages)
     print(f"[7/7] Validation:")

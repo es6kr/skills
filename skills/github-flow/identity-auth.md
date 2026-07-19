@@ -55,7 +55,7 @@ The browser agent is reserved for **situations CLI cannot handle** (e.g., comple
    - `gh auth status` → identify the `Active account` line. It must equal `<expected gh account>`
    - `gh api user --jq '.login'` → the response login must equal `<expected gh account>`
    - SSH-only repos: `ssh -T git@github.com 2>&1 | grep -oE 'Hi [^!]+!'` → the matched name must equal `<expected gh account>`
-4. Mismatch → `gh auth switch --user <expected>` (or inject `GH_TOKEN="$(gh auth token --user <expected>)"`), and for SSH ensure `core.sshCommand` or `ssh-add -l` points to the key registered on `<expected gh account>`
+4. Mismatch → `gh auth switch --user <expected>` (or `scripts/gh-as.sh <expected> <gh-args...>` — wraps the `GH_TOKEN="$(gh auth token --user <expected>)"` injection), and for SSH ensure `core.sshCommand` or `ssh-add -l` points to the key registered on `<expected gh account>`
 5. **Only after Steps 3-4 pass** → run `git push` or `gh pr create`
 6. If push already happened with the wrong identity → the PR `author` is immutable. Options: (a) close the wrong-author PR + reopen from the correct account on a fresh branch; (b) accept the wrong author (PR `author` shows on the PR forever)
 
@@ -132,6 +132,8 @@ Run these in order BEFORE asking the user:
    ```
 
    If this succeeds, your scope / membership is fine — it was a gh CLI internal issue, no user intervention needed.
+
+   **Shorthand**: `scripts/gh-as.sh <account> <gh-args...>` wraps this exact pattern — use it instead of repeating the `GH_TOKEN="$(gh auth token --user ...)"` prefix by hand. Example: `scripts/gh-as.sh <account> repo view <org>/<repo>`.
 4. **Org membership confirmation**: if steps 1-3 all fail with 404, ask the user about membership status
 
 ## Self-check (before any gh-auth-requiring command)
@@ -146,3 +148,36 @@ Run these in order BEFORE asking the user:
 - `merge` — merge requires `repo` scope for write operations
 - `pr` — PR creation requires `repo` scope; check `dependencies` for `addBlockedBy` GraphQL mutations
 - `push-guards` — `gh run list` (used in force-push CI status check) requires `repo`, `workflow` scope
+
+## Self-review account switch (scripted)
+
+When a PR author must review their own PR, the review must post from a dedicated review account, then restore the acting account. `scripts/review-as.sh` implements the full register → switch → verify → POST → restore sequence in one call:
+
+```bash
+scripts/review-as.sh --repo <owner/repo> --pr <N> --reviewer <review-account> \
+  --acting <acting-account> --input <review-payload.json> [--skip-register]
+```
+
+The acting account is restored on every exit path (`trap EXIT`), preventing review-account leakage into follow-up commits/comments.
+
+## PAT Scope Assignment Don't / Do (HARD STOP)
+
+Acting accounts (DrumRobot / daegunjhy) canonical scope set = `repo,read:org,workflow,gist,copilot,read:packages` (6). Special-purpose accounts (daegunsoft-web review-only) use purpose-minimum set.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Add `read:packages` alone on GHCR pull denied | 5-scope combined refresh — avoid repeated browser auth |
+| 2 | `gh auth refresh` manual guide only | Call `web-browser/credential-issue` topic first (auto auth). Manual guide is fallback |
+| 3 | Add scopes outside the matrix (over-grant) | Matrix 5 scopes + explicitly needed extras only |
+| 4 | Skip scope matrix check on new operation | Check matrix every time → if missing, add to this rule |
+| 5 | Run `gh auth login`/`refresh` without `-s` (only grants default `gist,read:org,repo`) | Always specify `-s` 5-scope — missing `workflow` on merge/push blocks `.github/workflows/*` changes |
+| 6 | Copy-paste browser PAT issue/edit URL from a previous case (`scopes=repo,read:org` re-use) | Check "account × required operation" against matrix before each issue — acting account uses `scopes=repo,read:org,workflow,gist,copilot,read:packages` prefill |
+
+### Self-check (before any scope-modifying gh auth command)
+
+1. Is this an acting account (DrumRobot/daegunjhy)? → 6-scope set required
+2. Is this a special-purpose account? → purpose-minimum set only
+3. Is a browser PAT being issued? → All 6 scopes must be listed (PAT has no implicit scopes)
+4. Is this a `gh auth refresh`? → Use `-s repo,read:org,workflow,copilot,read:packages` (gist is already a gh OAuth default)
+5. Was `write:packages` needed? → Separate explicit issue (not included in canonical set)
+

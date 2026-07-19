@@ -33,6 +33,13 @@ Plain `## AI Review Summary` is forbidden. The link form above is required.
 
 **Caller retitle does NOT touch this Summary title (HARD STOP)**: a caller "rename the review → X" instruction scopes to the **Code Review comment** (Step 3.5.3 / `internal.md` "Caller-supplied custom title contract") — NEVER this Summary. The Summary heading stays `## AI Review Summary — [receiving-code-review](...)`. The two comments must not share the "Summary" token: the Code Review comment's heading must contain **no** "Summary" (e.g. `## Code Review — [requesting-code-review](...)`), this Summary comment owns "Summary" exclusively.
 
+### Update Promotion PR Body with Cumulative Commits (HARD STOP)
+
+When consolidating a promotion PR (e.g., `next-fix` or `next-feat` -> `main`), if new commits have been merged into the promotion branch since the PR was created, the PR body (description) must be updated to keep the curated list of commits and files in sync.
+
+1. Enumerate all commits on the branch that are not yet on the base branch (e.g., `git log origin/main..origin/next-fix --oneline`).
+2. Edit the PR body via `gh pr edit <NUMBER> --body-file <file>` with the updated commit list and affected files.
+
 ### Pre-Summary gate — Code Review comment MUST already exist (HARD STOP — visible even if internal.md was skipped)
 
 **Before posting this Summary, a Code Review comment (Step 3.5.3, `requesting-code-review` link — under whatever title, default `## Internal Code Review` or a caller custom title like `## Code Review`) MUST already exist on the PR.** This gate is restated here in post.md (not only in internal.md) so that skipping the internal.md topic does not also skip the 2-comment invariant.
@@ -768,6 +775,7 @@ Among all actionable items from Step 4 classification:
 3. Has registration to the medium file been completed? (verify via Read)
 4. Have you reported the number of registered items + medium path in chat?
 5. **Placement check**: is the nearest preceding `##` heading of the just-registered items an active-work section (not `## REPEAT` / `## Completed`)? `## REPEAT` is invariantly the last section — an EOF or `###` append nests there. If mis-placed, move above the trailing sections
+6. **Promotion PR Body check**: If the PR is a staging promotion PR, did you update the PR body/description with the latest commit list?
 
 ## Next
 
