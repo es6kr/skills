@@ -25,6 +25,14 @@ match future obligations (e.g. "hook implementation mandatory", "hook
 automation under review", "hook implementation to execute immediately",
 "not yet implemented", "hook on Nth occurrence").
 
+hook=True/resolved=False rows also get their referenced hook/script file paths
+(backtick-wrapped `~/.claude/...` or `~/.agents/...` .sh/.py) extracted and
+checked for existence. A path that already exists usually means the hook was
+actually implemented and the row is a false negative of the RESOLVED regex —
+flagged in the default output so fa-prune doesn't need a manual Read+find per
+row (2026-07-16: 18 such rows needed manual verification, 17 were false
+negatives).
+
 Modes:
   (default)     print summary + COLD candidates (R = demoted via resolved-exception)
   --cut OUTDIR  write each COLD section body to OUTDIR/NNN.md (+ index.json),
@@ -59,6 +67,11 @@ DEFAULT_FILE = os.path.expanduser(
 DATE = re.compile(r"\((\d{4}-\d{2}-\d{2})")
 # check #1: recurrence marker in title (Korean-language "Nth occurrence" / "recurred")
 RECUR_TITLE = re.compile(r"\d+\s*회(차|째)|재발")
+# backtick-wrapped hook/script file path (~/.claude/... or ~/.agents/...) — used to
+# auto-verify hook=True/resolved=False rows: if the referenced file already exists on
+# disk, the row is very likely a false negative (hook was implemented but the RESOLVED
+# wording didn't match), not a genuinely unresolved obligation.
+HOOK_PATH = re.compile(r"`(~/\.(?:claude|agents)/[\w./-]+\.(?:sh|py))`")
 # check #3: future-hook obligation in body (kept HOT unless resolved)
 HOOK_FUTURE = re.compile(
     r"(회차|회째|다음 발생|재발).{0,20}(시|이상).{0,10}hook|hook (자동화|필수|검토)",
@@ -74,6 +87,19 @@ RESOLVED = re.compile(
     r"|자동[^\n]{0,6}(차단|방지)[^\n]{0,6}완료",
     re.I,
 )
+
+# the hook skill was renamed hook -> hook-kit; older log entries still reference
+# the pre-rename path, so fall back to the renamed location before giving up.
+_HOOK_RENAME = ("/skills/hook/resources/", "/skills/hook-kit/resources/")
+
+
+def _hook_path_exists(p):
+    expanded = os.path.expanduser(p)
+    if os.path.exists(expanded):
+        return True
+    if _HOOK_RENAME[0] in expanded:
+        return os.path.exists(expanded.replace(*_HOOK_RENAME))
+    return False
 
 
 def analyze(path, cutoff, relaxed=False):
@@ -94,6 +120,18 @@ def analyze(path, cutoff, relaxed=False):
         later_body = bool(title_date and latest and latest > title_date)
         old = (title_date or latest or "9999") < cutoff
         blocked = (recur or hook) and not resolved
+        hook_paths = []
+        if hook:
+            for m in HOOK_FUTURE.finditer(s):
+                start = max(0, m.start() - 150)
+                end = min(len(s), m.end() + 150)
+                window = s[start:end]
+                hook_paths.extend(HOOK_PATH.findall(window))
+        hook_paths = sorted(set(hook_paths))
+        hook_paths_exist = {p: _hook_path_exists(p) for p in hook_paths}
+        # only meaningful for the false-negative case this feature targets: an
+        # unresolved-per-regex hook obligation that already has an implemented file
+        hook_false_negative = hook and not resolved and any(hook_paths_exist.values())
         cold_strict = old and not blocked and not later_body
         # relaxed: stale recurrence (newest date < cutoff) demotes; hook-unresolved still blocks
         stale = bool(latest) and latest < cutoff
@@ -112,6 +150,9 @@ def analyze(path, cutoff, relaxed=False):
             "cold": cold,
             "via_resolve": cold and (recur or hook) and resolved,
             "via_relaxed": cold and relaxed and not cold_strict,
+            "hook_paths": hook_paths,
+            "hook_paths_exist": hook_paths_exist,
+            "hook_false_negative": hook_false_negative,
             "body": s.rstrip() + "\n",
         })
     return rows
@@ -176,6 +217,23 @@ def main():
     for r in sorted(cold, key=lambda x: x["title_date"] or x["latest"]):
         flag = "S" if r.get("via_relaxed") else ("R" if r["via_resolve"] else " ")
         print(f"[{r['idx']:3d}] {r['latest'] or r['title_date']} {flag} | {r['title'][:88]}")
+
+    # HOT rows kept blocked solely by an unresolved hook obligation, where a
+    # referenced hook path already exists on disk — likely false negatives
+    # (RESOLVED wording didn't match, but the file is there).
+    blocked_hook = [r for r in rows if r["hook"] and not r["resolved"] and not r["recur"] and r["hook_paths"]]
+    fneg = [r for r in blocked_hook if r["hook_false_negative"]]
+    if blocked_hook:
+        print(
+            f"\n--- hook=True/resolved=False rows with a referenced path ({len(blocked_hook)}, "
+            f"{len(fneg)} likely false negative — path already exists) ---"
+        )
+        for r in blocked_hook:
+            mark = "FALSE-NEG" if r["hook_false_negative"] else "missing  "
+            paths = ", ".join(
+                f"{'OK' if ok else 'no'}:{p}" for p, ok in r["hook_paths_exist"].items()
+            )
+            print(f"[{r['idx']:3d}] {mark} | {r['title'][:70]} | {paths}")
 
     if args.cut_dir:
         c, _ = cut(rows, args.cut_dir)
