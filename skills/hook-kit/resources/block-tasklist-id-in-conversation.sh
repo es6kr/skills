@@ -60,7 +60,7 @@ done <<< "$TEXTS"
 # for PR #A does not satisfy a bare reference to PR #B in the same payload)
 PR_NUMS_REFERENCED=$(echo "$TEXTS" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
 if [[ -n "$PR_NUMS_REFERENCED" ]]; then
-  PR_NUMS_WITH_URL=$(echo "$TEXTS" | grep -oiE 'https://github\.com/[^[:space:])]+/pull/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
+  PR_NUMS_WITH_URL=$(echo "$TEXTS" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
   MISSING_URL_FOR=()
   while IFS= read -r n; do
     [[ -z "$n" ]] && continue
@@ -76,15 +76,16 @@ if [[ -n "$PR_NUMS_REFERENCED" ]]; then
       echo "  - An ask is a self-contained decision UI: the user must be able to open"
       echo "    and inspect EVERY referenced PR before deciding, without hunting through"
       echo "    scroll-back"
-      echo "  - A bare 'PR #N' — even with the repo name — is not clickable"
+      echo "  - A bare 'PR #N' — even with the repo/project name — is not clickable"
       echo "  - One PR's URL does not satisfy references to a DIFFERENT PR number in the"
       echo "    same payload — each distinct number needs its own URL"
       echo ""
       echo "PR number(s) missing their own URL: ${MISSING_URL_FOR[*]}"
       echo ""
       echo "Required action:"
-      echo "  Add https://github.com/<owner>/<repo>/pull/<N> for each PR number listed"
-      echo "  above, in the question text or the relevant option's description, then retry."
+      echo "  Add the full PR/MR URL (e.g., https://github.com/<owner>/<repo>/pull/<N> or"
+      echo "  GitLab MR URL) for each PR number listed above, in the question text or"
+      echo "  the relevant option's description, then retry."
       echo ""
       echo "Reference: question skill options.md section 4 (metadata + full URL);"
       echo "  failed-attempts.md (grep \"bare PR\")"
