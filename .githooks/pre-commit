@@ -55,6 +55,9 @@ while IFS= read -r f; do
   # staged file must be judged by what would actually land in the commit.
   if git show ":$f" | "$PY" -c "
 import sys
+# Windows console defaults to cp949 — non-cp949 chars (emoji etc.) in matched
+# lines would crash print() with UnicodeEncodeError, hiding the diagnostics.
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 data = sys.stdin.buffer.read().decode('utf-8', errors='replace')
 hits = [(i, l) for i, l in enumerate(data.splitlines(), 1)
         if any('\uac00' <= ch <= '\ud7a3' for ch in l)]
