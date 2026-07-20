@@ -125,17 +125,12 @@ def _tracked_files(*roots: Path) -> set[Path] | None:
         return None
     if proc.returncode != 0:
         return None
-    try:
-        repo_root = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", check=False, env=_git_env(),
-        ).stdout.strip()
-        base = Path(repo_root) if repo_root else Path.cwd()
-    except (OSError, FileNotFoundError):
-        base = Path.cwd()
+    # git ls-files without --full-name reports paths relative to the CWD the
+    # subprocess ran in (not the repo root) — resolve against Path.cwd() to
+    # match, so tracked files still resolve correctly when this script runs
+    # from a subdirectory of the repo.
     return {
-        (base / entry).resolve()
+        (Path.cwd() / entry).resolve()
         for entry in proc.stdout.split("\0")
         if entry.strip()
     }

@@ -193,6 +193,38 @@ def test_untracked_and_ignored_files_skipped_in_git_repo(tmp_path):
     assert "clean" in result.stdout
 
 
+def test_tracked_files_detected_when_invoked_from_subdirectory(tmp_path):
+    """Regression: `_tracked_files` must resolve `git ls-files` output against
+    the invocation cwd, not `git rev-parse --show-toplevel`. `git ls-files`
+    reports paths relative to cwd by default; joining against repo root
+    instead produces wrong absolute paths when cwd != repo root, silently
+    dropping a real tracked file from the tracked set — the scanner then
+    treats it as untracked and skips it, missing Hangul it should catch."""
+    repo = tmp_path
+    skill = repo / "skills" / "myskill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(f"# x\nKorean: {HANGUL_SAMPLE_1}\n", encoding="utf-8")
+    other_dir = repo / "other_dir"
+    other_dir.mkdir()
+
+    def _git(*args):
+        return subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8",
+            env=_no_git_env(),
+        )
+
+    if _git("init", "-q").returncode != 0:
+        pytest.skip("git unavailable")
+    _git("config", "user.email", "t@t")
+    _git("config", "user.name", "t")
+    _git("add", "skills/myskill/SKILL.md")
+    _git("commit", "-q", "-m", "baseline")
+
+    result = _run_py(["../skills"], cwd=other_dir)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "myskill" in result.stdout
+
+
 def test_scanner_ignores_poisoned_grep(tmp_path):
     """Regression: the scanner must NOT depend on the ambient ``grep``.
 
