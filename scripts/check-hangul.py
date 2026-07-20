@@ -94,6 +94,20 @@ def _scan_dir(skill_dir: Path, tracked_files: set[Path] | None = None) -> list[t
     return matches
 
 
+def _git_env() -> dict:
+    """Environment with every GIT_* variable dropped.
+
+    When this script runs inside a git hook (e.g. pre-push, which invokes the
+    test suite that in turn invokes this scanner against a throwaway fixture
+    directory), git exports GIT_DIR / GIT_WORK_TREE pointing at the invoking
+    repository. Those variables override cwd-based repo discovery entirely,
+    so an unscrubbed `git ls-files` call silently scans the REAL repository
+    instead of the fixture directory the caller passed via cwd. Every git
+    subprocess this script spawns must use this scrubbed environment.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _tracked_files(*roots: Path) -> set[Path] | None:
     """Return resolved paths of git-tracked files under ``roots``, or None when
     git is unavailable / outside a repo (caller falls back to scanning all)."""
@@ -105,6 +119,7 @@ def _tracked_files(*roots: Path) -> set[Path] | None:
             encoding="utf-8",
             errors="replace",
             check=False,
+            env=_git_env(),
         )
     except (OSError, FileNotFoundError):
         return None
@@ -114,7 +129,7 @@ def _tracked_files(*roots: Path) -> set[Path] | None:
         repo_root = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, encoding="utf-8",
-            errors="replace", check=False,
+            errors="replace", check=False, env=_git_env(),
         ).stdout.strip()
         base = Path(repo_root) if repo_root else Path.cwd()
     except (OSError, FileNotFoundError):
@@ -142,6 +157,7 @@ def _tracked_skill_names(parent: Path) -> set[str] | None:
             encoding="utf-8",
             errors="replace",
             check=False,
+            env=_git_env(),
         )
     except (OSError, FileNotFoundError):
         return None
