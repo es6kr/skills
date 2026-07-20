@@ -22,10 +22,23 @@ HANGUL_SAMPLE_1 = chr(0xAC00) + chr(0xB098)
 HANGUL_SAMPLE_2 = chr(0xD55C) + chr(0xAE00)
 
 
+def _no_git_env():
+    """Environment with every GIT_* variable dropped.
+
+    Under a git hook (pre-push runs this suite), git exports GIT_DIR pointing
+    at the invoking repository. Without scrubbing, the fixtures' git calls and
+    the scanner's internal `git ls-files` ignore cwd=tmp_path and operate on
+    the REAL repo — the fixture's `git commit` then lands a stray commit on
+    the branch being pushed.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _run_py(args, cwd):
     return subprocess.run(
         [sys.executable, str(PY_SCRIPT), *args],
         capture_output=True, text=True, encoding="utf-8", cwd=cwd,
+        env=_no_git_env(),
     )
 
 
@@ -165,6 +178,7 @@ def test_untracked_and_ignored_files_skipped_in_git_repo(tmp_path):
     def _git(*args):
         return subprocess.run(
             ["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8",
+            env=_no_git_env(),
         )
 
     if _git("init", "-q").returncode != 0:
