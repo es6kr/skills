@@ -245,7 +245,7 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | # | Source | Severity | Finding | Status |
 |---|--------|----------|---------|--------|
 | 1 | `copilot` | 🟡 Minor | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
-| 2 | `coderabbitai` | 🟠 Important | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
+| 2 | `coderabbitai` | 🟠 Important | ⚠️ N+1 query vulnerability — verified via grep | 🟢 Fixed (commit abc123) |
 | 3 | Internal Code Review | 🟡 Minor | 📝 Unused import | 🟡 Minor |
 | 4 | @reviewer-login | 🟠 Important | 🛠️ DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
 
@@ -265,7 +265,7 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 
 | Value | Meaning |
 |-------|---------|
-| `🔴 Fixed (commit <sha>)` | Fix applied in this PR or a follow-up commit — SHA citation mandatory (cross-link) |
+| `🟢 Fixed (commit <sha>)` | Fix applied in this PR or a follow-up commit — SHA citation mandatory (cross-link) |
 | `🔴 Pending` | Immediate fix required (typically Critical) — awaiting author/reviewer action |
 | `🟡 Deferred (author follow-up)` | Follow-up handling (separate PR/issue/post-merge backport etc.) — plain phrasing |
 | `🟢 Deferred (no action)` | Review concluded irrelevant/unnecessary — plain phrasing |
