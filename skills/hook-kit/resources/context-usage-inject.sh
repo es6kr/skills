@@ -23,11 +23,20 @@
 
 INPUT=$(cat)
 
-python3 - "$INPUT" <<'PYEOF' 2>/dev/null || exit 0
+PY=""
+for _c in python3 python; do
+  if command -v "$_c" >/dev/null 2>&1 && "$_c" -c "pass" >/dev/null 2>&1; then
+    PY="$_c"; break
+  fi
+done
+[ -n "$PY" ] || exit 0
+
+export CLAUDE_HOOK_INPUT="$INPUT"
+"$PY" - <<'PYEOF' 2>/dev/null || exit 0
 import json, os, sys
 
 try:
-    payload = json.loads(sys.argv[1])
+    payload = json.loads(os.environ.get("CLAUDE_HOOK_INPUT", "{}"))
     path = payload.get("transcript_path", "")
     if not path or not os.path.isfile(path):
         sys.exit(0)

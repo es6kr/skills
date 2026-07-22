@@ -68,8 +68,8 @@ ssh-key (SSH multi-account)  ──counterpart──  credential-helper (HTTPS m
 1. `git -C <repo> worktree list` to enumerate existing worktrees
 2. **Operation-state gate (HARD STOP — before any inactive classification)**: for each candidate worktree `<W>`, check for an in-progress git operation:
    ```bash
-   gitdir=$(git -C <W> rev-parse --git-dir)
-   ls "$gitdir"/CHERRY_PICK_HEAD "$gitdir"/MERGE_HEAD "$gitdir"/REBASE_HEAD "$gitdir"/BISECT_LOG "$gitdir"/rebase-merge "$gitdir"/rebase-apply 2>/dev/null
+    gitdir=$(git -C <W> rev-parse --absolute-git-dir)
+    ls "$gitdir"/CHERRY_PICK_HEAD "$gitdir"/MERGE_HEAD "$gitdir"/REBASE_HEAD "$gitdir"/BISECT_LOG "$gitdir"/rebase-merge "$gitdir"/rebase-apply 2>/dev/null
    git -C <W> status --porcelain | grep -E '^(DD|AU|UD|UA|DU|AA|UU)'   # unmerged index entries
    ```
    Any hit = a cherry-pick/merge/rebase/bisect is **mid-flight** (likely the user's active operation) → the worktree is **NOT an inactive candidate**, its dirty files are the operation's payload (never offer discard / `git add` resolution / stash), and reuse is forbidden — report to the user instead. Merge-status heuristics (branch merged + ahead=0) do NOT override this gate. (see failed-attempts.md "cherry-pick in progress misclassified as abandoned")

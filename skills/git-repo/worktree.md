@@ -27,7 +27,7 @@ ls .claude/worktrees/ 2>/dev/null   # Claude Code default path
 **Step 2.0 — Operation-state gate (HARD STOP, runs before any classification)**: an in-progress git operation disqualifies a worktree from inactive classification regardless of merge status. Check per candidate `<W>`:
 
 ```bash
-gitdir=$(git -C <W> rev-parse --git-dir)
+gitdir=$(git -C <W> rev-parse --absolute-git-dir)
 for f in CHERRY_PICK_HEAD MERGE_HEAD REBASE_HEAD BISECT_LOG rebase-merge rebase-apply; do
   [ -e "$gitdir/$f" ] && echo "$gitdir/$f"
 done

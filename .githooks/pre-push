@@ -24,8 +24,9 @@ while IFS= read -r line; do
 "
   # shellcheck disable=SC2086
   set -- $line
+  local_ref="${1:-}"
   remote_ref="${3:-}"
-  if [ "$remote_ref" = "refs/heads/local" ]; then
+  if [ "$local_ref" = "refs/heads/local" ] || [ "$remote_ref" = "refs/heads/local" ]; then
     LOCAL_PUSH_ATTEMPTED=1
   fi
 done
@@ -39,7 +40,7 @@ ERROR: Pushing the 'local' branch to origin is blocked.
     git push -u origin <tag>/<scope>
     gh pr create -R es6kr/skills --title '...' --body '...'
 
-Rule: daegunsoftDev/.claude/rules/agents-local-branch-nopush.md
+Rule: .claude/rules/agents-local-branch-nopush.md
 
 If you truly intend to force-push 'local' (rare, requires explicit user consent):
     PUSH_LOCAL_OVERRIDE=1 git push origin local
@@ -49,7 +50,7 @@ fi
 # Re-emit the stdin we consumed so downstream logic (if any) sees the same lines.
 # (Currently downstream CI checks below do not read stdin, but preserve the
 # contract for future hook chaining.)
-printf '%s' "$LOCAL_STDIN" >/dev/null
+printf '%s' "$LOCAL_STDIN"
 
 echo "Running pre-push checks (CI parity)..."
 

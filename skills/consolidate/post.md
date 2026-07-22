@@ -244,10 +244,10 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 
 | # | Source | Severity | Finding | Status |
 |---|--------|----------|---------|--------|
-| 1 | `copilot` | 📝 Minor | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
-| 2 | `coderabbitai` | 🟡 Important | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
-| 3 | Internal Code Review | 📝 Minor | 📝 Unused import | 🟡 Minor |
-| 4 | @reviewer-login | 🟡 Important | 🛠️ DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
+| 1 | `copilot` | 🟡 Minor | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
+| 2 | `coderabbitai` | 🟠 Important | ⚠️ N+1 query vulnerability — verified via grep | 🔴 Fixed (commit abc123) |
+| 3 | Internal Code Review | 🟡 Minor | 📝 Unused import | 🟡 Minor |
+| 4 | @reviewer-login | 🟠 Important | 🛠️ DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
 
 [✅ All AI reviews passed. Ready to merge.
 
@@ -654,7 +654,7 @@ When a Critical is decided as not-fixed-immediately, **downgrade Severity by one
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Post Critical as-is inline after deferred decision | Downgrade Critical → Important + state the downgrade reason in the inline label (e.g., `🟡 Important — siteIndex hardcoded guard (Critical → Important downgrade)`) |
+| 1 | Post Critical as-is inline after deferred decision | Downgrade Critical → Important + state the downgrade reason in the inline label (e.g., `🟠 Important — siteIndex hardcoded guard (Critical → Important downgrade)`) |
 | 2 | Also change the Type axis (Potential → Refactor) | Change only the Severity axis. Keep the Type as-is (apply Step 4's dual-label orthogonal rule) |
 | 3 | Autonomously downgrade without asking the user | Downgrade only when the Step 5 / Step 8 ask answer explicitly directs it or deferred is decided |
 
@@ -691,7 +691,7 @@ When a Critical is decided as not-fixed-immediately, **downgrade Severity by one
       "path": "apps/dt/app/site/[siteIndex]/record/pqm/page.tsx",
       "line": 9,
       "side": "RIGHT",
-      "body": "⚠️ Potential | 🟡 Important — siteIndex hardcoded guard (Critical → Important downgrade)\n\n`Number(siteIndex) !== 1` is a URL param integer comparison. The sidebar already uses the `siteType === TEST_SITE_TYPE` pattern (master 4982267c, PR #261). Only the page guard departs from this convention.\n\nRecommendation: replace with `useSiteDetail(siteIndex)` + `siteType === 'EQMT-STY01'` check."
+      "body": "⚠️ Potential | 🟠 Important — siteIndex hardcoded guard (Critical → Important downgrade)\n\n`Number(siteIndex) !== 1` is a URL param integer comparison. The sidebar already uses the `siteType === TEST_SITE_TYPE` pattern (master 4982267c, PR #261). Only the page guard departs from this convention.\n\nRecommendation: replace with `useSiteDetail(siteIndex)` + `siteType === 'EQMT-STY01'` check."
     }
   ]
 }

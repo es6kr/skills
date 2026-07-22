@@ -22,8 +22,13 @@ case "$FILE_PATH" in
   *) exit 0 ;;
 esac
 
-# Extract the written/edited body (Write=content, Edit=new_string)
-BODY=$(echo "$INPUT" | jq -r '(.tool_input.content // .tool_input.new_string) // empty' 2>/dev/null)
+# Read the saved plan file if available (PostToolUse: the file is already updated)
+if [ -f "$FILE_PATH" ]; then
+  BODY=$(cat "$FILE_PATH")
+else
+  # Fall back to the tool input written/edited chunk
+  BODY=$(echo "$INPUT" | jq -r '(.tool_input.content // .tool_input.new_string) // empty' 2>/dev/null)
+fi
 [ -z "$BODY" ] && exit 0
 
 # Undecided-marker detection (2 kinds):
@@ -40,7 +45,8 @@ BODY=$(echo "$INPUT" | jq -r '(.tool_input.content // .tool_input.new_string) //
 DATA_DIR="$(dirname "$0")/../data"
 if compgen -G "$DATA_DIR/*.regex" > /dev/null 2>&1; then
   PATTERN=$(cat "$DATA_DIR"/*.regex | sed 's/#.*$//' | awk 'NF' | paste -sd'|' -)
-else
+fi
+if [ -z "${PATTERN:-}" ]; then
   PATTERN='___|\bTBD\b|decision required|deferred| vs |recommend|[Tt]rade-?offs?|[Aa]lternatives|\|[[:space:]]*Chosen|Pros[[:space:]]*\|.*Cons'
 fi
 
@@ -48,17 +54,19 @@ MATCHES=$(echo "$BODY" | grep -nEi "$PATTERN" 2>/dev/null | head -8)
 
 [ -z "$MATCHES" ] && exit 0
 
-echo "⚠️ [plan-undecided-guard] undecided markers detected in plan file: $FILE_PATH"
-echo "  matched lines:"
-echo "$MATCHES" | sed 's/^/    /'
-echo ""
-echo "  → HARD STOP loop (vibe-coding.md 'annotation cycle' + code-workflow steps.md 'Plan post-write ask'):"
-echo "     1. If the user request itself is an either/or ('do A or B'), that decision is the primary mandatory AskUserQuestion"
-echo "     2. Convert each undecided marker above into an AskUserQuestion option (questions array, 1 axis = 1 question)"
-echo "     3. On answer received → reflect 'Decision: X' into the plan file (Edit) + save"
-echo "     4. Re-grep to confirm 0 undecided markers, then report/proceed"
-echo ""
-echo "  A 'recommend' prose line is NOT a decision — user confirmation (AskUserQuestion) is required."
-echo "  See failed-attempts.md: 'plan post-write undecided-items ask omitted' (2026-05-27, 2nd)"
+{
+  echo "⚠️ [plan-undecided-guard] undecided markers detected in plan file: $FILE_PATH"
+  echo "  matched lines:"
+  echo "$MATCHES" | sed 's/^/    /'
+  echo ""
+  echo "  → HARD STOP loop (vibe-coding.md 'annotation cycle' + code-workflow steps.md 'Plan post-write ask'):"
+  echo "     1. If the user request itself is an either/or ('do A or B'), that decision is the primary mandatory AskUserQuestion"
+  echo "     2. Convert each undecided marker above into an AskUserQuestion option (questions array, 1 axis = 1 question)"
+  echo "     3. On answer received → reflect 'Decision: X' into the plan file (Edit) + save"
+  echo "     4. Re-grep to confirm 0 undecided markers, then report/proceed"
+  echo ""
+  echo "  A 'recommend' prose line is NOT a decision — user confirmation (AskUserQuestion) is required."
+  echo "  See failed-attempts.md: 'plan post-write undecided-items ask omitted' (2026-05-27, 2nd)"
+} >&2
 
-exit 0
+exit 2

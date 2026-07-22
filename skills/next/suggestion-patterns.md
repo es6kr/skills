@@ -13,8 +13,8 @@
 | Severity | Handling in next-action options |
 |----------|--------------------------------|
 | 🔴 Critical | Per-PR immediate action (block merge until resolved) |
-| 🟡 Important | Per-PR immediate action (recommended to resolve before merge) |
-| 🟢 **Minor** | **Cross-PR bundle** (aggregate across related PRs' deferred findings) |
+| 🟠 Important | Per-PR immediate action (recommended to resolve before merge) |
+| 🟡 **Minor** | **Cross-PR bundle** (aggregate across related PRs' deferred findings) |
 | ⚪ **Nitpick** | **Cross-PR bundle** (same as Minor) |
 
 ### Don't / Do
@@ -64,7 +64,7 @@
 
 ## Deferred-status overrides severity + pending-task precedence (HARD STOP)
 
-The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟡 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.
+The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟠 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.
 
 Two independent errors this gate prevents: (a) surfacing a deferred-status finding as a discrete option, and (b) failing to pull the actual pending TaskList backlog as the primary candidate source. "There are tasks to finish — don't spend a next-action slot on a deferred item." Deferred findings aggregate into a late bundle (fix_plan sweep); they are never a slot-filler.
 
