@@ -34,6 +34,34 @@
 3. Are Important/Critical findings from the current PR still surfaced as per-PR immediate action? → They should be (this rule affects only Minor/Nitpick)
 4. If only 1 PR has deferred Minor findings and no bundle exists yet, is the Minor option omitted entirely? → It should be. The candidate goes into fix_plan and waits for the next PR's Minor findings
 
+## Cross-cutting rule — PR creation in option description (HARD STOP)
+
+**Whenever an AskUserQuestion option proposes PR creation (in any "After X" section below), the option `description` MUST explicitly state "draft PR".** Bare "create PR" / "PR" is forbidden. The `--ready` (non-draft) variant must be offered as a **separate option** (different axis), not bundled into the same description.
+
+**Why**: `github-flow/pr.md` enforces "Draft is the DEFAULT (HARD STOP)" at `gh pr create` execution time. But option descriptions written before execution are the user's primary decision medium — if "create PR" is shown without specifying draft, the user may interpret it as a ready-for-review PR (CodeRabbit/Copilot fire immediately on ready PRs, review cost grows). Option description must mirror the executed command's intent verbatim. `--ready` toggle is a meaningful axis — separating it lets the user make the draft vs ready choice consciously.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `description: "...→ create PR + merge"` (draft unspecified) | `description: "...→ create draft PR + merge"` |
+| 2 | `description: "worktree → cherry-pick → push → PR"` | `description: "worktree → cherry-pick → push → draft PR"` |
+| 3 | Bundle ready-PR toggle into the draft-PR option | Separate axis: option 1 = "create draft PR", option 2 = "create ready PR (CodeRabbit/Copilot fires immediately)" |
+| 4 | Omit "draft" from description on the rationale that "draft vs ready is decided at gh pr create time" | description = user's primary decision medium. Mirror the command's intent (draft default) verbatim |
+| 5 | Include `--ready` in every PR ask by default | `--ready` is offered as a separate axis on explicit user request. Default option = draft. Ready only when the user explicitly chooses it |
+
+### Self-check (HARD STOP — before drafting any option array that mentions PR creation)
+
+1. Does the option description contain "PR"? — If yes, continue
+2. Does it specify "**draft PR**" explicitly? — If no, add "draft" before "PR"
+3. If `--ready` is needed, is it a **separate option** (different axis), not bundled with draft option? — If bundled, split into 2 options
+4. Multi-PR scenarios (e.g., "3-way worktree+PR"): does the description say "**draft PRs**" (plural-aware) for each? — If just "PRs", replace with "draft PRs"
+
+### Cross-ref
+
+- `github-flow/pr.md` lines 13-14, 276-279 (Draft-default HARD STOP at execution time) — this skill mirrors that rule into option-description time.
+- Triggering keyword in option description (any locale): `create PR`, `PR creation`, `register PR`, `worktree+PR`, `cherry-pick + PR`, `gh pr create`, and equivalent localized forms. Any of these without a "draft" qualifier = violation.
+
 ## After code writing/modification
 
 ```typescript
