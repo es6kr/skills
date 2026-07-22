@@ -111,14 +111,14 @@ Before posting **either** the Step 5 AskUserQuestion **or** the Step 7 `## AI Re
 
 ### Medium decision (MANDATORY — inline targets decide the posting medium)
 
-The Internal Review's posting medium branches on whether **inline targets** exist (auto-fire policy below: line-specific 🔴 Critical + 🟡 Important findings by default; ALL line-specific findings with the `--inline` flag):
+The Internal Review's posting medium branches on whether **inline targets** exist (auto-fire policy below: line-specific 🔴 Critical + 🟠 Important findings by default; ALL line-specific findings with the `--inline` flag):
 
 | Inline targets | Medium | First post (no prior Internal Review) | Re-review (prior Internal Review exists) |
 |----------------|--------|----------------------------------------|------------------------------------------|
 | **1+ exist** | **Single reviews API POST** — `gh api POST .../pulls/{N}/reviews`: `body` = full Internal Review findings, `comments[]` = inline annotations | First `gh api POST .../reviews` — no PATCH target exists yet | **New review POST every time** (no PATCH/PUT of the prior review — each re-review is a fresh time-ordered review, like external bots) |
 | **None** | Issue comment (`gh pr comment`) | First `gh pr comment <N>` — no PATCH target exists yet | **PATCH the existing comment** (`gh api repos/{owner}/{repo}/issues/comments/{id} --method PATCH --input <file>`) — forbid a parallel new comment |
 
-**Merge state does not change the medium (HARD STOP).** A merged or closed PR still takes the reviews API POST with `comments[]` inline when inline targets exist — the auto-fire policy (line-specific 🔴 Critical + 🟡 Important → review POST) applies **regardless of merge state**. The reviews API accepts inline comments on a merged PR against its head SHA. A post-merge review is still a review POST, not an issue comment. Do NOT downgrade to `gh pr comment` because the PR is merged.
+**Merge state does not change the medium (HARD STOP).** A merged or closed PR still takes the reviews API POST with `comments[]` inline when inline targets exist — the auto-fire policy (line-specific 🔴 Critical + 🟠 Important → review POST) applies **regardless of merge state**. The reviews API accepts inline comments on a merged PR against its head SHA. A post-merge review is still a review POST, not an issue comment. Do NOT downgrade to `gh pr comment` because the PR is merged.
 
 **Existing-artifact check before posting** (per medium):
 
@@ -209,7 +209,7 @@ When inline targets exist, the single reviews API POST carries them in `comments
 
 | Invocation | Inline targets |
 |------------|----------------|
-| Default (no flag) | Line-specific 🔴 Critical + 🟡 Important findings only |
+| Default (no flag) | Line-specific 🔴 Critical + 🟠 Important findings only |
 | `--inline` flag on the consolidate call | ALL line-specific findings (Minor/Refactor included) |
 | No line-specific finding matches the policy | No review POST — issue-comment medium |
 

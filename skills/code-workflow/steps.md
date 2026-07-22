@@ -180,6 +180,8 @@ The plan body starts after the frontmatter with `# Plan: [Title]` heading. The h
    | 1 | Omit trade-offs when proposing a single approach | Honestly state the strengths AND the limits/risks of the single approach |
    | 2 | Multi-alternative comparison reduced to "this one is best" hand-wave | Pros, cons, cost, risk for each alternative — clear contrast/comparison |
    | 3 | Hide security or downtime risk in a deployment plan | Mark expected risks + impact scope as Warning/Caution explicitly |
+   | 4 | Evaluate third-party AI agent/orchestration tools (that wrap a paid LLM subscription CLI — Claude Code, Codex, etc.) on technical axes only (tool access, session persistence, docs quality) | Add a **vendor ToS / subscription-authorization risk** axis: WebSearch `"<tool name>" ban terms of service <vendor>` before finalizing the choice. Some tools are explicitly named in vendor enforcement actions — technical superiority does not override this risk |
+   | 5 | Silently substitute a different specific third-party tool for one already named in a prior plan/session document ("technically equivalent" reasoning) | Treat a prior plan's named tool choice as a **sticky decision** — if research suggests a substitute, re-verify why the original tool was chosen (cost/ToS/prior incident) via AskUserQuestion before switching, don't just adopt the newly-discovered option |
 
 5. **Verification plan** — Verification procedures, commands/URLs, and expected results for each change group.
    - **For regression cases**: manual commands (`curl`, `ssh`) are only auxiliary. **Independently runnable test code (Python, JS, etc.)** must be authored and included in the Plan.
@@ -243,6 +245,7 @@ After writing or updating `plan-*.md`, **AI must actively scan the plan for unde
 | Pattern | Treatment |
 |---------|-----------|
 | **The original request itself poses an explicit either/or (e.g., "plan whether A or B", "one commit vs separate", "merge vs split")** | **PRIMARY mandatory question** — this is the decision the user explicitly asked you to plan. A prose "recommend X" recommendation does NOT satisfy it. Convert to AskUserQuestion with Recommended option |
+| **A "Trade-offs / Alternatives" section EXISTS with 2+ alternatives — STRUCTURAL trigger, even a clean `Option/Pros/Cons/Chosen` table with ✅/✗ and zero prose markers** | **UNCONDITIONAL mandatory question.** The section's *existence* is the trigger — not prose tokens (`vs`/`recommend`/`TBD`) inside it. The author's ✅/Chosen/recommended pick is a recommendation, NOT a user-confirmed decision. Convert each alternative to an option. Do **not** self-certify "0 undecided" because you picked one. No implement/commit/push before the answer |
 | Trade-offs / Alternatives row with a forward-looking question mark (e.g., "is support needed?", "can this change?") | Convert to a question option |
 | "User review memo" section with placeholder lines (`___`, "additional request: ___", "other format needed?") | Convert to a question option |
 | "Out of scope" item that requires user confirmation to actually defer | Confirm via question |
@@ -273,12 +276,13 @@ After writing or updating `plan-*.md`, **AI must actively scan the plan for unde
 #### Self-check (every time after writing/updating plan file)
 
 1. Does the **original request** pose an explicit either/or ("whether A or B")? → That decision is the PRIMARY mandatory question (a prose "recommend" does not satisfy it)
-2. Did you Grep the plan body for `___`, `?`, "TBD", "deferred", "vs", "decision required", "recommend"?
-3. Did each match become an option in an AskUserQuestion call?
-4. Are the questions structured as **decision axes** (1 axis per question), not as a single mega-question?
-5. Did you call AskUserQuestion **before** reporting "plan complete" in chat?
-6. **After the user answers, did you reflect the decision back into the plan file (Edit) and save?** — ask without reflect+save = incomplete
-7. If 0 undecided items found, did you state that explicitly in the report? ("No open decisions in plan revision N — ready for apply or further review")
+2. **Does the plan contain a "Trade-offs / Alternatives" section with 2+ alternatives?** (Grep for the heading `Trade-?off`/`Alternatives` and a `Chosen`/`Pros…Cons` table — NOT just prose markers) → if yes, AskUserQuestion is **unconditional**, even when you marked one option ✅/Chosen. "I picked it with reasons" ≠ decided
+3. Did you Grep the plan body for `___`, `?`, "TBD", "deferred", "vs", "decision required", "recommend"?
+4. Did each match (structural section + prose markers) become an option in an AskUserQuestion call?
+5. Are the questions structured as **decision axes** (1 axis per question), not as a single mega-question?
+6. Did you call AskUserQuestion **before** reporting "plan complete" in chat?
+7. **After the user answers, did you reflect the decision back into the plan file (Edit) and save?** — ask without reflect+save = incomplete
+8. If 0 undecided items found, did you state that explicitly in the report? ("No open decisions in plan revision N — ready for apply or further review"). **Note: a plan with a Trade-offs/Alternatives section is never "0 undecided"** (item 2)
 
 #### Procedure (after every plan write/update) — ask → reflect → auto-save loop (HARD STOP)
 
@@ -326,7 +330,7 @@ grep -l '^- \[ \]' {output-dir}/plan-*.md
 ## Step 3: User Review & Branch Creation
 
 1. **Report BLOCKED or Open Questions**: If there are any ambiguities, report them and wait for user feedback.
-2. **Obtain Approval**: Wait for the user to approve the plan (e.g., "Proceed", "approved").
+2. **Obtain Approval — via a structured entry ask, not a prose wait (HARD STOP)**: Once ALL plan decision axes are resolved (post-write ask answered + reflected), collect the approval decision with an **AskUserQuestion at turn wrap-up** whose options are next-actions (e.g., "Start implementation (Phase 1)", "Hold — plan stays at status: review", other pending candidates). Ending the turn with prose like "implementation starts on your approval" / "awaiting your go-ahead" and no ask forces the user to type a free-form prompt to proceed — that is a wrap-up violation, not a sanctioned wait state. The "Plan ask scope" rule (trade-offs/open-decisions only) forbids **plan-body-review** options ("Plan review", "annotation cycle"), NOT the implementation-entry next-action ask.
 3. **Identify Primary Branch (HARD STOP)**:
    - Identify the repository's primary (default) branch via `git remote show origin` or `git branch -r`
    - Usually one of `master`, `main`, or `develop`. If unclear, AskUserQuestion.
@@ -369,6 +373,8 @@ The dependencies topic will:
 If the plan has no `chain:` frontmatter, this trigger is skipped — single-issue plans don't need dependency wiring.
 
 **Prohibited: Immediate Implementation Offer**: When creating or updating an issue draft or plan document, **DO NOT offer to implement the code immediately** (e.g., "Shall we write the code now?"). Creating an issue draft means the task is being planned/scheduled. You must strictly wait for user approval or the explicit `Implement` command before proceeding to Step 3b/3c.
+
+**Boundary — this prohibition vs the Step-3 entry ask**: the prohibition targets (a) prose pressure to implement and (b) any implementation offer **while decision axes are still unresolved**. It does NOT exempt you from the structured entry ask above once every axis is resolved. The two failure modes are symmetric: offering implementation too early (this prohibition) and ending with a passive prose wait after full resolution (violates Step 3 item 2). Implementation itself still starts only after the user picks the entry option.
 
 ### Step 3b: Branch Creation (github-flow issue only)
 

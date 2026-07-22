@@ -157,7 +157,7 @@ jobs:
           MAX_RETRIES=6
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i/$MAX_RETRIES: Running clawhub inspect $SLUG..."
-            OUT=$(clawhub inspect "$SLUG")
+            OUT=$(clawhub inspect "$SLUG" 2>&1 || true)
             if echo "$OUT" | grep -qF "Latest: $VERSION"; then
               echo "OK: latest pointer advanced to $VERSION"
               exit 0
