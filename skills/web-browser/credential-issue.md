@@ -40,8 +40,57 @@ manual browser and delegating post-login steps (form fill, Generate click, token
 violates the "Boundary: login wait vs token automation" table and the Phase 3-5 entry gate below.
 
 **Key rule**: Playwright MCP opens an **invisible** window — the user cannot complete an interactive
-login there. For any flow that needs a fresh user sign-in, prefer chrome-devtools (real session) or
-the user's default browser. Do not drive an interactive login through invisible Playwright.
+login there. For any flow that needs a fresh user sign-in, prefer chrome-devtools (real session, or
+fresh `new_page` if visible) or the user's default browser. Do not drive an interactive login through
+invisible Playwright.
+
+**chrome-devtools with no session still outranks Default browser when visible (HARD STOP)**: "no
+existing session" is not the same as "unusable for this flow." If chrome-devtools-mcp is connected and
+its window is confirmed visible (not headless), open the login/issuance URL there via `new_page` even
+when a fresh login is required — the user signs in inside that same window, and automation continuity
+(navigate → fill → click → extract) survives past login. Falling back to `Start-Process`/`open` (OS-level
+launch) at this point creates a **disconnected, non-automatable window**: whatever the user does there
+afterward (bucket creation, token generation) cannot be driven or read by any backend tool, forcing a
+full manual handoff for the rest of the flow. Only use Default browser when chrome-devtools is
+disconnected or confirmed headless/invisible — see "Fresh-login flow" below.
+
+### Fresh-login flow: chrome-devtools `new_page` vs OS `Start-Process` (HARD STOP)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | See no existing session in chrome-devtools (`list_pages` → `about:blank`) and immediately switch to `Start-Process`/OS default browser | Confirm chrome-devtools is connected + visible → open the URL there via `new_page` first. Absence of a session only means the user must log in — it does not disqualify the backend |
+| 2 | Open the login window via OS `Start-Process`, let the user complete everything there, then explain the automatable tool (chrome-devtools) is a "separate instance" as if that were an external constraint | If a disconnected window was already created by OS-level open, own the choice explicitly ("I opened this window in a way I can't automate") rather than framing it as the automation tool's limitation |
+| 3 | Treat Default browser as the obvious/default choice for any login-required flow | Default browser is the fallback **only** when chrome-devtools is disconnected or confirmed headless — check both before choosing it |
+| 4 | After work has already progressed in a disconnected OS-opened window (bucket created, token page open), abandon it and restart automation in a fresh chrome-devtools window | Mid-flow, prefer continuing in whichever window already holds progress — switch backends going forward only for the *next* fresh-login flow, not by discarding in-progress user work |
+| 5 | See a single anti-automation block screen in chrome-devtools (e.g. Google's "Couldn't sign you in / this browser or app may not be secure") and immediately conclude the backend is unusable → open a second, disconnected Default-browser window | A site-level bot-detection message is not the same as "backend disconnected/headless" (the only two disqualifying conditions in row 3). Ask the user to retry in the **same visible chrome-devtools window** first (click retry, or reload) — the block is sometimes a one-shot heuristic, not a hard wall, and the window stays automatable if it succeeds |
+
+**Case (2026-07-22)**: chrome-devtools showed Google's "Couldn't sign you in" block once; assistant concluded the backend was blocked and opened a separate OS `Start-Process` window, asking the user to log in there instead — creating two windows and abandoning the automatable one. The user, following the original instruction to use "the browser you opened," logged into the **chrome-devtools window** anyway and it succeeded (reached the real cart/checkout page with the actual VAT-inclusive price). A single block screenshot is a data point, not a terminal verdict — retry (or ask the user to retry) in place before downgrading.
+
+### Fallback: raw CDP WebSocket scripting when both chrome-devtools-mcp and profile-copy fail
+
+When chrome-devtools-mcp's own browser is genuinely **unstable** (resets to a blank page between
+tool calls — no persisted state across calls) and copying the user's real profile cookies into a
+fresh `--user-data-dir` fails (modern Chrome's App-Bound Encryption binds the cookie-decryption key
+to the original profile path, so a copied `Cookies` DB silently fails to decrypt and the browser
+redirects to login), the working fallback is: launch a **debug-enabled Chrome instance with
+`--remote-debugging-port`**, have the **user log in there directly** (this is a fresh, real window —
+not a copy), then drive the rest of the flow via **raw CDP WebSocket commands** from a script (e.g.
+`uv run --with websockets python -c "..."` on Windows), bypassing MCP tools entirely:
+
+1. `Start-Process chrome.exe -ArgumentList '--remote-debugging-port=<port>', '--user-data-dir=<short-path>', '--profile-directory=Default', '<url>'` — **use a SHORT `--user-data-dir` path** (e.g. `C:\ccdp`, not a deeply nested scratchpad path). Chrome's `Service Worker\CacheStorage\...` subpaths are among the longest in a profile and silently fail with `UnknownError: Failed to execute 'open' on 'CacheStorage'` once the full path approaches Windows' `MAX_PATH` (260 chars) — a symptom easy to misattribute to broken extensions instead of path length.
+2. Confirm the CDP endpoint: `curl http://localhost:<port>/json/version`, then `curl http://localhost:<port>/json` to get each page's `webSocketDebuggerUrl`.
+3. User signs in interactively in that real window (screen-visible, normal login/2FA).
+4. Drive the rest (navigate / `Runtime.evaluate` for form fills and clicks / extract the issued token from the page) via a small script sending JSON-RPC messages over the WebSocket — `Runtime.evaluate` with a `document.querySelector(...).click()` expression works for React/SPA forms that don't respond to plain CSS-selector automation.
+5. Use `Log.enable` + `Runtime.exceptionThrown` to read real console errors when something looks broken — don't guess the cause (e.g. "must be an extension issue") from a single symptom; enable console/network domains and read the actual error text first.
+
+**PID-scoped process termination (HARD STOP — do not kill by process name)**: when a debug-enabled
+instance needs to be restarted, **identify its exact PID first** (`netstat -ano | grep <port>` for
+the port owner, or the PID printed by `Start-Process`) and stop only that PID
+(`Stop-Process -Id <pid> -Force`). `Stop-Process -Name chrome -Force` kills **every** Chrome process
+under that name — including the user's own, unrelated, already-open browser windows. A real
+incident: this exact command closed a window the user had just reopened after a cookie-copy step,
+requiring an apology and re-open. Name-based kill is only acceptable when you have first confirmed
+(via a fresh process list) that no other Chrome instance is running.
 
 **Disconnected automatable backend → offer reconnect before degrading**: if the priority-1
 automatable backend (chrome-devtools) is *disconnected*, do NOT silently fall to the manual
