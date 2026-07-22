@@ -26,11 +26,16 @@ if [[ -z "$CMD" ]]; then
   exit 0
 fi
 
-# Fast pre-filter — both substrings must be present before the expensive parse.
+# Fast pre-filter — require `gh` AND an adjacent `pr create` token pair before the
+# expensive parse. A bare 'create' substring matches innocent read-only commands
+# (e.g. `--json ...createdAt`, `created_at`, or a filename like
+# `block-pr-create-without-draft.sh`), so match `pr` + whitespace + `create`
+# instead — that only appears in a real `gh pr create` invocation (or a quoted
+# reference the shlex parser below then correctly PASSes).
 if ! echo "$CMD" | grep -qE '\bgh\b'; then
   exit 0
 fi
-if ! echo "$CMD" | grep -q 'create'; then
+if ! echo "$CMD" | grep -qE 'pr[[:space:]]+create'; then
   exit 0
 fi
 
@@ -38,7 +43,24 @@ fi
 # three ADJACENT bare tokens. A quoted "gh pr create" (grep pattern / echo arg)
 # stays a single token, so it does not match — eliminating string-reference
 # false positives. CMD is passed via env, not stdin.
-RESULT=$(PR_CREATE_HOOK_CMD="$CMD" python3 - <<'PY'
+# Resolve a working Python interpreter. On Windows the `python3` App Execution
+# Alias lives under WindowsApps and opens the Microsoft Store instead of running,
+# so skip that path and prefer a real python3/python/py. Fail OPEN when none is
+# found — blocking every command (fail-closed) is far worse than skipping this
+# best-effort draft guard.
+PYBIN=""
+for _cand in python3 python py; do
+  _p=$(command -v "$_cand" 2>/dev/null) || continue
+  case "$_p" in
+    *[Ww]indows[Aa]pps*) continue ;;
+  esac
+  PYBIN="$_cand"; break
+done
+if [[ -z "$PYBIN" ]]; then
+  exit 0
+fi
+
+RESULT=$(PR_CREATE_HOOK_CMD="$CMD" "$PYBIN" - <<'PY'
 import os
 import shlex
 
