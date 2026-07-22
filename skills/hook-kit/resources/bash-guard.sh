@@ -148,7 +148,7 @@ if [ "$RUN_BG" = "true" ]; then
 fi
 
 # System / file destruction
-echo "$COMMAND" | $GREP -qiP '\brm\s+-rf\s+/'          && block "rm -rf / is extremely dangerous"
+echo "$COMMAND" | $GREP -qiP '\brm\s+-rf\s+/(\s|$|\*|/)' && block "rm -rf / is extremely dangerous"
 echo "$COMMAND" | $GREP -qiP '\brm\s+-rf\s+~'          && block "rm -rf ~ deletes your home directory"
 echo "$COMMAND" | $GREP -qiP '\brm\s+-rf\s+\.\.'       && block "rm -rf .. can delete a parent directory"
 echo "$COMMAND" | $GREP -qiP '\brm\s+-rf\s+\*'         && block "rm -rf * is dangerous"
@@ -163,6 +163,8 @@ echo "$COMMAND" | $GREP -qiP '\brm\b[^|;&]*\s(\./)?\.tmp/\*'           && block 
 # Docker destruction
 echo "$COMMAND" | $GREP -qiP 'docker\s+volume\s+rm'    && block "docker volume rm permanently deletes volume data"
 echo "$COMMAND" | $GREP -qiP 'docker\s+rm\b'           && block "docker rm deletes the container. Check if stop is sufficient"
+echo "$COMMAND" | $GREP -qiP 'docker\s+system\s+prune' && block "docker system prune irreversibly deletes containers/networks/images/build cache across ALL projects, not just the one in scope. Ask the user for an itemized, scoped cleanup instead"
+echo "$COMMAND" | $GREP -qiP 'docker\s+(image|container|volume|builder|network)\s+prune' && block "docker prune subcommands bulk-delete across all projects irreversibly. Ask the user for an itemized, scoped cleanup instead"
 
 # ── git destructive guards (global-option-aware + command-position aware) ──
 # FN fix: git accepts global options between `git` and the subcommand

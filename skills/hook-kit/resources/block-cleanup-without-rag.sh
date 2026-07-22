@@ -13,6 +13,11 @@
 #
 # Escalation policy (cleanup/run.md): 3rd recurrence+ Stop hook automation required.
 
+# Ralph autonomous loop (RALPH_LOOP=1) manages RAG persistence via its own wrapper
+# and has no interactive user to act on an injected reminder. Emitting the missing-RAG
+# reminder every turn only adds noise the headless agent may fixate on, so pass silently.
+if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
+
 # Load locale-specific regex patterns from data/. The file is git-ignored so
 # the public repo never sees Korean characters. When absent, cleanup detection
 # falls back to English-only markers.
@@ -56,7 +61,7 @@ if [[ -z "$RESPONSE" ]]; then
 fi
 
 # Detect cleanup-completion or session-end markers (locale variants from data/)
-if ! echo "$RESPONSE" | grep -qE "$HG_CLEANUP_MARKERS"; then
+if ! echo "$RESPONSE" | grep -qiE "$HG_CLEANUP_MARKERS"; then
   exit 0
 fi
 
