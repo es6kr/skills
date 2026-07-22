@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/claudify-v0.3.1...claudify-v0.4.0) (2026-07-17)
+
+
+### Features
+
+* **claudify:** add background-polling topic ([9fe0d46](https://github.com/es6kr/skills/commit/9fe0d4607053c046007c34dcfb3929a9e3796be0))
+* **claudify:** add background-polling topic ([0d9b3b9](https://github.com/es6kr/skills/commit/0d9b3b91f6d24ef646b301d12a9d78efac63ecb6))
+* **claudify:** forbid main-session idle while background work runs ([b248438](https://github.com/es6kr/skills/commit/b2484389f4c58aef918cb27c6c32b6a0e3054024))
+* promote next-feat to main (hook-kit, github-flow, claude-session, todowrite, claudify, cleanup) ([7c598eb](https://github.com/es6kr/skills/commit/7c598ebdbfdb21cf421e8f814ea1a2513ad27a58))
+
+
+### Bug Fixes
+
+* **claudify:** address internal review findings on PR [#81](https://github.com/es6kr/skills/issues/81) ([81921fa](https://github.com/es6kr/skills/commit/81921fa6be80ba88bd6669df40d9699e6e1ef57d))
+* **claudify:** document background-dispatch time-bound guard ([54f8396](https://github.com/es6kr/skills/commit/54f8396ba7ad43cec37792022fa94be66256b20c))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/claudify-v0.3.0...claudify-v0.3.1) (2026-06-25)
 
 

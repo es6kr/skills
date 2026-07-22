@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/es6kr/skills/compare/fix-plan-v0.3.1...fix-plan-v0.3.2) (2026-07-16)
+
+
+### Bug Fixes
+
+* **consolidate,fix-plan:** promote next-fix staging (review hardening + periodic archive) ([24726e9](https://github.com/es6kr/skills/commit/24726e99a5b2972f706d8749ea3a45cbc358984b))
+* **fix-plan:** add receiver-independent periodic archive for Completed section ([#73](https://github.com/es6kr/skills/issues/73)) ([122b179](https://github.com/es6kr/skills/commit/122b179d381f33f8345848f2a364c01ce8cb0ab1))
+* **fix-plan:** batch GitHub API queries and allow automated cleanup ([8f35c45](https://github.com/es6kr/skills/commit/8f35c4588d465acffa58f19f61795c364936688f))
+* **fix-plan:** guard subtree-archival against burying open children ([#91](https://github.com/es6kr/skills/issues/91)) ([3389987](https://github.com/es6kr/skills/commit/33899876e1c6f12ee059d19f2f811c27672d3d0c))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/fix-plan-v0.3.0...fix-plan-v0.3.1) (2026-06-25)
 
 

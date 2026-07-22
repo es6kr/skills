@@ -45,6 +45,23 @@ User confirmation is required before:
 
 **When `git push` is rejected, stop and AskUserQuestion.** Forbid autonomous `git pull`, `git rebase`, `git merge`. Show the remote's additional commits and let the user decide.
 
+## Mixed-result push output — per-ref evidence before continuing (HARD STOP)
+
+A push can partially succeed: some refs update while others are `! [rejected]` and git still exits with a command-level `error:`. This clause applies to ANY push output the assistant consumes — assistant-run OR **user-run** (`!` bash-input). Root cause to check first: a refspec-less push (`git push --force-with-lease` with no `origin <branch>`, e.g. a line-wrapped command) under `push.default=matching` attempts EVERY matching branch.
+
+1. **Per-ref evidence table is mandatory** — for each ref in the output: updated/rejected + `git ls-remote origin <ref>` confirmation. Never compress to "the intended ref worked; the rest is noise".
+2. **A rejected force-push against a shared/accumulation branch is a near-miss, not noise** — it was saved only by `--force-with-lease` stale-info protection. Flag it explicitly and diagnose why the push targeted that ref at all.
+3. **An `error:`-terminated push blocks gated continuations** (merge, publish, deploy) until the user confirms the interpretation — even when the target ref verifiably updated.
+4. **Commands handed to the user to run manually**: one line, explicit refspec (`git push --force-with-lease origin <branch>`) — wrapping drops the refspec into a second shell command.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | "Target ref updated → proceed; rejections are stale-ref noise" | Per-ref table + ls-remote evidence; shared-branch force rejections flagged as near-miss |
+| 2 | Continue straight to merge/publish after an error-terminated push | Report the evidence → user confirms the interpretation → then continue the gated flow |
+| 3 | Hand the user a multi-line force-push command without a refspec | Single line with explicit `origin <branch>` |
+
+**Self-check (every time push output contains `! [rejected]` or `error:`)**: ① every ref in the output enumerated with per-ref outcome + remote evidence? ② any rejected ref a shared branch? → near-miss flag + cause diagnosis ③ is the next action gated (merge/publish/deploy)? → user confirmation first ④ if the push was user-run from a command I supplied, was the command single-line with an explicit refspec?
+
 ## Hook failure handling (--no-verify is forbidden)
 
 **`--no-verify` is allowed ONLY when the user explicitly instructs it.** Do not bypass it even under environmental constraints. On failure, analyze the root cause → fix, OR report via AskUserQuestion.
@@ -169,3 +186,23 @@ See failed-attempts.md HOT entry "force-push CI in-progress run cancelled" — d
 
 - `merge` — merge condition gates (CI / AI Review Summary / Test Plan / Formal Review). Force-push CI check pairs with merge-condition CI check
 - `identity-auth` — gh auth scope refresh for `gh run list` to work on org repos
+
+## Hotfix / Emergency Deploy: Route Ask Before Any Action (HARD STOP)
+
+**"hotfix" / "urgent" / "deploy fast" / "deploy now" signals do NOT specify a deployment route (medium).** Applying PR creation as the default is forbidden — the route (direct master commit+push vs feature branch+PR vs reuse existing branch) is the user's decision, so **AskUserQuestion BEFORE code change/commit**. Urgent signals are precisely when whether to bypass the normal github-flow (PR) process is the core decision.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | "Deploy as hotfix" → auto-create branch+PR following normal procedure (github-flow) | Ask deploy route first: master direct push vs PR. "hotfix" is an unspecified-route signal |
+| 2 | Interpret "urgent" as "let's roll the PR quickly" | "urgent" = trigger to ask whether to bypass the normal PR procedure. Include direct master push (fastest route) as an option |
+| 3 | Interpret hotfix as a procedure (fast-track) only, not reflecting visible classification (label/title) | Classification (hotfix etc.) → reflect as label + route as separate ask |
+| 4 | Create worktree/branch, code change, commit, push, PR while route is undecided | **Hold all**: worktree/branch creation, code change, commit, push, PR — until route is confirmed |
+| 5 | Use worktree (full file checkout) for a single-line urgent fix — opposite of urgent, it's slow | Depending on route decision: master direct = in-place minimal change, PR = worktree. Worktree is a heavy path; forbidden as default for urgent |
+
+### Self-check (immediately after receiving urgent/hotfix/deploy instruction)
+
+1. Did the user specify the deployment **route (medium)**? ("via PR", "directly to master" etc.) — If unspecified, next step
+2. Am I about to proceed with worktree/branch/PR creation as default? — If yes, stop; ask route first (worktree creation is also setup = hold)
+3. Did the ask options include direct master push (shortest urgent path)?
+4. Is the change small (1-2 files) yet considering heavy setup like worktree? — If urgent, check in-place minimal path first
+

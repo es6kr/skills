@@ -132,7 +132,7 @@ The Claude environment implementation of resume.md Step 2. **One question per ta
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | List 4 tasks as options of a single question ("Delete all / Keep all / ...") | Split into `questions` array with one question per task (max 4) |
-| 2 | Use `multiSelect: true` to bundle the task list under one question | Each question independently decides one task's direction (proceed / hold / delete) |
+| 2 | Use `multiSelect: true` to bundle the task list under one question | Each question independently decides one task's direction (proceed / hold / defer-to-checklist / delete) |
 | 3 | Compress 5+ remaining tasks into a single question | Ask the top 4 by priority in the `questions` array, report the rest as "deferred" |
 
 ### Correct pattern (4 tasks — full use of the `questions` array)
@@ -156,11 +156,25 @@ AskUserQuestion({
       options: [
         { label: "Proceed", description: "Write missing cases" },
         { label: "Hold", description: "After #12 implementation" },
+        { label: "Defer to checklist", description: "External wait — move to fix_plan.md hold section, remove from task list" },
       ], multiSelect: false
     },
     // ... one question per task, max 4
   ]
 })
+```
+
+**External-wait items (user manual action / merge instruction / reply pending) must include the "Defer to checklist" option** — Hold keeps them in the task list across sessions, which violates the medium-separation principle (Step D below).
+
+### Defer to checklist — execution
+
+When the user picks "Defer to checklist" for a task:
+
+```javascript
+// 1. Append to the checklist medium (trigger mandatory)
+Edit("fix_plan.md")  // hold section: - [ ] [BLOCKED] <subject> (trigger: <re-activation condition>)
+// 2. Remove from the task list — never keep both media
+TaskUpdate({ taskId: "<id>", status: "deleted" })
 ```
 
 ### 5 or more tasks

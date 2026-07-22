@@ -3,13 +3,14 @@ name: todowrite
 metadata:
   author: es6kr
   version: "0.1.0"
-depends-on: [wip]
-description: Route TODO checklists to the right storage. session - in-session tracking via /wip, file - persistent TODO (fix_plan.md, TODO.md), issue - team-shared via GitHub Issues. "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue" triggers.
+depends-on:
+  - wip
+description: Route TODO checklists to the right storage + TaskList conversational discipline. session - in-session tracking via /wip, file - persistent TODO (fix_plan.md, TODO.md), issue - team-shared via GitHub Issues, conversation-id - subject-prefix references in user-visible output (no internal TaskList IDs), completion-report - TaskUpdate completion message format + file-change disclosure, fix-plan-sync - two-way sync between task medium and checklist medium, priority-prefix - encode task priority + execution order via subject prefix when TaskUpdate has no priority field, media-separation - 3-layer model: tracking (files) vs recording (RAG) vs knowledge (Wiki) [media-separation.md]. "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue", "task ID", "completion report", "task transfer", "task priority", "prefix ordering", "3-layer separation", "RAG vs wiki", "work record media" triggers.
 ---
 
 # TodoWrite
 
-Route TODO checklists to the appropriate storage based on context.
+Route TODO checklists to the appropriate storage based on context, and enforce conversational/reporting discipline around TaskList items.
 
 ## Routing Decision
 
@@ -22,11 +23,28 @@ New TODO arrives
 
 ## Topics
 
-| Topic | Storage | Lifetime | Tool |
-|-------|---------|----------|------|
+| Topic | Storage | Lifetime | Tool / Guide |
+|-------|---------|----------|--------------|
 | session | TaskCreate/TodoWrite | Session | → `/wip` skill |
 | file | fix_plan.md, TODO.md | While file exists | Write/Edit |
 | issue | GitHub Issues | Permanent | `gh issue create` |
+| conversation-id | — | Always-on | [conversation-id.md](./conversation-id.md) — subject-prefix references in user-visible output |
+| completion-report | — | Always-on | [completion-report.md](./completion-report.md) — TaskUpdate completion format + file-change disclosure |
+| fix-plan-sync | — | Always-on | [fix-plan-sync.md](./fix-plan-sync.md) — two-way sync between task medium and checklist medium |
+| priority-prefix | — | Always-on | [priority-prefix.md](./priority-prefix.md) — priority/order via subject prefix (`P{n}`, PR-anchored, `fix-*` > P0) |
+| media-separation | — | On-demand | [media-separation.md](./media-separation.md) — 3-layer model: tracking files vs RAG vs LLM Wiki |
+
+## Skip exceptions
+
+**TodoWrite can be skipped when**:
+- Running a single command (e.g., `kubectl get`, `ls`)
+- A task with 2 or fewer trivial steps
+- Information lookup only
+
+**`AskUserQuestion` can be skipped when**:
+- The user gave a clear directive
+- The action is safe and reversible
+- The general best practice is unambiguous
 
 ## Session → /wip
 

@@ -454,6 +454,7 @@ gh pr view <PR_NUMBER> --json mergeable
 Most feature work / bug fixes use squash merge. Clean up the commit message per the rules:
 
 1. **Subject**: start from the PR title with redundant tags (e.g. `[WIP]`, `[DRAFT]`) removed. **Subject MUST end with ` (#<PR_NUMBER>)` suffix** (HARD STOP) — matches GitHub's native squash default format. Enforced by `~/.claude/hooks/block-squash-subject-without-pr.sh` (PreToolUse:Bash): blocks `gh pr merge --squash` when (a) `--subject` is absent or (b) `--subject` value does not end with `(#<digits>)`.
+   - **Release-automation exclusion marker check (HARD STOP — before composing the subject)**: if the repo runs push-driven release automation (semantic-release / release-please on the base branch), inspect its config for a **catch-all release rule** (e.g. a `releaseRules` entry like `{"release": "patch"}` with no type filter — any unmarked commit cuts a release). If present, and this merge must NOT release (routine dependabot/dev-dep bumps, CI/config changes), append the config's exclusion marker (commonly `[skip release]`) to the squash subject. Verify against precedent: `git log --oneline -20 origin/<base>` — prior squash subjects of the same class (e.g. earlier dependabot merges) carrying the marker = the repo convention. Merging without the marker on a catch-all config publishes an unintended release.
 2. **Body**:
    - Distill the key content from the PR body's "Changes" or "Key changes" section.
    - Include `Closes #issue` or `Fixes #issue`.
@@ -567,3 +568,21 @@ gh pr view <N> --json reviews -q '[.reviews[] | select(.state == "APPROVED") | .
 1. Did the user use the explicit words "merge" / "proceed with merge" / "ship it"? → If no, do NOT present a merge option
 2. Verification work and merge work are separate. End with the verification-complete report
 3. Including a merge option in the AskUserQuestion = rule violation (pressures the user into the merge decision)
+
+## PR-before-close: tracking issue close requires merged deliverable PR (HARD STOP)
+
+When a tracking repo (usually PRIVATE) issue tracks a code deliverable in another repo (usually PUBLIC), the tracking issue may only be closed **after the deliverable PR is authored AND merged**.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Local code change + report in tracking issue → close tracking issue | (1) Author PR in deliverable repo → (2) record PR URL in tracking issue body/comment → (3) confirm PR merged → (4) close tracking issue |
+| 2 | "Tracking issue marks work complete, so deliverable PR is optional" assumption | Tracking issue = work tracking. Deliverable PR = actual artifact. **These are separate responsibilities.** Closing tracking without a PR = work incomplete + unverifiable later |
+| 3 | Treat work completed in a local directory (e.g., `~/.agents/`) as "deliverable done" | Verify whether that directory is a git repo (`git remote -v`) + where the remote is (`gh repo view`). Push + PR creation = deliverable done |
+
+### Self-check (before every `gh issue close`)
+
+1. Is the issue being closed in the same repo as the deliverable? — Yes = single-repo workflow, this rule does not apply
+2. Which repo holds the deliverable? (check the git repo where code changes occurred via `git remote -v`)
+3. Does the deliverable repo have a PR for this work? (`gh pr list -R <deliverable-repo> --search "<keyword>"`)
+4. Is that PR **merged**? (`gh pr view <N> --json mergedAt -R <deliverable-repo>`)
+5. Only close when (2)–(4) are all satisfied. If any unmet → block close + report to user

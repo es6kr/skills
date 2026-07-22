@@ -13,10 +13,14 @@
 # resources/ home) → re-homed here in hook-kit/resources/ so /hook audit tracks it.
 # Rule strengthening alone did not prevent recurrence; this hook automates the gate.
 #
-# PR-URL gate (2nd guard, same file): any PR reference in ask text requires a
-# clickable PR URL somewhere in the same questions payload, so the user can open
-# and inspect the PR before deciding. A bare "PR #N" — even with the repo name —
-# is insufficient. Tracked in failed-attempts.md (grep "bare PR", 3rd recurrence).
+# PR-URL gate (2nd guard, same file): every DISTINCT PR number referenced in ask
+# text requires its OWN matching clickable PR URL somewhere in the same questions
+# payload, so the user can open and inspect each PR before deciding. A bare "PR #N"
+# — even with the repo name — is insufficient, and one PR's URL does not satisfy
+# references to other PR numbers in the same payload (payload-wide "any URL exists"
+# checking under-enforces multi-PR asks). Tracked in failed-attempts.md (grep "bare
+# PR", 4th recurrence — 3rd recurrence's fix used payload-wide checking, which a
+# multi-PR-reference ask slipped through).
 
 INPUT=$(cat)
 
@@ -51,20 +55,37 @@ while IFS= read -r line; do
   done < <(echo "$line" | grep -oE '.{0,25}#[0-9]{1,3}([^0-9]|$)')
 done <<< "$TEXTS"
 
-# --- PR-URL gate: PR reference present but no PR URL anywhere in the payload ---
-if echo "$TEXTS" | grep -qiE '\bPR[[:space:]]*#?[0-9]+'; then
-  if ! echo "$TEXTS" | grep -qiE 'https://github\.com/[^[:space:])]+/pull/[0-9]+|https://[^[:space:])]*gitlab[^[:space:])]+/-/merge_requests/[0-9]+'; then
+# --- PR-URL gate: each DISTINCT PR number must have its own matching URL ---
+# (payload-wide "any URL exists" checking under-enforces multi-PR asks — a URL
+# for PR #A does not satisfy a bare reference to PR #B in the same payload)
+PR_NUMS_REFERENCED=$(echo "$TEXTS" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
+if [[ -n "$PR_NUMS_REFERENCED" ]]; then
+  PR_NUMS_WITH_URL=$(echo "$TEXTS" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
+  MISSING_URL_FOR=()
+  while IFS= read -r n; do
+    [[ -z "$n" ]] && continue
+    if ! grep -qxF "$n" <<< "$PR_NUMS_WITH_URL"; then
+      MISSING_URL_FOR+=("$n")
+    fi
+  done <<< "$PR_NUMS_REFERENCED"
+  if [[ ${#MISSING_URL_FOR[@]} -gt 0 ]]; then
     {
-      echo "DENIED: AskUserQuestion references a PR without exposing its URL."
+      echo "DENIED: AskUserQuestion references PR number(s) without a matching URL for each."
       echo ""
       echo "Why blocked:"
       echo "  - An ask is a self-contained decision UI: the user must be able to open"
-      echo "    and inspect the PR before deciding, without hunting through scroll-back"
-      echo "  - A bare 'PR #N' — even with the repo name — is not clickable"
+      echo "    and inspect EVERY referenced PR before deciding, without hunting through"
+      echo "    scroll-back"
+      echo "  - A bare 'PR #N' — even with the repo/project name — is not clickable"
+      echo "  - One PR's URL does not satisfy references to a DIFFERENT PR number in the"
+      echo "    same payload — each distinct number needs its own URL"
+      echo ""
+      echo "PR number(s) missing their own URL: ${MISSING_URL_FOR[*]}"
       echo ""
       echo "Required action:"
-      echo "  Include the full PR URL (https://github.com/<owner>/<repo>/pull/<N>)"
-      echo "  in the question text or the relevant option's description, then retry."
+      echo "  Add the full PR/MR URL (e.g., https://github.com/<owner>/<repo>/pull/<N> or"
+      echo "  GitLab MR URL) for each PR number listed above, in the question text or"
+      echo "  the relevant option's description, then retry."
       echo ""
       echo "Reference: question skill options.md section 4 (metadata + full URL);"
       echo "  failed-attempts.md (grep \"bare PR\")"
