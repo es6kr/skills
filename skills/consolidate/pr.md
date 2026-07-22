@@ -54,6 +54,8 @@ Skip entirely if any of these are true:
 1. **CI failing**: `gh pr checks <NUMBER> --json state --jq '[.[] | select(.state != "SUCCESS")] | length'` > 0
 2. **Reviews not complete**: CodeRabbit summary comment not yet posted (check for "<!-- walkthrough_start -->")
 3. **Already summarized**: `gh pr view <NUMBER> --comments` contains "AI Review Summary"
+4. **Draft PR (HARD STOP — no exception for "no findings" framing)**: `gh pr view <NUMBER> --json isDraft --jq '.isDraft'` returns `true` → skip the entire flow, including Step 7. A draft PR has not opted into review (CodeRabbit/Copilot commonly skip drafts by their own config, matching Step 2 condition 2's "reviews not complete"). **Do not post a Summary that documents the absence of review** ("no findings", "eligible for no-review merge", etc.) — an absent review is not a reviewed-and-clean verdict, and posting one anyway defeats condition 2's intent through a side door. Re-run consolidate after the PR transitions to ready (`gh pr ready <NUMBER>`).
+5. **Non-default base branch used for staged/pre-merge batching** (project-specific — check the project's own branch-promotion convention, e.g. a staging branch that later opens its own promotion PR into the default branch): skip Summary/Formal Review for the same reason as condition 4 — the review gate for that PR's actual content sits on the later promotion PR, not this one. If the project has no such convention, this condition does not apply.
 
 > **Bash exit code caveat**: `grep -c` returns exit code 1 when there are zero matches. When chaining multiple commands with `grep` last, add a `|| true` guard to prevent false-positive errors.
 
@@ -323,6 +325,7 @@ git -C <worktree> merge --abort   # always abort — do not commit a merge into 
 ```
 
 Report the conflicting files in the Summary so the author can rebase. **Do not resolve another author's conflict** (branch ownership: only the PR author resolves — see `~/.agents/rules/git.md` "Branch ownership" rule).
+**Exception for Staging Promotion PRs (e.g. next-fix / next-feat)**: If all blocking/ready PRs are already merged, and the promotion PR is conflicting with `main`, the operator should resolve the conflict by merging `origin/main` (or the base branch) into the promotion branch, resolving the conflicts, and pushing the update to origin.
 
 ### Don't / Do
 
@@ -330,7 +333,7 @@ Report the conflicting files in the Summary so the author can rebase. **Do not r
 |---|-------|-----|
 | 1 | Review only from `gh pr diff` with no local checkout | Check out the PR branch into a worktree first; the code-reviewer reads real files + runs tests |
 | 2 | `git worktree add` a fresh worktree every review | Use the git-repo `worktree` topic — reuse inactive / merged-PR worktrees first (decision tree) |
-| 3 | Resolve a CONFLICTING PR's conflict in the worktree | Detect + report conflicting files. Branch ownership: only the author resolves |
+| 3 | Resolve a CONFLICTING PR's conflict in the worktree (except for staging promotion PRs) | Detect + report conflicting files. Branch ownership: only the author resolves (unless it is a staging promotion PR with all blockers merged) |
 | 4 | `git worktree remove` after every review | Leave it for git-repo to reuse next review. Do not delete blindly |
 | 5 | Skip the worktree when external AI review is already sufficient | Worktree is mandatory for **all** reviews — it enables CONFLICTING detection + local verification regardless of external AI completeness |
 
@@ -353,7 +356,7 @@ Report the conflicting files in the Summary so the author can rebase. **Do not r
 
 - **Never auto-fix without explicit user instruction** — fix (code changes) must not run automatically in Step 5/6. Proceed only when the user explicitly chooses "fix" in the Step 8 next-action ask. Posting the Summary (Step 7) is procedure, so it proceeds automatically without a user decision
 - **Never auto-commit/push without user approval** — even after a fix is decided, commit/push needs separate explicit consent
-- **Always post summary comment automatically** — regardless of whether actionable items exist. Findings are auto-registered to fix_plan in Step 7.6. Asking whether to post the Summary is forbidden (HARD STOP). For the medium, see the "Medium selection" table in [`post.md`](./post.md)
+- **Always post summary comment automatically** — regardless of whether actionable items exist, **once Step 2 is passed** (draft / non-default-base-staging PRs are skipped at Step 2 condition 4/5, never reach this rule). Findings are auto-registered to fix_plan in Step 7.6. Asking whether to post the Summary is forbidden (HARD STOP). For the medium, see the "Medium selection" table in [`post.md`](./post.md)
 - **Check branch ownership** — only modify code on self-created branches
 - **Formal Review is mandatory when you are a requested reviewer** — issue comment Summary alone does not satisfy the review request
 - **One summary per PR** — skip if "AI Review Summary" already exists. On re-run, update via PATCH on the existing comment

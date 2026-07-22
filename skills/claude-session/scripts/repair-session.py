@@ -40,14 +40,20 @@ def load_lines(session_file: Path) -> List[Tuple[str, Optional[dict]]]:
     return messages
 
 
-def remove_400_errors(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tuple[str, Optional[dict]]], int]:
+def remove_400_errors(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tuple[str, Optional[dict]]], int, Dict[str, Optional[str]]]:
     """Remove 400 error lines and the preceding user message
 
     Condition: isApiErrorMessage==True or error=="invalid_request"
     Also removes the preceding user message when an error is removed
+
+    Returns (result, removed_count, removed_parents) where removed_parents maps each
+    removed message's uuid -> its parentUuid. Downstream chain repair uses this to
+    bridge a dangling pointer PAST the removed node to its real surviving ancestor,
+    instead of re-linking to an unrelated file-order-previous message.
     """
     removed = 0
     result = []
+    removed_parents: Dict[str, Optional[str]] = {}
 
     for line, data in messages:
         if data is None:
@@ -62,20 +68,27 @@ def remove_400_errors(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[
         if is_error:
             # Remove preceding user message
             if result and result[-1][1] is not None and result[-1][1].get('type') == 'user':
-                result.pop()
+                popped = result.pop()[1]
+                if popped.get('uuid'):
+                    removed_parents[popped['uuid']] = popped.get('parentUuid')
                 removed += 1
+            if data.get('uuid'):
+                removed_parents[data['uuid']] = data.get('parentUuid')
             removed += 1
         else:
             result.append((line, data))
 
-    return result, removed
+    return result, removed, removed_parents
 
 
-def remove_orphan_tool_results(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tuple[str, Optional[dict]]], int]:
+def remove_orphan_tool_results(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tuple[str, Optional[dict]]], int, Dict[str, Optional[str]]]:
     """Detect and remove orphan tool_results
 
     Collect all assistant tool_use ids -> delete user messages whose
     tool_result.tool_use_id does not match any remaining tool_use
+
+    Returns (result, removed_count, removed_parents); removed_parents maps a fully
+    removed message's uuid -> its parentUuid (see remove_400_errors for the rationale).
     """
     # Collect all tool_use ids
     tool_use_ids = set()
@@ -89,6 +102,7 @@ def remove_orphan_tool_results(messages: List[Tuple[str, Optional[dict]]]) -> Tu
 
     removed = 0
     result = []
+    removed_parents: Dict[str, Optional[str]] = {}
 
     for line, data in messages:
         if data and data.get('type') == 'user':
@@ -114,11 +128,13 @@ def remove_orphan_tool_results(messages: List[Tuple[str, Optional[dict]]]) -> Tu
                             data['message']['content'] = non_orphan_content
                             result.append((json.dumps(data), data))
                         else:
+                            if data.get('uuid'):
+                                removed_parents[data['uuid']] = data.get('parentUuid')
                             removed += 1
                         continue
         result.append((line, data))
 
-    return result, removed
+    return result, removed, removed_parents
 
 
 # Types to exclude from chain repair
@@ -156,17 +172,52 @@ def repair_chains(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tupl
     return result, fixed
 
 
-def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tuple[str, Optional[dict]]], int]:
+def _resolve_surviving_ancestor(parent: Optional[str],
+                                kept_uuids: set,
+                                removed_parents: Dict[str, Optional[str]]) -> Optional[str]:
+    """Resolve a dangling parentUuid to the nearest SURVIVING ancestor.
+
+    Follows the removed_parents chain (removed uuid -> its parentUuid) to skip past
+    messages that this repair deleted (400 errors, orphan tool_results), landing on
+    the first ancestor that still exists. Returns None when the ancestry is truly
+    lost — a null root, NOT a bridge to an unrelated file-order-previous message
+    (which would splice pre-boundary history back into the active context).
+    """
+    seen = set()
+    while parent is not None:
+        if parent in kept_uuids:
+            return parent
+        if parent in seen:            # cycle guard
+            return None
+        seen.add(parent)
+        if parent in removed_parents:
+            parent = removed_parents[parent]   # step past a removed node
+        else:
+            return None               # genuinely gone -> new root
+    return None
+
+
+def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]],
+                          removed_parents: Optional[Dict[str, Optional[str]]] = None
+                          ) -> Tuple[List[Tuple[str, Optional[dict]]], int, List[dict]]:
     """Repair messages whose parentUuid points to a non-existent UUID.
 
-    Cross-references parentUuid values against the set of all message UUIDs
-    in the file. If parentUuid is set (non-null) but does not match any
-    message's uuid, replace it with the immediately preceding message's uuid
-    (same fallback as repair_chains).
+    Cross-references parentUuid values against the set of all message UUIDs in the
+    file. When parentUuid is set (non-null) but matches no message, resolve it to the
+    nearest surviving ancestor via removed_parents (bridging PAST nodes this repair
+    deleted), or to null when the ancestry is truly lost.
 
-    Detects post-dedup leftovers and Syncthing/manual-edit damage that
-    the field-presence check in repair_chains misses.
+    Never re-links to the immediately preceding file-order message: file order is not
+    chain order, and bridging across a compact/resume boundary re-attaches pre-compact
+    history to the active chain, inflating the effective context.
+
+    Returns (result, fixed_count, null_roots) — null_roots lists {uuid, line, old_parent}
+    for every resolution that landed on None (ancestry truly lost), so the caller can
+    disclose exactly where history connectivity was severed instead of only reporting
+    an aggregate count.
     """
+    removed_parents = removed_parents or {}
+
     all_uuids = set()
     for _, d in messages:
         if d and d.get('uuid'):
@@ -174,9 +225,9 @@ def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[L
 
     fixed = 0
     result = []
-    prev_uuid = None
+    null_roots: List[dict] = []
 
-    for line, data in messages:
+    for i, (line, data) in enumerate(messages):
         if data is None or not data.get('uuid'):
             result.append((line, data))
             continue
@@ -186,16 +237,18 @@ def repair_orphan_parents(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[L
 
         if not is_sidechain and msg_type not in _SKIP_CHAIN_TYPES:
             parent = data.get('parentUuid')
-            if parent is not None and parent not in all_uuids and prev_uuid is not None:
+            if parent is not None and parent not in all_uuids:
+                resolved = _resolve_surviving_ancestor(parent, all_uuids, removed_parents)
+                if resolved is None:
+                    null_roots.append({'uuid': data['uuid'], 'line': i + 1, 'old_parent': parent})
                 data = dict(data)
-                data['parentUuid'] = prev_uuid
+                data['parentUuid'] = resolved
                 line = json.dumps(data, ensure_ascii=False)
                 fixed += 1
 
-        prev_uuid = data.get('uuid')
         result.append((line, data))
 
-    return result, fixed
+    return result, fixed, null_roots
 
 
 def validate(messages: List[Tuple[str, Optional[dict]]]) -> dict:
@@ -270,6 +323,46 @@ def validate(messages: List[Tuple[str, Optional[dict]]]) -> dict:
     }
 
 
+def active_chain_stats(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[Optional[str], int]:
+    """Return (leaf_uuid, active_chain_hops) for the current conversation.
+
+    The leaf is the last non-sidechain message with a uuid (what Claude Code loads as
+    the current turn). Hops = length of the parentUuid walk from the leaf until a null
+    root or a dangling pointer. Used as a regression signal: a repair that PRESERVES
+    chain topology must keep the leaf identity and must not balloon the hop count
+    (ballooning == pre-boundary history spliced back into the active context).
+    """
+    by_uuid: Dict[str, dict] = {}
+    order: List[dict] = []
+    for _, d in messages:
+        if d and d.get('uuid'):
+            order.append(d)
+            by_uuid.setdefault(d['uuid'], d)
+
+    leaf = None
+    for d in reversed(order):
+        if not d.get('isSidechain'):
+            leaf = d
+            break
+    if leaf is None:
+        return None, 0
+
+    seen = set()
+    node = leaf
+    hops = 0
+    while node is not None:
+        u = node.get('uuid')
+        if not u or u in seen:
+            break
+        seen.add(u)
+        hops += 1
+        p = node.get('parentUuid')
+        if p is None:
+            break
+        node = by_uuid.get(p)
+    return leaf.get('uuid'), hops
+
+
 def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     """Run full session file repair"""
     session_file = Path(session_file)
@@ -308,22 +401,52 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
         # dry-run: analyze original as-is
         messages = original_lines
 
+    # Baseline topology of the pre-repair conversation (for the regression check).
+    before_leaf, before_hops = active_chain_stats(original_lines)
+
     # Step 3: remove 400 errors
-    messages, error_removed = remove_400_errors(messages)
+    messages, error_removed, removed_parents_400 = remove_400_errors(messages)
     print(f"[3/7] 400 error removal: {error_removed} (error lines + preceding user messages)")
 
     # Step 4: remove orphan tool_results
-    messages, orphan_removed = remove_orphan_tool_results(messages)
+    messages, orphan_removed, removed_parents_orphan = remove_orphan_tool_results(messages)
     print(f"[4/7] Orphan tool_result removal: {orphan_removed}")
 
+    # Nodes this repair deleted -> their parent, so dangling pointers bridge past them
+    # to a surviving ancestor instead of a file-order-previous message.
+    removed_parents = {**removed_parents_400, **removed_parents_orphan}
     # Step 5: repair broken chains (missing parentUuid field)
     messages, chain_fixed = repair_chains(messages)
     print(f"[5/7] Broken chain repair: {chain_fixed}")
 
     # Step 6: repair orphan parent UUIDs (parentUuid value points to nonexistent message)
-    messages, orphan_parent_fixed = repair_orphan_parents(messages)
+    messages, orphan_parent_fixed, orphan_null_roots = repair_orphan_parents(messages, removed_parents)
     print(f"[6/7] Orphan parent repair: {orphan_parent_fixed}")
 
+    # Combine null-root disclosures from dedup's Pass 6 and this pass — every line where
+    # a dangling parentUuid could not be traced to any surviving ancestor (data genuinely
+    # missing from the file, not something this repair caused). In --dry-run mode dedup's
+    # in-memory fix is never swapped into `messages` (only the real run does that), so the
+    # same dangling parent can be caught by both passes — dedupe by uuid to report each
+    # affected message once regardless of mode.
+    null_roots = list({nr['uuid']: nr for nr in (list(dedup_result.get('null_roots', [])) + orphan_null_roots)}.values())
+    if null_roots:
+        print(f"\n[WARN] {len(null_roots)} chain repair(s) had NO recoverable ancestor "
+              f"(history above these lines is genuinely missing from this file — inspect "
+              f"before declaring the session fully repaired):")
+        for nr in null_roots:
+            print(f"  line {nr['line']}: uuid={nr['uuid'][:8]} (was parent={nr['old_parent'][:8]}, not found in file)")
+
+    # Chain-topology regression check: a topology-preserving repair keeps the leaf and
+    # must not balloon the active-chain length. A ballooned hop count means pre-boundary
+    # history was spliced back into the active context (the bug this guard catches).
+    after_leaf, after_hops = active_chain_stats(messages)
+    if before_leaf and after_leaf and before_leaf != after_leaf:
+        print(f"  [WARN] active leaf changed: {before_leaf[:8]} -> {after_leaf[:8]} "
+              f"(Claude Code will load a different current turn)")
+    if before_hops > 0 and after_hops > max(before_hops * 3, before_hops + 200):
+        print(f"  [WARN] active chain inflated: {before_hops} -> {after_hops} hops "
+              f"(possible pre-boundary history spliced into active context)")
     # Step 7: validate
     validation = validate(messages)
     print(f"[7/7] Validation:")
@@ -352,6 +475,7 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
         'orphan_removed': orphan_removed,
         'chain_fixed': chain_fixed,
         'orphan_parent_fixed': orphan_parent_fixed,
+        'null_roots': null_roots,
         'validation': validation,
     }
 
@@ -387,6 +511,13 @@ def main():
     ok = all(v[k] == 0 for k in v)
     status = "PASS" if ok else "FAIL"
     print(f"\nValidation: {status}")
+
+    if result.get('null_roots'):
+        print(f"\nNOTE: Validation PASS means the file is now structurally sound (no dangling "
+              f"references), NOT that all history is reachable — {len(result['null_roots'])} "
+              f"line(s) above have a new root because their true ancestor is missing from this "
+              f"file (see [WARN] above). Do not report this repair as \"complete\" without also "
+              f"disclosing those line/uuid pairs to the user.")
 
 
 if __name__ == '__main__':

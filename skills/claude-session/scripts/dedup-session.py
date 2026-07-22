@@ -90,10 +90,13 @@ def get_dedup_key(data: dict) -> str:
 def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
     """Remove duplicates from session file and repair chain
 
-    Strategy: dedup -> chain repair (aggressive)
+    Strategy: dedup -> topology-preserving chain repair
     1. Load all messages
-    2. Keep only first occurrence in each duplicate group (regardless of references)
-    3. Repair parentUuid chain broken by removals, linking to previous message uuid
+    2. Keep only the richest copy in each duplicate group (regardless of references)
+    3. Preserve each surviving message's real parentUuid; only redirect pointers that
+       referenced a dropped duplicate to the surviving copy, and null-root pointers
+       whose target is truly gone. Never re-link to the previous file-order message
+       (that would splice unrelated history across compact/resume boundaries).
 
     Returns:
         dict: {
@@ -136,6 +139,30 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
         # Sort by richness score, pick the highest
         best = max(group, key=lambda x: get_content_richness(x[1]))
         best_messages[key] = best
+
+    # Build two maps used by the topology-preserving chain repair (Pass 6):
+    #   uuid_remap:  every uuid seen in a dedup group -> the kept (best) copy's uuid.
+    #                Syncthing conflicts (and streaming fragments) record the same
+    #                message.id under DIFFERENT uuids; only the richest copy survives,
+    #                so a parentUuid pointing at a dropped copy must redirect to it.
+    #   orig_parent: uuid -> its ORIGINAL parentUuid (first occurrence). Lets us walk
+    #                out of a message's own streaming group: a kept copy's parent is
+    #                often an earlier fragment OF THE SAME TURN, and remapping that to
+    #                the kept uuid would make the message its own parent (self-loop).
+    #                We follow orig_parent until we exit the group.
+    uuid_remap = {}
+    orig_parent = {}
+    for key, group in dedup_groups.items():
+        best_data = best_messages[key][1]
+        kept_uuid = best_data.get('uuid') if best_data else None
+        if not kept_uuid:
+            continue
+        for _, gdata in group:
+            if gdata and gdata.get('uuid'):
+                uuid_remap[gdata['uuid']] = kept_uuid
+    for _, data in messages:
+        if data and data.get('uuid') and data['uuid'] not in orig_parent:
+            orig_parent[data['uuid']] = data.get('parentUuid')
 
     # Preserve original order while building unique_lines (use best message)
     unique_lines = []
@@ -207,58 +234,100 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
     unique_lines = filtered_lines
     unique_data = filtered_data
 
-    # Pass 6: rebuild chain (sequential linking)
-    # Force all messages to point to the previous message as parent
+    # Pass 6: repair the chain WITHOUT destroying its topology.
+    #
+    # File order != logical chain order. Claude Code sessions interleave sidechains
+    # (subagents), compact/resume boundaries, and branch points, so a message's true
+    # parent (parentUuid) very often differs from the previous file-order message.
+    # The old "force every message to point at the previous line" strategy spliced
+    # unrelated history into one linear mega-chain: it changed the effective leaf/root
+    # and re-attached pre-compact history onto post-compact history, inflating the
+    # active context ("context merges across the compact boundary"). Measured on a real
+    # 30k-line session it rewrote 6056 parentUuids, 3265 of which still had a valid
+    # surviving parent, and grew the leaf's active chain from ~77 to 10343 hops.
+    #
+    # Correct, topology-preserving handling per message:
+    #   - parentUuid == null                     -> keep (chain ROOT / compact boundary)
+    #   - parentUuid points to a surviving uuid   -> keep exactly (valid parent)
+    #   - parentUuid points to a dropped duplicate -> remap to the surviving copy
+    #   - parentUuid truly gone (no remap)         -> set null (new root); NEVER bridge
+    #     to an unrelated file-order-previous message
+    kept_uuids = set()
+    for data in unique_data:
+        if data and data.get('uuid'):
+            kept_uuids.add(data['uuid'])
+
+    def resolve_parent(parent, own_uuid):
+        """Resolve a parentUuid to the nearest SURVIVING ancestor that is not the
+        message itself. Walks uuid_remap (dropped copy -> kept copy) and, when that
+        lands on the message's own turn (a streaming fragment of the same message.id),
+        follows orig_parent out of the group. Returns None when the ancestry is lost."""
+        seen = set()
+        cur = parent
+        while cur is not None:
+            if cur in seen:                 # cycle guard
+                return None
+            seen.add(cur)
+            kept = uuid_remap.get(cur, cur)  # surviving copy of this uuid
+            if kept in kept_uuids and kept != own_uuid:
+                return kept                  # a real, distinct, surviving ancestor
+            # Either 'cur' has no surviving copy, or it collapses onto own_uuid
+            # (an earlier fragment of this same turn). Step to its original parent.
+            cur = orig_parent.get(cur)
+        return None
+
     fixed_chains = 0
     final_lines = []
+    # Null-rooted repairs: a non-null parentUuid that resolve_parent could not map to
+    # any surviving ancestor (ancestry truly lost — see resolve_parent docstring).
+    # Tracked with line/uuid so the caller can disclose exactly WHERE history
+    # connectivity was severed, instead of only reporting an aggregate count (a repair
+    # landing on a user-visible message, e.g. a compact-boundary marker, means real
+    # data is missing from the file — not a defect this repair introduced, but a fact
+    # worth surfacing rather than folding into a blanket "Validation: PASS").
+    null_roots = []
 
-    prev_uuid = None
     for i, (line, data) in enumerate(zip(unique_lines, unique_data)):
-        if data is None:
+        if data is None or not data.get('uuid'):
+            # Messages without uuid (e.g. file-history-snapshot) are kept as-is
             final_lines.append(line)
             continue
 
-        # Messages without uuid (e.g. file-history-snapshot) are kept as-is
-        if not data.get('uuid'):
-            final_lines.append(line)
-            continue
-
+        own_uuid = data.get('uuid')
         current_parent = data.get('parentUuid')
-        expected_parent = prev_uuid  # uuid of the previous message
 
-        # First message must have parentUuid == null
-        if i == 0 or prev_uuid is None:
-            if current_parent is not None:
-                data['parentUuid'] = None
-                final_lines.append(json.dumps(data, ensure_ascii=False))
-                fixed_chains += 1
-            else:
-                final_lines.append(line)
-        # A mid-file explicit parentUuid == null is a legitimate chain ROOT, not a
-        # break to repair. Claude Code re-roots the chain at every compact/resume
-        # boundary: the isCompactSummary node's parent is a `system` node written
-        # with parentUuid: null. Corruption never emits an explicit null — only a
-        # missing field or a dangling pointer — so an explicit null must be
-        # preserved. Bridging it to the previous line would splice pre-compact
-        # history onto post-compact history (repair.md §"Repair Broken Chain":
-        # "parentUuid: null is normal — do not touch").
-        elif current_parent is None:
-            final_lines.append(line)
-        # Subsequent messages must point to the previous message
-        elif current_parent != expected_parent:
-            data['parentUuid'] = expected_parent
+        if current_parent is None:
+            # Root / compact boundary — preserve.
+            new_parent = None
+        elif current_parent in kept_uuids and current_parent != own_uuid:
+            # Valid parent survives — preserve exactly.
+            new_parent = current_parent
+        else:
+            # Parent was deduplicated, collapses onto self, or is gone -> resolve to
+            # the nearest distinct surviving ancestor, or null (never bridge to an
+            # unrelated file-order-previous line, which would merge contexts).
+            new_parent = resolve_parent(current_parent, own_uuid)
+
+        # The very first surviving message is always a root.
+        if i == 0:
+            new_parent = None
+
+        if new_parent != current_parent:
+            if new_parent is None and current_parent is not None:
+                null_roots.append({'uuid': own_uuid, 'line': i + 1, 'old_parent': current_parent})
+            data = dict(data)
+            data['parentUuid'] = new_parent
             final_lines.append(json.dumps(data, ensure_ascii=False))
             fixed_chains += 1
         else:
             final_lines.append(line)
-
-        prev_uuid = data.get('uuid')
 
     result = {
         'original_lines': len(messages),
         'unique_lines': len(final_lines),
         'duplicates_by_type': duplicates_by_type,
         'fixed_chains': fixed_chains,
+        'null_roots': null_roots,
     }
 
     if not dry_run:
@@ -299,6 +368,13 @@ def main():
         print("\nRemoved by type:")
         for t, c in sorted(result['duplicates_by_type'].items(), key=lambda x: -x[1]):
             print(f"  {t}: {c}")
+
+    if result.get('null_roots'):
+        print(f"\n[WARN] {len(result['null_roots'])} chain repair(s) had NO recoverable ancestor "
+              f"(history above these lines is genuinely missing from this file, not caused by this "
+              f"repair — inspect before declaring the session fully repaired):")
+        for nr in result['null_roots']:
+            print(f"  line {nr['line']}: uuid={nr['uuid'][:8]} (was parent={nr['old_parent'][:8]}, not found in file)")
 
     if not dry_run and 'output_file' in result:
         print(f"\nSaved: {result['output_file']}")

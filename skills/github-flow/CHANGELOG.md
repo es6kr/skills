@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/es6kr/skills/compare/github-flow-v0.6.0...github-flow-v0.6.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* externalize internal-host detection tokens (edit-guard + sanitize doc) ([0bb7f83](https://github.com/es6kr/skills/commit/0bb7f831c752ecc5272611da752325f44e3c32a6))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/github-flow-v0.5.0...github-flow-v0.6.0) (2026-07-17)
 
 

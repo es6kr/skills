@@ -22,10 +22,23 @@ HANGUL_SAMPLE_1 = chr(0xAC00) + chr(0xB098)
 HANGUL_SAMPLE_2 = chr(0xD55C) + chr(0xAE00)
 
 
+def _no_git_env():
+    """Environment with every GIT_* variable dropped.
+
+    Under a git hook (pre-push runs this suite), git exports GIT_DIR pointing
+    at the invoking repository. Without scrubbing, the fixtures' git calls and
+    the scanner's internal `git ls-files` ignore cwd=tmp_path and operate on
+    the REAL repo — the fixture's `git commit` then lands a stray commit on
+    the branch being pushed.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _run_py(args, cwd):
     return subprocess.run(
         [sys.executable, str(PY_SCRIPT), *args],
         capture_output=True, text=True, encoding="utf-8", cwd=cwd,
+        env=_no_git_env(),
     )
 
 
@@ -128,12 +141,88 @@ def test_nested_md_files_are_scanned(tmp_path):
     assert "1 Korean lines found" in result.stdout
 
 
-def test_default_argument_is_skills_dir():
-    """No CLI args defaults to scanning ./skills relative to cwd."""
-    result = _run_py([], cwd=REPO_ROOT)
-    # Real repo skills/ tree should be clean (CI enforces this).
-    assert result.returncode == 0
-    assert "All skills clean" in result.stdout
+def test_default_argument_is_skills_dir(tmp_path):
+    """No CLI args defaults to scanning ./skills relative to cwd.
+
+    Hermetic: builds its own ./skills fixture instead of asserting on the real
+    repo tree — a local working branch may legitimately carry Korean content
+    (locale data, private topics), and a test that scans the live checkout
+    blocks every push from such a machine via the pre-push CI-parity gate.
+    """
+    dirty = tmp_path / "skills" / "skill-with-hangul"
+    dirty.mkdir(parents=True)
+    (dirty / "SKILL.md").write_text(
+        f"# dirty\nKorean: {HANGUL_SAMPLE_1}\n", encoding="utf-8"
+    )
+    result = _run_py([], cwd=tmp_path)
+    # Detecting the planted Korean proves ./skills was scanned by default.
+    assert result.returncode == 1, result.stderr
+    assert "skill-with-hangul" in result.stdout
+
+
+def test_untracked_and_ignored_files_skipped_in_git_repo(tmp_path):
+    """Inside a git repo, only tracked files are publish material: untracked
+    working files and gitignored locale data (a skill's data/ dir) must not
+    trip the gate. Outside a repo the scanner falls back to scanning all."""
+    repo = tmp_path
+    skills = repo / "skills"
+    skill = skills / "myskill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("english only\n", encoding="utf-8")
+    (skill / ".gitignore").write_text("data/\n", encoding="utf-8")
+    data = skill / "data"
+    data.mkdir()
+    (data / "locale.md").write_text(f"ignored Korean: {HANGUL_SAMPLE_1}\n", encoding="utf-8")
+    (skill / "draft.md").write_text(f"untracked Korean: {HANGUL_SAMPLE_2}\n", encoding="utf-8")
+
+    def _git(*args):
+        return subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8",
+            env=_no_git_env(),
+        )
+
+    if _git("init", "-q").returncode != 0:
+        pytest.skip("git unavailable")
+    _git("config", "user.email", "t@t")
+    _git("config", "user.name", "t")
+    _git("add", "skills/myskill/SKILL.md", "skills/myskill/.gitignore")
+    _git("commit", "-q", "-m", "baseline")
+
+    result = _run_py(["skills"], cwd=repo)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "clean" in result.stdout
+
+
+def test_tracked_files_detected_when_invoked_from_subdirectory(tmp_path):
+    """Regression: `_tracked_files` must resolve `git ls-files` output against
+    the invocation cwd, not `git rev-parse --show-toplevel`. `git ls-files`
+    reports paths relative to cwd by default; joining against repo root
+    instead produces wrong absolute paths when cwd != repo root, silently
+    dropping a real tracked file from the tracked set — the scanner then
+    treats it as untracked and skips it, missing Hangul it should catch."""
+    repo = tmp_path
+    skill = repo / "skills" / "myskill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(f"# x\nKorean: {HANGUL_SAMPLE_1}\n", encoding="utf-8")
+    other_dir = repo / "other_dir"
+    other_dir.mkdir()
+
+    def _git(*args):
+        return subprocess.run(
+            ["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8",
+            env=_no_git_env(),
+        )
+
+    if _git("init", "-q").returncode != 0:
+        pytest.skip("git unavailable")
+    _git("config", "user.email", "t@t")
+    _git("config", "user.name", "t")
+    _git("add", "skills/myskill/SKILL.md")
+    _git("commit", "-q", "-m", "baseline")
+
+    result = _run_py(["../skills"], cwd=other_dir)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "myskill" in result.stdout
 
 
 def test_scanner_ignores_poisoned_grep(tmp_path):
