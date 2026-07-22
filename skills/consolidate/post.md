@@ -270,7 +270,9 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | `🟡 Deferred (author follow-up)` | Follow-up handling (separate PR/issue/post-merge backport etc.) — plain phrasing |
 | `🟢 Deferred (no action)` | Review concluded irrelevant/unnecessary — plain phrasing |
 | `⚪ Rejected — <one-line reason>` | Rejected + reason inline |
-| `🟢 Verified — <evidence>` | Verification passed + evidence (curl/test/grep result inline) |
+
+> [!IMPORTANT]
+> **Prohibit Using Verified Status (HARD STOP)**: Never use `Verified` as a status for valid findings. Valid findings must be marked as `🔴 Pending` from the beginning if they are inside the diff (awaiting fix), or `🟡 Deferred (author follow-up)` if they are outside the diff (postponed).
 
 **The fix_plan tracking tags are for Step 7.6 deferred registration only (when writing entries inside fix_plan.md's Hold section)**. Carrying the same tag into the Summary body Status column leaves the GitHub reader with no meaning (zero readability).
 
@@ -304,7 +306,7 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 **The per-finding Status column and the conclusion / Merge Recommendation must agree — derive the conclusion FROM the Status column, never write the two independently.** Status encodes blocking: `🔴 Pending` = blocks merge (fix first), `🟡/🟢 Deferred` = non-blocking (post-merge follow-up / no action). A finding cannot be both `Deferred` and the reason the merge is held.
 
 - Any finding `🔴 Pending` → conclusion ⏳ "Actionable Items PENDING / Not ready to merge", Merge Recommendation "Hold — address the Pending findings first".
-- Zero `🔴 Pending` (all Deferred / Rejected / Verified) → ✅ "Ready to merge"; if the Test Plan is unchecked, "Ready pending Test Plan" — the hold reason is the Test Plan (Step 7.5), NOT the findings.
+- Zero `🔴 Pending` (all Deferred / Rejected) → ✅ "Ready to merge"; if the Test Plan is unchecked, "Ready pending Test Plan" — the hold reason is the Test Plan (Step 7.5), NOT the findings.
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -315,8 +317,8 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 **Self-check (before POSTing the Summary — consistency)**:
 
 1. Conclusion says "Hold" / "Not ready to merge" / cites findings to address first? → every finding it names as a blocker must be `🔴 Pending`, not `Deferred` or `Fixed`.
-2. All findings `Fixed` / `Deferred` / `Rejected` / `Verified` (zero `🔴 Pending`)? → conclusion must be ✅ "Ready to merge" (or "Ready pending Test Plan" with a `⏳` emoji when the Test Plan is unchecked), never "Hold to address the findings".
-3. Read the Status column and the Merge Recommendation together — is any finding both `Deferred`/`Fixed` and the cited reason the merge is held? That is the contradiction; reconcile before POST.
+2. All findings `Fixed` / `Deferred` / `Rejected` (zero `🔴 Pending`)? → conclusion must be ✅ "Ready to merge" (or "Ready pending Test Plan" with a `⏳` emoji when the Test Plan is unchecked), never "Hold to address the findings".
+3. Read the Status column and the Merge Recommendation together — is any finding both `Deferred`/`Fixed`/`Rejected` and the cited reason the merge is held? That is the contradiction; reconcile before POST.
 
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
 
