@@ -22,6 +22,7 @@ Environment detection:
 1. `TaskList` tool callable → Claude Code
 2. `task.md` artifact exists or `appDataDir` context present → Antigravity
 3. If both, prefer Claude Code (TaskList is more reliable)
+4. **`TaskList` shows as unavailable (`ToolSearch` no-match / disconnect reminder) in a session that is otherwise clearly Claude Code** (Claude-Code-specific context present, no `task.md`/`appDataDir`) — do not conclude "not Claude Code" or "skip task tracking" from this signal alone. `ToolSearch` returning no match does not distinguish "temporarily disconnected" from "disabled in this session's context" from "genuinely absent". Attempt one direct call (e.g. `TaskCreate`) to read the actual error, then report that finding to the user before deciding the fallback — see [claude.md](./claude.md) → "Tool unavailability — verify before falling back" for the full branch table (recoverable vs context-disabled) and the `claude-task` CLI fallback mechanics (persistent `~/.agents/tasks/default/` directory — never the session scratchpad, which does not survive a session/compact boundary). Do not silently drop to `fix_plan.md`/`checklist.md`-only tracking without surfacing this first — a broken task tool is an anomaly worth flagging, not a routine environment branch
 
 ## Precondition — Resume mode selected by SKILL.md Step 0
 
