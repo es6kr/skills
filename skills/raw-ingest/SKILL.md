@@ -13,6 +13,12 @@ description: |
 
 Convert external documents and raw sources (PDF, HWP, DOCX, RTF, Markdown, web pages) into `raw/<slug>.md` for karpathy-style LLM-Wiki workflows.
 
+## Mandatory Rules (HARD STOP)
+
+- **pages/ Creation Gate (HARD STOP)**: Never create or update `pages/<domain>/*.md` knowledge documents without first invoking the `raw-ingest` workflow or ensuring a corresponding `raw/<slug>.md` source exists in the repository. Creating `pages/` files directly without a raw source is strictly prohibited.
+- **source_path Rule**: `source_path` in frontmatter MUST be an HTTP/HTTPS URL (Google Drive, Nextcloud, WebDAV, web link). Local file paths (`~/...`, `C:\...`) are strictly prohibited.
+- **Dual-Repo Sync Confirmation**: Always ask the user via `AskUserQuestion` whether to propagate changes across both `daegunsoftDev/llm-wiki` and `es6kr/llm-wiki` repositories.
+
 ## Overview & Workflow
 
 1. **Format Conversion**: Convert rich documents (HWP/DOCX/PDF) to plain Markdown text while preserving structure and table formatting (utilizing `doc-convert` / `LibreOffice` / `pandoc` / `hwp5txt`).
