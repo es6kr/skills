@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/cc-plugin-v0.5.0...cc-plugin-v0.5.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **cc-plugin:** relocate cache-cleanup hook to resources/ and restore exec bit ([810c3d6](https://github.com/es6kr/skills/commit/810c3d6ee0e049c280609a194f90a0cb65118f30))
+* hook relocation + Korean-pattern externalization (cc-plugin, fix, wip) ([f4af5b5](https://github.com/es6kr/skills/commit/f4af5b564b2d43387a5d004f875e56b30a36ce13))
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/cc-plugin-v0.4.2...cc-plugin-v0.5.0) (2026-07-07)
 
 

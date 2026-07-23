@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/next-v0.5.1...next-v0.6.0) (2026-07-23)
+
+
+### Features
+
+* **consolidate:** address PR 134 reviews and reflect orange/yellow severity display rules ([e6118d0](https://github.com/es6kr/skills/commit/e6118d0fb0217a4c4ad388b82e574203a8f9258e))
+* **hook-kit:** add pre-tool AskUserQuestion context gate ([#123](https://github.com/es6kr/skills/issues/123)) ([271b5b3](https://github.com/es6kr/skills/commit/271b5b37df5e64cf3185b2c81c3d97b66789e9ab))
+* **next-feat:** accumulate features for hook-kit context gate ([df4f73a](https://github.com/es6kr/skills/commit/df4f73ae4d27d4919105da70c6c94a14a32e8056))
+* **next:** wire Stop auto-invocation via script action + jq portability ([de2bed5](https://github.com/es6kr/skills/commit/de2bed5489a247a21eab54c0e13b27ae00d18196))
+* skills topic bundle — brief/email, code-workflow/plan-research-search, git-repo topics, skill-kit/invoke-discipline ([7fd877d](https://github.com/es6kr/skills/commit/7fd877da1b703fcdcdcaf1a3ce912f885abfa3f0))
+
+
+### Bug Fixes
+
+* **next:** require "draft PR" in option descriptions proposing PR creation ([7925177](https://github.com/es6kr/skills/commit/79251773a2aef74b5bc44f12a3a943a73ac37d02))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/next-v0.5.0...next-v0.5.1) (2026-07-19)
 
 
