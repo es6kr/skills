@@ -4,11 +4,8 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 
 > **`output-dir`**: All research/plan files are written to the configured `output-dir` (default: `docs/generated/`). Examples below use `{output-dir}` as placeholder.
 
-## Step 0: Resume Check (Always First)
-
-**Must be executed first when entering code-workflow (whether new or re-entry):**
-
-1. Check if **research/plan files** already exist in `{output-dir}` for the target task
+0. **Task Checklist Registration (Tool Call #1 MANDATORY HARD STOP)**: The very first tool call upon entering `/code-workflow` MUST be creating or updating `task.md` (or `TodoWrite`) with the 4 workflow steps (Research, Plan, Review, Implement). No research commands (`run_command`), file viewing (`view_file`), or search (`grep_search`) are allowed before `task.md` is initialized.
+1. Check if **research/plan files** already exist in `{output-dir}` for the target task. **If the project-local `{output-dir}` has nothing for the task, also check the workspace-root Ralph directory** (e.g. `<workspace-root>/.ralph/docs/generated/`, one level above any individual project repo) before concluding no governing plan exists — cross-cutting or organization-level plans (e.g. a release-branch-strategy decision spanning multiple repos) are often written there instead of inside a single project's `docs/generated/`
 2. **Read** the corresponding file to understand the current progress
 3. If the plan has a Phase order, check **up to which Phase has been completed currently**
 4. If there is an incomplete Phase, **proceed from that Phase** — do not skip to subsequent Phases (merge, deploy, etc.)
@@ -71,6 +68,7 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 Read and understand the relevant code **deeply**, then write findings to `{output-dir}/research-<issue-number>-<task-slug>.md`.
 
 - **Naming Rule**: Always include the GitHub issue number (e.g., `research-176-login-lock.md`). If no issue exists, use `research-<task-slug>.md`.
+- **Mandatory Corpus & RAG Pre-Lookup (HARD STOP)**: Before writing the research document, check existing project knowledge stores and memory backends (LLM Wiki, Qdrant vector memory, Serena RAG, KI summaries) to prevent duplicate analysis and ground findings in established patterns.
 - Do not skim a file and move on at the signature level
 - Understand existing layers, ORM relationships, and duplicate API presence
 - **Mandatory exploration of existing test files**: Find related `*.test.*`, `*.spec.*` files and understand what cases are already covered
@@ -168,6 +166,8 @@ chain: []                  # optional: issue dependency chain (see github-flow/d
 | 4 | Omit frontmatter and write a bare `# Plan:` heading | Frontmatter is mandatory — plan is incomplete without it |
 
 The plan body starts after the frontmatter with `# Plan: [Title]` heading. The heading title should match the frontmatter `title` field.
+
+**Backlog & LLM Wiki Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) and `llm-wiki/index.md` / `log.md` is MANDATORY**. Never leave a newly created plan un-indexed in the backlog or LLM Wiki repository.
 
 **Mandatory sections** (Plan is incomplete if any are missing):
 1. **Approach** — Detailed explanation of the chosen approach
