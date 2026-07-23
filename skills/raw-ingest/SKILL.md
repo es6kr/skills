@@ -29,6 +29,7 @@ Convert external documents and raw sources (PDF, HWP, DOCX, RTF, Markdown, web p
 4. **Wiki Ingestion Logging**: Append entry to `log.md`:
    `[YYYY-MM-DD HH:MM] ingest raw/<slug>: <one-line summary>`
 5. **Qdrant / Vector Indexing**: Trigger `artifact_post_ingest.py` (or Python ingest script) to keep vector search in sync.
+6. **Dual-Repo Sync Confirmation**: Always ask the user via `AskUserQuestion` whether to propagate and commit wiki changes across both `daegunsoftDev/llm-wiki` and `es6kr/llm-wiki` repositories.
 
 ## Quick Usage
 
