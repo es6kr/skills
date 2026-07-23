@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # PreToolUse:AskUserQuestion — consolidated guard for AskUserQuestion-stage anti-patterns.
 #
-# Consolidates 5 source hooks:
-#   1. block-tasklist-id-in-conversation.sh    (TaskList #NN ambiguity with PR/issue numbers)
-#   2. block-merge-without-review.sh           (merge option without AI Review Summary + Test Plan)
-#   3. block-release-please-close-without-verification.sh (release-please/semantic-release close without verification)
-#   4. block-vendor-in-generic-skill.sh        (AskUserQuestion branch: vendor names not introduced by user)
-#   5. block-supervisor-loop-work-recommend.py (Ralph supervisor session recommending Ralph-loop work)
+# Consolidates 4 source hooks (a 5th, TaskList #NN ambiguity, was re-homed to
+# todowrite/resources/block-tasklist-id-in-conversation.sh — that check is
+# domain-specific to TaskList conventions, not a general AskUserQuestion
+# concern, per automation.md's hook-ownership policy. A 6th, the PR-URL gate
+# that used to live bundled inside the old TaskList-ID hook's file, was split
+# out to github-flow/resources/block-pr-url-gate.sh for the same reason):
+#   1. block-merge-without-review.sh           (merge option without AI Review Summary + Test Plan)
+#   2. block-release-please-close-without-verification.sh (release-please/semantic-release close without verification)
+#   3. block-vendor-in-generic-skill.sh        (AskUserQuestion branch: vendor names not introduced by user)
+#   4. block-supervisor-loop-work-recommend.py (Ralph supervisor session recommending Ralph-loop work)
 #
 # Strategy:
 #   - Single jq pass extracts ASK_TEXT, OPTIONS_BLOB, TRANSCRIPT path
@@ -25,17 +29,16 @@ if [[ -f "$HG_DATA_FILE" ]]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
 fi
-HG_ASK_ISSUE_PREFIX="${HG_ASK_ISSUE_PREFIX:-(PR|issue|pull)[[:space:]]*#[0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]}"
-HG_ASK_FINDING_PREFIX="${HG_ASK_FINDING_PREFIX:-(Finding|Item|Section|Important|Nitpick|Critical|Comment|Walkthrough|Task)[[:space:]]*#[0-9]}"
-# Brace quantifiers cannot live inside a ${VAR:-default} (the first `}` ends the
-# expansion and corrupts the regex) — assign this fallback with an explicit guard.
-if [[ -z "${HG_ASK_RETROSPECT_PR:-}" ]]; then
-  HG_ASK_RETROSPECT_PR='(merged|MERGED|previously|prior)[^0-9]{0,20}#[0-9]'
-fi
 HG_ASK_ACTIVE_MERGE_KO="${HG_ASK_ACTIVE_MERGE_KO:-}"
 HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this}"
+# Known limitation: bare \bmerge\b over-matches git branch-merge / conflict-resolution
+# asks (e.g. "merge origin/main into next-fix"), non-PR "merge" nouns (e.g. "plan
+# merge", "doc merge", "consolidation"), not just PR-merge recommendations.
+# Mitigated by HG_ASK_RETROSPECT_MERGE below (includes "merge origin/", "conflict
+# resolution", "resolve conflict", "plan merge", "consolidat*") — phrase such asks
+# with those tokens to pass.
 HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-\bmerge\b|\bMerge\b|\bMERGE\b|\bSquash\b|\bsquash\b}"
-HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/}"
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/|plan merge|doc merge|docs? merge|consolidat[a-z]*}"
 HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:-AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+}"
 HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅}"
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
@@ -67,6 +70,17 @@ OPTIONS_BLOB=$(echo "$INPUT" | jq -r '
 
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
+# Interpreter resolution: probe for a WORKING python, not merely a name on
+# PATH. The Windows py3 shim is a Microsoft Store stub that exits 49 without
+# running anything, so a name-only check leaves every python-backed check
+# silently dead (stderr is discarded and the caller fails open).
+PY=""
+for _c in python3 python; do
+  if command -v "$_c" >/dev/null 2>&1 && "$_c" -c "pass" >/dev/null 2>&1; then
+    PY="$_c"; break
+  fi
+done
+
 # Lazy loaders for transcript-derived blobs
 USER_TEXT=""
 USER_TEXT_LOADED=0
@@ -79,7 +93,8 @@ load_user_text() {
   if [[ -z "$TRANSCRIPT" || ! -f "$TRANSCRIPT" ]]; then
     return 0
   fi
-  USER_TEXT=$(python3 - "$TRANSCRIPT" <<'PYEOF' 2>/dev/null
+
+  USER_TEXT=$("$PY" - "$TRANSCRIPT" <<'PYEOF' 2>/dev/null
 import json, sys
 path = sys.argv[1]
 out = []
@@ -112,60 +127,9 @@ load_context_blob() {
   CONTEXT_BLOB=$(tail -n 200 "$TRANSCRIPT" 2>/dev/null)
 }
 
-# ============================================================================
-# Check 1: TaskList #NN without PR/issue context
-# ============================================================================
-check_tasklist_id() {
-  local violations=()
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    while IFS= read -r snippet; do
-      [[ -z "$snippet" ]] && continue
-      # PR / issue / pull #N → explicit GitHub reference, allowed
-      if echo "$snippet" | grep -qiE "$HG_ASK_ISSUE_PREFIX"; then
-        continue
-      fi
-      # GitHub URL → allowed
-      if echo "$snippet" | grep -q 'github\.com'; then
-        continue
-      fi
-      # Explicit enumeration prefix → not a TaskList ID, an ordinal reference
-      # (e.g., "Finding #3", "Item #5", "Section #N", "Important #1", "Nitpick #2",
-      #  "Critical #4", "Comment #1"; locale-specific variants come from data/)
-      if echo "$snippet" | grep -qiE "$HG_ASK_FINDING_PREFIX"; then
-        continue
-      fi
-      # Past-tense merge / history reference → not an active task
-      # (e.g., "merged #40", "previously #57"; locale-specific variants come from data/)
-      if echo "$snippet" | grep -qiE "$HG_ASK_RETROSPECT_PR"; then
-        continue
-      fi
-      violations+=("$snippet")
-    done < <(echo "$line" | grep -oE '.{0,25}#[0-9]{1,3}([^0-9]|$)')
-  done <<< "$ASK_TEXT"
-
-  [[ ${#violations[@]} -eq 0 ]] && return 0
-
-  {
-    echo "DENIED: AskUserQuestion contains TaskList ID pattern (#NN) without PR/issue context."
-    echo ""
-    echo "Why blocked:"
-    echo "  - TaskList internal IDs and GitHub PR/issue numbers both use #NN format"
-    echo "  - User cannot distinguish; previous violations recorded in failed-attempts.md"
-    echo ""
-    echo "Violating snippets (with preceding context):"
-    for v in "${violations[@]}"; do
-      echo "  - $v"
-    done
-    echo ""
-    echo "Required action (pick one before retrying):"
-    echo "  1. Replace TaskList ID with subject keyword (e.g., 'core clearStale task', 'Ralph improve task')"
-    echo "  2. If #NN refers to a GitHub PR/issue, add an explicit prefix: 'PR #NN' or 'issue #NN'"
-    echo ""
-    echo "Reference: workflow.md 'TaskList ID conversation use forbidden (HARD STOP)'"
-  } >&2
-  exit 2
-}
+# Check 1 (TaskList #NN ambiguity) re-homed to
+# todowrite/resources/block-tasklist-id-in-conversation.sh — registered as its
+# own PreToolUse:AskUserQuestion hook, see automation.md's hook-ownership policy.
 
 # ============================================================================
 # Check 2: Merge option without AI Review Summary + Test Plan attestation
@@ -235,10 +199,10 @@ check_merge_without_review() {
         # GitHub App variant; webhook/API payloads use "github-actions[bot]".
         # Match both forms (one-line additions for future bots).
         case "$rp_author" in
-          "github-actions[bot]"|"release-please[bot]"|"app/github-actions"|"app/release-please") continue ;;
+          "github-actions[bot]"|"release-please[bot]"|"app/github-actions"|"app/release-please"|"dependabot[bot]"|"app/dependabot"|"dependabot") continue ;;
         esac
         case "$rp_headref" in
-          "release-please--"*) continue ;;
+          "release-please--"*"dependabot/"*) continue ;;
         esac
         rp_all=0; break            # a non-bot PR is present -> require attestation
       done <<< "$rp_prs"
@@ -343,6 +307,15 @@ check_vendor_leak() {
   local violations=""
   load_user_text
 
+  # Workload context exception (Issue #109): If k8s/cluster workload context tokens are present, skip vendor leak check
+  local workload_pattern='\b(Application|workload|pod|namespace|Prune|selfHeal|StatefulSet|Deployment)\b'
+  if [[ -n "${HG_ASK_WORKLOAD_CONTEXT_KO:-}" ]]; then
+    workload_pattern="(${workload_pattern}|${HG_ASK_WORKLOAD_CONTEXT_KO})"
+  fi
+  if echo "$ASK_TEXT" | grep -qiE "$workload_pattern"; then
+    return 0
+  fi
+
   for vendor in qdrant chroma weaviate pinecone milvus pgvector redis-search; do
     if echo "$ASK_TEXT" | grep -qiE "\b${vendor}\b|mcp__${vendor}([_-]|$)"; then
       if ! echo "$USER_TEXT" | grep -qiE "\b${vendor}\b"; then
@@ -395,7 +368,7 @@ check_supervisor_loop_recommend() {
   [[ -z "$OPTIONS_BLOB" ]] && return 0
 
   # Quick trigger pattern check before loading transcript
-  if ! python3 -c "
+  if ! "$PY" -c "
 import re, sys
 blob = sys.argv[1]
 pat = re.compile(r'(?<![A-Za-z0-9_-])(consolidate|pr-review|/consolidate|/github-flow\s+merge|code-reviewer)(?![A-Za-z0-9_-])', re.IGNORECASE)
@@ -407,7 +380,7 @@ sys.exit(0 if pat.search(blob) else 1)
   load_context_blob
   [[ -z "$CONTEXT_BLOB" ]] && return 0
 
-  if ! python3 -c "
+  if ! "$PY" -c "
 import re, sys
 blob = sys.argv[1]
 pat = re.compile(
@@ -585,7 +558,6 @@ MSG
 }
 
 # Execute checks in cost order
-check_tasklist_id
 check_merge_without_review
 check_release_please_close
 check_vendor_leak
