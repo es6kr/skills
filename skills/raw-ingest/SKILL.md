@@ -21,7 +21,7 @@ Convert external documents and raw sources (PDF, HWP, DOCX, RTF, Markdown, web p
    ```yaml
    ---
    title: <document title>
-   source_path: <original path or URL>
+   source_path: <HTTP/HTTPS URL (Google Drive, Nextcloud, WebDAV, public/internal web URL) — Local absolute/tilde file paths are strictly prohibited>
    converted_at: <YYYY-MM-DD>
    original_format: <HWP | DOCX | PDF | MD | WEB>
    ---
