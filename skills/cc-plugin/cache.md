@@ -8,7 +8,7 @@ Clean old plugin cache versions and temporary git directories.
 ## Usage
 
 ```bash
-scripts/cache-cleanup.sh [--dry-run] [--verbose]
+resources/cache-cleanup.sh [--dry-run] [--verbose]
 ```
 
 - `--dry-run`: Preview deletions without removing

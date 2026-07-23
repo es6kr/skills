@@ -143,7 +143,7 @@ HWP (Hangul Word Processor) is a Korean office format frequently used in officia
 
 | Input | Recommended converter | Fallback | Notes |
 |-------|----------------------|----------|-------|
-| `.hwp` (HWP 5.x binary) | LibreOffice `--convert-to pdf` or `--convert-to html` | `uvx --from pyhwp --with six hwp5txt` (text-only, images lost) | LibreOffice preserves tables and images. pyhwp txt is a **last-resort text-only fallback**, never the default |
+| `.hwp` (HWP 5.x binary) | LibreOffice `--convert-to pdf` or `--convert-to html` | `uvx --from pyhwp --with six hwp5txt` (text-only, images lost) | LibreOffice preserves tables and images. pyhwp txt is a **last-resort text-only fallback**, never the default. **Exception**: some HWP 5.1.0.x sub-versions are not parsed by LibreOffice's HWP import filter at all (distinct from the filename-encoding issue below) — for these, pyhwp is the only working path, not a last resort |
 | `.hwpx` (HWP 2010+ XML) | LibreOffice `--convert-to pdf` | (rare) unzip + XML parse | HWPX is a zip container — LibreOffice reads it natively |
 | `.doc` (Word 97-2003) | LibreOffice `--convert-to docx` then re-open | — | Legacy DOC must be upgraded before editing |
 | `.rtf`, `.odt` | LibreOffice `--convert-to pdf` | — | Native support |
@@ -158,6 +158,7 @@ When the user asks to **analyze** a rich-format document (HWP / DOCX / PDF / leg
 | 2 | Fall back to `hwp5txt` because `soffice` failed once | If LibreOffice load fails, retry with a sanitized filename copy in `/tmp` first. Only after LibreOffice truly cannot open the file → offer pyhwp `hwp5txt` as an **explicit fallback with a note** that images will be lost |
 | 3 | Present a `txt / html / pdf` option set without stating the default | State explicitly: "Default = PDF (images preserved). Pick another only if you need txt-only" |
 | 4 | Interpret an ambiguous option label ("LibreOffice install") as "install only, then extract txt" | Read the option description. If it says "preserves images / faithful to original", the user intent is a visual-preserving format (PDF or HTML), not txt |
+| 5 | Retry the sanitized-filename workaround repeatedly when `soffice` already fails on a clean path (no Korean characters / spaces in the filename) | A clean-path failure is a **filter incompatibility** signal, not an encoding issue — some HWP 5.1.0.x sub-versions are unsupported by LibreOffice's HWP import filter regardless of filename. Move directly to pyhwp `hwp5txt` instead of repeating the sanitize step |
 
 #### Sanitized filename workaround
 

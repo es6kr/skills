@@ -150,6 +150,10 @@ When the current user is **not a requested reviewer** but the **author ≠ me** 
 4. If APPROVE candidate, did you call `AskUserQuestion` with 3 options (APPROVE / COMMENT only / Skip)?
 5. Did you avoid asking "Formal Review or issue comment?" — medium itself is deterministic, only the event for APPROVE candidate is asked
 
+### Posted comments on an author ≠ me PR are immutable records (HARD STOP)
+
+Once the Internal Code Review / AI Review Summary comment has been posted on a PR you did **not** author, treat it as an **immutable record** — do NOT `minimizeComment`/resolve it to "tidy up" after the author acts on the findings. Over-minimizing an already-posted peer review erases the review trail that the PR audit relies on. When findings are addressed or deferred, close them out by updating the tracking medium (`fix_plan.md`) only; leave the posted comment visible.
+
 ### Authorship-aware merge recommendation in Summary body (peer reviewer disclaimer)
 
 When Summary body includes a `Merge Recommendation` line AND author ≠ me, append a one-line disclaimer that the recommendation is advisory:

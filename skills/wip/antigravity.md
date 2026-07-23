@@ -68,7 +68,7 @@ replace_file_content(
 
 ### Step 2 — ask.md per-item direction option format
 
-Map resume Step 2's environment-agnostic labels (proceed / split / merge / hold / delete) to ask.md options:
+Map resume Step 2's environment-agnostic labels (proceed / split / merge / hold / defer-to-checklist / delete) to ask.md options:
 
 ```markdown
 # Remaining-item direction
@@ -82,7 +82,10 @@ Map resume Step 2's environment-agnostic labels (proceed / split / merge / hold 
 - [ ] B: Split — separate lookup vs update into distinct tasks
   - *Pros*: Isolates change impact
   - *Cons*: Two PRs to manage
-- [ ] C: Delete — no longer needed
+- [ ] C: Defer to checklist — external wait, move to fix_plan.md hold section
+  - *Pros*: Task list stays clean; item survives across sessions in the checklist medium
+  - *Cons*: Needs an explicit trigger note for later re-promotion
+- [ ] D: Delete — no longer needed
   - *Pros*: Less work
   - *Cons*: Risk of discovering it missing in a follow-up task
 
@@ -90,7 +93,7 @@ Map resume Step 2's environment-agnostic labels (proceed / split / merge / hold 
 ...
 ```
 
-Same format per item. 2–4 options per item (only the labels among the 5 that make sense for this task).
+Same format per item. 2–4 options per item (only the labels among the 6 that make sense for this task). "Defer to checklist" execution: append `- [ ] [BLOCKED] <subject> (trigger: ...)` to the checklist file, then remove the line from `task.md` (never keep both media).
 
 ## Workflow
 
