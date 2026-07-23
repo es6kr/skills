@@ -154,6 +154,34 @@ Otherwise → proceed to Step 0.5.
 2. Do the tasks mentioned in option descriptions **actually exist in TaskList**? — 1:1 mapping with TaskList output
 3. If there are N pending tasks but only M < N appear in options → state the filtering reason in description or use the wrap-up pattern
 
+## Step 0.6: Workspace fix_plan.md active integration protocol (MANDATORY — when TaskList is empty, done, or unavailable)
+
+**Trigger scope (HARD STOP)**: this step applies whenever `TaskList` yields no actionable pending items — whether because it is genuinely empty, all items are done, **or the TaskList/TaskCreate tool is disconnected/unavailable this turn**. "Unavailable" is not a different case from "empty" — both mean the session-local task medium cannot surface backlog, so the persistent checklist medium (`fix_plan.md`) becomes the primary source. Do not read the word "empty" literally and treat a disconnected tool as exempt.
+
+1. **Locate Workspace Root(s)**: Determine the active workspace root(s) containing `.git` or `.ralph/`. **Do not derive this from current cwd alone** — a session can move across multiple workspaces (e.g., start in a project directory debugging an issue, then pivot to a skills/rules repo). Enumerate every workspace root visited during the session (via Bash cwd changes, Read/Edit/Grep paths, or `cd`/`git -C` targets seen in the transcript), not just the one matching the cwd at the moment `next` fires.
+2. **Find fix_plan.md**: For each workspace root from step 1, read its project backlog checklist (`<workspace-root>/.ralph/fix_plan.md` or `<workspace-root>/fix_plan.md`) if present. A workspace without one (e.g., a skills/rules repo with no Ralph loop) is skipped, not treated as proof no other workspace has one.
+3. **Extract Pending Backlog**: Extract pending checklist items (`- [ ]`) from the `## Priority Work` (or equivalent priority) section.
+4. **Context & Relevance Filtering**: Filter these tasks to identify those related to the current session (e.g., matching files edited, directories touched, or keywords from the conversation history).
+5. **Sort by Priority**: Sort the remaining candidates by priority level: `P0` -> `P1` -> `P2` -> `[REPEAT]`.
+6. **Compose Options**: Surface the top 2-3 prioritized and related tasks as options in `AskUserQuestion`. Place them above generic options like "End session", using concise labels with their priority level indicated in the description (e.g. `[P0]`).
+
+### Don't / Do table
+
+| # | Don't | Do |
+|---|---|---|
+| 1 | Suggest "End session" immediately when session tasks are complete without checking the project's persistent backlog | Read the active workspace's `fix_plan.md` first, find prioritized tasks, and offer them |
+| 2 | Pull tasks from a parent or different workspace's `fix_plan.md` | Detect the current workspace root(s) first, then read the local `.ralph/fix_plan.md` for each one actually visited this session |
+| 3 | Present tasks out of priority order (e.g. suggesting P2/REPEAT before P0/P1) | Sort strictly by priority level (`P0` -> `P1` -> `P2` -> `[REPEAT]`) and surface the highest first |
+| 4 | Present all `fix_plan.md` tasks blindly | Filter for tasks that are relevant to the files or topics touched in the current session first |
+| 5 | Treat "TaskList tool disconnected/unavailable" as outside this step's scope because the trigger says "empty" | Unavailable = equivalent to empty for this step's purpose. The fix_plan.md check is the fallback specifically when the session-local task medium cannot be read at all |
+| 6 | Derive "the workspace" solely from the cwd at the moment `next` fires, especially when that cwd (e.g. a skills/rules repo) has no `fix_plan.md` | Check every workspace root the session actually touched. A session that started in a project directory and later moved to a different repo still has backlog in the first one |
+
+### Self-check (before declaring "no work" / "session complete")
+
+1. Is TaskList empty, done, or **did the TaskList/TaskCreate call itself fail or return unavailable**? → Either case triggers this step
+2. Did the session's cwd change at any point (project debugging → skills/rules repo, or similar)? → If yes, check `fix_plan.md` in **each** workspace root visited, not just the final cwd
+3. Does the final-cwd workspace lack a `fix_plan.md`? → That is not evidence no other visited workspace has one — check them all before concluding no backlog exists
+
 ## Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
 
 **Before composing options, if any of the following conditions apply, ask the user "what are you currently working on / waiting for" FIRST. Do not bake assumptions into option descriptions.**
