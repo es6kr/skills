@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.8](https://github.com/es6kr/skills/compare/fix-v0.3.7...fix-v0.3.8) (2026-07-23)
+
+
+### Bug Fixes
+
+* **fix:** externalize Korean detection patterns in ambiguity-guard hook ([18dc89f](https://github.com/es6kr/skills/commit/18dc89fe309d035197db4aefb4bb6be920395858))
+* **fix:** step3-resume + SKILL body refinements ([944597d](https://github.com/es6kr/skills/commit/944597df28eab767052a26ced7c4d5ea6ee71a73))
+* hook relocation + Korean-pattern externalization (cc-plugin, fix, wip) ([f4af5b5](https://github.com/es6kr/skills/commit/f4af5b564b2d43387a5d004f875e56b30a36ce13))
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+* skills body bundle — consolidate/fix/hook-kit refinements + English-clean guard hooks (Ralph-loop bypass) ([2e26f41](https://github.com/es6kr/skills/commit/2e26f412a5b963984898e13caaca186c3617ca08))
+
 ## [0.3.7](https://github.com/es6kr/skills/compare/fix-v0.3.6...fix-v0.3.7) (2026-07-16)
 
 

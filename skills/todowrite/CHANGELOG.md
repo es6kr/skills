@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/todowrite-v0.5.0...todowrite-v0.6.0) (2026-07-23)
+
+
+### Features
+
+* **hook-kit:** add pre-tool AskUserQuestion context gate ([#123](https://github.com/es6kr/skills/issues/123)) ([271b5b3](https://github.com/es6kr/skills/commit/271b5b37df5e64cf3185b2c81c3d97b66789e9ab))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/todowrite-v0.4.0...todowrite-v0.5.0) (2026-07-17)
 
 
