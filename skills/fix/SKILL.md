@@ -21,7 +21,8 @@ Activated when user gives feedback with "fix:" prefix. Finds the root cause of t
 
 ## Options
 
-- `--plan`: In Step 2, instead of modifying prompts directly, **emit only the modification plan** for user review before execution. Use for complex changes or changes spanning multiple files.
+- `--plan`: In Step 2, instead of modifying prompts directly, **emit only the modification plan** for user review before execution. Use for complex changes or changes spanning multiple files. **Forced Ask (HARD STOP)**: After saving the plan artifact .md and presenting the summary, you MUST invoke `AskUserQuestion` instead of stopping at plain text, forcing an explicit user decision.
+  - **Trade-off-axis questions FIRST, disposition LAST (HARD STOP — applies to ANY /fix flow that authors or promotes a plan artifact, not only `--plan`)**: a generic disposition-only ask (`Apply plan now` / `Refine plan` / `Hold`) is FORBIDDEN when the plan contains Trade-offs rows or unresolved human-review questions (open interpretation notes, "confirm on review" markers). Convert **each** trade-off axis / open review question into its own question object in the `questions` array (one axis per question, max 4 per call — chunk sequential calls when more, never drop the tail), then ask the disposition (`Apply plan now` / `Refine plan` / `Hold`) as the **last** question or a follow-up call. Recurrence source: a promote-completion ask that offered only approve/refine/hold caused the user to re-request the trade-off review manually.
 - `--local`: Scope Step 2 rule modifications to the **workspace-local** or **project-local** rule directory only. Use when the rule applies to a specific workspace (e.g., `~/ghq/github.com/<org>/`) or a specific repo, not globally.
   - Resolution order (Step 2 picks the innermost matching location):
     1. **Project-local** — `<repo>/.claude/rules/` if cwd is inside a git repo
@@ -91,22 +92,34 @@ TodoWrite([
 ])  # ❌ Existing task data is lost
 ```
 
-**Default form (when no existing tasks)**:
+**Default form (when no existing tasks — MINIMUM 5+ GRANULAR STEPS HARD STOP)**:
+
+Every `/fix` task registration MUST contain at least 5+ (typically 6~8) granular steps. Collapsing the workflow or Resume phase into 4 or fewer generic items is strictly forbidden (`HARD STOP`).
 
 ```text
 TodoWrite([
-  { id: "fix-0", content: "🔍 fix: {user feedback summary} — root cause analysis", status: "in_progress" },
-  { id: "fix-1", content: "🔧 Root cause fix", status: "pending" },
-  { id: "fix-2", content: "🔄 Resume original work: {one-line summary of original work}", status: "pending" },
-  { id: "fix-3", content: "📋 Wrap-up: report + task pruning", status: "pending" },
+  { id: "fix-0", content: "🔍 fix: {user feedback summary} — 5-Why root cause analysis", status: "in_progress" },
+  { id: "fix-1", content: "🔧 Prompt improvement plan (Step 1.5 Action Plan table & AskUserQuestion approval)", status: "pending" },
+  { id: "fix-2", content: "🔌 Plugin/Dependency installation (if required) & environment parity check", status: "pending" },
+  { id: "fix-3", content: "🛠️ Skill/Tool invocation & official autoloader execution (view_file IsSkillFile)", status: "pending" },
+  { id: "fix-4", content: "🧪 Empirical Fix Verification (verify fix actually works in current execution)", status: "pending" },
+  { id: "fix-5", content: "🔄 Resume original work: {granular breakdown step 1}", status: "pending" },
+  { id: "fix-6", content: "🔄 Resume original work: {granular breakdown step 2}", status: "pending" },
+  { id: "fix-7", content: "📋 Wrap-up & AskUserQuestion next options", status: "pending" },
 ])
 ```
 
 - **Antigravity (Gemini) Users**: Create or update the `task.md` artifact representing the TODO list above. This fulfills the TodoWrite requirement.
+- **Claude Code with `TaskCreate`/`TodoWrite` unavailable (HARD STOP — mechanical gate, not advisory)**: `ToolSearch` returning no match is NEVER sufficient diagnosis on its own — it cannot distinguish "temporarily disconnected" from "disabled in this context". **This gate blocks Step 0 completion**: before falling back to the CLI medium below, you MUST actually execute a direct `TaskCreate` call (not merely `ToolSearch` it) at least once per session, and again at the start of any `/fix` call after a prior direct call returned a disconnect-class error (connectivity can change mid-session). A `ToolSearch`-only check does NOT satisfy this gate — the gate requires the call attempt itself, because only the call's error message distinguishes the two cases below.
+  - Error mentions disconnect/MCP-unreachable → treat as recoverable — retry at the start of each subsequent `/fix` call in this session
+  - Error is **"exists but is not enabled in this context"** → this is a context/settings gap, not connectivity. **Report this to the user in the same turn, in plain text, before or alongside the fix-continuation work** — do not silently normalize the workaround as if no explanation were owed. State it plainly: "`TaskCreate` exists but is disabled in this session's context — this may be fixable in Claude Code settings." Silently working around it for an entire session without ever surfacing this is itself a Step 0 violation.
+  - Only after this diagnosis, if no task tool is usable this turn, use the `claude-task` CLI (`todowrite` skill's `claude-task` topic — `claude-task --env agent add/list/update`) to track fix-0/1/2/3, updating status at every step transition. This CLI persists to `~/.agents/tasks/default/`, a fixed directory that survives session/scratchpad-path changes — **do NOT use the session scratchpad directory** for this tracking; the scratchpad path changes across sessions/compacts and silently drops its contents (case history: failed-attempts.md "scratchpad ephemeral task loss"). Narrating steps in prose only, with no durable record, does not satisfy the "register tasks" requirement — `claude-task` is an interim substitute, not a replacement goal, for `TaskCreate`.
+  - **Self-check (before relying on the `claude-task` fallback in any `/fix` call this session)**: (1) Have I made an actual `TaskCreate` call attempt this session (not just `ToolSearch`)? → If no, make one now. (2) Did that call's error say "not enabled in this context"? → If yes, have I told the user this in plain text yet this session? → If no, say so now, in this turn. (3) Am I about to write fix-tracking state to the scratchpad directory instead of `claude-task`? → Forbidden — scratchpad is session-scoped and ephemeral, not a durable-tracking medium.
 
-- In `fix-2`'s `{original work}`, list **the initial request plus everything in progress including the immediately preceding action**
-  - Example: "Deploy workflow: image swap done, verification 3/5 in progress, PR body update pending"
-  - Listing only the most recent action narrows the scope — go all the way back to the initial request and enumerate the full task list
+- In Resume tasks (`fix-5+`), list **the initial request plus everything in progress including the immediately preceding action**.
+  - **Multi-substep Resume Breakdown (MINIMUM 5+ STEPS HARD STOP)**: When resuming multi-stage or complex work, **break Resume down into explicit substeps (`fix-5`, `fix-6`, `fix-7`, etc.)** instead of flattening it into a single line. This ensures sequential execution proceeds through all remaining phases without dropping intermediate actions (such as plugin install, skill call, code edit, empirical verification, or post-plan decisions).
+  - Example: `fix-2: Plugin install`, `fix-3: Skill invocation`, `fix-4: Empirical fix verification`, `fix-5: Code implementation`, `fix-6: Verification & Walkthrough`
+- **Multi-question `questions` Array Rule (HARD STOP)**: When invoking `AskUserQuestion` to address multiple decision axes or questions, **NEVER lump them into a single question object with compound text**. Build an array of discrete question objects in `questions: [{question: Q1, options: [...]}, {question: Q2, options: [...]}]` (one question per decision axis, up to 4 questions per call).
 - **[Measure 2] Dependency and Reference State Declaration (MANDATORY)**: When registering `fix-2`, you must explicitly declare the **preconditions (Depends on)** and the **base commit state (Reference commit)** required for the `Resume` task to run safely.
   - *Format Example*: `🔄 Resume original work: {summary} (Depends on: {preconditions}, Reference commit: {commit_sha})`
 - fix-2 = "Complete the original work with the revised approach" — the goal is **the deliverable the user originally requested**, not skill/rule changes themselves
@@ -217,13 +230,41 @@ Why 3: Why was that knowledge/rule missing? (structural — skill/rule gap)
 
 If Step 1 produced even one Why, Step 2 is **mandatory**. Default medium = `feedback` memory (1st-2nd recurrence); rule-file Edit only when the **4-filter gate** passes (3rd+ recurrence); hook implementation at 4th+ recurrence with a deterministic pattern. Minimize always-on rule context.
 
+**Language gate (HARD STOP — mechanical, run before every skill-file Edit/Write in this step, not just once per fix call)**: this rule has already recurred more than once (search failed-attempts.md for the "skill language mismatch" pattern) precisely because it lived only as prose in the "Confirm existing rule coverage" bullet list in Step 1 — easy to read and still skip under conversation-language momentum. Before each individual Edit/Write to a skill file (`SKILL.md`, topic `.md`, `resources/*`) in this step: (1) run `head -5 <target-file>` or `Grep "^description:"` on the skill's `SKILL.md` to get its language, (2) write the new content in that language — if the skill is English-described and the content you're about to add contains locale-specific illustration, abstract it (describe the concept, don't insert literal non-English vocabulary) rather than translate-then-insert. This check runs **per file**, not once — a fix touching 3 skill files needs 3 checks, since they can differ in language. `~/.claude/skills/hook-kit/resources/block-skill-language-mismatch.sh` (PreToolUse:Edit/Write) is a backstop, not a substitute for this check — do not rely on the hook catching it after the fact.
+
+**Skill-First Improvement Discipline (HARD STOP)**: When the root cause originates from a skill procedure, topic output gap, or template defect, modifying the skill file itself (`skills/<name>/SKILL.md` or `topics/*.md`) is MANDATORY. Do NOT default to adding rules exclusively into global `GEMINI.md` or `CLAUDE.md`. Global rule files are reserved for universal behavioral constraints (3rd+ recurrence); skill procedure defects must be resolved directly within the target skill.
+
+**Rule/Skill Fix Execution Rule (HARD STOP)**: When a `/fix` task updates a skill/rule file that specifies a mandatory tool or skill call (such as `receiving-code-review`), simply editing the file text is incomplete — executing the mandated skill protocol on the active target codebase or artifact is MANDATORY before declaring the task completed.
+
+**Prompt Improvement Plan AskUserQuestion Gate (HARD STOP)**: Before applying file edits to any skill file (`skills/**/*.md`) or rule file (`rules/**/*.md`), **you MUST emit the Step 1.5 Action-plan table and call `AskUserQuestion` presenting the proposed prompt modifications for user confirmation**. Modifying prompt/skill/rule files without first presenting the modification plan via `AskUserQuestion` is strictly forbidden.
+
 **Read [step2-improvement.md](./step2-improvement.md) before executing** — it holds the 4-filter gate, medium-priority table, escalation matrix, no-stage-skipping Don't/Do, `--plan` mode, and the Step 2 Checkpoint (verify every Why-level target from the Step 1.5 table was actually modified). Do not advance to Step 3 until the Checkpoint passes.
+
+### 2.5 Plugin/Dependency Installation Step (MANDATORY HARD STOP)
+
+If the updated or referenced skill/rule specifies a plugin or dependency (e.g. `superpowers` plugin `obra/superpowers`, `cc-plugin`, or external tools), **you MUST execute the plugin/dependency installation command** (`claude plugin add <plugin>` or equivalent) in this step before proceeding. Skipping plugin installation and proceeding to doc edits or resume is strictly forbidden (`HARD STOP`).
+
+### 2.6 Skill/Tool Invocation Step (MANDATORY HARD STOP)
+
+If the updated or referenced skill/rule mandates a skill or tool call (e.g. `receiving-code-review`, `code-review`, `AskUserQuestion`), **you MUST execute the tool call / autoloader invocation (`view_file` on SKILL.md with `IsSkillFile: true` or native tool execution)** in this step. Updating doc text without physically triggering the tool/skill invocation is strictly forbidden (`HARD STOP`).
+
+### 2.7 Empirical Fix Verification Step (MANDATORY HARD STOP)
+
+Before moving to Step 3 Resume, **you MUST run concrete, empirical verification** demonstrating that the fix implemented in Step 2 actually works in the active session and codebase (e.g., verifying task checklist step creation, running tests, or verifying command exit codes). Relying on text edits alone without empirical verification is strictly forbidden (`HARD STOP`).
+
+### 2.8 Active Task Completion & Ask Priority Gate (HARD STOP)
+
+Completing active tasks in `task.md` / `TaskList` is the #1 top priority over invoking the `next` skill or proposing next-step options.
+- If an active task has open questions, trade-offs, or requires user confirmation/decision, presenting `AskUserQuestion` for that active task is MANDATORY as the very first action of the turn.
+- Invoking `next` skill or offering next-action suggestions while tasks are pending/in_progress or open asks remain is strictly forbidden (`HARD STOP`).
 
 ### 3. Resume Original Work (fix-2)
 
 **The most important step.** Complete the user's original request — not just the fix. Infer user intent and pin the verification medium verbatim; re-call any rejected AskUserQuestion once its reject cause is resolved; resume existing in_progress tasks; reproduce verification through the exact user-reported medium (no detour).
 
-**Read [step3-resume.md](./step3-resume.md) before executing** — it holds intent inference, missing-question identification, dismissal-signal handling, reject-cause classification + secondary-issue default, the verification-scope-reduction guard, and the Step 3 mandatory self-questions (PR Test Plan sync, architectural-finding record).
+**When the resumed step is itself a skill/tool call** (e.g., an un-invoked `next` / consolidate / ask), it becomes its **own terminal task** and the actual call MUST run **this turn** before wrap-up — reporting "it should now be called" and stopping is the exact Antigravity drift the guard exists for. See step3-resume.md "Skill/tool-invocation resume is a first-class task".
+
+**Read [step3-resume.md](./step3-resume.md) before executing** — it holds intent inference, missing-question identification, dismissal-signal handling, reject-cause classification + secondary-issue default, the verification-scope-reduction guard, the Step 3 mandatory self-questions (PR Test Plan sync, architectural-finding record), and the skill/tool-invocation resume rule (same-turn call, unchecked `task.md` box blocks wrap-up).
 
 ### 4. Wrap-up (Report + Task Pruning)
 

@@ -30,6 +30,9 @@ If the user's fix args contain expressions like "you didn't ask / the ask comes 
 | "you should have read the prompt, found what was missing, and put it in resume" | Re-read fix.md / the related skill and specify the missing step (usually an ask) in the fix-2 Resume |
 | "distinguish in-progress vs waiting" / "you didn't ask about what's waiting" | Two separate asks for "in progress" + "waiting on" (do not merge into one option) |
 
+**Active Task Ask Priority (HARD STOP)**:
+If an active task has open questions, design choices, trade-offs, or requires user confirmation/decision, presenting `AskUserQuestion` for that active task MUST be the very first action of Step 3. Completing the active work taking into account user decisions is the primary goal; invoking `next` skill or proposing unrelated next steps is forbidden until all active tasks are complete.
+
 **Self-check (every time the fix args contain "didn't ask / missing ask" keywords)**:
 1. What specific question did the user want asked? — Identify from fix args
 2. Is the asked subject "in progress" or "waiting on" or both? — Split into separate asks if both
@@ -63,6 +66,10 @@ If the user's fix args contain expressions like "you didn't ask / the ask comes 
 **3-0.5. Re-call rejected AskUserQuestion (HARD STOP)**:
 
 If the turn immediately before fix had **AskUserQuestion rejected + /fix triggered** as the flow, then after fix Resume removes the reject cause, **re-calling ask with improved options** is part of Step 3's deliverable. Do not autonomously decide "end without re-call".
+
+**3-0.6. Bypassed Ask Recovery Gate (HARD STOP)**:
+
+If `/fix` was triggered because an `AskUserQuestion` decision gate (e.g. `/skill-kit route` placement, plan trade-offs, human review questions, prompt improvement plan approval) was omitted or bypassed in the preceding turn/request, **the Resume step (`fix-2`) MUST execute that exact missing `AskUserQuestion` as its first deliverable action**. Reporting rule/skill updates without calling the bypassed `AskUserQuestion` is a strict Step 3 violation.
 
 ## Reject cause classification
 
@@ -125,7 +132,8 @@ If TaskList had in_progress/pending entries before entering fix, fix Step 3 must
 
 1. Re-read `fix-2` subject — it contains the full list from the initial request to the immediately preceding action
 2. **Classify done/not-done**: confirm the current state of each task (done, in progress, not yet started)
-3. **Identify missing tasks**: list the correct procedure step by step, compare with what actually ran, and find **skipped intermediate steps**. Example: in "create issue → branch → implement → PR", if issue creation was skipped, that is the missing task
+3. **Multi-substep Resume Breakdown (MINIMUM 5+ STEPS HARD STOP)**: Never collapse the Resume phase into 1 generic single line. Always register explicit sub-items for: (a) plugin/dependency installation (`fix-2`), (b) skill invocation (`fix-3`), (c) empirical fix verification (`fix-4`), (d) code modification / deliverable execution (`fix-5`), (e) verification & walkthrough (`fix-6`). Flattening these into 4 or fewer items is strictly forbidden (`HARD STOP`).
+4. **Identify missing tasks**: list the correct procedure step by step, compare with what actually ran, and find **skipped intermediate steps**. Example: in "create issue → branch → implement → PR", if issue creation was skipped, that is the missing task
 3.5. **Retroactive correction of the trigger object (HARD STOP)**: If the `/fix` was triggered because an action on a specific object in the past missed a required step (e.g., "you missed RAG import when archiving file X earlier"), **you must retroactively perform the missing step on that exact past object (file X) in Step 3**. Applying the new rule only to tests or future objects is a violation. The object that triggered the fix must be fully corrected.
 4. Register the not-done + missing tasks and execute sequentially
 5. Produce each task's **original deliverable** (e.g., classification table, plan document, deployment result, checklist update)
@@ -174,8 +182,9 @@ Do not use a different medium than what the user reported as a detour. Reproduce
 **Self-check (every time before reporting verification complete)**:
 1. Did you copy the user's fix-args medium (URL/API/screen) accurately?
 2. Did you call/reproduce directly via that medium?
-3. Did you compare the response with the user-reported error to confirm "normal" vs same/similar?
-4. Did you avoid detoured verification (different URL, different screen, logs only)?
+3. **Did you write and execute an automated test case / script verifying the fix?** (Text edits alone are invalid without running empirical test commands)
+4. Did you compare the response with the user-reported error to confirm "normal" vs same/similar?
+5. Did you avoid detoured verification (different URL, different screen, logs only)?
 
 (Case history: a verification reported "complete" after checking only login + dashboard load, while the user-reported API itself still reproduced the error — see failed-attempts.md "verification scope reduction".)
 
@@ -201,7 +210,7 @@ When the user's concrete ask is "get X back" / "make Y work again" (data recover
 **Step 3 mandatory self-questions (MANDATORY before marking fix-2 complete)**:
 1. Did Why analysis identify a "skipped intermediate step"? → If yes, that step is fix-2's **immediate execution target**
 2. Can that step **run standalone now (stateless)?** → If yes, run it unconditionally. "Original work is done, skip" is a violation
-3. If the missed step is a skill/tool invocation → execute in this fix Step 3 → complete through result handling
+3. If the missed step is a skill/tool invocation → it becomes its **own terminal `fix-N` task**; emit the actual tool call **this turn** (not a report that it will run) and mark done only after its result returns. See "Skill/tool-invocation resume is a first-class task" below. (Antigravity: represent as an unchecked `task.md` entry that blocks wrap-up — see wip/antigravity.md "Skill-invocation resume".)
 4. **PR work sync check (HARD STOP)**: If this fix's original work is an active PR (`gh pr list --state open` includes the work's branch), did new feature/fix implementations get reflected in the PR body's Test Plan? — `gh pr view <N> --json body` → confirm a `- [ ]` line matching the implemented behavior exists. Missing line = skipped step → add via `gh pr edit --body` before completing fix-2. Applies even when no test was written: a manually verified behavior still needs a Test Plan line so reviewers know what was checked
 5. **Architectural finding record check (HARD STOP)**: During fix work, was a non-obvious architectural fact discovered (e.g., "X record has no Y field", "API Z silently fails on type W", "framework auto-strips Q under condition R")? If yes, decide its recording medium **before completing fix-2**:
    - Project-specific structural fact → `CLAUDE.md` (project root) or `<repo>/.claude/rules/<topic>.md`
@@ -209,3 +218,27 @@ When the user's concrete ask is "get X back" / "make Y work again" (data recover
    - Session-local context only → no record needed
    - "Code change alone = fix complete" thinking is a violation. The discovery is **load-bearing knowledge** for the next person (or future session) touching this surface — silent loss = the same wall hit again
 6. **Non-destructive verification precedence check (HARD STOP)**: Does completing the original work involve a destructive/ask-gated action (apply, deploy, merge, push)? → If yes, did you **autonomously run the preceding non-destructive verification (dry-run / plan / `--check` / `--dry-run` / read-only diff)** and attach its result to the ask? Presenting the ask without the verification result — or deferring the dry-run together with the destructive action — is a violation (see "Non-destructive verification is autonomous" boundary above)
+
+## Skill/tool-invocation resume is a first-class task — same-turn execution (HARD STOP — Antigravity drift prevention)
+
+When the missed step this fix resumes **is itself a skill or tool invocation** (e.g., "the `next` skill was not called", "consolidate was skipped", "the ask was not issued"), prose instructions to "execute it in Step 3" are not enough — some runtimes (notably Antigravity/Gemini) narrate the intent and stop instead of emitting the actual tool call, even across repeated retries. Enforce mechanically:
+
+1. **Give the skill/tool call its own granular task** (`fix-N`), never folded into a broader "resume original work" line. Its subject names the exact call: `🛠️ Resume: invoke <skill/tool> — <purpose>`.
+2. **It is the terminal action of the fix.** The fix cannot reach Step 4 wrap-up while this task is open. A completion report emitted while this task is unchecked is a Step 3 violation.
+3. **Complete = the tool call actually ran**, not "reported that it will run". Marking the task done without the invocation's tool-result present in the transcript is forbidden — this is the "reporting a verb ≠ executing it" failure applied to the resumed skill call.
+4. **Same turn, not next turn.** Emit the tool call in the same turn the fix reaches this task — do not defer to "the next turn will handle it". There is no next turn guaranteed to fire.
+
+### Antigravity (Gemini) — task.md enforcement
+
+Antigravity tracks via the `task.md` artifact and emulates skills, so a prose "invoke skill X" does not reliably trigger a tool call. Represent the resumed skill/tool call as an explicit **unchecked** `task.md` entry and treat that unchecked box as a hard block on wrap-up:
+
+- The entry stays `[ ]` until the skill/tool call has actually executed and returned. Do not pre-check it.
+- Do not write the completion report or clear the task list while the skill-invocation entry is `[ ]`.
+- If the runtime drifts to a report without the call, the correct recovery is to **emit the call now** — not to re-explain that it should be called. See wip/antigravity.md "Skill-invocation resume" for the task.md notation.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Report "the next skill should now be invoked" and end the turn | Emit the actual `Skill(...)`/tool call as the turn's action, then handle its result |
+| 2 | Fold the skill call into a "Resume original work: {everything}" one-liner | Give the skill call its own `fix-N` task with the exact call named |
+| 3 | Mark the skill-invocation task done because the plan says to call it | Done only after the call ran and returned — verify the tool-result exists |
+| 4 | (Antigravity) pre-check the `task.md` box then narrate the call | Leave `[ ]` until executed; the unchecked box blocks wrap-up |
