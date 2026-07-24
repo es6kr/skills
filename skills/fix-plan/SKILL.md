@@ -2,8 +2,8 @@
 name: fix-plan
 description: |
   fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
-  Default (no args): move (or archive-receiver) → format → sync → priority.
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked".
+  Default (no args): move (or archive-receiver) → format → sync → priority, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -69,15 +69,38 @@ fix-plan (schema + lifecycle)
 | `archive-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for **default invocation** (no args). When set, the caller routes the source's `## Completed` section to this receiver for external archiving (weekly report, postmortem log, RAG store, etc.). Receiver harvests + appends to its own report + removes harvested lines from source. Set via `--archive=<skill>:<topic>` CLI flag. See "Default invocation" below |
 | `completed-archive-period` | `monthly` | Period for the **receiver-independent local archive** of the `## Completed` section — `monthly` (`YYYY-MM`) or `weekly` (ISO `YYYY-Www`). On the period boundary, older Completed entries move to `<tracker-dir>/.bak/<tracker-stem>-completed-<period>.md` and are removed from the tracker, keeping the live file small. Set via `--completed-archive-period=weekly\|monthly`. See [move.md](./move.md) "Completed-section size management" |
 | `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing — set via the `--rag=<skill>:<topic>` CLI flag on the `move` topic (see [move.md](./move.md)). No env var or config file is consumed by this skill; the caller routes |
+| `role-profile` | (unset) | Execution-role scoping for the default invocation — CLI `--role=<pm\|deep\|impl>`. Values are **abstract profile names** (`pm` = mechanical bookkeeping/recording, `deep` = large-scale classification & audit, `impl` = implementation); this skill never hardcodes model names. Resolution chain: explicit flag → context self-detection → unset = full pipeline (backward compatible). See "Role-based execution" below |
 | `task-tracker` | `fix_plan.md` | Tracker filename. Use `checklist.md` for non-Ralph workspaces |
 
 ## Default invocation (no args)
 
-When `/fix-plan` is invoked with **no args**, it must execute the following sequential pipeline:
+When `/fix-plan` is invoked with **no args**, it must execute the following sequential pipeline (scoped by the resolved role profile — see "Role-based execution" below):
 1. **Move / Archive**: Dispatch to the configured **archive receiver** (or fall back to the `move` topic) to harvest/cleanup Completed entries.
 2. **Format**: Verify the schema, markers, and section structure of the tracker.
 3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
 4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
+
+### Role-based execution (`role-profile`)
+
+The default pipeline is scoped by the execution role, so a high-capability session is not spent on mechanical bookkeeping — and a bookkeeping session does not attempt deep-analysis passes it is unsuited for.
+
+**Role resolution chain** (first match wins):
+
+1. Explicit `--role=<pm|deep|impl>` CLI flag
+2. **Context self-detection** — when the invoking agent can identify the model it is running on (from its own runtime context, e.g. a model identifier exposed by the harness) AND the workspace declares a model→profile mapping (a local operating note in the tracker, a project rule — caller-side, never in this skill), resolve the profile from that mapping
+3. Neither available → run the **full pipeline** (backward compatible — unchanged behavior for existing users and environments without role mappings)
+
+**Per-profile default pipeline**:
+
+| Profile | Steps executed | Skipped (reported as remainder) |
+|---------|----------------|--------------------------------|
+| `pm` | move → format → sync → priority (current full pipeline) | — |
+| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format — surfaced as a delegation remainder for a `pm` session |
+| `impl` | sync → priority, then surface `selfable` implementation candidates | move, format, model-triage |
+| (unresolved) | full pipeline | — |
+
+- A skipped step is never silently dropped: the run report must list the skipped steps and their pending workload (e.g. "N completed `[x]` items awaiting move") so a later `pm` session picks them up.
+- Model names never appear in this skill. The caller-side mapping translates concrete models to `pm` / `deep` / `impl` — the same supply pattern as the `--archive` / `--rag` receiver contracts.
 
 ### Receiver contract
 

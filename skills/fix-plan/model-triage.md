@@ -7,6 +7,7 @@ Route backlog items to the model tier best suited to them. High-capability (deep
 - A high-capability model window opens (promotion period, dedicated budget) and you need to fill it with the highest-leverage work
 - "Which tasks deserve the strong model?" / "model triage" / "complex-task triage"
 - Periodic re-triage when the dedicated section is exhausted
+- **The default invocation resolves to the `deep` role profile** (see SKILL.md "Role-based execution") — a `deep` session's no-arg `/fix-plan` runs this topic's re-discovery pass instead of the mechanical move/format steps; `pm` sessions run the bookkeeping pipeline and skip this topic
 
 ## Section Convention
 
