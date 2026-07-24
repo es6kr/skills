@@ -15,6 +15,7 @@
 | 3 | "Re-asking would revert the user's prior Other selection → skip" | Prior ask = topic-decision axis (e.g., PR tag). Next-action ask = progress-decision axis (proceed / refine / hold). Different axes, no revert |
 | 4 | "Stop hook re-triggered next, but I already asked once this turn → skip" | The just-completed work is the trigger condition, not "have I asked in this turn". If the work changed (new artifact, new state), ask again |
 | 5 | "TaskList has just one item and it depends on user → no decision axis → skip" | Even single-item TaskList has progress / refine / hold axes for the just-produced artifact. Ask the artifact-level decision |
+| 6 | "User said 'stop working this session' → skip ALL asks including the wrap-up/cleanup ask" | "Stop working" forbids proposing *new task work*, not asking about the wrap-up mechanism itself. Treat it as an explicit wrap-up-intent signal (Context-usage gate condition 1 in suggestion-patterns.md) — if context-usage also reads at/above the session model's threshold (condition 2 — Fable/Mythos 55%, Opus 50%, others 45%), the cleanup ask is *more* warranted, not skipped. Present the ask; do not silently auto-run cleanup either — the user still decides |
 
 ### Skip-target topic list
 
@@ -25,8 +26,8 @@
 | `/archive`, `/safe-delete` | User message: `archive`, `delete`, `move to .bak` | ✅ Skip |
 | `/todo`, `/todowrite` add/move | User message: `todo add`, `task register` | ✅ Skip |
 | `/wip` start/register | User message: `wip`, "track progress" | ⚠️ Conditional (multi-step task → ask allowed) |
-| `/session rename`, `/session move` | Single-action session management | ✅ Skip |
-| Code modification / implementation | Edit/Write performed | ❌ Ask required (verification/commit/push branch) |
+| Intermediate modification with remaining tasks | `task.md` / `TaskList` has active `pending` or `in_progress` items | ✅ **Skip ask** — proceed directly to next remaining task in same turn |
+| Code modification / implementation | Edit/Write performed (all tasks completed) | ❌ Ask required (verification/commit/push branch) |
 | Commit / push | git commit/push performed | ❌ Ask required (next-step branch) |
 | Skill/rule modification | Skill/rule file Edit | ❌ Ask required (test/commit branch) |
 
@@ -46,14 +47,29 @@
 3. Did the user explicitly express follow-up intent alongside the recording-topic invocation (e.g., "record then proceed with X")? -- If no, end with report only
 4. Does the just-completed work include code change / commit / push / external publish / plan-or-research authoring? -- If yes, ask is required (decision branch exists)
 5. Am I about to skip on grounds of "user awaiting reply" / "prior turn already asked" / "re-ask reverts prior selection"? -- All three are extrapolation traps (see Don't/Do #2–4 above). Ask required
+6. Even if skip is confirmed (step 1–5 all pass) — **did I run the context-usage gate (step 4 of "How to skip")? (HARD STOP)**: if live context-usage ≥ model threshold OR user signaled wrap-up intent, the cleanup/retrospective ask is **required** even for a confirmed skip target. Skip ≠ context-gate exemption.
+
+### Antigravity Environment Context Usage Reporting Gate & Cleanup Selection Execution (HARD STOP)
+
+When running in Antigravity (Gemini), backend hooks are limited. You MUST:
+1. **Explicitly state current context usage % & token estimate** in the `AskUserQuestion` question text header (e.g. `[Context Usage: XX% (~YYK tokens)]`). In Antigravity (Gemini), context usage % MUST be calculated based on the **1M token capacity (1,000,000 tokens)**: `pct = (tokens / 1,000,000) * 100`. (e.g., 40,000 tokens = ~4%).
+2. **Mandatory `/cleanup` Recommendation**: If context usage >= 45% (>=450K tokens in Antigravity or transcript log size indicates high usage), set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 in `AskUserQuestion`.
+3. **Mandatory Session Cleanup Execution (HARD STOP)**: When the user selects any option whose label denotes session cleanup (`/cleanup`, or its session-language equivalent), the agent MUST NOT conclude the turn with a plain text wrap-up message alone. The agent MUST immediately register cleanup tasks in `task.md` / `TaskList` and execute the `cleanup` skill protocol (via `Skill("cleanup")` or environment-appropriate autoloader such as `view_file` with `IsSkillFile: true` under Antigravity).
+
+| # | Don't | Do |
+|---|---|---|
+| 1 | Omit context usage % or token count in `AskUserQuestion` question text when running in Antigravity | Include `[Context Usage: XX% (~YYK tokens)]` in the question text |
+| 2 | Recommend forward work options without `/cleanup` when context usage >= 45% | Set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 when usage >= 45% |
+| 3 | Conclude with text greeting when user selects a session-cleanup option (`/cleanup` or its session-language equivalent) | Immediately register cleanup tasks and execute `cleanup` skill protocol (`Skill("cleanup")` or `view_file IsSkillFile:true`) |
 
 ### How to skip (procedure)
 
 1. Determine skip target via Step 0.3 self-check
 2. **Run Step 0.4 first — skip never bypasses it (HARD STOP)**: even a confirmed skip-target must pass through Step 0.4's decision-deferral scan. If the report defers a decision as prose (e.g. "start decision is yours" / "the start decision awaits your instruction"), Step 0.4 **overrides** the skip and forces the ask. Only after Step 0.4 finds no deferred decision does the skip stand.
 3. If skip-target **and** Step 0.4 clean, do not proceed to Step 0.5/0.7 (TaskList check, user-work confirmation)
-4. Report completion as plain text only (no AskUserQuestion call)
-5. If Stop hook re-triggers next skill, re-evaluate the same skip judgment
+4. **Run context-usage gate (HARD STOP — skip does NOT exempt this check)**: even when the skip is confirmed (recording topic + Step 0.4 clean), check the live context-usage signal from `suggestion-patterns.md` "Context-usage gate". If the live reading is at/above the model's threshold (Fable/Mythos 55%, Opus 50%, others 45%) **or** the user has already signaled wrap-up intent — the cleanup/retrospective ask becomes **required** per the positive-trigger rule. A skip-target completion that crosses the gate forces a single-question AskUserQuestion offering the cleanup/retrospective option (not the full next-action ask — just the cleanup decision). Without this check, skip silently discards the cleanup option on high-context sessions.
+5. Report completion as plain text only (no AskUserQuestion call) — **only when step 4's context-usage gate is also clear**
+6. If Stop hook re-triggers next skill, re-evaluate the same skip judgment
 
 ### Case history
 
@@ -66,6 +82,8 @@ If skip-target (exact match in closed list) → no ask. Otherwise → proceed to
 ## Step 0.4: Decision-deferral forced-ask gate (HARD STOP)
 
 **Before ending a completion report, scan your own just-emitted text for a decision left as prose.** If the report defers a decision to the user instead of asking it, that deferral is itself a decision axis — you **must** compose an `AskUserQuestion` for it, not end on the text. This is the mirror image of Step 0.3: 0.3 *skips* the ask for recording topics; 0.4 *forces* the ask when a real decision was left unasked.
+
+**Applies regardless of whether `next` was formally invoked this turn.** This self-check is a standing rule for any turn-ending text — a `/fix` wrap-up, a tool-result summary, an aside tacked onto an unrelated report — not something gated behind an explicit `Skill("next")` call. A classic instance: appending "let me know if you want /cleanup" as a courtesy note at the end of an otherwise-unrelated report. That is exactly the text-deferral pattern this gate exists to catch — compose a standalone `AskUserQuestion` for it (folded into an existing ask if one is already being composed this turn, or on its own if not), rather than reasoning "no ask is happening this turn, so text is fine."
 
 ### Trigger phrases — a decision left as text
 
@@ -135,6 +153,34 @@ Otherwise → proceed to Step 0.5.
 1. Does this ask relate to task progress direction? → If yes, TaskList Read is mandatory
 2. Do the tasks mentioned in option descriptions **actually exist in TaskList**? — 1:1 mapping with TaskList output
 3. If there are N pending tasks but only M < N appear in options → state the filtering reason in description or use the wrap-up pattern
+
+## Step 0.6: Workspace fix_plan.md active integration protocol (MANDATORY — when TaskList is empty, done, or unavailable)
+
+**Trigger scope (HARD STOP)**: this step applies whenever `TaskList` yields no actionable pending items — whether because it is genuinely empty, all items are done, **or the TaskList/TaskCreate tool is disconnected/unavailable this turn**. "Unavailable" is not a different case from "empty" — both mean the session-local task medium cannot surface backlog, so the persistent checklist medium (`fix_plan.md`) becomes the primary source. Do not read the word "empty" literally and treat a disconnected tool as exempt.
+
+1. **Locate Workspace Root(s)**: Determine the active workspace root(s) containing `.git` or `.ralph/`. **Do not derive this from current cwd alone** — a session can move across multiple workspaces (e.g., start in a project directory debugging an issue, then pivot to a skills/rules repo). Enumerate every workspace root visited during the session (via Bash cwd changes, Read/Edit/Grep paths, or `cd`/`git -C` targets seen in the transcript), not just the one matching the cwd at the moment `next` fires.
+2. **Find fix_plan.md**: For each workspace root from step 1, read its project backlog checklist (`<workspace-root>/.ralph/fix_plan.md` or `<workspace-root>/fix_plan.md`) if present. A workspace without one (e.g., a skills/rules repo with no Ralph loop) is skipped, not treated as proof no other workspace has one.
+3. **Extract Pending Backlog**: Extract pending checklist items (`- [ ]`) from the `## Priority Work` (or equivalent priority) section.
+4. **Context & Relevance Filtering**: Filter these tasks to identify those related to the current session (e.g., matching files edited, directories touched, or keywords from the conversation history).
+5. **Sort by Priority**: Sort the remaining candidates by priority level: `P0` -> `P1` -> `P2` -> `[REPEAT]`.
+6. **Compose Options**: Surface the top 2-3 prioritized and related tasks as options in `AskUserQuestion`. Place them above generic options like "End session", using concise labels with their priority level indicated in the description (e.g. `[P0]`).
+
+### Don't / Do table
+
+| # | Don't | Do |
+|---|---|---|
+| 1 | Suggest "End session" immediately when session tasks are complete without checking the project's persistent backlog | Read the active workspace's `fix_plan.md` first, find prioritized tasks, and offer them |
+| 2 | Pull tasks from a parent or different workspace's `fix_plan.md` | Detect the current workspace root(s) first, then read the local `.ralph/fix_plan.md` for each one actually visited this session |
+| 3 | Present tasks out of priority order (e.g. suggesting P2/REPEAT before P0/P1) | Sort strictly by priority level (`P0` -> `P1` -> `P2` -> `[REPEAT]`) and surface the highest first |
+| 4 | Present all `fix_plan.md` tasks blindly | Filter for tasks that are relevant to the files or topics touched in the current session first |
+| 5 | Treat "TaskList tool disconnected/unavailable" as outside this step's scope because the trigger says "empty" | Unavailable = equivalent to empty for this step's purpose. The fix_plan.md check is the fallback specifically when the session-local task medium cannot be read at all |
+| 6 | Derive "the workspace" solely from the cwd at the moment `next` fires, especially when that cwd (e.g. a skills/rules repo) has no `fix_plan.md` | Check every workspace root the session actually touched. A session that started in a project directory and later moved to a different repo still has backlog in the first one |
+
+### Self-check (before declaring "no work" / "session complete")
+
+1. Is TaskList empty, done, or **did the TaskList/TaskCreate call itself fail or return unavailable**? → Either case triggers this step
+2. Did the session's cwd change at any point (project debugging → skills/rules repo, or similar)? → If yes, check `fix_plan.md` in **each** workspace root visited, not just the final cwd
+3. Does the final-cwd workspace lack a `fix_plan.md`? → That is not evidence no other visited workspace has one — check them all before concluding no backlog exists
 
 ## Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
 
@@ -248,4 +294,33 @@ options: [
 ```
 
 After receiving both answers, compose the actual next-action options based on the answered current state + waiting items.
+
+---
+
+## Post-task-completion follow-up is Skill("next") invocation duty — no plain-text questions (HARD STOP)
+
+**When a task-batch (or work flow) completes and the turn is wrapping up, the way to ask about the next action is to call `Skill("next")` and then `AskUserQuestion`. Ending with a plain-text question like "anything else you'd like me to do?" / "let me know the next action" / "let me know the follow-up direction" is forbidden.** Discovering follow-up work is the assistant's responsibility, not the user's — the `next` skill actively surfaces candidates from fix_plan / open PRs·issues / dependent follow-ups / the just-completed work, and presents them as options.
+
+Always-on promotion of memory `feedback_subskill_resume_orchestration` (3rd recurrence). The `next` skill's description specifies Stop-hook auto-invocation, but the safety net can break if the dispatcher isn't wired up or Korean-regex coverage is missing — so **an assistant's explicit `Skill("next")` call is the correct approach**.
+
+### Don't / Do
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------|-----------------|
+| 1 | End the completion report with a plain-text question like "anything else you'd like me to do?" / "anything else to handle?" and close the turn | Call `Skill("next")` in the same turn → surface candidates → present as `AskUserQuestion` options |
+| 2 | Offload discovery to the user via text like "let me know the next action" / "let me know the follow-up direction" | Follow-up discovery = assistant's responsibility. The `next` skill surfaces candidates from primary sources (fix_plan/PR/issue) |
+| 3 | Relying on "AskUserQuestion is too heavy, wrap up with text" / "the Stop hook will fire on its own" | The hook is a safety net (may not cover Korean). The assistant explicitly calls `Skill("next")` on the final turn |
+| 4 | After a sub-skill (`/wip`, `/fix`, `/cleanup`, consolidate, etc.) returns, output only the report and end | Return to the outer flow — if a proceed-item remains, move to the next item; otherwise call `Skill("next")` |
+| 5 | Classifying a wait/polling-handoff turn (registering `ScheduleWakeup` and returning control) as "work incomplete, so `next` doesn't apply" + interpreting the `ScheduleWakeup` result's "Nothing more to do this turn" wording as exempting the final report and `next` + **emitting the text first and placing the wakeup call as the turn's last call** (leaving the final message tool-call-only) | A wait handoff is also a user-facing close — `next` ask (if needed) → **call `ScheduleWakeup` → receive its result → the turn's final output must be the final-report text**. "Nothing more to do this turn" is not grounds to omit the text (enforcement: `next-trigger.sh` blind-spot guard — detects tool-call-only/`ScheduleWakeup` turn endings) |
+| 6 | Ending with a **status/completion statement** rather than a plain-text "question" (e.g. "done", "completed", "passed", "remaining state: waiting on ~") → judging "not a question, so the `next` rule doesn't apply" + omitting `Skill("next")` | **The trigger is "task-batch completion", not "a question was written"**. Whether it's a question or a status statement, if the work flow is complete and the turn is wrapping up, call `Skill("next")` in the same turn. Even if the completion phrasing isn't covered by the hook's regex and the safety net doesn't fire, the assistant calls it proactively (same as row 3 — no reliance on the hook) |
+| 7 | Treating a **mid-turn AskUserQuestion on another axis** (a push/deploy confirmation, a trade-off answer, an option selection) as having satisfied the completion-time `next` duty → wrapping up with a report only | A mid-turn ask is a **different decision axis**; the next-action ask fires at batch completion regardless. Critically, on a **continuation chain** (a turn that resumed from an earlier Stop-hook block), the Stop-hook safety net is **structurally silent** for every later stop in that chain (`stop_hook_active` loop prevention — no block, no log). Long chained turns with multiple ask round-trips are therefore exactly where the assistant's explicit `Skill("next")` call is the ONLY path — evidence: next-trigger.debug.log gap, next-invocation family 10th recurrence |
+
+### Self-check (every time before wrapping up a turn on task completion)
+
+1. Did a task-batch / work flow complete in this turn? → If yes, this rule applies
+2. Am I about to close the response with a plain-text question ("follow-up/next/additional work" + "anything else?"/"let me know"/"?") **or a status/completion statement** ("done"/"completed"/"passed"/"remaining state: waiting on ~")? → Neither may close the turn by itself. If a task-batch completed, replace it with `Skill("next")` (the trigger is **task completion**, not the presence of a question)
+3. Does this same turn include a `Skill("next")` tool call? → If no, add the call
+4. Only genuine branch axes explicitly requiring the user (e.g. push/merge confirmation) may get a separate ask — and even those can be folded into `next`'s options
+5. Is this turn being handed off via `ScheduleWakeup`? → Confirm that **after** calling wakeup and receiving its result, the **turn's final output is the final-report text** — a tool-call-only final message is a violation (placing the text only before the wakeup call is also a violation)
+
 

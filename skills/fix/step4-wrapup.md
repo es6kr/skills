@@ -14,13 +14,15 @@ If /fix has been invoked 2+ times in this session, **before** marking fix-* task
 1. Call `TaskList` → collect every task containing `🔄 Resume` or `Resume`
 2. Extract outstanding work from each Resume task's description
 3. **Register outstanding work as new tasks** (without the fix-* prefix)
-4. Only after new tasks are registered, **bulk-delete all fix-* tasks**
+5. **Suggest Next Actions (Only When ALL Tasks Completed — HARD STOP)**: Completing active tasks is top priority. Present active task decision/confirmation (`AskUserQuestion`) FIRST if open questions exist. Invoke `next` / `AskUserQuestion` for next actions ONLY when ALL registered tasks in `task.md` or `TaskList` are 100% completed (`[x]`). If uncompleted tasks (`pending` or `in_progress`) remain or active task asks exist, DO NOT invoke `next` or present next action options — directly proceed to complete the task or ask the active decision item in the same turn.
+6. **Call `Skill("next")` after the wrap-up report when the batch is complete (HARD STOP — the mirror of step 5)**: step 5 forbids a premature `next`; this step forbids the omitted one. When every registered task IS completed and the turn is ending on the wrap-up report, the same turn MUST include a `Skill("next")` call (its own gates then decide whether an ask follows). A **mid-turn AskUserQuestion on another axis** (push confirmation, trade-off answer, option selection) does NOT substitute for this call. Do not rely on the Stop-hook safety net: on a continuation chain (a turn resumed from an earlier Stop-hook block), the harness suppresses every later stop's hooks (`stop_hook_active` loop prevention), so long chained /fix turns are precisely where only the explicit call fires (next-invocation family recurrence evidence).
+
 
 ```text
 Fix complete:
 - 🔍 Root cause: {what was missing}
 - 🔧 Improvement: {which file was modified and how}
-- 🔄 Current fix: {result of fixing the current issue}
+- 🔄 Current fix: {result of fixing the current issue} (Note: any referenced PRs/Issues must use clickable links `[PR #N](URL)`)
 - 📋 Wrap-up: {fix-* tasks deleted, outstanding work separated}
 ```
 
