@@ -12,22 +12,22 @@ GitHub PR/Issue state polling. Reads `[ ]` items in fix_plan, finds PR/Issue num
 
 ### 1. Extract PR/Issue numbers from `[ ]` items
 
-Grep fix_plan for `PR #N`, `Issue #N`, or bare `#N` near a known issue/PR keyword. For each match, capture the number.
+Grep fix_plan for `PR #N`, `Issue #N`, or bare `#N` near a known issue/PR keyword. For each match, capture the number. When rewriting or updating the state of these items, ensure bare references (or raw `PR #N`) are rewritten to clickable Markdown links `[PR #N](URL)`.
 
 ### 2. Query GitHub state
 
 **Batch per repo (default — avoids the N-call loop)**: when a tracker references many numbers (≥3) in the same repo, query them in one call per artifact type instead of looping `gh pr view` per number. This respects the external-API repeat-call limit (3+ identical calls need justification) and is dramatically faster on large trackers:
 
 ```bash
-# All referenced PRs of one repo in a single call
+# All referenced PRs of one repo in a single call (include url)
 gh pr list -R <owner>/<repo> --state all --limit 200 \
-  --json number,state,mergedAt,title \
-  --jq '.[] | select(.number|IN(41,44,45,47)) | "\(.number)\t\(.state)\t\(.mergedAt // "-")"'
+  --json number,state,mergedAt,url,title \
+  --jq '.[] | select(.number|IN(41,44,45,47)) | "\(.number)\t\(.state)\t\(.mergedAt // "-")\t\(.url)"'
 
-# All referenced issues of one repo in a single call
+# All referenced issues of one repo in a single call (include url)
 gh issue list -R <owner>/<repo> --state all --limit 200 \
-  --json number,state,title \
-  --jq '.[] | select(.number|IN(23,150,436)) | "\(.number)\t\(.state)"'
+  --json number,state,url,title \
+  --jq '.[] | select(.number|IN(23,150,436)) | "\(.number)\t\(.state)\t\(.url)"'
 ```
 
 Numbers absent from the batch output (older than the `--limit` window) fall back to per-item queries below.
@@ -35,8 +35,8 @@ Numbers absent from the batch output (older than the `--limit` window) fall back
 **Per-item fallback** (few numbers, or absent from the batch window):
 
 ```bash
-gh pr view <N> --json state,mergedAt -q '{state: .state, mergedAt: .mergedAt}'
-gh issue view <N> --json state,closedAt -q '{state: .state, closedAt: .closedAt}'
+gh pr view <N> --json state,mergedAt,url -q '{state: .state, mergedAt: .mergedAt, url: .url}'
+gh issue view <N> --json state,closedAt,url -q '{state: .state, closedAt: .closedAt, url: .url}'
 ```
 
 (Try `gh pr view` first; on "not found" fall back to `gh issue view`. Both error → skip the entry. Note: a number can be a PR in one tracker line and an issue in another — the batch queries cover both artifact types separately, so run both when the reference kind is ambiguous.)
