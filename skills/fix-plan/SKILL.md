@@ -1,7 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 GitHub-aligned BLOCKED suffix + external/selfable reason classification), add (Action/Why/How authoring), draft (record a deferred plan stub when full planning is postponed → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete lifecycle). Default (no args): dispatch to configured archive-receiver `<skill>:<topic>` (e.g., weekly report, RAG store) to harvest Completed section + remove from source; falls back to move topic when no receiver registered. Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive".
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
+  Default (no args): move (or archive-receiver) → format → sync → priority.
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -26,23 +28,26 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| completion-criteria | Definition of done per item output type (`Why` = scope narrative vs `How to apply` = deliverable), marker transition rules, residual-scope split | [completion-criteria.md](./completion-criteria.md) |
 | format | Schema: `[ ]` / `[x]` / `[BLOCKED]` markers, Progress/Completed sections, item state changes, section-consistency check | [format.md](./format.md) |
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
+| model-triage | High-capability model triage: 5 fit categories + anti-fit table + cross-section discovery procedure + dedicated `## <Model> Target Tasks` section operation | [model-triage.md](./model-triage.md) |
 | add | New item authoring schema (Action / Why / How), length budget, deliverable separation (research / plan / checklist split) | [add.md](./add.md) |
 | draft | Record a deferred plan **stub** (purpose + defer reason + resume trigger + expected deliverable) in `## Plan Drafts` when full planning is postponed; promote to `code-workflow` research→plan when the trigger fires. Invoked `/fix-plan draft` | [draft.md](./draft.md) |
 | move | `[x]` → Completed summary rules, subtree-move partial completion under unfinished parent, optional abstract RAG dispatch | [move.md](./move.md) |
-| sync | GitHub PR/Issue state polling (`gh pr view` / `gh issue view`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
+| sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
 
 ## Topic Dependencies
 
 ```text
 fix-plan (schema + lifecycle)
-  ├─→ (default, no args) → archive-receiver dispatch (caller-supplied) — falls back to move
+  ├─→ (default, no args) → move (archive-receiver) ──→ format ──→ sync ──→ priority
   ├─→ format (entry — section structure + markers)
   ├─→ priority (new convention — BLOCKED P0-P3 + reason)
   │     └─→ depends on sync (Step 0: refresh external state before classifying)
   ├─→ add (authoring act-now items)
+  ├─→ model-triage (cross-section discovery → dedicated section; items authored via add's schema)
   ├─→ draft (deferred plan stub → `## Plan Drafts`)
   │     └─→ code-workflow/steps dispatch on promote (research → plan)
   ├─→ move (completion → Completed)
@@ -52,7 +57,7 @@ fix-plan (schema + lifecycle)
 ```
 
 - All topics are independently invocable, **except `priority` which invokes `sync` as Step 0 (HARD STOP)** — triage on stale state is the failure mode the dependency prevents (see [priority.md](./priority.md) Triage workflow Step 0)
-- **Default invocation (no args)** dispatches Completed section to a caller-supplied archive-receiver (`--archive=<skill>:<topic>`); if no receiver is registered, falls back to in-tracker `move` (Completed cleanup only). See "Default invocation" section
+- **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, and triages blockers via `priority`.
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic uses `gh` CLI per `github-flow` skill's conventions
 - `draft` topic dispatches to `code-workflow` (`steps`) on promote — turns a deferred stub into a real research → plan
@@ -68,7 +73,11 @@ fix-plan (schema + lifecycle)
 
 ## Default invocation (no args)
 
-When `/fix-plan` is invoked with **no args**, dispatch to the configured **archive receiver** to harvest the `## Completed` section into an external report and remove the harvested items from the source tracker. If no receiver is registered, fall back to the `move` topic (in-tracker Completed cleanup only).
+When `/fix-plan` is invoked with **no args**, it must execute the following sequential pipeline:
+1. **Move / Archive**: Dispatch to the configured **archive receiver** (or fall back to the `move` topic) to harvest/cleanup Completed entries.
+2. **Format**: Verify the schema, markers, and section structure of the tracker.
+3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
+4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
 
 ### Receiver contract
 
