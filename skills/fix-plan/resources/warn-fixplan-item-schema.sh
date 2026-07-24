@@ -47,15 +47,34 @@ NEW=$(printf '%s' "$INPUT" | jq -r '
 ' 2>/dev/null)
 [ -z "$NEW" ] && exit 0
 
+# Anchor/context text carried THROUGH the edit (Edit -> old_string, MultiEdit ->
+# all old_strings; Write has none). An item header that appears here too is a
+# pre-existing anchor whose body may lie OUTSIDE the edit window: inserting a new
+# item BEFORE an existing one leaves that existing item's header as the trailing
+# line of new_string while its Why/How stay below the cut. Flagging it would
+# misfire (the exact false-positive this exemption removes). The advisory targets
+# only items the session actually authored in this edit.
+OLD=$(printf '%s' "$INPUT" | jq -r '
+  .tool_input.old_string //
+  ([.tool_input.edits[]?.old_string] | join("\n")) //
+  empty
+' 2>/dev/null)
+
 # A top-level item starts at column 0 with "- [". Its span runs until the next
-# top-level "- [" line, a "#"-header line, or EOF.
-FINDINGS=$(printf '%s' "$NEW" | awk -v budget="$BUDGET" -v maxrep="$MAX_REPORT" '
+# top-level "- [" line, a "#"-header line, or EOF. OLD is fed before a separator
+# so awk can collect anchor headers, then the NEW section is inspected.
+FINDINGS=$(printf '%s\n===HOOK_OLD_NEW_SEP===\n%s' "$OLD" "$NEW" | awk -v budget="$BUDGET" -v maxrep="$MAX_REPORT" '
+  BEGIN { reading_old = 1 }
+  reading_old && /^===HOOK_OLD_NEW_SEP===$/ { reading_old = 0; next }
+  reading_old { if ($0 ~ /^- \[/) oldhead[$0] = 1; next }
   function flush(endnr,   span, probs) {
-    # Exempt completed [x] items (bloat hook owns those) and [BLOCKED] items.
-    # A BLOCKED item is an external-wait entry whose schema is a trigger line
-    # ("**trigger: <condition>**"), not the Action/Why/How of an act-now item —
-    # the whole Hold section uses that form, so requiring Why/How here misfires.
-    if (!in_item || is_done || is_blocked) { in_item = 0; return }
+    # Exempt completed [x] items (bloat hook owns those), [BLOCKED] items, and
+    # anchor items carried from old_string (is_anchor) whose body may be cut off
+    # by the edit boundary. A BLOCKED item is an external-wait entry whose schema
+    # is a trigger line ("**trigger: <condition>**"), not the Action/Why/How of
+    # an act-now item — the whole Hold section uses that form, so requiring
+    # Why/How here misfires.
+    if (!in_item || is_done || is_blocked || is_anchor) { in_item = 0; return }
     span = endnr - start + 1
     probs = ""
     if (!has_why) probs = probs "Why "
@@ -72,6 +91,7 @@ FINDINGS=$(printf '%s' "$NEW" | awk -v budget="$BUDGET" -v maxrep="$MAX_REPORT" 
     start = NR; head = $0; in_item = 1
     is_done = ($0 ~ /^- \[x\]/)
     is_blocked = ($0 ~ /\[BLOCKED/)
+    is_anchor = ($0 in oldhead)
     has_why = 0; has_how = 0
     next
   }
