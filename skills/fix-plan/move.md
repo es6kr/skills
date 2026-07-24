@@ -45,6 +45,18 @@ Keep the Completed file minimal — detailed steps, commit hashes, and session I
 | Reference | Do NOT include commit hashes or session IDs. These are cataloged in RAG. If applicable, keep only the PR or Issue number (e.g. `(PR #N)`). |
 | No `[x]` marker | Completed uses `-` followed by a space (no checkbox) |
 
+### Session identifier format (HARD STOP — when a `(session <id>)` reference is kept)
+
+A session reference is normally dropped (Reference rule above). When one **is** kept — Progress-item completion notes and some environments' Completed lines carry `(session <id>)` inline — it must be a **prefix of the runtime's canonical session id**, never a session *name* / alias. In Claude Code that id is the 36-char transcript UUID; the inline convention is its **first 8 hex chars** (e.g. `(session c1b6e7e2)`) — enough to grep a transcript, without bloating the line with the full 36 chars. A human-readable session name (a `/rename` label like `fable-fix-plan`) is NOT an id: it cannot be matched back to a transcript, and it is the exact failure this rule prevents.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write the session's display name / alias: `(session fable-fix-plan)` | Write the 8-char id prefix: `(session c1b6e7e2)` |
+| 2 | Bloat the inline note with the full 36-char UUID: `(session c1b6e7e2-445e-4884-97e4-6a02042149b2)` | 8-char prefix is the fix_plan convention: `(session c1b6e7e2)`. Reserve the full UUID for RAG metadata / import reports, not the fix_plan line |
+| 3 | Invent a placeholder because the id is not at hand | Obtain the real id first (see below), then write its prefix — a placeholder that later gets treated as real is worse than omitting the reference |
+
+**When the id is not known**: in a runtime where the session id is only obtainable through the harness (Claude Code exposes it via the SessionStart-injected `Current session ID` context or the `/session id` command, not by the model guessing), do NOT fabricate a name/placeholder. Either omit the `(session …)` reference entirely (the Reference rule already permits this) or retrieve the real id first, then keep its 8-char prefix. Emitting a name in the identifier slot is the failure this rule prevents.
+
 ## PR-level item
 
 When a top-level `[x]` PR entry carries branch / CI / code-review sub-bullets, **roll the whole thing into one simple line**:
