@@ -31,7 +31,7 @@ Top-level sections:
 | Section | Purpose | Behavior |
 |---------|---------|----------|
 | `## Progress` | Active and recently-completed items | Always present. Never empty — if no items, keep `(none)` placeholder |
-| `## Completed` | Historical one-line summaries | Append-only chronological. New entries inserted at sort position. **Not unbounded** — older entries are periodically archived to `.bak/` partition files (see [move.md](./move.md) "Completed-section size management"); the live section holds only the current period |
+| `## Completed` | Historical one-line summaries | Temporary holding area. New entries inserted at sort position. **Not unbounded** — older entries are periodically archived to `.bak/` partition files (and index to RAG) and **deleted from the active file** (see [move.md](./move.md) "Completed-section size management"); the live section holds only the current period |
 | `## Hold` (optional) | External-response BLOCKED items separate from active Progress | Used when Progress would otherwise be cluttered with un-actionable items |
 | `## Notes` | Project conventions, project-specific guard rails | Not modified by this skill |
 
@@ -46,15 +46,16 @@ Top-level sections:
 | `-` followed by space, no checkbox | Already-summarised historical line | `## Completed` only |
 | `- [REPEAT]` | Persistent recurring item (Ralph-specific — see ralph/periodic.md) | `## REPEAT` section only (out of scope for this skill) |
 
-## Item state changes
-
 When an item completes, change `- [ ]` → `- [x]` and append session ID + timestamp to the title line.
 
-Format: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, commit <hash>)` or for merged PRs: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, PR #N)`.
+Format: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, commit <hash>)` or for merged PRs: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, [PR #N](https://github.com/<owner>/<repo>/pull/N))`. All PR/Issue references in the tracker must be clickable Markdown links (`[PR #N](URL)` or `[Issue #N](URL)`).
 
 - Session ID: first 8 chars from `.ralph/.claude_session_id` (Ralph environment) or current session ID
 - Timestamp: 24-hour `YYYY-MM-DD HH:mm` of the completion moment
 - Add `**complete**` markers to inner sub-steps where useful
+
+**Completion Migration Rule (HARD STOP)**: When the user explicitly instructs to "mark this as completed" or its locale equivalent (a completion-marking instruction in the user's language), you must **not** just change `- [ ]` (or `- [BLOCKED]`) to `- [x]` in place. You must change the state **AND** move the item to the `## Completed` section (as a summarized one-line entry with the timestamp and session ID) in the **very same edit/turn**. Do not split completion marking and completed section migration into separate turns.
+
 
 ## Section-consistency check (HARD STOP)
 
@@ -116,6 +117,16 @@ Exceptions:
 - Do not arbitrarily delete or modify existing entries in `## Completed`
 - Do not touch the `## Notes` section
 - **Do not add AI behavior constraints (e.g. version-change prohibitions, test-bypass prohibitions) to this file or to `fix_plan.md`** — these belong in `.ralph/PROMPT.md` (Ralph environment) or `~/.agents/rules/*.md` (global). `fix_plan.md` is a **task list + completion-log artefact only**
+- **`###` section headers for deferred/PR-specific findings are FORBIDDEN (HARD STOP)** — consolidate, code-review, and other auto-registration paths must **not** create `### PR #N ...` or `### Epic #N ...` sub-sections inside `## Progress` or `## Hold`. Instead:
+  - Register each deferred finding as `- [BLOCKED] [REVIEW_FEEDBACK] ...` list item directly inside the section
+  - Group related findings from the same PR/review round under a single parent `[BLOCKED]` item with sub-bullets
+  - Rationale: `###` headers fragment the file into isolated islands that are hard to batch-process and prevent cleanup.py from properly traversing the item tree. All items at the same depth belong in the same list hierarchy.
+
+  | Don't | Do |
+  |-------|----|
+  | `### PR #56 consolidate deferred — 2026-06-23` + inline narrative | `- [BLOCKED] [REVIEW_FEEDBACK] PR #56 deferred findings — {summary}` list item |
+  | Separate `### PR #409` + `### PR #412` sections | Group related PRs under one parent `- [BLOCKED]` with sub-items per PR |
+
 
 ## See also
 
