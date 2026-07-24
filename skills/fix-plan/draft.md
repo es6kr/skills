@@ -70,7 +70,7 @@ A plan-draft follows three stages.
 | Stage | Action | Owner |
 |-------|--------|-------|
 | 1. Write | Add a `- [BLOCKED:P*:selfable]` entry to `## Plan Drafts` (optionally a `plan-drafts/<slug>.md` body file) | This topic, when the user defers |
-| 2. Promote | When the resume trigger fires, hand the stub to the planning workflow (research → plan) and convert the entry into active work | This topic → `code-workflow` |
+| 2. Promote | When the resume trigger fires, re-verify the stub's premises against first sources, then hand the stub to the planning workflow (research → plan) and convert the entry into active work | This topic → `code-workflow` |
 | 3. Archive | When a stub is superseded / abandoned, move any body file to `plan-drafts/.bak/` and remove the entry | This topic |
 
 ### 1. Write
@@ -84,17 +84,19 @@ A plan-draft follows three stages.
 
 When the resume trigger is met:
 
-1. Dispatch the stub to the planning workflow: `Skill("code-workflow", "steps")` (research → plan → user review) using the stub's Purpose + Expected deliverable as the seed.
-2. After the real research/plan artifact exists, **remove the stub entry** from `## Plan Drafts` (its job is done — the artifact supersedes it).
-3. If a `plan-drafts/<slug>.md` body file existed, archive it: `mkdir -p plan-drafts/.bak && mv plan-drafts/<slug>.md plan-drafts/.bak/`.
+1. **Re-verify the stub's premises against first sources before planning.** A stub is a defer-time snapshot; by promote time its premises drift — the config it targets may already be fixed, the question it poses may already be answered, or its proposed flag/approach may now conflict with a changed contract. Check each premise at a first source (grep the code/config, `gh`/`git`/`npm`/registry state, the tracker's `## Completed`). If any premise is invalidated, record it at the head of the research seed (passed to `code-workflow`) so the plan starts from current reality, not the stale stub.
+2. Dispatch the stub to the planning workflow: `Skill("code-workflow", "steps")` (research → plan → user review) using the stub's Purpose + Expected deliverable — plus any premise corrections from step 1 — as the seed.
+3. After the real research/plan artifact exists, **remove the stub entry** from `## Plan Drafts` (its job is done — the artifact supersedes it).
+4. If a `plan-drafts/<slug>.md` body file existed, add valid YAML frontmatter (`title`, `status: superseded`, `created`, `share_eligibility: public|private`, `relates_to`, `archived: true`, `archived_at`, `archive_reason`) and move it to the unified `.ralph/` backup directory (`mkdir -p .ralph/.bak && mv plan-drafts/<slug>.md .ralph/.bak/draft-<slug>.md`). All `.ralph/` sub-document backups MUST be unified in `.ralph/.bak/` (never create sub-folder `.bak/` directories like `plan-drafts/.bak/` or `docs/generated/.bak/`).
 
 ### 3. Archive (superseded / abandoned)
 
 When a draft is no longer wanted (duplicated by another plan, scope dropped):
 
 ```bash
-mkdir -p plan-drafts/.bak
-mv plan-drafts/<slug>.md plan-drafts/.bak/   # only if a body file exists
+# Add YAML frontmatter (title, status: superseded, share_eligibility, relates_to, archived: true, archive_reason)
+mkdir -p .ralph/.bak
+mv plan-drafts/<slug>.md .ralph/.bak/draft-<slug>.md   # only if a body file exists (all .ralph backups unify under .ralph/.bak/)
 ```
 
 Then remove the `## Plan Drafts` entry. **Order**: archive the file first, remove the entry second (same rule as `issue-drafts` — reverse order leaves an orphan file mis-read as pending).
@@ -111,6 +113,7 @@ Then remove the `## Plan Drafts` entry. **Order**: archive the file first, remov
 | 6 | Record only the inline 3-field stub when this session has already gathered substantive research/measurements (the chat contains numbers/tables/classified findings) | **Inline + body file mode** — write the findings to `plan-drafts/<slug>.md` first, then cite the file from the entry. Inline-only here loses the research when chat is compressed |
 | 7 | Use `- [ ]` for Plan Draft entries | Use `- [BLOCKED:P*:selfable]`. `[ ]` lets autonomous loops (e.g. Ralph) try to act on the entry — but a deferred plan cannot be promoted by an agent on its own. `[BLOCKED]` ensures the entry is skipped until the user signals promote |
 | 8 | Use `:external` reason on Plan Draft entries | Always `:selfable`. The body file / stub is prepared — the wait-state is on a user signal, not on a third party. `:external` is reserved for true external dependencies (`priority.md`) |
+| 9 | Promote a stub straight into `code-workflow` on its defer-time premises | Re-verify each premise at a first source first (Stage 2 step 1); note any invalidated premise at the head of the research seed — a deferred stub drifts and its assumptions may already be resolved or contradicted |
 
 ## Self-check (before recording a draft)
 
