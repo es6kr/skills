@@ -10,13 +10,48 @@ Phase 1: immediate block (dangerous command pattern matching)
 Phase 2: informational checks + conditional block
 Exit codes: 0 = allow, 1 = soft block (BLOCK), 2 = hard block
 
+2026-07-24: absorbed the standalone PreToolUse:Bash/PowerShell scripts with the
+highest timeout counts in a single session (block-semaphore-cmd-without-skill.sh 28,
+block-pr-create-without-draft.sh 27, block-authentik-api-mutate.sh 22 — each a
+separate bash.exe/jq spawn per Bash call). New PreToolUse:Bash/PowerShell
+constraints should default to a SIMPLE_BLOCKS entry (pure regex) or a new
+check_*() function here rather than a new standalone script — every extra
+registered hook is another subprocess spawn on Windows Git Bash.
+
+This file lives in this skill's `resources/` (git-tracked, PUBLIC — this repo
+is es6kr/skills). It must stay generic: no hardcoded internal IPs/hostnames,
+account-specific paths, or vendor/company project names. Deployment-specific
+constraints (the two scripts above were exactly this — a Semaphore host IP and
+an Authentik-terraform-pam gate) belong in the optional LOCAL overlay module
+instead — see `LOCAL_OVERLAY` below, loaded from `../data/bash-guard.local.py`
+(covered by this repo's `skills/*/data` .gitignore pattern, so it never leaves
+this machine). Absence of that file is the normal case for any other clone of
+this repo — the overlay hook is a no-op when the module can't be imported.
+
 Self-test: python bash-guard.py --test   (runs in-process — no per-case spawn)
 """
+import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
+
+# ── Optional local overlay (git-ignored, machine-specific) ──
+# Must expose: check(command: str, tool_name: str, transcript_path: str) -> str | None
+# Returning a non-None string hard-blocks with that string as the reason.
+_LOCAL_OVERLAY_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data", "bash-guard.local.py")
+LOCAL_OVERLAY = None
+if os.path.isfile(_LOCAL_OVERLAY_PATH):
+    try:
+        _spec = importlib.util.spec_from_file_location("bash_guard_local", _LOCAL_OVERLAY_PATH)
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        if hasattr(_mod, "check"):
+            LOCAL_OVERLAY = _mod
+    except Exception:
+        LOCAL_OVERLAY = None  # fail open — a broken local overlay must not break the generic guard
 
 I = re.IGNORECASE
 IM = re.IGNORECASE | re.MULTILINE  # sh version greps per line — keep line semantics
@@ -29,9 +64,9 @@ SIMPLE_BLOCKS = [
     (r"\brm\s+-rf\s+\.\.", "rm -rf .. can delete a parent directory"),
     (r"\brm\s+-rf\s+\*", "rm -rf * is dangerous"),
     # .tmp shared temporary directory protection (file-operations.md convention)
-    (r"\brm\b[^|;&]*\s(\./)?\.tmp(?![\w/.\-])",
+    (r"\brm\b[^|;&\n]*\s(\./)?\.tmp(?![\w/.\-])",
      "Deleting the entire .tmp/ folder (rm -rf .tmp) will destroy in-progress files of concurrent sessions. Delete only your specific .tmp/<file>"),
-    (r"\brm\b[^|;&]*\s(\./)?\.tmp/\*",
+    (r"\brm\b[^|;&\n]*\s(\./)?\.tmp/\*",
      "Glob-deleting .tmp/* will destroy other sessions' files. Delete only your specific .tmp/<file>"),
     # Docker destruction
     (r"docker\s+volume\s+rm", "docker volume rm permanently deletes volume data"),
@@ -62,7 +97,10 @@ GITPFX = r"\bgit(?:\s+-\S+(?:\s+[^-\s]\S*)?)*"
 GIT_BLOCKS = [
     # Git history destruction
     (r"reset\s+--hard", "git reset --hard deletes uncommitted work"),
-    (r"branch\s+[^|;&]*(?:-f\b|--force)",
+    # NOTE: newline excluded from the span — without it, "git branch --show-current"
+    # on one line and "git commit -F" lines later false-matched as "branch -f"
+    # (IGNORECASE makes -F hit -f\b). Same \n-exclusion applied to the rm/.tmp spans.
+    (r"branch\s+[^|;&\n]*(?:-f\b|--force)",
      "git branch -f force-moves a branch ref, equivalent to reset --hard (previous commits on that ref become unreachable)"),
     (r"push\s+.*--force", "git push --force overwrites remote history"),
     (r"push\s+.*-f\b", "git push -f overwrites remote history"),
@@ -95,6 +133,46 @@ TIME_BOUND = re.compile(
 EXECUTOR = re.compile(r"\b(?:ba|z|k)?sh\s+-c\b|\bssh\b|\beval\b|\bxargs\b", I)
 HEREDOC_WRITER = re.compile(r"^[ \t]*(cat|tee)[ \t].*<<")
 
+# ── gh pr create --draft guard (ported from block-pr-create-without-draft.sh) ──
+GH_TOKEN_RE = re.compile(r"\bgh\b")
+PR_CREATE_PREFILTER = re.compile(r"pr[ \t]+create")
+
+
+def check_pr_create_draft(command: str) -> str | None:
+    """Real `gh pr create` invocation (3 adjacent bare tokens, via shlex — a
+    quoted string reference like a grep pattern stays one token and never
+    matches) must carry --draft or the PR_READY_APPROVED=1 opt-out."""
+    if not GH_TOKEN_RE.search(command) or not PR_CREATE_PREFILTER.search(command):
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None  # unparseable (unbalanced quotes) — fail open, do not block
+    invocation = any(
+        tokens[i] == "gh" and tokens[i + 1] == "pr" and tokens[i + 2] == "create"
+        for i in range(len(tokens) - 2)
+    )
+    if not invocation:
+        return None
+    has_draft = any(t == "--draft" or t.startswith("--draft=") for t in tokens)
+    has_bypass = any(t == "PR_READY_APPROVED=1" for t in tokens)
+    if has_draft or has_bypass:
+        return None
+    return (
+        "`gh pr create` must include --draft.\n\n"
+        "Why blocked:\n"
+        "  - Draft is the DEFAULT (github-flow/pr.md:13 HARD STOP). A ready (non-draft) PR "
+        "fires CodeRabbit/Copilot review immediately - cost grows per non-draft PR.\n"
+        "  - PR creation should route through Skill(\"github-flow\", \"register\"), which "
+        "applies the draft default + base-convention checks. Raw `gh pr create` bypasses them.\n\n"
+        "Required action (pick one):\n"
+        "  1. Add --draft to the gh pr create command (default), OR\n"
+        "  2. Prefer Skill(\"github-flow\", \"register\") over a raw gh pr create, OR\n"
+        "  3. If the user EXPLICITLY requested a ready PR (\"ready PR\" / \"non-draft\" / \"--ready\"), "
+        "prefix the command with PR_READY_APPROVED=1 gh pr create ... so the opt-out is auditable.\n\n"
+        "Reference: failed-attempts.md 'raw gh pr create bypass / non-draft' (github-flow/pr.md:13)."
+    )
+
 
 def git_scan_text(command: str) -> str:
     """FP fix: quoted literals mentioning git commands must not trip the guards.
@@ -126,7 +204,13 @@ def git_scan_text(command: str) -> str:
     return scan
 
 
-def evaluate(command: str, run_bg: bool, raw_input_json: str = "") -> tuple[int, list[str], list[str]]:
+def evaluate(
+    command: str,
+    run_bg: bool,
+    raw_input_json: str = "",
+    tool_name: str = "Bash",
+    transcript_path: str = "",
+) -> tuple[int, list[str], list[str]]:
     """Returns (exit_code, stderr_lines, stdout_lines)."""
     warnings: list[str] = []
     soft_blocks: list[str] = []
@@ -154,6 +238,15 @@ def evaluate(command: str, run_bg: bool, raw_input_json: str = "") -> tuple[int,
     for sub, msg in GIT_BLOCKS:
         if re.search(GITPFX + r"\s+" + sub, scan, IM):
             return hard(msg)
+
+    pr_reason = check_pr_create_draft(command)
+    if pr_reason:
+        return hard(pr_reason)
+
+    if LOCAL_OVERLAY is not None:
+        overlay_reason = LOCAL_OVERLAY.check(command, tool_name, transcript_path)
+        if overlay_reason:
+            return hard(overlay_reason)
 
     # ── Phase 2 ──
     if re.search(r"git\s+commit", command) and "--amend" not in command:
@@ -255,6 +348,10 @@ def self_test() -> int:
         (False, False, 'git commit -m "document git reset --hard behaviour"'),
         (False, False, 'git commit -m "fix: git push --force guard"'),
         (False, False, 'rg "git -C \\S+ reset --hard" skills/'),
+        # multiline: "git branch --show-current" + later "git commit -F -" must NOT
+        # cross-line match as "branch -f" (regression: 2026-07-20 gitops commit FP)
+        (False, False, "git branch --show-current\ngit add a.yaml\ngit commit -F - <<'EOF'\nfeat: x\nEOF"),
+        (False, False, "rm -f .tmp/my-file.md\necho done .tmp keep"),
         (False, False, "cat <<'EOF'\ncase history: git push --force overwrites remote history\nEOF"),
         (False, False, "tee -a /tmp/notes.md <<'EOF'\nexample: git reset --hard deletes work\nEOF"),
         (True, False, "bash <<'EOF'\ngit push --force origin main\nEOF"),
@@ -276,6 +373,12 @@ def self_test() -> int:
         (True, False, "gh pr close 123"),
         (True, False, "rm -rf .tmp"),
         (False, False, "rm -f .tmp/pr-body.md"),
+        # ── gh pr create --draft guard (ported from block-pr-create-without-draft.sh) ──
+        (True, False, "gh pr create --title x --body y"),
+        (False, False, "gh pr create --draft --title x --body y"),
+        (False, False, "PR_READY_APPROVED=1 gh pr create --title x --body y"),
+        (False, False, 'grep "gh pr create" README.md'),
+        (False, False, 'echo "run gh pr create --draft next"'),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:
@@ -288,7 +391,14 @@ def self_test() -> int:
             tag = "bg" if run_bg else "fg"
             print(f"FAIL({tag}) expected={'BLOCK' if expect_block else 'ALLOW'} "
                   f"got={'BLOCK' if got_block else 'ALLOW'} :: {cmd!r}")
+
     print(f"\n{passed} passed, {failed} failed")
+
+    # Local overlay (machine-specific, git-ignored) runs its own self-test if present.
+    if LOCAL_OVERLAY is not None and hasattr(LOCAL_OVERLAY, "self_test"):
+        overlay_failed = LOCAL_OVERLAY.self_test()
+        return 0 if failed == 0 and overlay_failed == 0 else 1
+
     return 0 if failed == 0 else 1
 
 
@@ -307,8 +417,10 @@ def main() -> None:
     if not command:
         sys.exit(0)
     run_bg = bool(tool_input.get("run_in_background", False))
+    tool_name = data.get("tool_name") or ""
+    transcript_path = data.get("transcript_path") or ""
 
-    code, err_lines, out_lines = evaluate(command, run_bg, raw)
+    code, err_lines, out_lines = evaluate(command, run_bg, raw, tool_name, transcript_path)
     for l in err_lines:
         print(l, file=sys.stderr)
     for l in out_lines:
