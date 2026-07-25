@@ -78,64 +78,54 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - run: uv sync
+      - run: uv run ruff check .
       - run: uv run pytest
 ```
 
-### Release (GitHub Releases)
+### Release (npm)
 
 ```yaml
 name: Release
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
 ```
 
-### Docker
+### Helm Chart (GitHub Pages)
 
 ```yaml
-name: Docker
+name: Helm Chart
 on:
   push:
     branches: [main]
+    paths: ['charts/**']
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v5
-        with:
-          push: true
-          tags: ghcr.io/${{ github.repository }}:latest
-```
-
-### Helm Chart
-
-```yaml
-name: Helm
-on:
-  push:
-    branches: [main]
-
-jobs:
-  helm:
-    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
     steps:
       - uses: actions/checkout@v4
         with:
