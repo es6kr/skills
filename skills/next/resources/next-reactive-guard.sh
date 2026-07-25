@@ -19,6 +19,11 @@
 #      satisfy a later batch completion — suggestion-patterns row 7). Firing on
 #      "completion with no subsequent next" catches the exact "already-invoked-
 #      this-chain" rationalization variant, not just "next never called".
+#   4. No terminal ask — the completion signal is also NOT followed by an
+#      AskUserQuestion. A turn that ends on an ask (e.g. /wip Step 2 per-item
+#      direction, /fix disposition) surfaced follow-up to the user directly, so
+#      an earlier completion signal is not an un-followed batch. Without this,
+#      the guard false-fired on every ask-terminal turn (the known FP).
 #
 # Reactive limitation: fires on the NEXT prompt, so it cannot prevent the
 # same-turn miss — it offloads detection from the user to the hook.
@@ -70,6 +75,7 @@ fi
 # user prompt (a user message whose content is a STRING — tool_result content
 # is an array, so those anchor lines are skipped, mirroring next-trigger.sh):
 #   "N"        -> a Skill("next") tool_use
+#   "A"        -> an AskUserQuestion tool_use (terminal ask suppresses firing)
 #   "T\t<txt>" -> an assistant text block (tested against PATTERN below)
 STREAM=$(jq -R 'fromjson? // empty' "$TRANSCRIPT" 2>/dev/null | jq -rs '
   [ .[] | select(type == "object") ] as $e
@@ -82,18 +88,22 @@ STREAM=$(jq -R 'fromjson? // empty' "$TRANSCRIPT" 2>/dev/null | jq -rs '
       | (.message.content // [])[]
       | if .type == "text" then "T\t" + ((.text // "") | gsub("\n"; " "))
         elif (.type == "tool_use" and .name == "Skill" and ((.input.skill? // "") == "next")) then "N"
+        elif (.type == "tool_use" and .name == "AskUserQuestion") then "A"
         else empty end
     end
 ' 2>/dev/null || echo "")
 
 last_c=-1   # index of last completion-signal text block
 last_n=-1   # index of last Skill("next") call
+last_a=-1   # index of last AskUserQuestion tool_use
 idx=0
 while IFS= read -r line; do
   [[ -z "$line" ]] && continue
   idx=$((idx + 1))
   if [[ "$line" == "N" ]]; then
     last_n=$idx
+  elif [[ "$line" == "A" ]]; then
+    last_a=$idx
   else
     txt=${line#T$'\t'}
     if printf '%s' "$txt" | grep -qiE "$PATTERN"; then
@@ -104,17 +114,18 @@ done <<< "$STREAM"
 
 # Diagnostics (matches next-trigger.sh's evidence-trail philosophy).
 {
-  printf '%s\ttranscript=%s\tlast_c=%s\tlast_n=%s\tfire=%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRANSCRIPT" "$last_c" "$last_n" \
-    "$([[ "$last_c" -gt "$last_n" ]] && echo true || echo false)" >> "$GUARD_LOG"
+  printf '%s\ttranscript=%s\tlast_c=%s\tlast_n=%s\tlast_a=%s\tfire=%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRANSCRIPT" "$last_c" "$last_n" "$last_a" \
+    "$([[ "$last_c" -gt "$last_n" && "$last_c" -gt "$last_a" ]] && echo true || echo false)" >> "$GUARD_LOG"
   if [[ "$(wc -l < "$GUARD_LOG" 2>/dev/null || echo 0)" -gt 500 ]]; then
     tail -n 200 "$GUARD_LOG" > "$GUARD_LOG.tmp" && mv "$GUARD_LOG.tmp" "$GUARD_LOG"
   fi
 } 2>/dev/null || true
 
-# Fire when a completion signal appears with no Skill("next") after it
-# (last_n == -1 means next was never called this turn).
-if [[ "$last_c" -gt "$last_n" ]]; then
+# Fire when a completion signal is the last relevant event — no Skill("next")
+# AND no AskUserQuestion after it (last_n/last_a == -1 means never called this
+# turn). A terminal ask surfaced follow-up directly, so it suppresses firing.
+if [[ "$last_c" -gt "$last_n" && "$last_c" -gt "$last_a" ]]; then
   REASON='next-invocation continuation-chain guard: the prior turn appears to have completed a task batch inside the stop_hook_active window (Stop hook suppressed) without a Skill("next") call after the completion. A mid-turn ask does not satisfy a batch-completion next-action ask (suggestion-patterns row 7). If a batch actually completed, invoke the `next` skill now to surface follow-up options before continuing; if not, proceed.'
   jq -cn --arg ctx "$REASON" '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $ctx}}'
 fi
