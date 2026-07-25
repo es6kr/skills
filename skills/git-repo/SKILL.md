@@ -2,11 +2,11 @@
 name: git-repo
 metadata:
   author: es6kr
-  version: "0.1.3"
+  version: "0.1.2"
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), ci-guard (commit-msg hook to block fix(ci) tags), conflict-dry-run (isolated worktree merge/cherry-pick test), credential-helper (per-org HTTPS token pin for multi-account), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), split-history (extract a monorepo subdirectory's history into its own standalone repo via git subtree split, with mandatory repo-boundary precision), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "multi-account clone", "core.sshCommand", "Repository not found", "credential helper", "wrong account", "worktree create", "merge conflict test", "cherry-pick dry run", "ci-guard", "block fix(ci)", "commit-msg hook", "subtree split", "extract package history", "monorepo to standalone repo", "move the .git" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "bare convert", "multi-account clone", "core.sshCommand", "Repository not found", "worktree create" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -28,21 +28,17 @@ Git repository management and SourceGit GUI client integration.
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | clone | ghq get with automatic SourceGit registration (multi-account support) | [clone.md](./clone.md) |
-| ci-guard | configure git commit-msg hook to block fix(ci) tags and enforce ci tags instead | [ci-guard.md](./ci-guard.md) |
-| conflict-dry-run | test merge/cherry-pick applicability in an isolated worktree, without touching the main working tree | [conflict-dry-run.md](./conflict-dry-run.md) |
-| credential-helper | pin a per-org GitHub token for HTTPS remotes (fixes recurring `Repository not found` from active-account mismatch); HTTPS counterpart to ssh-key | [credential-helper.md](./credential-helper.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
-| move-worktree | move/register unregistered worktrees to .worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
+| move-worktree | move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
 | patrol | batch inspection of ghq repositories (status, stash, unpushed + commit-splitter integration) | [patrol.md](./patrol.md) |
 | rename-worktree | rename worktree directory and metadata (cross-platform, Windows safe) | [rename-worktree.md](./rename-worktree.md) |
 | sourcegit | SourceGit preference.json management (add repos, workspaces, folder rename) | [sourcegit.md](./sourcegit.md) |
-| split-history | extract a monorepo subdirectory's commit history into its own standalone repo (`git subtree split`); mandates stating repo boundaries precisely before describing the operation | [split-history.md](./split-history.md) |
 | ssh-key | per-repo SSH key mapping for multi-account GitHub (core.sshCommand + IdentityAgent) | [ssh-key.md](./ssh-key.md) |
 | to-bare | convert a regular repo → bare + worktree at a custom location, preserving uncommitted changes (inverse of to-ghq; helper: `scripts/repo-to-bare-worktree.sh`) | [to-bare.md](./to-bare.md) |
 | to-ghq | migrate bare+worktree → regular `.git` at the ghq path (formerly `migrate`) | [to-ghq.md](./to-ghq.md) |
-| worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.worktrees/` | [worktree.md](./worktree.md) |
+| worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.claude/worktrees/` | [worktree.md](./worktree.md) |
 | worktree-register | shared: register a populated directory as a worktree via metadata only (used by fix-worktree + to-bare) | [worktree-register.md](./worktree-register.md) |
 
 ## Topic Dependencies
@@ -57,8 +53,6 @@ worktree-register (shared metadata register/relink mechanism)
   └─← to-bare (link the working tree after a regular→bare conversion)
 
 to-bare  ←inverse→  to-ghq (formerly `migrate`)
-
-ssh-key (SSH multi-account)  ──counterpart──  credential-helper (HTTPS multi-account)
 ```
 
 ## Worktree decision tree (HARD STOP — every time a worktree is needed)
@@ -108,8 +102,7 @@ git status (check for other changes)
 
 1. Leave the new work's diff in place — do NOT stash (preserve the working directory)
 2. `git -C <repo> worktree list` to inspect inactive worktrees (per the decision tree above)
-3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
-
+3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .claude/worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
 4. cd into the new worktree, then `git checkout -b <new-branch>` (or use the existing inactive branch)
 5. **Re-apply the same diff in the new worktree via Edit** (the original main changes stay on main)
 6. add → commit → push → PR inside the new worktree
@@ -211,4 +204,4 @@ Key features:
 
 - `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
 - `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)
-- `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch, and print manual commands to push and open a draft PR.
+- `./scripts/local-to-staging-pr.sh` - Cherry-pick a local commit to a staging branch, and print manual commands to push and open a draft PR

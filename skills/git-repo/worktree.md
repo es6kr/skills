@@ -81,24 +81,24 @@ git status --short                   # confirm clean state
 
 ### 4B. Create new worktree
 
-**Default path**: `<repo>/.worktrees/<branch-name>`
+**Default path**: `<repo>/.claude/worktrees/<branch-name>`
 
 ```bash
 cd /path/to/repo
-git worktree add .worktrees/<branch-name> <branch>
+git worktree add .claude/worktrees/<branch-name> <branch>
 ```
 
 If the branch does not exist yet:
 
 ```bash
-git worktree add -b <new-branch> .worktrees/<new-branch> <start-point>
+git worktree add -b <new-branch> .claude/worktrees/<new-branch> <start-point>
 ```
 
 Post-create verification:
 
 ```bash
 git worktree list
-cd .worktrees/<branch-name>
+cd .claude/worktrees/<branch-name>
 git branch --show-current
 ```
 
@@ -146,11 +146,11 @@ For plain-base repos (no staging tier), steps 2-5 are manual: `git fetch origin 
 
 | Environment | Worktree path |
 |-------------|--------------|
-| Claude Code / Antigravity / Git standard | `<repo>/.worktrees/<name>` |
+| Claude Code (any) | `<repo>/.claude/worktrees/<name>` |
 | vibe-kanban | Managed by vibe-kanban (do not override) |
 | Other plugins / agents | Honor the path declared in their context (project `CLAUDE.md`, plugin settings, env var) |
 
-**Default**: this skill standardizes on `<repo>/.worktrees/<name>`.
+**Default**: this skill standardizes on `<repo>/.claude/worktrees/<name>`. If the active environment context (project `CLAUDE.md`, plugin settings such as vibe-kanban, or environment variables) pins a different worktree path, honor that path instead. Creating `<repo>/.worktrees/` ad hoc — without any environment context declaring it — is discouraged because it splinters the worktree root across tools.
 
 ## Don't / Do
 
@@ -158,8 +158,7 @@ For plain-base repos (no staging tier), steps 2-5 are manual: `git fetch origin 
 |---|-------|-----|
 | 1 | `git worktree add` as first action | `git worktree list` first → check for reusable candidates |
 | 2 | Present only "create new" in AskUserQuestion | Include "reuse worktree X" option when inactive candidates exist |
-| 3 | Create worktree outside `.worktrees/` | Use `.worktrees/` |
-
+| 3 | Create worktree in `.worktrees/` | Use `.claude/worktrees/` |
 | 4 | Start coding without branch verification | `git branch --show-current` before any Write/Edit |
 | 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
 | 6 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
