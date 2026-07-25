@@ -81,24 +81,24 @@ git status --short                   # confirm clean state
 
 ### 4B. Create new worktree
 
-**Default path**: `<repo>/.claude/worktrees/<branch-name>`
+**Default path**: `<repo>/.worktrees/<branch-name>`
 
 ```bash
 cd /path/to/repo
-git worktree add .claude/worktrees/<branch-name> <branch>
+git worktree add .worktrees/<branch-name> <branch>
 ```
 
 If the branch does not exist yet:
 
 ```bash
-git worktree add -b <new-branch> .claude/worktrees/<new-branch> <start-point>
+git worktree add -b <new-branch> .worktrees/<new-branch> <start-point>
 ```
 
 Post-create verification:
 
 ```bash
 git worktree list
-cd .claude/worktrees/<branch-name>
+cd .worktrees/<branch-name>
 git branch --show-current
 ```
 
@@ -113,15 +113,44 @@ git branch --show-current   # must match intended branch
 
 If branch mismatch → do NOT proceed with Write/Edit. Fix first (checkout or re-create).
 
+## Commit → worktree → cherry-pick → draft PR (promote local work)
+
+When work accumulates on a local/working branch and needs to land as a reviewable PR, the pattern is: commit on the local branch first, resolve the target base branch, acquire a worktree off that base (reuse-first, per the decision tree above), cherry-pick the commit(s) into it, push, and open a draft PR. Never push the local branch directly, and never move uncommitted changes between branches — commit first, then cherry-pick the commit.
+
+### Steps
+
+1. **Commit on the local/working branch.** The commit is the unit that moves — not the working-tree diff.
+2. **Resolve the target base branch.** Two shapes:
+   - **Staging-branch model** (a project routes patch-type changes through one staging branch and feature-type changes through another, merging into a longer-lived integration branch later): derive the base from the commit's conventional-commit type. Check whether the target file/directory already **diverges** on a longer-lived staging branch — if so, prefer that staging branch regardless of commit type (see the project's own base-branch resolution rule, if one exists, for the exact divergence check).
+   - **Plain-base model** (no staging tier): the base is simply the repo's usual integration branch for the change being made.
+3. **Acquire a worktree off the resolved base** — follow the decision tree above (§"Worktree decision tree"): inventory first, reuse an inactive worktree if one exists, otherwise create new off `origin/<base>`.
+4. **Cherry-pick the commit(s)** from the local branch into the worktree. On conflict, stop and resolve manually — do not force through.
+5. **Push the worktree's branch**, then open a **draft PR** (base = the branch resolved in step 2).
+
+### Automation available
+
+`scripts/local-to-staging-pr.sh <repo-dir> <commit-sha> [--branch <name>] [--base <staging-branch>]` automates steps 2-4 for repos following the staging-branch model: it derives the base from the commit's conventional-commit tag (override with `--base` for a plain-base repo or a divergence-override case), creates the worktree off `origin/<base>`, cherry-picks, and runs a pre-flight scaffolding check (confirms every directory the commit touches already has its baseline file present on the target base, before creating the worktree). It stops after a clean cherry-pick — push and `gh pr create --draft` remain manual by design, keeping the PR title/body under human review before it goes out.
+
+For plain-base repos (no staging tier), steps 2-5 are manual: `git fetch origin <base>` → worktree add off `origin/<base>` → cherry-pick → push → `gh pr create --draft`.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Push the local/working branch directly to move its commits onto a PR branch | Commit on local first → cherry-pick the commit(s) onto a clean branch off the resolved base → push that branch |
+| 2 | Stash or checkout to shuffle *uncommitted* changes onto another branch | Commit first — the commit, not the working-tree diff, is what cherry-picks cleanly |
+| 3 | Derive the base purely from the commit's conventional-commit tag when the target file/directory is already known to diverge on a longer-lived staging branch | Check divergence first (e.g. `git diff origin/<default-base> origin/<staging-base> -- <path>`) — a non-empty diff means the staging branch overrides the tag-derived default |
+| 4 | Open the PR as ready-for-review by default | Draft is the default for a freshly promoted commit — convert to ready only after the author decides it's reviewable |
+
 ## Default Path Rules
 
 | Environment | Worktree path |
 |-------------|--------------|
-| Claude Code (any) | `<repo>/.claude/worktrees/<name>` |
+| Claude Code / Antigravity / Git standard | `<repo>/.worktrees/<name>` |
 | vibe-kanban | Managed by vibe-kanban (do not override) |
 | Other plugins / agents | Honor the path declared in their context (project `CLAUDE.md`, plugin settings, env var) |
 
-**Default**: this skill standardizes on `<repo>/.claude/worktrees/<name>`. If the active environment context (project `CLAUDE.md`, plugin settings such as vibe-kanban, or environment variables) pins a different worktree path, honor that path instead. Creating `<repo>/.worktrees/` ad hoc — without any environment context declaring it — is discouraged because it splinters the worktree root across tools.
+**Default**: this skill standardizes on `<repo>/.worktrees/<name>`.
 
 ## Don't / Do
 
@@ -129,7 +158,8 @@ If branch mismatch → do NOT proceed with Write/Edit. Fix first (checkout or re
 |---|-------|-----|
 | 1 | `git worktree add` as first action | `git worktree list` first → check for reusable candidates |
 | 2 | Present only "create new" in AskUserQuestion | Include "reuse worktree X" option when inactive candidates exist |
-| 3 | Create worktree in `.worktrees/` | Use `.claude/worktrees/` |
+| 3 | Create worktree outside `.worktrees/` | Use `.worktrees/` |
+
 | 4 | Start coding without branch verification | `git branch --show-current` before any Write/Edit |
 | 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
 | 6 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
