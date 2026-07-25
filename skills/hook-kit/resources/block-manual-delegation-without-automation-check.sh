@@ -38,6 +38,9 @@ fi
 
 # Korean fallback is empty in non-Korean envs — only English patterns apply.
 HG_MD_KEYWORDS_KO="${HG_MD_KEYWORDS_KO:-}"
+HG_MD_HOLD_KEYWORDS_KO="${HG_MD_HOLD_KEYWORDS_KO:-}"
+HG_MD_ASSISTANT_KO="${HG_MD_ASSISTANT_KO:-}"
+HG_MD_USER_KO="${HG_MD_USER_KO:-}"
 
 # English manual-delegation triggers. Matched case-insensitively (-i in the
 # loop below), so no separate capitalized alternatives are needed here.
@@ -140,6 +143,14 @@ if [[ "${1:-}" == "--test" ]]; then
 
   test_case "Token-context manual with cmux probe evidence" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Manual","description":"User pastes token - chrome-devtools disconnected and cmux not installed, manual only path"},{"label":"skip","description":"skip"}]}]}}'
 
+  test_case "Self-name quotation" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Review","description":"Discuss block-manual-delegation hook rules"},{"label":"skip","description":"skip"}]}]}}'
+
+  test_case "Domain-terminology manual sync near ArgoCD" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Sync","description":"Trigger ArgoCD manual sync for deployment"},{"label":"skip","description":"skip"}]}]}}'
+
+  test_case "Domain-terminology manual sync without context" 2 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Sync","description":"Trigger manual sync for deployment"},{"label":"skip","description":"skip"}]}]}}'
+
+  test_case "Hold option deferring manual task" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Hold","description":"Defer manual token generation and record to fix_plan"},{"label":"skip","description":"skip"}]}]}}'
+
   set -e
   echo ""
   echo "Total: $((PASS+FAIL)), Pass: $PASS, Fail: $FAIL"
@@ -172,6 +183,42 @@ CMUX_VIOLATIONS=()
 while IFS=$'\t' read -r label desc; do
   [[ -z "$label" && -z "$desc" ]] && continue
   combined="${label} ${desc}"
+
+  # 1. Self-name quotation exception
+  if echo "$combined" | grep -qEi "block-manual-delegation"; then
+    continue
+  fi
+
+  # 2. Domain-terminology close proximity exception (ArgoCD/GitOps/k8s/Terraform/PAM)
+  if echo "$combined" | grep -qEi "(manual (sync|apply|deploy|trigger|promotion)|non-automated).{0,40}(ArgoCD|GitOps|k8s|kubernetes|Terraform|PAM|argocd)" \
+     || echo "$combined" | grep -qEi "(ArgoCD|GitOps|k8s|kubernetes|Terraform|PAM|argocd).{0,40}(manual (sync|apply|deploy|trigger|promotion)|non-automated)"; then
+    continue
+  fi
+
+  # 3. Hold/carryover-only exception
+  hold_pattern='\b(hold|defer|carryover|postpone)\b'
+  if [[ -n "$HG_MD_HOLD_KEYWORDS_KO" ]]; then
+    hold_pattern="(${hold_pattern}|${HG_MD_HOLD_KEYWORDS_KO})"
+  fi
+
+  if echo "$combined" | grep -qEi "$hold_pattern"; then
+    assistant_pattern='(I will|assistant|we will)'
+    if [[ -n "$HG_MD_ASSISTANT_KO" ]]; then
+      assistant_pattern="(${assistant_pattern}|${HG_MD_ASSISTANT_KO})"
+    fi
+
+    user_pattern='\b(you|user)\b'
+    if [[ -n "$HG_MD_USER_KO" ]]; then
+      user_pattern="(${user_pattern}|${HG_MD_USER_KO})"
+    fi
+
+    # Allow if assistant is the active subject or if there are no active user-directed nouns/verbs
+    if echo "$desc" | grep -qEi "$assistant_pattern" \
+       || ! echo "$desc" | grep -qEi "$user_pattern"; then
+      continue
+    fi
+  fi
+
   # Negation-lookback: strip "no/not/without/zero ... manual" phrasing before
   # the delegation-keyword check, so an option describing the ABSENCE of
   # manual work (e.g. "no second manual trigger needed") doesn't false-positive
@@ -185,6 +232,26 @@ while IFS=$'\t' read -r label desc; do
     && echo "$combined" | sed -E 's/(^|[^a-zA-Z])(no|not|without|zero)[a-zA-Z ]{0,20}manual/\1/gi' \
     || echo "$combined")
   # Check manual-delegation keyword present (case-insensitive)
+  # Self-name quotation exception (Issue #109): If option mentions the script name itself, skip
+  if echo "$combined" | grep -qiE "block-manual-delegation"; then
+    continue
+  fi
+
+  # Hold/carryover-only exception (Issue #109): If option is a pure hold/defer action assigned to assistant
+  local hold_pattern="^(Hold|Defer|Carryover${HG_MD_HOLD_KEYWORDS_KO:+|$HG_MD_HOLD_KEYWORDS_KO})$"
+  local user_pattern="user|human${HG_MD_USER_KO:+|$HG_MD_USER_KO}"
+  if echo "$label" | grep -qiE "$hold_pattern"; then
+    if ! echo "$desc" | grep -qiE "$user_pattern"; then
+      continue
+    fi
+  fi
+
+  # Domain-terminology exception (Issue #109): Infra/tool terms like "manual sync", "manual apply", "non-automated" near GitOps/k8s/ArgoCD
+  if echo "$combined" | grep -qiE "(manual sync|manual apply|non-automated)" && \
+     echo "$combined" | grep -qiE "(ArgoCD|argocd|gitops|k8s|kubernetes|root app)"; then
+    continue
+  fi
+
   if echo "$md_check_text" | grep -qEi "$MD_PATTERN"; then
     # Check automation evidence in description (case-insensitive)
     if ! echo "$desc" | grep -qEi "$EVIDENCE_PATTERN"; then

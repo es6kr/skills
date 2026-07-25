@@ -18,6 +18,19 @@ allowed-tools:
 
 Guide users to convert functionality into the appropriate Claude Code automation type (Agent, Skill, Rule, Command, or Hook).
 
+## Topic Dispatch
+
+**When this skill is invoked with a topic specifier (e.g., `Skill("claudify", "improve")` or `/claudify improve`), load and follow ONLY the matching topic file below — do NOT default to the creation-wizard body (Decision Matrix / Workflow) in this SKILL.md.** A bare invocation (no topic, `agentify`, or `create`) uses the creation workflow below.
+
+| Topic arg | File | Purpose |
+|-----------|------|---------|
+| `create` / `agentify` / (none) | this SKILL.md (below) | Convert functionality into an automation (Agent/Skill/Rule/Command/Hook) |
+| `improve` | [improve.md](./improve.md) | Self-improving loop: retrospect + hook/skill review + pattern detect |
+| `persist` | [persist.md](./persist.md) | Knowledge persistence: documentation + memory save |
+| `background-polling` | [background-polling.md](./background-polling.md) | ScheduleWakeup/timeout polling discipline for 5min+ background dispatches |
+
+For any topic arg other than `create`, **Read that topic file and follow it** — the Decision Matrix and creation Workflow below apply only to the creation path.
+
 ## Decision Matrix
 
 | Type | When to use | Implementation |
