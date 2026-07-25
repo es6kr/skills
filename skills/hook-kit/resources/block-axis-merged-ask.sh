@@ -200,8 +200,8 @@ try:
 except Exception:
     print("0"); raise SystemExit(0)
 opts = (data.get("tool_input", {}).get("questions", [{}])[0] or {}).get("options", []) or []
-VERBS = r"(sync|remove|add|normalize|clean up|edit|fix|update|register|apply|merge|drop|delete|create|write|implement|revert|keep)"
-clause_re = re.compile(r",\s+|;\s+|\band\b", re.IGNORECASE)
+VERBS = r"\b(sync|remove|add|normalize|clean up|edit|fix|update|register|apply|merge|drop|delete|create|write|implement|revert|keep)\b"
+clause_re = re.compile(r",\s+|;\s+|\band\b|\n+\s*[-*•]?\s*", re.IGNORECASE)
 verb_re = re.compile(VERBS, re.IGNORECASE)
 for o in opts:
     desc = (o or {}).get("description", "") or ""
