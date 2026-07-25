@@ -40,12 +40,20 @@ TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""' 2>/dev/null |
 
 STOP_HOOK_ACTIVE=$(printf '%s' "$INPUT" | jq -r 'if .stop_hook_active then "true" else "false" end' 2>/dev/null || echo "false")
 
-# Prevent infinite loops: do not re-trigger when this hook itself caused the stop
+DEBUG_LOG="$(dirname "$0")/next-trigger.debug.log"
+
+# Prevent infinite loops: do not re-trigger when this hook itself caused the stop.
+# OBSERVABILITY (next-invocation family, 12th recurrence): this suppression used to
+# exit with NO log line, hiding the fact that EVERY later stop of a continuation
+# chain (a turn resumed from an earlier Stop-hook block) is silently skipped by the
+# harness — exactly the window where the "next call missed" family recurs on long
+# chained turns. The suppression itself cannot be bypassed (loop prevention is the
+# point); log it so the gap is diagnosable from evidence instead of guesses.
 if [[ "$STOP_HOOK_ACTIVE" == "true" ]]; then
+  { printf '%s\tsuppressed=stop_hook_active\ttranscript=%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRANSCRIPT" >> "$DEBUG_LOG"; } 2>/dev/null || true
   exit 0
 fi
-
-DEBUG_LOG="$(dirname "$0")/next-trigger.debug.log"
 
 if [[ -z "$TRANSCRIPT" || ! -f "$TRANSCRIPT" ]]; then
   { printf '%s\tearly_exit=no_transcript\ttranscript=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRANSCRIPT" >> "$DEBUG_LOG"; } 2>/dev/null || true
