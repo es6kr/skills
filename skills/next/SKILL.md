@@ -200,6 +200,8 @@ AskUserQuestion({
 
 (See failed-attempts.md "background-agent-without-parallel-work" for recurrence history.)
 
+**Decide foreground vs background BEFORE spawning, not after (recurrence correction)**: the idle-wait allowance above assumes backgrounding was the right call in the first place — it is not, when there is no second independent task to interleave. Before every `Agent` spawn, check: is there other selected/pending work this turn could drive while the agent runs? If yes, background it and drive that other work. If no, spawn it in the foreground (`run_in_background: false`, or the Agent tool's default synchronous behavior) instead of backgrounding it and then idle-waiting alone for its own notification — that pattern buys zero parallelism and only exposes the turn to the cache-TTL-expiry cost described above. A single-item follow-up (e.g. "run Internal Review on this PR, then post the Summary") with nothing else queued is a foreground case, not a background-and-wait case. Case history: a solo Internal Review dispatch during a `/next`-selected follow-up chain was backgrounded with no other drivable work, then idle-waited on — user correction: do not run agents like code-review in the background when there is no other work to interleave; if the cache-overage state can't be known in advance, always plan for the shorter 5-minute cache window rather than assuming the idle wait is free.
+
 ## Suggestion Patterns
 
 Per-context option templates for "After X" completions (code change, feature, bug fix, config, commit, push, PR fix-commit re-review, PR creation reviewer matrix, skill/agent creation, file creation, refactoring, complex workflow, exploration, session wrap-up, PR consolidate).
