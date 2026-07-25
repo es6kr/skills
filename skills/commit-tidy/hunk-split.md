@@ -69,7 +69,7 @@ git commit -m "..."
 |---|-------|-----|
 | 1 | `git add <file>` when the file has 2+ unrelated hunks | Isolate the target hunk first (Steps 0-3), then `git apply --cached` only that patch |
 | 2 | Hand-write the patch's `@@` header by copying it from `git diff -U3`/`-U0` output | Generate the patch via `git diff --no-index` on reconstructed base/target files — hand-edited hunk headers (line counts) are a common source of `git apply` failures |
-| 3 | Skip the `--check` dry-run before `git apply --cached` | Always dry-run first — a failed cached-apply can leave the index in a partially-modified state |
+| 3 | Skip the `--check` dry-run before `git apply --cached` | Always `git apply --check` first — it validates hunk context and line counts, surfacing a malformed patch before you touch the index. (`git apply --cached` is atomic — all-or-nothing — so a failed apply won't leave a *partially* staged index; `--check` still catches a bad patch cleanly up front.) |
 | 4 | Forget to verify the *other* hunk is still unstaged after applying | `git diff -- <file>` after commit — confirm the remaining hunk didn't get silently included |
 
 Clean up temp files after the commit lands.
