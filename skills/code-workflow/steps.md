@@ -72,15 +72,8 @@ Read and understand the relevant code **deeply**, then write findings to `{outpu
 
 - **Naming Rule**: Always include the GitHub issue number (e.g., `research-176-login-lock.md`). If no issue exists, use `research-<task-slug>.md`.
 - **Mandatory Corpus & RAG Pre-Lookup (HARD STOP)**: Before writing the research document, check existing project knowledge stores and memory backends (LLM Wiki, Qdrant vector memory, Serena RAG, KI summaries) to prevent duplicate analysis and ground findings in established patterns.
-  - **Grounded command (when the `fix-plan` peer skill ships `artifact_pre_lookup.py`)**: resolve its scripts dir, run the lookup once with the task topic, and embed the output as a `## Prior Knowledge & Context` section at the top of `research-*.md` — the embedded section is the auditable evidence that the pre-lookup actually ran:
-
-    ```bash
-    for d in ~/.agents/skills/fix-plan/scripts ~/.gemini/config/skills/fix-plan/scripts; do
-      [ -f "$d/artifact_pre_lookup.py" ] && python3 "$d/artifact_pre_lookup.py" "<task topic>" && break
-    done
-    ```
-
-    When the script is absent, the mandate still applies via direct store queries (RAG semantic find / wiki `index.md` read).
+  - **Grounded command (optional, abstract contract — same shape as "Research artifact dispatch" below)**: when the caller supplies `--pre-lookup=<skill>:<topic>`, invoke that skill's topic with the task subject before writing, and embed its output as a `## Prior Knowledge & Context` section at the top of `research-*.md` — the embedded section is the auditable evidence that the pre-lookup actually ran. This generic skill does not name a vendor; the caller wires `<skill>:<topic>` to whichever project skill owns pre-lookup (e.g., a backlog-lifecycle skill's own pre-lookup topic).
+  - When no `--pre-lookup` flag is supplied — or the specified receiver is unavailable in the caller's environment — the mandate still applies via direct store queries (RAG semantic find / wiki `index.md` read); fail-non-blocking (warning + continue), same policy as "Research artifact dispatch" below.
 - Do not skim a file and move on at the signature level
 - Understand existing layers, ORM relationships, and duplicate API presence
 - **Mandatory exploration of existing test files**: Find related `*.test.*`, `*.spec.*` files and understand what cases are already covered

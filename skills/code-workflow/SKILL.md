@@ -24,7 +24,7 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 Set via project CLAUDE.md or skill invocation argument:
 
 ```text
-/code-workflow --output-dir llm-wiki/generated/
+/code-workflow --output-dir llm-wiki/outputs/
 ```
 
 Trivial tasks such as simple configuration changes or 1~2 line edits may skip this workflow.
