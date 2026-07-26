@@ -108,13 +108,14 @@ Identify the type of task just completed.
 
 #### Premise verification for stale/prior-session candidates (HARD STOP)
 
-**A candidate carried over from a pre-`/compact` summary or an old in-progress task is a *claim* ("X is still unresolved"), not a fact.** Composing it as an option restates that claim to the user as if current. Before presenting such a candidate, verify its premise is still true — check (a) fix_plan.md's `## Completed` section, (b) a RAG search if a store is registered, (c) Plane (see source row above) — for evidence it was already resolved between sessions. This mirrors `/fix`'s own "Recurrence pre-check" (RAG + grep before concluding a pattern is still active) — the same discipline applied to `next`'s own candidate composition, not just to `/fix`.
+**A candidate carried over from a pre-`/compact` summary or an old in-progress task is a *claim* ("X is still unresolved"), not a fact.** Composing it as an option restates that claim to the user as if current. Before presenting such a candidate, verify its premise is still true — check (a) fix_plan.md's `## Completed` section, (b) a RAG search if a store is registered, (c) Plane (see source row above), (d) when the fix_plan item's "How to apply" links a plan doc, that doc's own Progress Checklist — for evidence it was already resolved between sessions. This mirrors `/fix`'s own "Recurrence pre-check" (RAG + grep before concluding a pattern is still active) — the same discipline applied to `next`'s own candidate composition, not just to `/fix`.
 
 | # | Don't (forbidden) | Do (correct alternative) |
 |---|-------------------|------------------------|
 | 1 | Carry an "still open" item straight from a pre-compact summary into an option label | Re-check its current state (fix_plan Completed / RAG / Plane) before phrasing it as actionable |
 | 2 | Treat "it was in_progress when the summary was written" as proof it still is | in_progress in a stale summary is a snapshot, not current truth — verify, don't assume |
 | 3 | Skip verification because the investigation "sounds involved" | The verification itself (grep fix_plan, one RAG query, one Plane check) is cheaper than dispatching the user into a re-investigation of an already-solved problem |
+| 4 | Compose a decision ask from a fix_plan item's inline "Why"/summary text alone, when that item's "How to apply" points at a linked plan doc | Read the linked doc's own Progress Checklist / phase-completion state first — fix_plan's inline note can go stale relative to the doc's own tracked progress (e.g. a phase the fix_plan note calls undecided may already show complete in the plan doc) |
 
 #### Self-check (every time before calling AskUserQuestion)
 
@@ -124,6 +125,7 @@ Identify the type of task just completed.
 4. Are options diverse (different action types: progress task / external follow-up / wrap-up / verify)? → If all 3 are the same family, broaden
 5. Does the completed work carry ≥2 discrete findings the user must disposition? → Per-finding questions first (see suggestion-patterns.md "After analysis / review producing multiple findings"), never one option bundling all findings
 6. Does any candidate originate from a pre-compact summary or an old in-progress task rather than this turn's own discovery? → If yes, run the premise-verification check above before including it
+7. Does the candidate's fix_plan item reference a linked plan doc? → Read that doc's own Progress Checklist before composing the ask; do not rely solely on fix_plan's inline summary
 
 ```typescript
 AskUserQuestion({
