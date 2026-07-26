@@ -82,6 +82,8 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
 4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
 
+**Register BEFORE execute (HARD STOP)**: before Step 1 (Move) begins, `TaskCreate` (or `TodoWrite` if `TaskCreate` is unavailable) must register one task per pipeline step actually being run (Move/Format/Sync/Priority for the full pipeline, fewer for a role-scoped subset — see "Role-based execution" below). A default-invocation `/fix-plan` run is multi-step by definition; "the tracker looks small" is not an exception. If a `TaskCreate` call errors, retry it with the corrected parameters from its own error message before any Move/Sync/Priority Edit proceeds — treating a retry as unnecessary overhead and silently dropping tracking is the exact violation this line prevents. Mirrors `~/.claude/skills/wip/SKILL.md` "Register BEFORE execute".
+
 ### Role-based execution (`role-profile`)
 
 The default pipeline is scoped by the execution role, so a high-capability session is not spent on mechanical bookkeeping — and a bookkeeping session does not attempt deep-analysis passes it is unsuited for.
