@@ -60,6 +60,7 @@ fix-plan (schema + lifecycle)
 - **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, and triages blockers via `priority`.
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic uses `gh` CLI per `github-flow` skill's conventions
+- `sync` topic optionally dispatches to a secondary-tracker receiver if the caller supplies `--secondary-sync=<skill>:<topic>` — see [sync.md](./sync.md) "Secondary-tracker sync cadence"
 - `draft` topic dispatches to `code-workflow` (`steps`) on promote — turns a deferred stub into a real research → plan
 
 ## Configuration
@@ -70,6 +71,7 @@ fix-plan (schema + lifecycle)
 | `completed-archive-period` | `monthly` | Period for the **receiver-independent local archive** of the `## Completed` section — `monthly` (`YYYY-MM`) or `weekly` (ISO `YYYY-Www`). On the period boundary, older Completed entries move to `<tracker-dir>/.bak/<tracker-stem>-completed-<period>.md` and are removed from the tracker, keeping the live file small. Set via `--completed-archive-period=weekly\|monthly`. See [move.md](./move.md) "Completed-section size management" |
 | `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing — set via the `--rag=<skill>:<topic>` CLI flag on the `move` topic (see [move.md](./move.md)). No env var or config file is consumed by this skill; the caller routes |
 | `role-profile` | (unset) | Execution-role scoping for the default invocation — CLI `--role=<pm\|deep\|impl>`. Values are **abstract profile names** (`pm` = mechanical bookkeeping/recording, `deep` = large-scale classification & audit, `impl` = implementation); this skill never hardcodes model names. Resolution chain: explicit flag → context self-detection → unset = full pipeline (backward compatible). See "Role-based execution" below |
+| `secondary-sync-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for the `sync` topic — runs a project's non-GitHub backlog tracker (Plane, Jira, etc.) in the same cadence as this skill's GitHub PR/Issue sync, instead of letting it drift independently. Set via the `--secondary-sync=<skill>:<topic>` CLI flag. No tracker name is hardcoded — the receiver owns all tracker-specific details. See [sync.md](./sync.md) "Secondary-tracker sync cadence" |
 | `task-tracker` | `fix_plan.md` | Tracker filename. Use `checklist.md` for non-Ralph workspaces |
 
 ## Default invocation (no args)
