@@ -58,6 +58,17 @@ Use the same format as [format.md](./format.md) item state changes: `(YYYY-MM-DD
 
 Items just synced to `[x]` are immediate candidates for the next [move](./move.md) cycle. The recommended sequence is `sync` → `move` so the freshly-merged items roll into Completed in the same pass.
 
+## Secondary-tracker sync cadence
+
+When a project mirrors its backlog into a second external tracker (a project-management tool, issue tracker, etc.) alongside GitHub, run that tracker's own sync in the same cadence as this GitHub sync — poll both together rather than letting them drift independently.
+
+The fix-plan skill stays vendor-agnostic here too: no tracker name is hardcoded. Dispatch via `--secondary-sync=<skill>:<topic>` (same caller-supplied receiver pattern as `--archive=<skill>:<topic>` — see the top-level Configuration table). The caller wires this to whichever skill owns that tracker's sync script (e.g., a project-management-tool skill's own dry-run sync command); this skill only documents the cadence contract.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run only the GitHub sync and assume the secondary tracker stays current on its own | If `--secondary-sync` is configured, run it in the same pass as this GitHub sync |
+| 2 | Hardcode a specific tracker's domain/skill name into this file | Dispatch through the abstract `--secondary-sync=<skill>:<topic>` flag; the receiver owns vendor specifics |
+
 ## Sync-specific prohibitions
 
 | # | Don't | Do |
