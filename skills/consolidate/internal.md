@@ -155,8 +155,9 @@ If `--interactive` is off, proceed directly to the medium-decided POST (determin
 **Title template (MANDATORY — first line of the review body / comment body)**:
 ```markdown
 ## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
+<!-- consolidate:verified -->
 ```
-Do not write `code-reviewer` as plain text; use the link format above.
+Do not write `code-reviewer` as plain text; use the link format above. The `<!-- consolidate:verified -->` HTML comment on the second line is an invisible machine-readable provenance marker: it renders as nothing on GitHub but lets the `block-noncompliant-review-comment` guard (client hook + server Action) confirm the comment came through consolidate even if the `requesting-code-review` link text is ever reworded.
 
 #### Caller-supplied custom title contract (HARD STOP)
 
