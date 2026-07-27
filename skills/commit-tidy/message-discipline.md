@@ -12,7 +12,7 @@ Conventional Commit conventions, PUBLIC repo English enforcement, Git operation-
 ## Conventional Commit base (HARD STOP)
 
 - Tags: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf` — **no other tags allowed**. Forbid invented tags like `infra:`, `build:`, `wip:`
-- Repo-visibility language: **PUBLIC = English enforced, PRIVATE = native-language default** (see opensource.md visibility table). Per-medium separation — commit / PR / issue / comment all follow the same visibility rule
+- Repo-visibility & project language: **Korean Repositories / Projects = Native language (Korean) commit messages enforced** (e.g. `llm-wiki`, `daegunsoftDev/*` Korean docs/projects, `es6kr/*` Korean projects must write subject and body in Korean, e.g., `docs(ops): timescale-hypertable migration plan creation and move to outputs`). **PUBLIC international open-source = English enforced, PRIVATE = native-language default** (see opensource.md visibility table). Per-medium separation — commit / PR / issue / comment all follow the same visibility rule
 - Open-source contributions: see `opensource.md`
 - Wrong commits → fix with a new commit. `--amend` + force-push is allowed only when the user explicitly instructs it
 
@@ -49,10 +49,11 @@ Conventional Commit conventions, PUBLIC repo English enforcement, Git operation-
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | `git commit -m "feat(scope): subject"` — stop at the subject line | `git commit -m "feat(scope): subject" -m "<body>"` or HEREDOC (`git commit -F -`) for multi-line body |
-| 2 | Body restricted to a per-file enumeration | Body can be free-form (prose / bullets / sections / mixed). Per-file enumeration is one option, not the only one |
-| 3 | "Diff is small, so subject is enough" autonomous skip | Author a body whenever a body would help future readers — most commits qualify. Subject-only is the exception, not the default |
-| 4 | Use the footer for prose that belongs in the body (e.g., motivation, trade-offs) | Footer = machine-readable references (`Closes`, `BREAKING CHANGE:`, `Co-Authored-By:`). Prose goes in the body |
-| 5 | Skip the blank line between subject ↔ body ↔ footer | Maintain blank-line separators — Git tooling (`git log --oneline`, GitHub squash) relies on them |
+| 2 | Put long inline details/parentheses into subject (e.g. `feat(zsh): add script (autocorrect X to Y)`) | Keep subject concise (`feat(zsh): add script`). Move implementation details (`- Autocorrect X to Y`), rationale, and bullet points into the detail body `-m "<body>"` |
+| 3 | Body restricted to a per-file enumeration | Body can be free-form (prose / bullets / sections / mixed). Per-file enumeration is one option, not the only one |
+| 4 | "Diff is small, so subject is enough" autonomous skip | Author a body whenever a body would help future readers — most commits qualify. Subject-only is the exception, not the default |
+| 5 | Use the footer for prose that belongs in the body (e.g., motivation, trade-offs) | Footer = machine-readable references (`Closes`, `BREAKING CHANGE:`, `Co-Authored-By:`). Prose goes in the body |
+| 6 | Skip the blank line between subject ↔ body ↔ footer | Maintain blank-line separators — Git tooling (`git log --oneline`, GitHub squash) relies on them |
 
 ### Bash invocation forms
 
