@@ -145,11 +145,15 @@ def repair_chains(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tupl
     """Repair broken chains
 
     For messages where isSidechain==false and type is not in the exclusion list,
-    set parentUuid to the previous message's uuid if parentUuid is missing
+    normalize a missing parentUuid field to an explicit null (new root). Never
+    bridge to the previous file-order message's uuid — file order is not chain
+    order, and doing so would splice unrelated history across a compact/resume
+    boundary or sidechain (a genuinely missing field carries no ancestor info to
+    resolve from; the surviving-ancestor resolution in Pass 6 handles the case
+    where a parentUuid IS present but dangling — see _resolve_surviving_ancestor).
     """
     fixed = 0
     result = []
-    prev_uuid = None
 
     for line, data in messages:
         if data is None or not data.get('uuid'):
@@ -160,13 +164,12 @@ def repair_chains(messages: List[Tuple[str, Optional[dict]]]) -> Tuple[List[Tupl
         is_sidechain = data.get('isSidechain', False)
 
         if not is_sidechain and msg_type not in _SKIP_CHAIN_TYPES:
-            if 'parentUuid' not in data and prev_uuid is not None:
+            if 'parentUuid' not in data:
                 data = dict(data)
-                data['parentUuid'] = prev_uuid
+                data['parentUuid'] = None
                 line = json.dumps(data, ensure_ascii=False)
                 fixed += 1
 
-        prev_uuid = data.get('uuid')
         result.append((line, data))
 
     return result, fixed
@@ -398,8 +401,11 @@ def repair_session(session_file: Path, dry_run: bool = False) -> dict:
     if not dry_run:
         messages = load_lines(session_file)
     else:
-        # dry-run: analyze original as-is
-        messages = original_lines
+        # dry-run: use dedup's in-memory deduplicated records so the subsequent
+        # passes (and validation) see the same topology execute mode would —
+        # analyzing original_lines here would let a parent that references a
+        # duplicate execute mode is about to remove still look valid.
+        messages = dedup_result['messages']
 
     # Baseline topology of the pre-repair conversation (for the regression check).
     before_leaf, before_hops = active_chain_stats(original_lines)
