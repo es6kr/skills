@@ -8,7 +8,8 @@ section demote once the recurring risk is actually resolved — a hook/escalatio
 has been implemented (matched by the RESOLVED pattern below) — while still
 keeping live/unresolved recurrences HOT.
 
-Classification per section (date = latest `(YYYY-MM-DD` in title, else body):
+Classification per section (date = meta-line `last=YYYY-MM-DD` if present,
+else latest `(YYYY-MM-DD` or bullet-leading `YYYY-MM-DD` in title, else body):
   blocked = (recur_marker OR future_hook) AND NOT resolved
   cold    = old(date < cutoff) AND NOT blocked AND NOT later_body_recurrence
   hot     = otherwise
@@ -57,6 +58,14 @@ DEFAULT_FILE = os.path.expanduser(
 )
 
 DATE = re.compile(r"\((\d{4}-\d{2}-\d{2})")
+# class-format meta line (`<!-- fa: class=... count=N last=YYYY-MM-DD status=... -->`)
+# carries the authoritative last-recurrence date. DATE above only matches
+# parenthesized dates and misses this HTML-comment form entirely, so a
+# class-format section with no other `(YYYY-MM-DD` text anywhere in its body
+# falls back to whatever stray parenthesized date happens to appear (or "").
+META_LAST = re.compile(r"<!--\s*fa:[^>]*\blast=(\d{4}-\d{2}-\d{2})")
+# bullet-list leading date, no parens (`- 2026-07-24 — ...` recurrence-history lines)
+BULLET_DATE = re.compile(r"(?m)^-\s*(\d{4}-\d{2}-\d{2})\b")
 # check #1: recurrence marker in title (Korean-language "Nth occurrence" / "recurred")
 RECUR_TITLE = re.compile(r"\d+\s*회(차|째)|재발")
 # check #3: future-hook obligation in body (kept HOT unless resolved)
@@ -84,8 +93,11 @@ def analyze(path, cutoff, relaxed=False):
     rows = []
     for i, s in enumerate(sections):
         title = s.split("\n", 1)[0][3:].strip()
-        dates = DATE.findall(s)
-        latest = max(dates) if dates else ""
+        dates = DATE.findall(s) + BULLET_DATE.findall(s)
+        meta_last = META_LAST.search(s)
+        # meta-line last= is authoritative when present (class-format sections);
+        # otherwise fall back to the newest date found anywhere in the body.
+        latest = meta_last.group(1) if meta_last else (max(dates) if dates else "")
         title_dates = DATE.findall(title)
         title_date = max(title_dates) if title_dates else ""
         recur = bool(RECUR_TITLE.search(title))
