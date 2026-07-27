@@ -274,6 +274,8 @@ gh api 'orgs/<org>/copilot/billing' --jq '{
 
 **Availability gate (HARD STOP)**: If query 3 returns `active: 0` or `management: "disabled"` or fails with "Not Found", **Copilot reviewer registration is NOT possible for this PR**. The "Request Copilot review" option in the "Copilot absent" branch becomes inactive — skip the option set and self-decide on `consolidate (CodeRabbit only)` instead. Do not present an ask whose Recommended option is impossible to execute.
 
+**CI-gate-only base branch gate (HARD STOP — check BEFORE the reviewer-matrix queries)**: some long-lived branches exist purely to accumulate CI-passing commits ahead of a later, separately-reviewed promotion PR (e.g. a two-tier staging model). What matters is the base branch's *role*, not its literal name — verify via `gh pr checks <N>`: a CodeRabbit line reading `Review skipped: reviews are disabled for this base branch` means this base is CI-gate-only, and no walkthrough will ever arrive (not "pending", not "rate limited"). When this signal is present, skip the reviewer-matrix branches entirely — self-decide "CI green + Test Plan + Mergeable is the full gate for this base" and route straight to `github-flow/merge.md`'s CI-gate-only exception, not any of the four branches below.
+
 Then map to a branch:
 
 | CodeRabbit walkthrough | Copilot requested | Copilot reviewed | Branch (option set) |
