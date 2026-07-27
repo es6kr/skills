@@ -71,7 +71,7 @@ A plan-draft follows three stages.
 |-------|--------|-------|
 | 1. Write | Add a `- [BLOCKED:P*:selfable]` entry to `## Plan Drafts` (optionally a `plan-drafts/<slug>.md` body file) | This topic, when the user defers |
 | 2. Promote | When the resume trigger fires, re-verify the stub's premises against first sources, then hand the stub to the planning workflow (research → plan) and convert the entry into active work | This topic → `code-workflow` |
-| 3. Archive | When a stub is superseded / abandoned, move any body file to `plan-drafts/.bak/` and remove the entry | This topic |
+| 3. Archive | When a stub is superseded / abandoned, move any body file to `.ralph/.bak/` and remove the entry | This topic |
 
 ### 1. Write
 
