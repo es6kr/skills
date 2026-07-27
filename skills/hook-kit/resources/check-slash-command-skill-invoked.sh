@@ -77,7 +77,9 @@ if printf '%s' "$SCOPED" | grep -qF "\"skill\":\"$SLUG\""; then
   exit 0
 fi
 
-jq -n --arg slug "$SLUG" --arg reason \
-  "Detected \`/$slug\` typed by the user, but no \`Skill(\\\"$slug\\\", ...)\` tool_use call was found afterward in this transcript. A slash-command inject (the SKILL.md content shown after \`/$slug\`) is NOT itself a Skill invocation — it only surfaces the skill's instructions; the procedure starts only once the assistant actually calls the Skill tool. If \`/$slug\`'s procedure was already followed manually this turn, call \`Skill(\\\"$slug\\\")\` now anyway to record the formal invocation before proceeding." \
-  '{decision: "block", reason: $reason}'
+jq -n --arg slug "$SLUG" '
+  {
+    decision: "block",
+    reason: "Detected `/\($slug)` typed by the user, but no `Skill(\"\($slug)\", ...)` tool_use call was found afterward in this transcript. A slash-command inject (the SKILL.md content shown after `/\($slug)`) is NOT itself a Skill invocation — it only surfaces the skill'\''s instructions; the procedure starts only once the assistant actually calls the Skill tool. If `/\($slug)`'\''s procedure was already followed manually this turn, call `Skill(\"\($slug)\")` now anyway to record the formal invocation before proceeding."
+  }'
 exit 2
