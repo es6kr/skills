@@ -537,6 +537,7 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 - `**/.ralph/docs/generated/{plan,research,analysis,report,postmortem}-*.md`
 - `**/.omc/plans/*.md`
 - `**/walkthrough.md` (including walkthroughs in `<appDataDir>/brain/<conversation-id>/walkthrough.md`)
+- `**/implementation_plan.md` (same `<appDataDir>/brain/<conversation-id>/implementation_plan.md` location class as the walkthrough.md row above — an IDE-native session-brain directory outside every other Glob root in this list, easy to omit when only the sibling `walkthrough.md` pattern is copied forward)
 
 
 **Procedure**:
@@ -559,6 +560,7 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 | 2 | Handle only via `.bak/` archive-time REPEAT items (does not cover active artifacts) | Also check active artifacts in this sub-step. Archive time is a separate trigger |
 | 3 | Report as text "unsure if there are artifacts at session end" | Glob + scroll are mandatory. Do not assume 0 — confirm with primary sources |
 | 4 | Skip and end when the RAG receiver is unavailable | RAG receiver unavailability = this sub-step is BLOCKED. State it in the Step 4.5 BLOCKED row + set a trigger for the next session |
+| 5 | Check an IDE session-brain directory for only one known file pattern (e.g. `walkthrough.md`) and treat the directory as covered | Every file pattern the directory can produce needs its own Glob row — a directory being "already on the list" does not mean every artifact type inside it is checked |
 
 **Self-check (every time during cleanup Step 3)**:
 1. Identify `**/{plan,research,analysis,report,postmortem}-*.md` files written/edited this session (Glob mtime filter)
