@@ -51,7 +51,7 @@ For each mistake, organize the following (title includes the recurrence label id
 - What was done wrong
 
 ### Cause
-- Why it was done wrong (root cause)
+- Why it was done wrong (root cause summary in 1-2 concise sentences — DO NOT dump Why 1-5 number lists)
 
 ### Prevention
 - How to prevent it (concrete behavioral rule)
@@ -88,6 +88,10 @@ retrospect is the **step that records the learning trace** — a single recorded
 3. Does Recommended or default act as "skip"? → If so, it's a violation
 
 For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "retrospect options set to single-select with a default skip."
+
+#### Single-mistake case — no ask (AskUserQuestion requires >= 2 options)
+
+The AskUserQuestion tool rejects any question with fewer than 2 options, and the guard above forbids filler/skip meta-options. So when exactly **one** mistake was detected, do NOT compose the Step 3 ask at all — proceed directly to Step 4 recording and state it in the visible report ("1 mistake recorded — <title>"), letting the user veto or adjust from the report. This elides only the selection ask (a 1-option selection carries no decision); the recording obligation itself still applies in full. Do not invent a second filler option, and do not demote the sole mistake to "not worth recording" to dodge the constraint.
 
 ### 4. Executing the record
 
@@ -156,6 +160,26 @@ Add a section to `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT). This 
 ### Resolution and Prevention
 - ...
 ```
+
+#### 4-3. Immediate RAG store (MANDATORY — HARD STOP)
+
+**A HOT entry must also reach the RAG receiver at write time, not only when `fa-prune` later demotes it to COLD.** `fa-prune.md` Section 8 only dispatches archive-bound (COLD) sections — a freshly-written HOT entry stays invisible to semantic search until it goes stale enough to be archived (often weeks/months later). This defeats the "Recurrence pre-check" Stage 0 RAG search that `fix.md`/this file's own Step 1.5 mandate: it can only ever find *old* patterns, never a paraphrased recurrence of something recorded last week.
+
+Immediately after 4-2's file write, store a structured chunk to the same abstract RAG receiver contract fa-prune.md Section 8 uses (`--rag=<skill>:<topic>`, or whichever RAG-store tool is registered in the environment):
+
+| Field | Value |
+|-------|-------|
+| Content | The Problem/Cause/Resolution body just written (or a condensed summary of it) |
+| Idempotent id | `sha1("fa-hot:<class-or-title>")` — same scheme as fa-prune's archive-time id, so a later archive-time store for the same entry does not double-index |
+| Metadata | `type: "fa-hot"`, plus the entry's class/title, date, project |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat archive-time RAG dispatch (fa-prune Section 8) as covering all FA entries | HOT and COLD/archive dispatch are two separate triggers — both must fire, at write time and at archive time respectively |
+| 2 | Skip immediate store because "it'll get indexed eventually at archive time" | "Eventually" can be months out (COLD requires 90+ day staleness) — exactly the window where near-term recurrence detection matters most |
+| 3 | Re-store the same entry at archive time without an idempotent id, doubling the chunk | Use the same `sha1("fa-hot:<class-or-title>")` id at both write time and archive time so the archive-time store is a no-op update, not a duplicate |
+
+**Self-check (before ending Step 4)**: did the just-written HOT entry get a RAG-store call this turn (not just a file Edit)? If a RAG-store tool is registered in the environment and this step was skipped, go back and store it before proceeding to Step 5.
 
 ### 5. Skill malfunction check
 
