@@ -12,7 +12,7 @@ Conventional Commit conventions, PUBLIC repo English enforcement, Git operation-
 ## Conventional Commit base (HARD STOP)
 
 - Tags: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf` — **no other tags allowed**. Forbid invented tags like `infra:`, `build:`, `wip:`
-- Repo-visibility & project language: **Korean Repositories / Projects = Native language (Korean) commit messages enforced** (e.g. `llm-wiki`, `daegunsoftDev/*` Korean docs/projects, `es6kr/*` Korean projects must write subject and body in Korean, e.g., `docs(ops): timescale-hypertable migration plan creation and move to outputs`). **PUBLIC international open-source = English enforced, PRIVATE = native-language default** (see opensource.md visibility table). Per-medium separation — commit / PR / issue / comment all follow the same visibility rule
+- Repo-visibility & project language: **Project-primary / native language enforced for regional repositories & docs** (match the primary language of the target repository/documentation). **PUBLIC international open-source = English enforced, PRIVATE/regional = project-primary language default** (see opensource.md visibility table). Per-medium separation — commit / PR / issue / comment all follow the same visibility rule
 - Open-source contributions: see `opensource.md`
 - Wrong commits → fix with a new commit. `--amend` + force-push is allowed only when the user explicitly instructs it
 
