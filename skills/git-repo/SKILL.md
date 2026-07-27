@@ -62,11 +62,18 @@ to-bare  ←inverse→  to-ghq (formerly `migrate`)
 ### Flow
 
 1. `git -C <repo> worktree list` to enumerate existing worktrees
-2. Identify inactive candidates:
+2. **Operation-state gate (HARD STOP — before any inactive classification)**: for each candidate worktree `<W>`, check for an in-progress git operation:
+   ```bash
+   gitdir=$(git -C <W> rev-parse --absolute-git-dir)
+   ls "$gitdir"/CHERRY_PICK_HEAD "$gitdir"/MERGE_HEAD "$gitdir"/REBASE_HEAD "$gitdir"/BISECT_LOG "$gitdir"/rebase-merge "$gitdir"/rebase-apply 2>/dev/null
+   git -C <W> status --porcelain | grep -E '^(DD|AU|UD|UA|DU|AA|UU)'   # unmerged index entries
+   ```
+   Any hit = a cherry-pick/merge/rebase/bisect is **mid-flight** (likely the user's active operation) → the worktree is **NOT an inactive candidate**, its dirty files are the operation's payload (never offer discard / `git add` resolution / stash), and reuse is forbidden — report to the user instead. Merge-status heuristics (branch merged + ahead=0) do NOT override this gate. (see failed-attempts.md "cherry-pick in progress misclassified as abandoned")
+3. Identify inactive candidates (only among worktrees that passed the gate):
    - **Merged-PR worktrees** (commit hash equals the base branch's merge commit)
    - **Stale fix/refactor branch worktrees** (confirm with the user)
-3. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
-4. If no inactive worktree exists or the user opts for new → `git worktree add`
+4. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
+5. If no inactive worktree exists or the user opts for new → `git worktree add`
 
 ### New-commit-start trigger (HARD STOP — paired with git.md)
 
@@ -136,10 +143,11 @@ git status (check for other changes)
 ### Self-check (before any worktree work)
 
 1. Did you call `git -C <repo> worktree list`?
-2. Does any worktree in the output match (a) the same commit as HEAD or (b) a merge commit hash? → inactive candidate
-3. If inactive candidates exist, include both the new-add option and the reuse option in AskUserQuestion
-4. **Is the Recommended marker attached to the reuse option?** (apply the "Recommended placement rule" table)
-5. Use new-add only when 0 inactive candidates exist OR the user explicitly chose new
+2. **Did you run the operation-state gate (Flow step 2) on every candidate?** A worktree with `CHERRY_PICK_HEAD`/`MERGE_HEAD`/`REBASE_HEAD` or unmerged status codes (DU/UU/AA…) is mid-operation → excluded from candidates, no discard/stash options for its files
+3. Does any gated worktree match (a) the same commit as HEAD or (b) a merge commit hash? → inactive candidate
+4. If inactive candidates exist, include both the new-add option and the reuse option in AskUserQuestion
+5. **Is the Recommended marker attached to the reuse option?** (apply the "Recommended placement rule" table)
+6. Use new-add only when 0 inactive candidates exist OR the user explicitly chose new
 
 ### Typical failure mode
 
@@ -196,3 +204,4 @@ Key features:
 
 - `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
 - `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)
+- `./scripts/local-to-staging-pr.sh` - Cherry-pick a local commit to a staging branch, and print manual commands to push and open a draft PR
