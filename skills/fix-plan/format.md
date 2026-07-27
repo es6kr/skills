@@ -116,6 +116,14 @@ Exceptions:
 - Do not arbitrarily delete or modify existing entries in `## Completed`
 - Do not touch the `## Notes` section
 - **Do not add AI behavior constraints (e.g. version-change prohibitions, test-bypass prohibitions) to this file or to `fix_plan.md`** — these belong in `.ralph/PROMPT.md` (Ralph environment) or `~/.agents/rules/*.md` (global). `fix_plan.md` is a **task list + completion-log artefact only**
+- **Hybrid `- [ ] [BLOCKED...]` marker is FORBIDDEN (HARD STOP)** — the checkbox marker itself must be either `- [ ]` (pending) or `- [BLOCKED:P0-P3:reason]` (blocked), never both combined on the same list item. A `- [ ]` prefix followed by an inline `[BLOCKED...]` tag mixes the pending and blocked states and breaks the mutually-exclusive marker contract.
+
+  | Don't | Do |
+  |-------|----|
+  | `- [ ] [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` | `- [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` (drop the redundant `[ ] ` prefix) |
+  | `- [ ] [BLOCKED] claude-task CLI ID disambiguation rule` | `- [BLOCKED] claude-task CLI ID disambiguation rule` |
+
+  **Format-step self-check**: `grep -nE '^\s*-\s\[ \]\s\[BLOCKED' <fix_plan.md>` — any match is a hybrid-marker violation. Fix with a targeted `sed 's/- \[ \] \[BLOCKED/- [BLOCKED/g'` (or an equivalent per-line Edit) and re-run the grep to confirm zero matches.
 
 ## See also
 
