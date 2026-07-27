@@ -84,3 +84,44 @@ if [ "$FAIL" -ne 0 ]; then
   exit 1
 fi
 echo "All staged text files clean."
+
+# ── Internal IP / personal-machine-path gate ──
+# 2026-07-24 incident: a /fix ported a deployment-specific guard (RFC1918
+# Semaphore host IP + an account-only skill-data path) straight into a
+# tracked resources/ file before the Korean-only check above happened to also
+# catch it. Extend the same staged-content scan to two more narrow,
+# low-false-positive classes: RFC1918 IPs, and absolute paths that embed a
+# real machine username (/Users/<name>, /home/<name>, C:\Users\<name>).
+# Deliberately does NOT flag bare `~/.claude`/`~/.agents` — those are the
+# expected, pervasive Claude Code path convention throughout this repo, not
+# personal data (see opensource.md "no personal data in PUBLIC repos").
+FAIL2=0
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  content=$(git show ":$f" 2>/dev/null || true)
+  [ -z "$content" ] && continue
+
+  ip_hits=$(printf '%s\n' "$content" | grep -nE '\b(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3})\b' || true)
+  if [ -n "$ip_hits" ]; then
+    echo "BLOCKED: internal IP (RFC1918) in staged file: $f"
+    printf '%s\n' "$ip_hits" | head -5 | sed 's/^/    /'
+    FAIL2=1
+  fi
+
+  path_hits=$(printf '%s\n' "$content" | grep -nE '/Users/[a-zA-Z][a-zA-Z0-9_-]*/|/home/[a-zA-Z][a-zA-Z0-9_-]*/|C:\\Users\\[a-zA-Z][a-zA-Z0-9_-]*\\' || true)
+  if [ -n "$path_hits" ]; then
+    echo "BLOCKED: personal-machine path (embeds a real username) in staged file: $f"
+    printf '%s\n' "$path_hits" | head -5 | sed 's/^/    /'
+    FAIL2=1
+  fi
+done <<EOF
+$STAGED_TEXT_FILES
+EOF
+
+if [ "$FAIL2" -ne 0 ]; then
+  echo ""
+  echo "BLOCKED: internal IP or personal-machine path found in staged files."
+  echo "This repo is PUBLIC — replace with a placeholder (e.g. example.com,"
+  echo "10.0.0.0/24 -> <internal-host>, /Users/<name>/ -> ~/) before committing."
+  exit 1
+fi
