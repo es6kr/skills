@@ -48,6 +48,18 @@ A worktree that passed the gate is **inactive** (reuse candidate) if any of:
 | Not currently checked out by any session | No editor/terminal has `cwd` in that worktree |
 | Stale fix/refactor branch with no recent commits | `git log -1 --format=%ci <branch>` older than 7 days |
 
+### 2.5 Repurposable candidates (synced-to-origin, over-limit fallback)
+
+**Distinct from "inactive" above.** A worktree can have recent activity and an unmerged branch, yet still be safe to repurpose if its branch is **fully pushed to origin** — repointing it to a new branch loses nothing, since the existing work already lives on the remote.
+
+```bash
+# For each candidate <W>:
+git -C <W> log @{u}..HEAD --oneline   # unpushed commits ahead of the branch's upstream — empty = fully synced
+git -C <W> status --porcelain          # empty = no uncommitted local changes either
+```
+
+A worktree is **repurposable** when both checks are empty (fully pushed + clean). This is a weaker guarantee than "inactive" (the branch may still be under active review elsewhere), so it is used only as a **fallback** — when the worktree count is over the limit and no §2 inactive candidate exists.
+
 ### 3. Decision — reuse or create
 
 ```
@@ -55,7 +67,10 @@ inactive candidates found?
 ├─ YES → AskUserQuestion: which one to reuse?
 │        ├─ User selects one → Step 4A (rename/move)
 │        └─ User says "create new" → Step 4B (new)
-└─ NO  → Step 4B (new)
+└─ NO  → worktree count over the limit (see "Inactive Worktree Count Limit")?
+         ├─ YES → repurposable candidate found (§2.5)? → oldest one → Step 4A (rename/move)
+         │        └─ none found → report to user, ask before creating new
+         └─ NO  → Step 4B (new)
 ```
 
 **AskUserQuestion options must include both reuse and new-create** when inactive candidates exist.
@@ -167,6 +182,25 @@ Reuse via rename is the default for inactive worktrees (Don't/Do rule #5). Howev
 2. If count > 5 after this just-completed worktree → choose A (remove)
 3. If count ≤ 5 → choose B (detach + branch -D) for reuse
 4. Always pull main worktree to `origin/main` regardless of A or B
+
+### Over-limit selection when no inactive candidate exists (HARD STOP)
+
+When the worktree count already exceeds the limit and §2's inactive-candidate check finds none (all branches are unmerged and have recent commits), do **not** default to creating a new worktree or working directly in the main worktree. Apply the repurposable-candidate fallback (§2.5): among worktrees whose branch is fully pushed to origin and synced, **select the oldest one** (by last-commit timestamp) and repurpose it via `/git-repo rename-worktree`.
+
+**Why oldest**: age is the tie-breaker once safety (fully pushed) is established — an older worktree is less likely to represent someone's imminent next action, and "fully pushed" guarantees no data loss regardless of age.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Conclude "no reuse candidate" once §2's inactive criteria all fail, and default to creating a new worktree or working in the main worktree | Before concluding no candidate exists, run the repurposable check (§2.5) across the worktrees over the limit |
+| 2 | Repurpose the newest pushed+synced worktree on the assumption it's "most likely genuinely done" | Select the **oldest** pushed+synced worktree — recency is not a completion signal, only sync status is |
+| 3 | Repurpose a worktree with unpushed commits or uncommitted changes just because it's old | Both checks (unpushed commits + uncommitted changes) must be empty — an old-but-dirty worktree is still someone's WIP |
+
+**Self-check (before proposing "no reuse candidate, create new" when over the limit)**:
+1. Did §2's inactive check return zero candidates?
+2. Is the current worktree count over the limit?
+3. If both yes, did you run the repurposable check (§2.5 — unpushed commits + uncommitted changes, both empty) across the existing worktrees?
+4. Among repurposable candidates, did you select by **oldest** timestamp, not newest or arbitrary?
+5. Only if the repurposable check also finds zero candidates → report this to the user and ask before creating new or working in the main worktree
 
 ### Origin
 
