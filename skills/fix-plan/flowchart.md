@@ -113,6 +113,26 @@ misalignment.
 When a real dependency tree and independent items coexist, keep the tree on solid edges and
 give the leftover independent items their own invisible priority columns beside it.
 
+## Sync procedure (pm-role default-pipeline step 5)
+
+The `pm` role's default pipeline (see `SKILL.md` "Default invocation") runs this as its final step, right after `priority` triage produces its sorted `[BLOCKED:P*:reason]` list. This is a **mechanical drift check** against that output — not a full re-authoring pass.
+
+1. **Read** the current `## Flow Chart` Mermaid block and its `Node Plan Mappings` list.
+2. **Cross-reference** each `[P*]`-labeled node against the tracker item it maps to (via the Node Plan Mappings entry or an inline reference):
+   - **Stale label** — the node's `[P*]` tag no longer matches that item's current `[BLOCKED:P*:reason]` tag → update the label.
+   - **Resolved item** — the backing item is now `[x]` / moved to `## Completed` → remove the node and any edges touching it.
+   - **New item, no node** — a `[BLOCKED:P*:reason]` item from this run's priority triage references a plan document but has no corresponding node → propose adding one (does not require re-laying-out the whole graph; append per "Layout ordering" above).
+   - **Path correction, whole-file grep** — when a Node Plan Mappings entry's document path was stale/wrong and gets corrected, grep the entire tracker file for the same stale path string before considering the correction done. A path can be cited in more than one place — most commonly inside the backing `[BLOCKED]` item's own body (`Why` / `Options` prose) — and fixing only the Node Plan Mappings line leaves those other citations pointing at the old, possibly non-existent path.
+3. **Apply** only the drift found — do not redesign layout, columns, or dependency edges beyond what the drift requires. Semantic re-authoring (splitting into new priority columns, adding real dependency edges between unrelated nodes) stays a deliberate `/fix-plan flowchart` invocation, not part of this mechanical step.
+4. **Report** `N node(s) relabeled / M node(s) removed / K node(s) proposed` before the pipeline's overall run report closes — mirrors the priority topic's own "N entries auto-resolved" reporting contract (see [priority.md](./priority.md) Don't/Do #4).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Skip flowchart sync because "the graph still looks fine" | Cross-reference every `[P*]` node against its tracker item every `pm` run — drift is invisible without the check |
+| 2 | Use this step to also redesign columns/layout | Layout redesign is a separate, deliberate `/fix-plan flowchart` call — this step only corrects drift |
+| 3 | Silently drop a node for a resolved item without reporting it | Report removed/relabeled/proposed counts, same as priority's sync-resolution reporting |
+| 4 | Fix a stale document path only where it was first noticed (the Node Plan Mappings line) and stop | Grep the whole tracker file for the same stale path string and correct every citation, including the backing item's own `Why` / `Options` body |
+
 ## Rules (HARD STOP)
 
 | # | Don't (forbidden) | Do (correct alternative) |
@@ -129,3 +149,5 @@ give the leftover independent items their own invisible priority columns beside 
 2. Are node plan mappings formatted as clean relative paths without `file://` URLs?
 3. Are precedent relationships (`VaultSecret --> Domain`, `Cert --> PlaneExposure`, `ClawoRuntime --> Clawo`) accurately reflected?
 4. Are dependency-free items split into balanced priority columns with **invisible** ordering edges (`~~~`), rather than left as horizontal roots or forced into one over-tall single column?
+5. (pm-role runs only) Was every `[P*]`-labeled node cross-referenced against its tracker item's current `[BLOCKED:P*:reason]` tag this run, and was the relabeled/removed/proposed count reported?
+6. If a Node Plan Mappings document path was just corrected, was the whole tracker file grepped for the same stale path string, and were any other citations (e.g. the backing item's `Why` / `Options` body) corrected too?
