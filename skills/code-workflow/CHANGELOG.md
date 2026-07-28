@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/code-workflow-v0.5.0...code-workflow-v0.5.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **code-workflow:** default output-dir to llm-wiki/outputs/ + mandate RAG pre-lookup ([ad56a86](https://github.com/es6kr/skills/commit/ad56a863157776c4fb840f58eec80990543a3040))
+* **code-workflow:** default output-dir to workspace-local llm-wiki/outputs/ + mandate RAG pre-lookup before research ([b471487](https://github.com/es6kr/skills/commit/b471487c8330165f8df334d21a9203546efa19c4))
+* **code-workflow:** make pre-lookup vendor-agnostic + fix stale/dangling refs ([c8c61f1](https://github.com/es6kr/skills/commit/c8c61f1c9074e7c2dbf39f63a4e4fc8b8b928ca5))
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/code-workflow-v0.4.1...code-workflow-v0.5.0) (2026-07-23)
 
 
