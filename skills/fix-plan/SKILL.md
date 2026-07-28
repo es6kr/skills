@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format (markers/sections), priority (P0-P3 BLOCKED + external/selfable), add (Action/Why/How), draft (deferred plan stub → promote), move ([x] → Completed + subtree), sync (gh pr/issue polling → auto-check), sync-automation (overdue nudge), verify (commit/path staleness), issue-drafts (write→publish→archive), model-triage (model-fit section), completion-criteria (DoD + marker transition), claim (multi-session lease — CLAIMED tag prevents duplicate work across sessions).
-  Default (no args): move → format → sync → priority → flowchart-sync, scoped by --role=pm|deep|impl.
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "model triage", "completion criteria", "--role", "verify tracker reference", "claim item", "in-progress lease", "mark in progress", "concurrent session", "prevent duplicate work".
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role".
 metadata:
   author: es6kr
   version: "0.1.0"
