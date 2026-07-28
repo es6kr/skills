@@ -28,11 +28,12 @@ New TODO arrives
 | session | TaskCreate/TodoWrite | Session | → `/wip` skill |
 | file | fix_plan.md, TODO.md | While file exists | Write/Edit |
 | issue | GitHub Issues | Permanent | `gh issue create` |
-| conversation-id | — | Always-on | [conversation-id.md](./conversation-id.md) — subject-prefix references in user-visible output |
+| conversation-id | — | Always-on | [conversation-id.md](./conversation-id.md) — subject-prefix references in user-visible output. Enforced by `resources/block-tasklist-id-in-conversation.sh` (PreToolUse:AskUserQuestion, registered in `settings.json`) |
 | completion-report | — | Always-on | [completion-report.md](./completion-report.md) — TaskUpdate completion format + file-change disclosure |
 | fix-plan-sync | — | Always-on | [fix-plan-sync.md](./fix-plan-sync.md) — two-way sync between task medium and checklist medium |
 | priority-prefix | — | Always-on | [priority-prefix.md](./priority-prefix.md) — priority/order via subject prefix (`P{n}`, PR-anchored, `fix-*` > P0) |
 | media-separation | — | On-demand | [media-separation.md](./media-separation.md) — 3-layer model: tracking files vs RAG vs LLM Wiki |
+| claude-task | Task JSON CLI | Permanent / Standalone | [claude-task.md](./claude-task.md) — standalone Python CLI tool (`claude-task.py`) for managing Task JSON files directly from terminal shell |
 
 ## Skip exceptions
 
