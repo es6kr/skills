@@ -91,8 +91,8 @@ Demoted sections move to archive + RAG store, so recurrence detection (Section 7
 **Auto-classification script**: `scripts/fa-classify.py` implements the entire classification above (recurrence/hook/resolution detection + COLD verdict) — a successor to fa-analyze.py, including the resolution exception.
 
 ```bash
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py                     # strict summary + COLD candidates (R = demoted via resolution exception)
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed           # relaxed mode (S = stale-recurrence demotion) — default operating policy
+uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py                     # strict summary + COLD candidates (R = resolved-exception, S = stale-recurrence) and hook/FALSE-NEG diagnostics
+uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed           # relaxed mode (S = stale-recurrence demotion) — default operating policy and hook/FALSE-NEG diagnostics
 uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed --cut /tmp/fa-cold  # separate COLD body files + index.json (Section 8 RAG store input)
 ```
 

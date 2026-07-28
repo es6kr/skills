@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "bare convert", "multi-account clone", "core.sshCommand", "Repository not found", "worktree create" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), conflict-dry-run (isolated worktree merge/cherry-pick test), credential-helper (per-org HTTPS token pin for multi-account), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "multi-account clone", "core.sshCommand", "Repository not found", "credential helper", "wrong account", "worktree create", "merge conflict test", "cherry-pick dry run" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -28,6 +28,8 @@ Git repository management and SourceGit GUI client integration.
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | clone | ghq get with automatic SourceGit registration (multi-account support) | [clone.md](./clone.md) |
+| conflict-dry-run | test merge/cherry-pick applicability in an isolated worktree, without touching the main working tree | [conflict-dry-run.md](./conflict-dry-run.md) |
+| credential-helper | pin a per-org GitHub token for HTTPS remotes (fixes recurring `Repository not found` from active-account mismatch); HTTPS counterpart to ssh-key | [credential-helper.md](./credential-helper.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
@@ -53,6 +55,8 @@ worktree-register (shared metadata register/relink mechanism)
   └─← to-bare (link the working tree after a regular→bare conversion)
 
 to-bare  ←inverse→  to-ghq (formerly `migrate`)
+
+ssh-key (SSH multi-account)  ──counterpart──  credential-helper (HTTPS multi-account)
 ```
 
 ## Worktree decision tree (HARD STOP — every time a worktree is needed)

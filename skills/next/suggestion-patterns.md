@@ -13,8 +13,8 @@
 | Severity | Handling in next-action options |
 |----------|--------------------------------|
 | 🔴 Critical | Per-PR immediate action (block merge until resolved) |
-| 🟡 Important | Per-PR immediate action (recommended to resolve before merge) |
-| 🟢 **Minor** | **Cross-PR bundle** (aggregate across related PRs' deferred findings) |
+| 🟠 Important | Per-PR immediate action (recommended to resolve before merge) |
+| 🟡 **Minor** | **Cross-PR bundle** (aggregate across related PRs' deferred findings) |
 | ⚪ **Nitpick** | **Cross-PR bundle** (same as Minor) |
 
 ### Don't / Do
@@ -34,9 +34,37 @@
 3. Are Important/Critical findings from the current PR still surfaced as per-PR immediate action? → They should be (this rule affects only Minor/Nitpick)
 4. If only 1 PR has deferred Minor findings and no bundle exists yet, is the Minor option omitted entirely? → It should be. The candidate goes into fix_plan and waits for the next PR's Minor findings
 
+## Cross-cutting rule — PR creation in option description (HARD STOP)
+
+**Whenever an AskUserQuestion option proposes PR creation (in any "After X" section below), the option `description` MUST explicitly state "draft PR".** Bare "create PR" / "PR" is forbidden. The `--ready` (non-draft) variant must be offered as a **separate option** (different axis), not bundled into the same description.
+
+**Why**: `github-flow/pr.md` enforces "Draft is the DEFAULT (HARD STOP)" at `gh pr create` execution time. But option descriptions written before execution are the user's primary decision medium — if "create PR" is shown without specifying draft, the user may interpret it as a ready-for-review PR (CodeRabbit/Copilot fire immediately on ready PRs, review cost grows). Option description must mirror the executed command's intent verbatim. `--ready` toggle is a meaningful axis — separating it lets the user make the draft vs ready choice consciously.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `description: "...→ create PR + merge"` (draft unspecified) | `description: "...→ create draft PR + merge"` |
+| 2 | `description: "worktree → cherry-pick → push → PR"` | `description: "worktree → cherry-pick → push → draft PR"` |
+| 3 | Bundle ready-PR toggle into the draft-PR option | Separate axis: option 1 = "create draft PR", option 2 = "create ready PR (CodeRabbit/Copilot fires immediately)" |
+| 4 | Omit "draft" from description on the rationale that "draft vs ready is decided at gh pr create time" | description = user's primary decision medium. Mirror the command's intent (draft default) verbatim |
+| 5 | Include `--ready` in every PR ask by default | `--ready` is offered as a separate axis on explicit user request. Default option = draft. Ready only when the user explicitly chooses it |
+
+### Self-check (HARD STOP — before drafting any option array that mentions PR creation)
+
+1. Does the option description contain "PR"? — If yes, continue
+2. Does it specify "**draft PR**" explicitly? — If no, add "draft" before "PR"
+3. If `--ready` is needed, is it a **separate option** (different axis), not bundled with draft option? — If bundled, split into 2 options
+4. Multi-PR scenarios (e.g., "3-way worktree+PR"): does the description say "**draft PRs**" (plural-aware) for each? — If just "PRs", replace with "draft PRs"
+
+### Cross-ref
+
+- `github-flow/pr.md` lines 13-14, 276-279 (Draft-default HARD STOP at execution time) — this skill mirrors that rule into option-description time.
+- Triggering keyword in option description (any locale): `create PR`, `PR creation`, `register PR`, `worktree+PR`, `cherry-pick + PR`, `gh pr create`, and equivalent localized forms. Any of these without a "draft" qualifier = violation.
+
 ## Deferred-status overrides severity + pending-task precedence (HARD STOP)
 
-The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟡 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.
+The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟠 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.
 
 Two independent errors this gate prevents: (a) surfacing a deferred-status finding as a discrete option, and (b) failing to pull the actual pending TaskList backlog as the primary candidate source. "There are tasks to finish — don't spend a next-action slot on a deferred item." Deferred findings aggregate into a late bundle (fix_plan sweep); they are never a slot-filler.
 
@@ -386,6 +414,31 @@ options: [
 ## After session wrap-up with pending tasks (HARD STOP — TaskList based)
 
 **Precondition**: The session's core work is complete and the user signals wrap-up intent (explicit wrap-up keyword such as "wrap up", "cleanup", "end session"), or only asset cleanup (file moves, doc updates) remains. At least one pending/in_progress task remains for carryover.
+
+### Context-usage gate (HARD STOP — before offering ANY wrap-up/cleanup option, in any ask)
+
+A session-cleanup / retrospective / wrap-up option — including as a diversity slot inside a regular next-action ask — may be offered only when at least one of these holds:
+
+1. The user explicitly signaled wrap-up intent (wrap-up keyword, or 2+ consecutive declines of other follow-ups), or
+2. The injected context-usage signal (a `Context usage: ... (NN%)` line in hook additionalContext, when the environment provides one) reports **≥ 45%** — **read from the LATEST injection in the transcript at ask-composition time**. The signal only refreshes on user-prompt events, and a compact/summarization boundary shrinks context, so any reading taken before the most recent injection (or before an intervening compact) is stale and **overstates** usage. A stale reading NEVER satisfies the gate: if the freshest injection is below the threshold — or no post-compact reading exists yet — treat condition 2 as NOT met.
+
+When neither holds, omit the cleanup/wrap-up option entirely — fill the slot with another discovery-source candidate or present fewer options. Cleanup value scales with session fullness; offering it early pressures a premature session boundary the user did not ask for.
+
+**Live-check fallback when the last injection predates this turn's tool-call chain (HARD STOP)**: a Stop-hook-triggered continuation can run many tool calls (file reads, skill topic loads, PR/CI operations) with **no intervening `UserPromptSubmit`** — the injected line only refreshes on that event. During such a chain, automatic mid-session context compression can silently shrink the real usage well below an old high reading, with no explicit marker in the transcript (no `isCompactSummary` entry, and no user-visible manual-compact command run — e.g. Claude Code's `/compact` — in between). An old reading is therefore not just potentially stale-low (understating), it can also be stale-high (overstating) by the time you compose the ask. If the last injected reading is more than a few tool calls old, do not cite its percentage — get a live one instead, if your environment provides a context-usage injection script:
+
+```bash
+echo '{"transcript_path": "<current transcript path>"}' | bash <path-to-context-usage-injection-script>
+```
+
+This invokes the injection script directly — it parses the transcript's last assistant-message usage field on demand and does not depend on a fresh `UserPromptSubmit` firing. Use this live number, not the stale injected line, before citing any percentage as gate justification. (Claude Code's script lives at `~/.claude/hooks/context-usage-inject.sh`; other environments provide their own equivalent or none at all — absence of a direct-invocation path means fall back to omitting the option per the paragraph above.)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Use "Session wrap-up" as a generic slot filler at low context usage | Check the injected context-usage line first; below the threshold with no user signal, pick a different candidate |
+| 2 | Estimate session fullness from work volume ("many tasks were completed") | Only the injected context-usage signal or an explicit user statement counts as evidence of fullness |
+| 3 | Treat the absence of the signal as permission to offer cleanup | No signal + no user intent = no cleanup option (conservative fallback on environments without the injection hook) |
+| 4 | Reuse a context-usage % cached from an earlier prompt ("the gate passed at /wip entry") across a long multi-ask turn chain, or across a compact boundary | Re-check the **latest** injected `Context usage:` line each time a wrap-up option is composed; a compact boundary invalidates every earlier reading. Enforcement hook: `block-cleanup-option-below-context-gate.sh` (PreToolUse:AskUserQuestion) denies wrap-up options when the transcript-latest % is below the threshold |
+| 5 | Cite an old injected % as current-state justification when a long tool-call chain (Stop-hook continuation, no new `UserPromptSubmit`) separates that reading from ask-composition time | Get a live reading via direct invocation of the context-usage injection script (feed `{"transcript_path": "<path>"}` on stdin) before citing any percentage — see "Live-check fallback" above |
 
 **Step 0.5 required — Read TaskList directly to identify pending entries**:
 

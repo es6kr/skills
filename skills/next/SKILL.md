@@ -148,6 +148,21 @@ AskUserQuestion({
 
 **Background dispatch does not end the turn (HARD STOP)**: delegating a selected action to a background agent (`Agent` spawn — background or mailbox-returning) hands control straight back — it is NOT a turn-ending event. Scan the remaining selected/pending tasks and drive the next independent one **in the same turn**; "execute sequentially" governs result-consumption order, not idle waiting. Idle-waiting for the agent is acceptable only when nothing else is drivable. Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached. When a forced idle would exceed that cache window, never arm one long silent watcher — use short cycles (`timeout` ≤ 240 s, end → notify → re-arm); multiSelect-unselected ask items count as deferred fill candidates for the idle window, not declined work. Enforced by the idle-wait Stop hook (`block-idle-wait-without-short-cycle.sh`). Same rule as wip/resume.md Step 3 (background-dispatch rows).
 
+**Decide foreground vs background BEFORE spawning, not after (HARD STOP)** — → claudify skill background-polling topic: a wakeup covers hang recovery, it does not license idling past the 5-minute prompt-cache TTL. Before every `Agent` spawn, check whether other selected/pending work this turn could run while the agent works.
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|------------------------|
+| 1 | Background a single-item follow-up (e.g. "run Internal Review on this PR, then post the Summary") with nothing else queued, then idle-wait for its own notification | Spawn it in the foreground (`run_in_background: false`, or the Agent tool's default synchronous behavior) — a lone item is a foreground case |
+| 2 | Background an agent because other selected/pending work exists this turn, then not actually drive that other work while it runs | Background it AND drive the other work in the same turn — backgrounding only pays off when something fills the wait |
+| 3 | Assume the idle wait is "free" because usage-overage state isn't known yet | Always plan for the shorter 5-minute cache window, not the overage window |
+
+#### Self-check (before every `Agent` spawn)
+
+1. Is there other selected/pending work this turn could drive while the agent runs? → No → foreground it (`run_in_background: false`)
+2. Yes → background it, and actually drive that other work in the same turn — do not idle-wait alone
+
+(See failed-attempts.md "background-agent-without-parallel-work" for recurrence history.)
+
 ## Suggestion Patterns
 
 Per-context option templates for "After X" completions (code change, feature, bug fix, config, commit, push, PR fix-commit re-review, PR creation reviewer matrix, skill/agent creation, file creation, refactoring, complex workflow, exploration, session wrap-up, PR consolidate).

@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/next-v0.5.1...next-v0.6.0) (2026-07-23)
+
+
+### Features
+
+* **consolidate:** address PR 134 reviews and reflect orange/yellow severity display rules ([e6118d0](https://github.com/es6kr/skills/commit/e6118d0fb0217a4c4ad388b82e574203a8f9258e))
+* **hook-kit:** add pre-tool AskUserQuestion context gate ([#123](https://github.com/es6kr/skills/issues/123)) ([271b5b3](https://github.com/es6kr/skills/commit/271b5b37df5e64cf3185b2c81c3d97b66789e9ab))
+* **next-feat:** accumulate features for hook-kit context gate ([df4f73a](https://github.com/es6kr/skills/commit/df4f73ae4d27d4919105da70c6c94a14a32e8056))
+* **next:** wire Stop auto-invocation via script action + jq portability ([de2bed5](https://github.com/es6kr/skills/commit/de2bed5489a247a21eab54c0e13b27ae00d18196))
+* skills topic bundle — brief/email, code-workflow/plan-research-search, git-repo topics, skill-kit/invoke-discipline ([7fd877d](https://github.com/es6kr/skills/commit/7fd877da1b703fcdcdcaf1a3ce912f885abfa3f0))
+
+
+### Bug Fixes
+
+* **next:** require "draft PR" in option descriptions proposing PR creation ([7925177](https://github.com/es6kr/skills/commit/79251773a2aef74b5bc44f12a3a943a73ac37d02))
+
+## [0.5.1](https://github.com/es6kr/skills/compare/next-v0.5.0...next-v0.5.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **claude-session,consolidate,next:** promote next-fix staging ([902cfa5](https://github.com/es6kr/skills/commit/902cfa57de68d9f5487425b524ffa4441f81f302))
+* **next:** add operational-failure precedence gate to suggestion-patterns ([448e3ca](https://github.com/es6kr/skills/commit/448e3caf688b0eb37c2bd5281c3c28640378ec8e))
+* **next:** add populated-backlog precedence gate to ask-gates Step 0.7 ([5e01f88](https://github.com/es6kr/skills/commit/5e01f886b167ddce8fb871d077195cd45295cc69))
+* **next:** operational-failure + populated-backlog precedence gates ([45a5b11](https://github.com/es6kr/skills/commit/45a5b1153f37e30d32d1350b86a64c8da03ffb20))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/next-v0.4.4...next-v0.5.0) (2026-07-07)
 
 

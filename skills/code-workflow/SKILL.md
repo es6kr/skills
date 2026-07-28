@@ -9,6 +9,17 @@ depends-on:
   - web-browser
 description: |
   4-stage code-change workflow: research → plan → user review → implement (TDD). Topics — steps (Step 0-3: resume + research + plan + review + branch), implement (Step 4: TDD + build + commit), pr (capture + PR with image/GIF/video). For issue implementation, tracked tasks, new features. TDD default (opt out --no-tdd). github-flow auto-companion on GitHub repos. Use when: "coding workflow", "research plan implement", "write plan", "plan md", "user review", "code plan", "code changes", "PR with screenshots", "pull request", "capture and PR".
+triggers:
+  - event: PreToolUse
+    matcher: Bash
+    pattern: "git (checkout -b|commit|push|pr create)"
+    action: suggest
+    message: "Git checkout -b, commit, push, or pr create detected. Verify you are following the 4-stage coding workflow (Research -> Plan -> User Review -> TDD Implement). Call Skill(\"code-workflow\", \"steps\") if needed."
+  - event: PostToolUse
+    matcher: "Edit|Write"
+    pattern: "plan-.*\\.md|research-.*\\.md"
+    action: suggest
+    message: "plan-*.md or research-*.md file modification detected. Follow the code-workflow steps to author them, and call Skill(\"code-workflow\", \"steps\") for open decisions / trade-off verification."
 ---
 
 # Coding Workflow
