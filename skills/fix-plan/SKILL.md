@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
-  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role".
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role".
 metadata:
   author: es6kr
   version: "0.1.0"
