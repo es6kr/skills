@@ -387,6 +387,56 @@ def git_scan_text(command: str) -> str:
     return scan
 
 
+_PROD_BRANCHES = r"(?:production|master|release|prod|stable)"
+_PROD_BRANCH_PATTERNS = [
+    (r"git\s+push\s+.*:" + _PROD_BRANCHES + r"(?:$|\s)", "git push deleting protected branch"),
+    (r"git\s+push\s+.*" + _PROD_BRANCHES + r"(?:$|\s|:)", "git push targeting protected branch"),
+    (r"git\s+branch\s+(?:-[a-zA-Z]+\s+)*" + _PROD_BRANCHES + r"(?:$|\s)", "git branch create/force on protected branch"),
+    (r"git\s+(?:checkout|switch)\s+-[bBcC]\s+" + _PROD_BRANCHES + r"(?:$|\s)", "git branch create via checkout/switch on protected branch"),
+    (r"gh\s+api\s+.*branches/" + _PROD_BRANCHES, "gh api mutation on protected branch"),
+    (r"git\s+worktree\s+add\s+.*" + _PROD_BRANCHES + r"(?:$|\s)", "git worktree add on protected branch"),
+    (r"git\s+update-ref\s+refs/heads/" + _PROD_BRANCHES, "git update-ref on protected branch"),
+    (r"gh\s+workflow\s+run\s+.*(?:--ref|-r)\s+" + _PROD_BRANCHES + r"(?:$|\s)", "gh workflow run (workflow_dispatch) targeting protected branch"),
+]
+
+
+def check_prod_branch_ops(command: str) -> str | None:
+    """Block autonomous git/gh operations that create, push, delete, protect, or
+    workflow_dispatch against release-trigger branches (production/master/release/
+    prod/stable). `main` is deliberately excluded (already gated by the
+    push-confirmation rule). Bypass: prefix the command with
+    ALLOW_PROD_BRANCH_OPS=1 (per-command only — never session-wide).
+
+    Ported from the standalone block-prod-branch-autonomous-ops.sh hook into
+    bash-guard.py to avoid an extra PreToolUse:Bash process spawn per command."""
+    if os.environ.get("ALLOW_PROD_BRANCH_OPS") == "1":
+        return None
+    if re.search(r"ALLOW_PROD_BRANCH_OPS=1", command):
+        return None
+    scan = git_scan_text(command)
+    reason = None
+    for pat, r in _PROD_BRANCH_PATTERNS:
+        if re.search(pat, scan, IM):
+            reason = r
+            break
+    if reason is None and (
+        re.search(r"gh\s+api\s+.*actions/workflows/.*dispatches", scan, IM)
+        and re.search(r"(?:-f|-F|--field|--raw-field)\s+ref=" + _PROD_BRANCHES + r"(?:$|\s)", scan, IM)
+    ):
+        reason = "gh api workflow_dispatch targeting protected branch"
+    if reason is None:
+        return None
+    return (
+        f"{reason}\n\n"
+        "Branches matching /(production|master|release|prod|stable)/ are release triggers. "
+        "A single autonomous operation on them can trigger real user-facing publishes "
+        "(semantic-release, Marketplace stable, npm dist-tag latest, GitOps ArgoCD sync) "
+        "with no dry-run and no rollback.\n\n"
+        "To proceed with a genuinely user-approved operation, prefix the command with "
+        "ALLOW_PROD_BRANCH_OPS=1 (per-command only — never session-wide)."
+    )
+
+
 def evaluate(
     command: str,
     run_bg: bool,
@@ -437,6 +487,10 @@ def evaluate(
     summary_reason = check_summary_without_internal_review(command)
     if summary_reason:
         return hard(summary_reason)
+
+    prod_branch_reason = check_prod_branch_ops(command)
+    if prod_branch_reason:
+        return hard(prod_branch_reason)
 
     if LOCAL_OVERLAY is not None:
         overlay_reason = LOCAL_OVERLAY.check(command, tool_name, transcript_path)
