@@ -22,6 +22,22 @@ If any of 1-4 is unmet, **STOP**. Do not Edit/Write/commit. Issue an AskUserQues
 
 **Violation case (2026-05-26)**: A plan for Skills-7-Phase3 was posted to issue #7 comment 4534769660 on 2026-05-25 (Phase 3 plan posted + plan acceptance checklist 0/6). The next-day session interpreted a short "continue task" prompt as implement approval, skipped the acceptance gate, and proceeded to publish.yml + verify-phase3.sh implementation, commit, push, and `github-flow pr` invocation. The user surfaced it as: "the plan is already posted — aren't you checking it?".
 
+## Implementation Checklist Decomposition (HARD STOP — before the first Edit/Write)
+
+Once the Plan Acceptance Gate passes, **decompose the approved plan into a visible execution checklist BEFORE writing any implementation code**. The goal is that implementation progress is observable turn-by-turn — never a single opaque "implement everything" step whose status the user cannot see mid-flight.
+
+- Register the checklist via `TaskCreate` (or `TodoWrite` for a strictly sequential list) — one entry per concrete sub-step (Red test, Green change, refactor, per-file edit, verification), NOT one lump "implement the feature" item.
+- Mark each sub-step `in_progress` when you start it and `completed` the moment it lands, so the user can watch the implementation advance.
+- This is distinct from the workflow-entry checklist (SKILL.md "Task Checklist Registration" Tool Call #1): that gate registers the *phases* (research/plan/implement); this gate decomposes the *implementation phase itself* into observable sub-steps at Step 4 entry.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Enter Step 4 and start editing code under one broad "implement" task | Decompose into per-sub-step tasks first (TaskCreate/TodoWrite), then edit — so status is observable |
+| 2 | Report implementation progress only in prose ("done, here's what I changed") | Reflect each sub-step's transition in the task list as it happens; prose is a supplement, not the tracker |
+| 3 | Batch a multi-file / multi-stage implementation into a single silent turn | Surface the sub-steps up front; drive them one at a time with visible status transitions |
+
+**Self-check (at Step 4 entry, before the first Edit/Write)**: Is the implementation registered as ≥1 concrete sub-step task the user can watch advance? If the only task is a lump "implement" item — or there is no task at all — decompose first.
+
 ## Skill Invocation (Mandatory)
 
 **Implementation skill invocation mandatory** — Direct Agent dispatch prohibited:
