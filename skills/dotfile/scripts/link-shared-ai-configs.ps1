@@ -64,6 +64,57 @@ function Link-Folder {
     }
 }
 
+function Link-File {
+    param (
+        [string]$FileName,
+        [string]$DstPath
+    )
+
+    $SrcPath = Join-Path $AgentDir $FileName
+
+    if (-not (Test-Path $SrcPath)) {
+        Write-Host "❌ Source file not found: $SrcPath" -ForegroundColor Red
+        return
+    }
+
+    if (Test-Path $DstPath) {
+        $Item = Get-Item $DstPath -Force
+        if ($Item.LinkType -eq 'SymbolicLink' -and $Item.Target -eq $SrcPath) {
+            Write-Host "✓ Already linked: $DstPath" -ForegroundColor Green
+            return
+        }
+        # Backup existing file
+        $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $DstName = Split-Path $DstPath -Leaf
+        $DstParent = Split-Path $DstPath -Parent
+        $BackupDir = Join-Path $DstParent ".bak"
+        $BackupPath = Join-Path $BackupDir "$DstName-$Timestamp"
+        if (-not (Test-Path $BackupDir)) {
+            New-Item -ItemType Directory -Path $BackupDir -Force | Out-Null
+        }
+        Write-Host "⚠️ Backing up: $DstPath → $BackupPath" -ForegroundColor Yellow
+        try {
+            Move-Item -Path $DstPath -Destination $BackupPath -Force -ErrorAction Stop
+        } catch {
+            Write-Host "❌ Failed to backup $DstPath. Skipping." -ForegroundColor Red
+            return
+        }
+    }
+
+    $DstParent = Split-Path $DstPath -Parent
+    if (-not (Test-Path $DstParent)) {
+        New-Item -ItemType Directory -Path $DstParent -Force | Out-Null
+    }
+
+    Write-Host "→ Creating File Hard Link: $DstPath → $SrcPath" -ForegroundColor Cyan
+    try {
+        New-Item -ItemType HardLink -Path $DstPath -Target $SrcPath -Force | Out-Null
+    } catch {
+        Write-Host "❌ Failed to create hard link: $DstPath" -ForegroundColor Red
+    }
+}
+
+
 # Move Codex system skills into shared skills before linking
 function Merge-MoveDirectory {
     param(
@@ -116,6 +167,7 @@ $AgentSystemSkillsDir = Join-Path $AgentSkillsDir ".system"
 Merge-MoveDirectory -SrcDir $CodexSystemSkillsDir -DstDir $AgentSystemSkillsDir
 
 # Skills
+Link-Folder -FolderName "skills" -DstPath (Join-Path $GeminiDir "config\skills")
 Link-Folder -FolderName "skills" -DstPath (Join-Path $AntigravityDir "skills")
 Link-Folder -FolderName "skills" -DstPath (Join-Path $ClaudeDir "skills")
 Link-Folder -FolderName "skills" -DstPath (Join-Path $CodexDir "skills")
@@ -127,3 +179,6 @@ Link-Folder -FolderName "rules" -DstPath (Join-Path $ClaudeDir "rules")
 Link-Folder -FolderName "agents" -DstPath (Join-Path $AntigravityDir "global_workflows")
 Link-Folder -FolderName "agents" -DstPath (Join-Path $ClaudeDir "agents")
 Link-Folder -FolderName "agents" -DstPath (Join-Path $GeminiDir "agents")
+
+# Gemini agent config files
+Link-File -FileName "GEMINI.md" -DstPath (Join-Path $GeminiDir "GEMINI.md")
