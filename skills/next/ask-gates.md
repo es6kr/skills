@@ -164,6 +164,7 @@ Otherwise → proceed to Step 0.5.
 4. **Context & Relevance Filtering**: Filter these tasks to identify those related to the current session (e.g., matching files edited, directories touched, or keywords from the conversation history).
 5. **Sort by Priority**: Sort the remaining candidates by priority level: `P0` -> `P1` -> `P2` -> `[REPEAT]`.
 6. **Compose Options**: Surface the top 2-3 prioritized and related tasks as options in `AskUserQuestion`. Place them above generic options like "End session", using concise labels with their priority level indicated in the description (e.g. `[P0]`).
+7. **Write-back when the user selects (HARD STOP)**: this step is entered when `TaskList`/`TaskCreate` is empty, done, **or unavailable** — so `SKILL.md` Step 3's default "register each via `TaskCreate`" cannot be assumed to succeed for a selection made here. If `TaskCreate` is still unavailable at selection time, follow `SKILL.md` Step 3's `TaskCreate`-unavailable fallback (write the selection back into `fix_plan.md`/`checklist.md` instead of silently treating "options were shown" as "the selection is tracked").
 
 ### Don't / Do table
 

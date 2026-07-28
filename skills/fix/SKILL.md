@@ -57,7 +57,7 @@ The core procedure (Step 0 → 4) lives below. Heavy step detail is split into t
 When a new /fix arrives while a prior /fix's tasks are still pending/in_progress:
 - **Do not delete** prior fix tasks — incomplete work (especially Resume) is lost
 - **Insert 4 new fix tasks via TaskCreate**
-- Include the prior fix's incomplete work in the new fix's Resume (fix-2)
+- Include the prior fix's incomplete work in the new fix's Resume step (fix-5+ — not `fix-2`, which is the canonical plugin-install sub-item; see the "fix-2" naming note near line 125)
 
 **⚠️ CRITICAL — Preserve existing tasks when TaskCreate is unavailable (HARD STOP)**:
 
@@ -122,7 +122,7 @@ TodoWrite([
 - **Multi-question `questions` Array Rule (HARD STOP)**: When invoking `AskUserQuestion` to address multiple decision axes or questions, **NEVER lump them into a single question object with compound text**. Build an array of discrete question objects in `questions: [{question: Q1, options: [...]}, {question: Q2, options: [...]}]` (one question per decision axis, up to 4 questions per call).
 - **[Measure 2] Dependency and Reference State Declaration (MANDATORY)**: When registering `fix-2`, you must explicitly declare the **preconditions (Depends on)** and the **base commit state (Reference commit)** required for the `Resume` task to run safely.
   - *Format Example*: `🔄 Resume original work: {summary} (Depends on: {preconditions}, Reference commit: {commit_sha})`
-- fix-2 = "Complete the original work with the revised approach" — the goal is **the deliverable the user originally requested**, not skill/rule changes themselves
+- **Naming note (HARD STOP — do not reuse `fix-2` for this)**: the Resume step as a whole (fix-5+, Step 3 below) = "Complete the original work with the revised approach" — the goal is **the deliverable the user originally requested**, not skill/rule changes themselves. `fix-2` is reserved exclusively for the canonical Plugin/Dependency-install sub-item (line 103 above) — never use it as shorthand for "the Resume step"
 - Step 0 is **the first tool call** after /fix activation. Text output before TodoWrite = violation.
 
 ### 1. Root Cause Analysis (5-Why depth)
@@ -241,9 +241,9 @@ If Step 1 produced even one Why, Step 2 is **mandatory**. Default medium = `feed
 
 **Read [step2-improvement.md](./step2-improvement.md) before executing** — it holds the 4-filter gate, medium-priority table, escalation matrix, no-stage-skipping Don't/Do, `--plan` mode, and the Step 2 Checkpoint (verify every Why-level target from the Step 1.5 table was actually modified). Do not advance to Step 3 until the Checkpoint passes.
 
-### 2.5 Plugin/Dependency Installation Step (MANDATORY HARD STOP)
+### 2.5 Plugin/Dependency Installation Step (MANDATORY HARD STOP — confirmation-gated)
 
-If the updated or referenced skill/rule specifies a plugin or dependency (e.g. `superpowers` plugin `obra/superpowers`, `cc-plugin`, or external tools), **you MUST execute the plugin/dependency installation command** (`claude plugin add <plugin>` or equivalent) in this step before proceeding. Skipping plugin installation and proceeding to doc edits or resume is strictly forbidden (`HARD STOP`).
+If the updated or referenced skill/rule specifies a plugin or dependency (e.g. `superpowers` plugin `obra/superpowers`, `cc-plugin`, or external tools) that is not already installed, **first check whether it is already present** (e.g. `claude plugin list` / equivalent) — if already installed, this step is a no-op, proceed. If not installed: installing a plugin/dependency executes code from an external source, so it needs explicit user approval before running — **call `AskUserQuestion` presenting the exact install command** (e.g. `claude plugin add <plugin>`) and only execute it once the user approves. Skipping plugin installation entirely (running neither the presence check nor, once approved, the install) and proceeding straight to doc edits or resume is still strictly forbidden (`HARD STOP`) — the gate added here is the confirmation step, not a license to skip installation.
 
 ### 2.6 Skill/Tool Invocation Step (MANDATORY HARD STOP)
 
@@ -259,7 +259,7 @@ Completing active tasks in `task.md` / `TaskList` is the #1 top priority over in
 - If an active task has open questions, trade-offs, or requires user confirmation/decision, presenting `AskUserQuestion` for that active task is MANDATORY as the very first action of the turn.
 - Invoking `next` skill or offering next-action suggestions while tasks are pending/in_progress or open asks remain is strictly forbidden (`HARD STOP`).
 
-### 3. Resume Original Work (fix-2)
+### 3. Resume Original Work
 
 **The most important step.** Complete the user's original request — not just the fix. Infer user intent and pin the verification medium verbatim; re-call any rejected AskUserQuestion once its reject cause is resolved; resume existing in_progress tasks; reproduce verification through the exact user-reported medium (no detour).
 

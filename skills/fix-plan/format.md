@@ -135,7 +135,7 @@ Exceptions:
   | `- [ ] [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` | `- [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` (drop the redundant `[ ] ` prefix) |
   | `- [ ] [BLOCKED] claude-task CLI ID disambiguation rule` | `- [BLOCKED] claude-task CLI ID disambiguation rule` |
 
-  **Format-step self-check**: `grep -nE '^\s*-\s\[ \]\s\[BLOCKED' <fix_plan.md>` — any match is a hybrid-marker violation. Fix with a targeted `sed 's/- \[ \] \[BLOCKED/- [BLOCKED/g'` (or an equivalent per-line Edit) and re-run the grep to confirm zero matches.
+  **Format-step self-check**: `grep -nE '^\s*-\s\[ \]\s\[BLOCKED' <fix_plan.md>` — any match is a hybrid-marker violation. Fix with a line-anchored `sed -E 's/^(\s*)- \[ \] \[BLOCKED/\1- [BLOCKED/'` (unanchored `s/- \[ \] \[BLOCKED/- [BLOCKED/g` would also rewrite the same literal substring inside quoted prose elsewhere on the line, e.g. this file's own Don't/Do table examples) and re-run the grep to confirm zero matches.
 
 ## See also
 

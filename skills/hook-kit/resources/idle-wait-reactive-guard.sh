@@ -76,7 +76,7 @@ LAST_TEXT=$(printf '%s' "$PRIOR_TURN_RAW" | jq -rs '
          elif type == "string" then . else "" end)
     | select(length > 0)
   ] | last // "" | .[-300:]
-' 2>/dev/null)
+' 2>/dev/null || echo "")
 [[ -z "$LAST_TEXT" ]] && exit 0
 
 # Condition 3: explicit idle-ok annotation exempts.

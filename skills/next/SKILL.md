@@ -43,7 +43,11 @@ After task completion, use `AskUserQuestion` to suggest next steps and get user 
 
 ## Instructions
 
-### Step 0-0: Audit first (text), register only real work (HARD STOP — first action upon entering `/next`)
+### Step ordering in Antigravity (resolves the two "runs first" steps below — HARD STOP)
+
+Step 0-0 and Step 0-1 below each describe themselves as running "first" — that is only a conflict in Antigravity, where both apply (in Claude Code, Step 0-1 doesn't apply at all, so Step 0-0 is simply first). **In Antigravity, run Step 0-1's environment detection + context-usage gate before Step 0-0's audit** — Step 0-0's own "Environment note" branches on whether the session is in Antigravity, so that fact must already be known before Step 0-0's text is composed. Step 0-0's "first action upon entering `/next`" phrasing means first among the *user-facing/task-registration* steps (i.e., before any `AskUserQuestion` or task work), not literally the first line of code executed — Step 0-1's lightweight environment probe precedes it.
+
+### Step 0-0: Audit first (text), register only real work (HARD STOP)
 
 **Do NOT register the `next` skill's own internal procedure steps (audit / context-check / gates / option-composition) as tasks.** They are one-turn skill mechanics; registering them in the user-facing task list pollutes it with meta-tasks that create-and-complete within a single turn — which directly contradicts TaskCreate's own guidance ("skip for trivial / 1-turn work"). Task registration happens later, at **Step 3**, and only for the **actual follow-up work the user selects** (2+ selected → TaskCreate each; 1 selected → execute directly).
 
@@ -51,9 +55,9 @@ After task completion, use `AskUserQuestion` to suggest next steps and get user 
 
 **Environment note**: In Antigravity (Gemini), the `task.md` artifact doubles as the progress-display medium, so a lightweight `task.md` checklist there is acceptable. In Claude Code, `TaskList`/`TaskCreate` is a user-work medium — keep internal procedure steps out of it (narrate them in text) and reserve `TaskCreate` for Step 3's selected work.
 
-### Step 0-1: Antigravity Session Check & Context Usage Gate (MANDATORY in Antigravity)
+### Step 0-1: Antigravity Session Check & Context Usage Gate (MANDATORY in Antigravity — runs before Step 0-0 in that environment, see "Step ordering" above)
 
-Antigravity offers limited backend hooks, so environment detection and session context size evaluation must be performed **first thing** on entering the `next` skill — before composing anything.
+Antigravity offers limited backend hooks, so environment detection and session context size evaluation must be performed before Step 0-0's audit text is composed.
 
 1. **Detect Environment**: Check if running in Antigravity / Gemini environment.
 2. **Evaluate Context Usage**: Check the size of `transcript_full.jsonl` in the conversation log directory. In Antigravity (Gemini), compute context usage empirically: `tokens = 30,000 (system prompt baseline) + (transcript_full_bytes / 4)` and `pct = (tokens / 1,000,000) * 100`. Never copy example placeholder numbers.
@@ -145,6 +149,8 @@ AskUserQuestion({
 ### Step 3: Register and execute selected action(s)
 
 **If 2 or more actions are selected, register each via TaskCreate and execute sequentially.** If only 1 is selected, execute it directly. This is the **only** point where `/next` registers tasks — the skill's internal procedure steps (Step 0-0 audit, gates, option composition) are never registered; only the user-selected follow-up work is.
+
+**`TaskCreate`-unavailable fallback (HARD STOP — do not silently drop the selection)**: this is not a theoretical case here — options composed via [ask-gates.md](./ask-gates.md) Step 0.6 are, by that step's own trigger condition, sometimes composed in a turn where `TaskCreate`/`TaskList` is already known to be disconnected/unavailable. If `TaskCreate` fails or is unavailable when registering a 2+ selection, do NOT proceed as if registration succeeded and do NOT drop the unregistered items silently. Instead, register each unregistered selection as a `- [ ]` item in the active workspace's `fix_plan.md` (or `checklist.md`) `## Progress` section (or `## Hold` with `[BLOCKED] ... **trigger: Task tools reconnect**` if execution must also wait on the task tool, not just its tracking) — same fallback convention as `cleanup/run.md`'s "RAG store failure" TaskCreate-unavailable branch and `fix/SKILL.md`'s `claude-task` CLI fallback. State in the turn's report which items were written to `fix_plan.md` instead of `TaskCreate` and why.
 
 **Background dispatch does not end the turn (HARD STOP)**: delegating a selected action to a background agent (`Agent` spawn — background or mailbox-returning) hands control straight back — it is NOT a turn-ending event. Scan the remaining selected/pending tasks and drive the next independent one **in the same turn**; "execute sequentially" governs result-consumption order, not idle waiting. Idle-waiting for the agent is acceptable only when nothing else is drivable. Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached. When a forced idle would exceed that cache window, never arm one long silent watcher — use short cycles (`timeout` ≤ 240 s, end → notify → re-arm); multiSelect-unselected ask items count as deferred fill candidates for the idle window, not declined work. Enforced by the idle-wait Stop hook (`block-idle-wait-without-short-cycle.sh`). Same rule as wip/resume.md Step 3 (background-dispatch rows).
 

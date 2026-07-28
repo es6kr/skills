@@ -170,16 +170,19 @@ Immediately after 4-2's file write, store a structured chunk to the same abstrac
 | Field | Value |
 |-------|-------|
 | Content | The Problem/Cause/Resolution body just written (or a condensed summary of it) |
-| Idempotent id | `sha1("fa-hot:<class-or-title>")` — same scheme as fa-prune's archive-time id, so a later archive-time store for the same entry does not double-index |
+| Idempotent id | `sha1("fa-hot:<project>:<title>")` — `<title>` is the full mandatory header text from Step 4-2 (`[Mistake title] (YYYY-MM-DD[, Nth recurrence])`, not the bare class/topic label). Using `<project>` + the date/occurrence-qualified title as the seed avoids collision between distinct entries that share a class or title across different projects or occurrences |
 | Metadata | `type: "fa-hot"`, plus the entry's class/title, date, project |
 
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Treat archive-time RAG dispatch (fa-prune Section 8) as covering all FA entries | HOT and COLD/archive dispatch are two separate triggers — both must fire, at write time and at archive time respectively |
 | 2 | Skip immediate store because "it'll get indexed eventually at archive time" | "Eventually" can be months out (COLD requires 90+ day staleness) — exactly the window where near-term recurrence detection matters most |
-| 3 | Re-store the same entry at archive time without an idempotent id, doubling the chunk | Use the same `sha1("fa-hot:<class-or-title>")` id at both write time and archive time so the archive-time store is a no-op update, not a duplicate |
+| 3 | Seed the id with the bare class/topic label alone (e.g. `sha1("fa-hot:<class>")`) | Two distinct entries sharing a class/topic across projects or recurrence dates will collide on that seed — a later write silently upserts over an unrelated earlier entry. Always include `<project>` and the full date/occurrence-qualified `<title>` |
+| 4 | Assume this write-time id and fa-prune's archive-time id (`sha1("fa-archive:<file>:<title>")`, [fa-prune.md](./fa-prune.md) Section 8) collapse into the same point | They are deliberately two distinct ids (different prefix, different `<project>`/`<file>` component) — the archive-time store is a **second**, separately-idempotent point, not an update of the HOT-time point. Each is idempotent against re-runs of itself; they do not double-index each other because they never share an id |
 
-**Self-check (before ending Step 4)**: did the just-written HOT entry get a RAG-store call this turn (not just a file Edit)? If a RAG-store tool is registered in the environment and this step was skipped, go back and store it before proceeding to Step 5.
+**On store failure (HARD STOP — do not silently drop)**: if the RAG-store call in this section fails or every medium in [rag-store.md](./rag-store.md)'s Medium Matrix (1)-(3) is unreachable, this is the same "RAG server down ≠ info lost" case rag-store.md's Medium (4) covers — write `~/.claude/skills/cleanup/data/rag-pending/<session-uuid>.md` **this turn** with this entry's content + idempotent id + one-line unreachable-reason, per rag-store.md's Medium (4) spec. Do not defer to "fa-prune will pick it up at archive time" — archive time is a separate, much-later trigger (per the Don't/Do table above) and does not substitute for the immediate-store obligation this section exists to satisfy.
+
+**Self-check (before ending Step 4)**: did the just-written HOT entry get a RAG-store call this turn (not just a file Edit)? If a RAG-store tool is registered in the environment and this step was skipped, go back and store it before proceeding to Step 5. If the store call failed, did the medium (4) queue-file write above happen this turn?
 
 ### 5. Skill malfunction check
 

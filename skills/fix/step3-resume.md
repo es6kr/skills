@@ -1,4 +1,4 @@
-# Step 3: Resume Original Work (fix-2)
+# Step 3: Resume Original Work
 
 **This is the most important step.** The user's original request must be completed — not just the fix itself.
 
@@ -27,7 +27,7 @@ If the user's fix args contain expressions like "you didn't ask / the ask comes 
 |-----------------|-------------------------------|
 | "you didn't ask X" | Add an ask for X to the user in Step 3 |
 | "Y is the ask that comes first" | Make the first action of Step 3 the Y ask |
-| "you should have read the prompt, found what was missing, and put it in resume" | Re-read fix.md / the related skill and specify the missing step (usually an ask) in the fix-2 Resume |
+| "you should have read the prompt, found what was missing, and put it in resume" | Re-read fix.md / the related skill and specify the missing step (usually an ask) in the Resume step |
 | "distinguish in-progress vs waiting" / "you didn't ask about what's waiting" | Two separate asks for "in progress" + "waiting on" (do not merge into one option) |
 
 **Active Task Ask Priority (HARD STOP)**:
@@ -69,7 +69,7 @@ If the turn immediately before fix had **AskUserQuestion rejected + /fix trigger
 
 **3-0.6. Bypassed Ask Recovery Gate (HARD STOP)**:
 
-If `/fix` was triggered because an `AskUserQuestion` decision gate (e.g. `/skill-kit route` placement, plan trade-offs, human review questions, prompt improvement plan approval) was omitted or bypassed in the preceding turn/request, **the Resume step (`fix-2`) MUST execute that exact missing `AskUserQuestion` as its first deliverable action**. Reporting rule/skill updates without calling the bypassed `AskUserQuestion` is a strict Step 3 violation.
+If `/fix` was triggered because an `AskUserQuestion` decision gate (e.g. `/skill-kit route` placement, plan trade-offs, human review questions, prompt improvement plan approval) was omitted or bypassed in the preceding turn/request, **the Resume step MUST execute that exact missing `AskUserQuestion` as its first deliverable action**. Reporting rule/skill updates without calling the bypassed `AskUserQuestion` is a strict Step 3 violation.
 
 ## Reject cause classification
 
@@ -125,12 +125,12 @@ If TaskList had in_progress/pending entries before entering fix, fix Step 3 must
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | End fix saying "existing tasks are in TaskList, so no separation needed" | Continue executing existing in_progress tasks in fix Step 3 |
-| 2 | Resume only fix-2's subject scope and ignore existing tasks | fix-2 + existing in_progress tasks are **all** resume targets |
+| 2 | Resume only the Resume step's own subject scope and ignore existing tasks | The Resume step's tasks + existing in_progress tasks are **all** resume targets |
 | 3 | Shorten resume with "login success = verification complete" | Login is a prerequisite. Run each verification item (countdown, permissions, etc.) individually |
 | 4 | After completing 1 Resume item → switch to AskUserQuestion "what's next?" | **Complete all Resume items sequentially**. Completing 1 is not a switch point — start the next item immediately |
 | 5 | Sub-task completed → "this task is done, let's take a breath" | After sub-task completes, immediately move to the next item of the Resume task. AskUserQuestion only **after all Resume items complete** |
 
-1. Re-read `fix-2` subject — it contains the full list from the initial request to the immediately preceding action
+1. Re-read the Resume step's task subject(s) (`fix-5+` in the canonical scheme, not `fix-2` — see SKILL.md's naming note) — it contains the full list from the initial request to the immediately preceding action
 2. **Classify done/not-done**: confirm the current state of each task (done, in progress, not yet started)
 3. **Multi-substep Resume Breakdown (MINIMUM 5+ STEPS HARD STOP)**: Never collapse the Resume phase into 1 generic single line. Always register explicit sub-items for: (a) plugin/dependency installation (`fix-2`), (b) skill invocation (`fix-3`), (c) empirical fix verification (`fix-4`), (d) code modification / deliverable execution (`fix-5`), (e) verification & walkthrough (`fix-6`). Flattening these into 4 or fewer items is strictly forbidden (`HARD STOP`).
 4. **Identify missing tasks**: list the correct procedure step by step, compare with what actually ran, and find **skipped intermediate steps**. Example: in "create issue → branch → implement → PR", if issue creation was skipped, that is the missing task
@@ -207,12 +207,12 @@ When the user's concrete ask is "get X back" / "make Y work again" (data recover
 
 (Case history: after confirming a session's compact-boundary parentUuid was already unrecoverable via 2 local checks, this deliverable pivoted straight to a tooling-disclosure fix, commit, push, and draft PR without ever checking the RAG/Qdrant index for the same session's pre-break content — the user's actual ask was still open. See failed-attempts.md "premature unrecoverable declaration + pivot to secondary deliverable".)
 
-**Step 3 mandatory self-questions (MANDATORY before marking fix-2 complete)**:
-1. Did Why analysis identify a "skipped intermediate step"? → If yes, that step is fix-2's **immediate execution target**
+**Step 3 mandatory self-questions (MANDATORY before marking the Resume step complete)**:
+1. Did Why analysis identify a "skipped intermediate step"? → If yes, that step is the Resume step's **immediate execution target**
 2. Can that step **run standalone now (stateless)?** → If yes, run it unconditionally. "Original work is done, skip" is a violation
 3. If the missed step is a skill/tool invocation → it becomes its **own terminal `fix-N` task**; emit the actual tool call **this turn** (not a report that it will run) and mark done only after its result returns. See "Skill/tool-invocation resume is a first-class task" below. (Antigravity: represent as an unchecked `task.md` entry that blocks wrap-up — see wip/antigravity.md "Skill-invocation resume".)
-4. **PR work sync check (HARD STOP)**: If this fix's original work is an active PR (`gh pr list --state open` includes the work's branch), did new feature/fix implementations get reflected in the PR body's Test Plan? — `gh pr view <N> --json body` → confirm a `- [ ]` line matching the implemented behavior exists. Missing line = skipped step → add via `gh pr edit --body` before completing fix-2. Applies even when no test was written: a manually verified behavior still needs a Test Plan line so reviewers know what was checked
-5. **Architectural finding record check (HARD STOP)**: During fix work, was a non-obvious architectural fact discovered (e.g., "X record has no Y field", "API Z silently fails on type W", "framework auto-strips Q under condition R")? If yes, decide its recording medium **before completing fix-2**:
+4. **PR work sync check (HARD STOP)**: If this fix's original work is an active PR (`gh pr list --state open` includes the work's branch), did new feature/fix implementations get reflected in the PR body's Test Plan? — `gh pr view <N> --json body` → confirm a `- [ ]` line matching the implemented behavior exists. Missing line = skipped step → add via `gh pr edit --body` before completing the Resume step. Applies even when no test was written: a manually verified behavior still needs a Test Plan line so reviewers know what was checked
+5. **Architectural finding record check (HARD STOP)**: During fix work, was a non-obvious architectural fact discovered (e.g., "X record has no Y field", "API Z silently fails on type W", "framework auto-strips Q under condition R")? If yes, decide its recording medium **before completing the Resume step**:
    - Project-specific structural fact → `CLAUDE.md` (project root) or `<repo>/.claude/rules/<topic>.md`
    - Reusable across projects → `~/.claude/skills/<related-skill>/data/` or `~/.agents/rules/<topic>.md`
    - Session-local context only → no record needed

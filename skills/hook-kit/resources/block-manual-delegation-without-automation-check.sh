@@ -232,26 +232,16 @@ while IFS=$'\t' read -r label desc; do
     && echo "$combined" | sed -E 's/(^|[^a-zA-Z])(no|not|without|zero)[a-zA-Z ]{0,20}manual/\1/gi' \
     || echo "$combined")
   # Check manual-delegation keyword present (case-insensitive)
-  # Self-name quotation exception (Issue #109): If option mentions the script name itself, skip
-  if echo "$combined" | grep -qiE "block-manual-delegation"; then
-    continue
-  fi
-
-  # Hold/carryover-only exception (Issue #109): If option is a pure hold/defer action assigned to assistant
-  local hold_pattern="^(Hold|Defer|Carryover${HG_MD_HOLD_KEYWORDS_KO:+|$HG_MD_HOLD_KEYWORDS_KO})$"
-  local user_pattern="user|human${HG_MD_USER_KO:+|$HG_MD_USER_KO}"
-  if echo "$label" | grep -qiE "$hold_pattern"; then
-    if ! echo "$desc" | grep -qiE "$user_pattern"; then
-      continue
-    fi
-  fi
-
-  # Domain-terminology exception (Issue #109): Infra/tool terms like "manual sync", "manual apply", "non-automated" near GitOps/k8s/ArgoCD
-  if echo "$combined" | grep -qiE "(manual sync|manual apply|non-automated)" && \
-     echo "$combined" | grep -qiE "(ArgoCD|argocd|gitops|k8s|kubernetes|root app)"; then
-    continue
-  fi
-
+  # NOTE: self-name / hold-carryover / domain-terminology exceptions already
+  # ran once above (checks 1-3, lines ~187-220) — do not duplicate them here.
+  # A prior duplicate copy of these same three checks lived in this exact spot
+  # and (a) used `local` inside this top-level `while` loop, which is not a
+  # function scope and errors ("local: can only be used in a function"),
+  # silently breaking the hold/carryover exemption it implemented, and
+  # (b) re-declared `hold_pattern` with looser/narrower anchors than the
+  # working copy above, so even a fixed `local`->plain-assignment version
+  # would have shadowed the better pattern. Removed rather than repaired —
+  # the first copy already covers everything this one attempted.
   if echo "$md_check_text" | grep -qEi "$MD_PATTERN"; then
     # Check automation evidence in description (case-insensitive)
     if ! echo "$desc" | grep -qEi "$EVIDENCE_PATTERN"; then
