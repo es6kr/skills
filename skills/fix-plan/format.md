@@ -128,6 +128,14 @@ Exceptions:
   | `### PR #56 consolidate deferred — 2026-06-23` + inline narrative | `- [BLOCKED] [REVIEW_FEEDBACK] PR #56 deferred findings — {summary}` list item |
   | Separate `### PR #409` + `### PR #412` sections | Group related PRs under one parent `- [BLOCKED]` with sub-items per PR |
 
+- **Hybrid `- [ ] [BLOCKED...]` marker is FORBIDDEN (HARD STOP)** — the checkbox marker itself must be either `- [ ]` (pending) or `- [BLOCKED:P0-P3:reason]` (blocked), never both combined on the same list item. A `- [ ]` prefix followed by an inline `[BLOCKED...]` tag mixes the pending and blocked states and breaks the mutually-exclusive marker contract.
+
+  | Don't | Do |
+  |-------|----|
+  | `- [ ] [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` | `- [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` (drop the redundant `[ ] ` prefix) |
+  | `- [ ] [BLOCKED] claude-task CLI ID disambiguation rule` | `- [BLOCKED] claude-task CLI ID disambiguation rule` |
+
+  **Format-step self-check**: `grep -nE '^\s*-\s\[ \]\s\[BLOCKED' <fix_plan.md>` — any match is a hybrid-marker violation. Fix with a line-anchored `sed -E 's/^(\s*)- \[ \] \[BLOCKED/\1- [BLOCKED/'` (unanchored `s/- \[ \] \[BLOCKED/- [BLOCKED/g` would also rewrite the same literal substring inside quoted prose elsewhere on the line, e.g. this file's own Don't/Do table examples) and re-run the grep to confirm zero matches.
 
 ## See also
 

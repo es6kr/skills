@@ -89,6 +89,27 @@ if [[ "$MISSING" -eq 1 ]]; then
 fi
 
 WT_DIR=".claude/worktrees/$(echo "$BRANCH" | tr '/' '-')"
+
+# Reuse-first hygiene (non-interactive subset of worktree.md's "Worktree
+# decision tree" — Steps 1-3): before adding a new worktree, inventory
+# existing ones under .claude/worktrees/ and reclaim any whose branch is
+# already merged into origin/main. Merged branches have no unique commits,
+# so removal is safe without user confirmation; left unpruned they
+# accumulate across repeated script runs. This does NOT replace the
+# interactive reuse-first gate for *unmerged* inactive candidates — that
+# choice requires a human (AskUserQuestion), which a non-interactive script
+# cannot make, so it stays the plain-base manual path's responsibility.
+while IFS= read -r wt_path; do
+  [[ -z "$wt_path" || "$wt_path" != "$REPO"/.claude/worktrees/* ]] && continue
+  wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null || true)
+  [[ -z "$wt_branch" ]] && continue
+  if git merge-base --is-ancestor "$wt_branch" origin/main 2>/dev/null; then
+    echo "Reclaiming already-merged worktree: $wt_path ($wt_branch)" >&2
+    git worktree remove "$wt_path" --force 2>/dev/null || true
+    git branch -D "$wt_branch" 2>/dev/null || true
+  fi
+done < <(git worktree list --porcelain | awk '/^worktree /{print $2}')
+
 if [[ -d "$WT_DIR" ]]; then
   echo "Worktree already exists at $WT_DIR — remove it first or pass a different --branch." >&2
   exit 1

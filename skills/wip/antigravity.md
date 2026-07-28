@@ -168,6 +168,21 @@ Append new items at the bottom when discovered during work:
 - [ ] Step 4 (newly discovered)
 ```
 
+## Skill-invocation resume (task.md notation) — same-turn call, unchecked box blocks wrap-up (HARD STOP)
+
+When a resumed step (from `/fix` Step 3 or `/wip` resume) is **itself a skill or tool invocation** (e.g., the `next` skill was not called, consolidate was skipped, an ask was not issued), Antigravity tends to narrate "the skill should now be invoked" and stop — the actual tool call never fires, even across repeated retries. Enforce via `task.md`:
+
+- Represent the call as its **own** `task.md` line naming the exact call: `- [ ] Resume: invoke <skill/tool> — <purpose>`.
+- The line stays `[ ]` until the tool call has **actually executed and returned**. Never pre-flip it (`[ ]`→`[/]`→`[x]`) based on the plan.
+- **An unchecked skill-invocation line is a hard block on wrap-up** — do not write the completion report or clear `task.md` while it is `[ ]`.
+- **Same turn**: emit the actual `Skill(...)`/tool call in the turn that reaches this line. Deferring to "the next turn" is the exact drift this rule prevents — there is no guaranteed next turn.
+- Recovery when drift happens (report written, box still `[ ]`): emit the call now; do not re-explain that it should be called.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Narrate "invoke `next` now" and end the turn with the box `[ ]` | Emit the actual `Skill("next")`/tool call as the turn's action, then flip `[x]` after its result |
+| 2 | Flip the box `[x]` because the plan says to call the skill | Flip `[x]` only after the call ran and returned |
+
 ## Rules
 
 - **One `[/]` at a time** — don't mark multiple items as in progress

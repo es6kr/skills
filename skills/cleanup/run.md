@@ -35,6 +35,9 @@ If cleanup calls next, it becomes "select 1 → execute immediately → session 
 - Self-judging "not applicable" / "this session doesn't need it" to skip a learning step — the skill should judge this, not me
 - Only listing text without actually calling the skill (`claudify improve`, `claudify persist`) — "listing candidates" is not execution
 - Example: writing only text like "A deploy pattern is repeating → agentify candidate" and stopping there ❌ → call the `claudify improve` skill to actually detect and propose ✅
+- **Reporting a step as "skipped" in prose without the step's own documented skip condition being met** — e.g. saying "no RAG receiver registered, skipped" when the step's own rule (see "RAG store failure = cleanup failure" below) requires a recovery attempt + FAILED status + retry-task registration, not a silent skip. A step-level "skip" in the completion report is only valid when the exact skip condition text from that step's own section is quoted alongside it.
+
+**Task pre-registration (when Task tools are available)**: before executing Steps 1-5, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report and fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to skip the *tracking mechanism* for them.
 
 ## Execution Order
 
@@ -56,6 +59,7 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
 | Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) | **Always** + auto-import when the RAG receiver readyz responds |
 | **3-C.1 session RAG import** | **Automatic execution — no ask** | — | Immediately import with the `--raw` flag when the RAG receiver readyz responds OK |
+| **3-C.2 structured discovery chunk (mode B — HARD STOP)** | **Automatic execution — no ask** | — | If the session produced **reusable discoveries/decisions/deployments** (bug root-cause, infra gotcha, a config/URL/MTU/version that took effort to find, an architecture decision), store each as a keyword-searchable chunk via the **RAG receiver's structured-store dispatch (mode B)** — separate from 3-C.1. Session import (3-C.1 mode A) has **weak keyword retrieval**: it preserves turns but does NOT make a finding queryable (e.g. "DinD MTU hang", "dev-36 k3s runner"). Skip ONLY when the session had zero reusable discovery (pure Q&A / trivial edits) — and say so explicitly in the report row |
 | **3-C.3 check for missed active-artifact RAG store** | **Automatic execution — no ask** | — | Glob → identify this-session mtime artifacts → RAG receiver scroll → immediately store missing files. Matches plan/research/analysis/report/postmortem-*.md patterns |
 | Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) | When this session has artifacts |
 | Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) | **Always** — state preservation for next-session resume at cleanup end |
@@ -88,11 +92,13 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 
 | Step | Result |
 |------|------|
+| **Session identity (mandatory)** | **`Session ID: <full-36-UUID>` + `Recommend: /rename <name>` (2-3 candidates from the session's dominant work)** |
 | 0. TaskList | (cleanup result) |
 | 1. Commit | (commit result or skip reason) |
 | 2. Self-Improve | `claudify improve` result |
 | 3. Knowledge Persist | `claudify persist` result |
-| **3-C.1 RAG Store (mandatory row)** | **N chunks added (receiver: RAG import dispatch) — session UUID `<uuid>`. N artifacts imported.** |
+| **3-C.1 RAG Store (mandatory row)** | **State which medium actually fired ([rag-store.md](./rag-store.md) Medium Matrix (1)-(4)) — the wording differs by medium, do not reuse one fixed template for all: purpose-built importer (medium 2) → "N chunks added (session import, receiver: `<importer>`) — session UUID `<uuid>`. N turns imported."; generic MCP store used as 3-C.1 substitute (medium 1, no purpose-built importer found) → "1 ad-hoc summary chunk added (receiver: MCP store) — session UUID `<uuid>`. NOT a full session import (no purpose-built importer found)."; medium (4) local pending queue → "❌ FAILED — queued to local pending-import queue (`<queue-file>`), retry task registered."** |
+| **3-C.2 Structured discovery chunk (mode B — mandatory row)** | **M discovery chunks added (receiver structured-store dispatch, mode B) — keys: `<key1>`, … OR "none — no reusable discovery this session". Session import (mode A) alone ≠ knowledge persisted; discoveries need mode B to be searchable.** |
 | 4. Weekly Report | (skip / write result) |
 | 5. **wip task registration (mandatory row)** | **`Skill("wip")` call result — N tasks registered (next-session resume possible). Enumerate candidates** |
 
@@ -109,6 +115,7 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | 3 | RAG receiver readyz responds OK but the import call is skipped while the report table still shows a "RAG Store" row | The call itself is mandatory — the report row displays the result, it is not a bypass channel |
 | 4 | The cleanup wrap-up table explicitly states the RAG row, but the subsequent separate session-end report (e.g., "## ✅ Session Ended") buries the RAG result in a 1-line prose list | The session-end report carries the same obligation — highlight visibility with a separate markdown table row / bold line / dedicated header section |
 | 5 | Fill the "Self-Improve / Knowledge Persist" rows with a self-written inline retrospect text + FA Prune non-execution report + comprehensive-matrix text (0 claudify Skill call traces) | **Only quoting Skill call results is allowed.** Quote only the `Skill("claudify", "improve")` tool response result text + `Skill("claudify", "persist")` tool response result text into the rows. Filling the row with a self-written retrospect report = bypassing the call = a violation |
+| 6 | Omitting the active session UUID (`<uuid>`) or substituting a placeholder in the RAG store row or report header | Always extract conversation ID and explicitly format as `session UUID <full-36-UUID>` in row 3-C.1 and report header |
 
 For accumulated violation cases, see failed-attempts.md HOT (occurrence classification + escalation specification). Escalation from the 3rd occurrence: hook automation — `~/.agents/skills/hook-kit/resources/block-cleanup-without-rag.sh` registered. Injects a reminder when the cleanup/session-end response text matches the marker + lacks a RAG-visual-highlight row + has RAG-receiver call traces.
 
@@ -409,7 +416,7 @@ This step is mandatory before entering RAG store. **Do not conclude "unreachable
 
 | Order | Signal | Meaning | Action |
 |-----|------|------|------|
-| 1 | RAG receiver MCP tool available (in the system reminder's "available tools" list or matched via `ToolSearch` — the receiver's store/find tool name) | MCP is already connected to the receiver — primary availability signal | Enter import immediately. Call `ToolSearch select:<receiver-tool>` to load the schema, then use the store/find tools |
+| 1 | RAG receiver MCP tool available (in the system reminder's "available tools" list or matched via `ToolSearch` — the receiver's store/find tool name) | MCP is already connected to the receiver — primary availability signal | Run [rag-store.md](./rag-store.md) "Purpose-fit priority for 3-C.1" detection procedure FIRST — a purpose-built session-importer script (medium 2) outranks this generic MCP tool for whole-session import, even though the MCP tool is available. Only call the MCP store tool directly for 3-C.1 if no purpose-built importer is found |
 | 2 | The endpoint readyz probe explicitly documented by the receiver skill (use only the endpoint from the receiver's `<skill>:<topic>.md` doc) | Direct HTTP probe — secondary availability signal | MCP not connected, but the endpoint is alive. Enter via the script path |
 | **FAILED** | (1) MCP unavailable AND (2) endpoint probe timeout/HTTP 5xx | Both must fail to be unreachable | **Entire cleanup status = FAILED. Do not declare "✅ Complete"** — apply the "RAG store failure = cleanup failure" procedure below |
 
@@ -419,18 +426,23 @@ This step is mandatory before entering RAG store. **Do not conclude "unreachable
 
 **On failure, all of the following are mandatory**:
 
-1. One recovery attempt before judgment — confirm the underlying connectivity/VPN process (if applicable to the environment) is alive + if dead, restart and re-probe
-2. On confirmed recovery failure, mark the Step 5 completion-report table's "3-C.1 RAG Store" row as **`❌ FAILED`** (not worded as "Skipped"/"held")
+1. **Recovery-attempt decision is a mandatory ask, not an autonomous judgment (HARD STOP)** — when the failure occurs and connection info for the underlying service is knowable (an endpoint documented in the receiver topic, a local process/port, a VPN state, etc. — i.e., there is *something* to check or restart), do NOT autonomously decide either "attempt recovery" or "skip straight to fallback." Call `AskUserQuestion` immediately: state the failure (tool/endpoint + error text), and offer options such as "Attempt recovery now (check/restart the underlying service, re-probe)" / "Skip recovery — fall back to local pending queue now" / "Investigate more (I'll look at the connection details first)". Only proceed with whichever path the user selects. This applies even mid-cleanup — do not defer the ask to the end-of-cleanup Phase 2 batch, since the RAG store step blocks subsequent steps' correctness (retry-task registration content depends on the outcome).
+   - **Exception**: if no connection info is knowable at all (no documented endpoint, no local process to check, receiver skill provides no diagnostic path) — there is nothing to ask about; skip directly to the FAILED procedure below without asking (asking "recover?" with no actionable path is a hollow ask).
+2. On confirmed recovery failure (whether reached via the user selecting "skip" or via an attempted-and-failed recovery), mark the Step 5 completion-report table's "3-C.1 RAG Store" row as **`❌ FAILED`** (not worded as "Skipped"/"held")
 3. Use **"⚠️ cleanup FAILED (RAG store failed)"** instead of "✅ cleanup complete" in the report title/header
-4. **Retry task registration obligation**: register a "Retry RAG store (session <UUID> + N artifacts)" pending task via `TaskCreate` — do not end with carryover text alone
-5. Report the failure cause (MCP disconnected / endpoint down / underlying network down) + recovery path in 1 line
+4. **Medium (4) local pending-import queue file — the actual preservation mechanism (HARD STOP, do this BEFORE step 5)**: write `~/.claude/skills/cleanup/data/rag-pending/<session-uuid>.md` per [rag-store.md](./rag-store.md) "Medium (4)" spec (session UUID + date, artifact paths, distilled facts with metadata, one-line unreachable-reason). A `TaskCreate`/fix_plan retry note alone is a reminder, not preservation — per rag-store.md's own self-check, the queue file is the durable guarantee that survives even if no future session reads the retry task.
+5. **Retry task registration obligation**: register a "Retry RAG store (session <UUID> + N artifacts)" pending task via `TaskCreate` — do not end with carryover text alone. This is supplementary to step 4's queue file, not a substitute for it.
+   - **Fallback when `TaskCreate` itself is disconnected (HARD STOP)**: do not silently drop the retry obligation. Register it in the workspace's `fix_plan.md` `## Hold` section instead, using the same `[BLOCKED] ... **trigger: <condition>**` format as other hold items (trigger = "Task tools reconnect" or equivalent). This mirrors step4-wrapup.md's medium-separation principle (BLOCKED external-wait items go to fix_plan.md hold, not a task) extended to the case where the task-tracking tool itself is the unavailable dependency. Step 4's queue file write still applies regardless of `TaskCreate` availability — it is a plain file write, not gated on the task tool.
+6. Report the failure cause (MCP disconnected / endpoint down / underlying network down / **TaskCreate disconnected**) + recovery path + queue file path in 1 line
 
 | # | Don't | Do |
 |---|-------------|-----------------|
 | 1 | Declare "✅ Session cleanup complete" after skipping the RAG store | RAG failure = cleanup FAILED. State ⚠️ FAILED in the header |
-| 2 | End with only "Skipped — retry candidate for next session" carryover text | Register a `TaskCreate` retry task (pending) + report failure cause/recovery path |
+| 2 | End with only "Skipped — retry candidate for next session" carryover text | Write the medium (4) local pending-import queue file (item 4 above) + register a `TaskCreate` retry task (pending) + report failure cause/recovery path |
 | 3 | Judge "complete" because other cleanup steps finished | Even 1 mandatory step FAILED = the entire cleanup is FAILED. Show per-step status in the report table |
-| 4 | Judge FAILED immediately after confirming RAG receiver unavailability with no recovery attempt | Confirm the underlying connectivity is alive + attempt one restart before judging |
+| 4 | Judge FAILED immediately after confirming RAG receiver unavailability with no recovery decision | Confirm the underlying connectivity state, then `AskUserQuestion` whether to attempt recovery (per item 1 / row 5) before judging FAILED — do not autonomously restart |
+| 5 | Autonomously attempt recovery (or autonomously skip it) when connection info is knowable, then only report the outcome after the fact | `AskUserQuestion` first whenever there's an actionable recovery path — recovery may touch infra state (restarting a service, etc.) the user should decide on, not something to silently do or silently skip |
+| 6 | Treat "I have a safe local pending-queue fallback" as satisfying the recovery-attempt obligation | The fallback (medium 4) is the *terminal* step after recovery is declined/fails — it does not substitute for asking whether to attempt recovery first |
 
 **Don't / Do**:
 
@@ -447,7 +459,8 @@ This step is mandatory before entering RAG store. **Do not conclude "unreachable
 2. Attempt to load the receiver store/find tool schema via ToolSearch — success satisfies signal 1
 3. If both 1 and 2 are unmet, probe the endpoint documented in the receiver topic (query for the exact address in the receiver topic first)
 4. If the response is OK, enter
-5. If 1, 2, and 3 all fail, apply the **cleanup FAILED procedure** (above — one recovery attempt → FAILED report + retry task registration)
+5. If 1, 2, and 3 all fail, **is there any connection info to act on** (documented endpoint, known local process/port, VPN state)? → If yes, `AskUserQuestion` before doing anything else (recovery vs skip vs investigate) — do not decide autonomously. If no actionable info exists at all, apply the **cleanup FAILED procedure** directly (above)
+6. **Before calling ANY store/import command, have you Read the receiver skill's topic file THIS TURN** (e.g. `es6kr/qdrant-import.md`)? — A generic MCP tool (e.g. `mcp__qdrant__qdrant-store`) succeeding is NOT proof the receiver's documented protocol (session-turn import script, WSL execution requirement, sanitize/compress preprocessing, idempotent chunk IDs) was followed. "The tool call worked" ≠ "the receiver's Mode A/B/C contract was satisfied" — Read the topic file first, then use its documented invocation (case history: failed-attempts.md "RAG store/search handled ad-hoc instead of the existing permanent script")
 
 ##### Invocation command (delegated to the receiver topic)
 
@@ -524,6 +537,9 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 **Check targets (Glob patterns)**:
 - `**/.ralph/docs/generated/{plan,research,analysis,report,postmortem}-*.md`
 - `**/.omc/plans/*.md`
+- `**/walkthrough.md` (including walkthroughs in `<appDataDir>/brain/<conversation-id>/walkthrough.md`)
+- `**/implementation_plan.md` (same `<appDataDir>/brain/<conversation-id>/implementation_plan.md` location class as the walkthrough.md row above — an IDE-native session-brain directory outside every other Glob root in this list, easy to omit when only the sibling `walkthrough.md` pattern is copied forward)
+
 
 **Procedure**:
 
@@ -545,6 +561,7 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 | 2 | Handle only via `.bak/` archive-time REPEAT items (does not cover active artifacts) | Also check active artifacts in this sub-step. Archive time is a separate trigger |
 | 3 | Report as text "unsure if there are artifacts at session end" | Glob + scroll are mandatory. Do not assume 0 — confirm with primary sources |
 | 4 | Skip and end when the RAG receiver is unavailable | RAG receiver unavailability = this sub-step is BLOCKED. State it in the Step 4.5 BLOCKED row + set a trigger for the next session |
+| 5 | Check an IDE session-brain directory for only one known file pattern (e.g. `walkthrough.md`) and treat the directory as covered | Every file pattern the directory can produce needs its own Glob row — a directory being "already on the list" does not mean every artifact type inside it is checked |
 
 **Self-check (every time during cleanup Step 3)**:
 1. Identify `**/{plan,research,analysis,report,postmortem}-*.md` files written/edited this session (Glob mtime filter)
@@ -641,9 +658,15 @@ For the full case body, see `~/.claude/skills/cleanup/data/failed-attempts.md` "
 | 3 | Create the checklist file at an arbitrary location | Follow the decision order above. User explicit > artifact-folder default > search > AskUserQuestion |
 | 4 | Ignore the `<artifact-path>/checklist.md` default and use a different name | Use `checklist.md` (fixed default name) unless the user gives separate instructions |
 
-### Session UUID Citation Rule (HARD STOP — included at cleanup end)
+### Session Identity Rule — UUID + name recommendation (HARD STOP — included at cleanup end)
 
-When citing a session identifier in a session jsonl, RAG chunk, session id, checklist work item, etc., **full 36-character UUID output is mandatory**. This applies equally to the cleanup end-report text. **Missing the UUID output entirely is also a violation** — not just truncation, complete omission is forbidden too.
+A session has **two identity axes**, and the cleanup end-report must carry **both**:
+1. **UUID** (machine identity — for grep / RAG / transcript matching), and
+2. **A human-readable name recommendation** (findability — what the user sees in the session list and passes to `/rename`).
+
+**UUID**: when citing a session identifier in a session jsonl, RAG chunk, session id, checklist work item, etc., **full 36-character UUID output is mandatory**. This applies equally to the cleanup end-report text. **Missing the UUID output entirely is also a violation** — not just truncation, complete omission is forbidden too.
+
+**Name recommendation (mandatory in the end-report)**: the cleanup end-report must also propose **2-3 `/rename <name>` candidates** synthesized from the session's main work (same convention as the `/session name` capability). Emitting only the UUID and no name recommendation is a violation — the UUID is not human-findable in the session list. Keep each candidate short and descriptive (the dominant theme — a skill / PR / feature), in the session's own working language. `/rename` is a built-in the agent cannot run itself, so present the candidates for the user to copy.
 
 | # | Don't | Do |
 |---|-------------|-----------------|
@@ -669,6 +692,7 @@ When citing a session identifier in a session jsonl, RAG chunk, session id, chec
 2. Is the UUID the full 36 characters? Prefix-only/truncated/absent are all forbidden
 3. Does the location match the per-medium obligation table?
 4. Ending the report without outputting the UUID = a rule violation
+5. Does the report include a `/rename` **name recommendation** (2-3 candidates synthesized from the session's work)? — a UUID-only report is incomplete (the UUID is not findable in the session list)
 
 For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "session UUID omitted from wrap-up report."
 
@@ -684,7 +708,8 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 
 | Row | Content |
 |---|------|
-| Session ID | `Session ID: <full-36-UUID>` (consistent with the Step 4 "Session UUID Citation Rule") |
+| Session ID | `Session ID: <full-36-UUID>` (consistent with the Step 4 "Session Identity Rule") |
+| Session name | `Recommend: /rename <name>` — 2-3 candidates synthesized from the session's dominant work (findability in the session list) |
 | Commits | This session's created commit SHA + repository + branch matrix |
 | Files | List of files changed via Edit/Write this session (path + line changes) |
 | FA Prune | Demoted sections + archive file path + HOT line count change |

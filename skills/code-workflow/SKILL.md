@@ -30,12 +30,12 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `output-dir` | `docs/generated/` | Directory for research/plan files. Set per project (e.g., `.ralph/docs/generated/`) |
+| `output-dir` | `llm-wiki/outputs/` (workspace-local) | Directory for generated research and plan files; authoritative plans may be promoted to `pages/<domain>/` per the workspace wiki convention |
 
 Set via project CLAUDE.md or skill invocation argument:
 
 ```text
-/code-workflow --output-dir docs/generated/
+/code-workflow --output-dir llm-wiki/outputs/
 ```
 
 Trivial tasks such as simple configuration changes or 1~2 line edits may skip this workflow.

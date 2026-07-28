@@ -22,7 +22,7 @@
 # (the skill-trigger marker is embedded inside the JSON `reason` field — it is
 # NOT emitted as a bare standalone marker, because Stop hooks deliver stdout to
 # the debug log only; the `decision:"block"` envelope is what surfaces the
-# `reason` text to the LLM. See ~/.claude/skills/hook/SKILL.md "Output channel
+# `reason` text to the LLM. See ~/.claude/skills/hook-kit/SKILL.md "Output channel
 # spec per event"). On no match, output is empty.
 #
 # Responsibility: next skill (per automation.md "Hook responsibility policy").
@@ -163,7 +163,7 @@ fi
 if [[ "$MATCHED" == "true" ]]; then
   # Output JSON decision:"block" — Stop hook spec: stdout goes to debug log only;
   # JSON decision:"block" prevents stop and feeds reason to Claude as a follow-up signal.
-  # See ~/.claude/skills/hook/SKILL.md "Output channel spec per event".
+  # See ~/.claude/skills/hook-kit/SKILL.md "Output channel spec per event".
   echo '{"decision":"block","reason":"<skill-trigger name=\"next\">Task completion signal detected. Invoke the `next` skill to suggest follow-up actions.</skill-trigger>"}'
 fi
 
