@@ -86,6 +86,9 @@ The PRIVATE+Free row explains why cloud output may be walkthrough-only — but t
 **Fallback procedure:**
 
 1. **Call `Skill("superpowers:requesting-code-review")` (MANDATORY)** — this skill loads the review framework and includes code-reviewer agent dispatch. When the skill returns the review result, proceed to the "Check existing review comment" and "Post/update review comment" sub-steps below (still within Step 3.5).
+2. **In-session agent path unavailable → dispatch to a clawo session (do NOT abandon the review)**: if the `code-reviewer` agent path does not run in this session (Agent tool unregistered, the dispatch stalls, or repeated attempts fail), do not drop the Internal Review — dispatch the entire consolidate to a fresh **clawo session** (the `clawo` skill `launch` topic: `session-start` in the repo cwd + `session-send "consolidate <PR-URL>"`), which runs consolidate autonomously with the project's `.claude/` rules. Pre-bake the verdict/medium gates in the dispatch message (autonomous sessions cannot `AskUserQuestion` — see `clawo/launch.md` Step 5a). Abandoning the review because the in-session agent stalled — and pivoting to unrelated work — is the exact drift this fallback prevents.
+
+**Prevention tooling never substitutes for the POST (HARD STOP)**: if a non-compliant / garbage review comment is discovered on the PR, correcting the *process* (building a guard hook, adding a lint, filing a prevention task) does NOT complete this consolidate. The compliant `## AI Review Summary — [receiving-code-review](...)` must still be posted for this PR. A prevention effort spawned from a consolidate gap is additive work, never a substitute for the object deliverable — do not treat the consolidate as done until the Summary is on the PR.
 
 | # | Don't | Do (correct alternative) |
 |---|-------|-------------------------|
