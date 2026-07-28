@@ -2,7 +2,7 @@
 name: fix-plan
 description: |
   fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
-  Default (no args): move (or archive-receiver) → format → sync → priority, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
+  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
   Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role".
 metadata:
   author: es6kr
@@ -37,12 +37,13 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | move | `[x]` → Completed summary rules, subtree-move partial completion under unfinished parent, optional abstract RAG dispatch | [move.md](./move.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
+| flowchart | Mermaid priority-graph authoring + node-plan mappings; `pm`-role default-pipeline step 5 mechanical drift check against priority-triage output | [flowchart.md](./flowchart.md) |
 
 ## Topic Dependencies
 
 ```text
 fix-plan (schema + lifecycle)
-  ├─→ (default, no args) → move (archive-receiver) ──→ format ──→ sync ──→ priority
+  ├─→ (default, no args) → move (archive-receiver) ──→ format ──→ sync ──→ priority ──→ flowchart-sync
   ├─→ format (entry — section structure + markers)
   ├─→ priority (new convention — BLOCKED P0-P3 + reason)
   │     └─→ depends on sync (Step 0: refresh external state before classifying)
@@ -53,11 +54,12 @@ fix-plan (schema + lifecycle)
   ├─→ move (completion → Completed)
   │     └─→ optional --rag=<skill>:<topic> dispatch for semantic indexing (caller-supplied)
   ├─→ sync (GitHub state polling) — depends on github-flow gh CLI conventions
+  ├─→ flowchart (Mermaid priority graph) — step 5 of the default pipeline, drift-checks against priority's output
   └─→ issue-drafts (lifecycle of draft files)
 ```
 
 - All topics are independently invocable, **except `priority` which invokes `sync` as Step 0 (HARD STOP)** — triage on stale state is the failure mode the dependency prevents (see [priority.md](./priority.md) Triage workflow Step 0)
-- **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, and triages blockers via `priority`.
+- **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, triages blockers via `priority`, and finally drift-checks the priority graph via `flowchart` (step 5, skipped when the tracker has no `## Flow Chart` section).
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic uses `gh` CLI per `github-flow` skill's conventions
 - `sync` topic optionally dispatches to a secondary-tracker receiver if the caller supplies `--secondary-sync=<skill>:<topic>` — see [sync.md](./sync.md) "Secondary-tracker sync cadence"
@@ -81,8 +83,9 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 2. **Format**: Verify the schema, markers, and section structure of the tracker.
 3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
 4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
+5. **Flowchart Sync**: Apply the [flowchart](./flowchart.md) "Sync procedure" mechanical drift check against the Step 4 priority-triage output (relabel/remove/propose `[P*]` nodes) — only when the tracker has a `## Flow Chart` section; skip (report as not-applicable) otherwise.
 
-**Register BEFORE execute (HARD STOP)**: before Step 1 (Move) begins, `TaskCreate` (or `TodoWrite` if `TaskCreate` is unavailable) must register one task per pipeline step actually being run (Move/Format/Sync/Priority for the full pipeline, fewer for a role-scoped subset — see "Role-based execution" below). A default-invocation `/fix-plan` run is multi-step by definition; "the tracker looks small" is not an exception. If a `TaskCreate` call errors, retry it with the corrected parameters from its own error message before any Move/Sync/Priority Edit proceeds — treating a retry as unnecessary overhead and silently dropping tracking is the exact violation this line prevents. Mirrors `~/.claude/skills/wip/SKILL.md` "Register BEFORE execute".
+**Register BEFORE execute (HARD STOP)**: before Step 1 (Move) begins, `TaskCreate` (or `TodoWrite` if `TaskCreate` is unavailable) must register one task per pipeline step actually being run (Move/Format/Sync/Priority/Flowchart-Sync for the full pipeline, fewer for a role-scoped subset — see "Role-based execution" below). A default-invocation `/fix-plan` run is multi-step by definition; "the tracker looks small" is not an exception. If a `TaskCreate` call errors, retry it with the corrected parameters from its own error message before any Move/Sync/Priority Edit proceeds — treating a retry as unnecessary overhead and silently dropping tracking is the exact violation this line prevents. Mirrors `~/.claude/skills/wip/SKILL.md` "Register BEFORE execute".
 
 ### Role-based execution (`role-profile`)
 
@@ -98,7 +101,7 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 
 | Profile | Steps executed | Skipped (reported as remainder) |
 |---------|----------------|--------------------------------|
-| `pm` | move → format → sync → priority (current full pipeline) | — |
+| `pm` | move → format → sync → priority → flowchart-sync (current full pipeline) | — |
 | `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format — surfaced as a delegation remainder for a `pm` session |
 | `impl` | sync → priority, then surface `selfable` implementation candidates | move, format, model-triage |
 | (unresolved) | full pipeline | — |
