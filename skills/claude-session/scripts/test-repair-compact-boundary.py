@@ -92,10 +92,10 @@ def main():
     if not u3 or u3.get("parentUuid") != "u2":
         failures.append(f"compact summary detached: u3.parentUuid={u3 and u3.get('parentUuid')!r} (want u2)")
 
-    # 4. NO REGRESSION: a genuinely dangling parent is still repaired to the previous line
+    # 4. A genuinely missing parent becomes a new root; never bridge by file order
     u5 = by_uuid.get("u5")
-    if not u5 or u5.get("parentUuid") != "u4":
-        failures.append(f"dangling parent not repaired: u5.parentUuid={u5 and u5.get('parentUuid')!r} (want u4)")
+    if not u5 or u5.get("parentUuid") is not None:
+        failures.append(f"dangling parent not null-rooted: u5.parentUuid={u5 and u5.get('parentUuid')!r}")
 
     # 5. dedup still works: the duplicate of m1 is removed
     if "u1dup" in by_uuid:
