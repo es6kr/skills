@@ -7,7 +7,10 @@
 # Action: Deny with guidance to split into multiple questions in the questions array.
 #
 # Background: ask-user-question.md "Parallel decision tracks must split into a questions array (HARD STOP)".
-# failed-attempts.md tracks 3 recurrences (2026-05-04, 2026-05-16, 2026-05-28).
+# failed-attempts.md tracks 3 recurrences (2026-05-04, 2026-05-16, 2026-05-28) plus a
+# 4th action-axis (non-finding) sub-variant added 2026-07-25: a single option's
+# description bundles 3+ independent fix actions while sibling option labels
+# vary only by a scope word (all/except/only) — see ACTION_BUNDLE_TRIGGER below.
 # Rule strengthening alone did not prevent recurrence; this hook automates the gate.
 
 # Load locale-specific regex patterns from data/. The file is git-ignored so
@@ -22,6 +25,7 @@ fi
 HG_AXIS_TALLY_KO_SUFFIX="${HG_AXIS_TALLY_KO_SUFFIX:-}"
 HG_AXIS_COUNT_TOKEN="${HG_AXIS_COUNT_TOKEN:-([2-9]|[1-9][0-9])[[:space:]]+(findings|issues|points|items)}"
 HG_AXIS_DISPO_VERB="${HG_AXIS_DISPO_VERB:-dispose|include|post the}"
+HG_AXIS_SCOPE_WORD="${HG_AXIS_SCOPE_WORD:-\\ball\\b|\\bexcept\\b|\\bexcluding\\b|\\bwithout\\b|\\bonly\\b|\\bpartial(ly)?\\b}"
 
 INPUT=$(cat)
 
@@ -87,7 +91,18 @@ PATH_COUNT=${PATH_COUNT:-0}
 #     candidate location, choose-one). Real per-file finding asks cite file:line
 #     or carry finding-type keywords. (FP case: location-choice ask with
 #     common/CLAUDE md candidates denied incorrectly.)
-PATH_AXIS_MULTI=$(INPUT_JSON="$INPUT" python3 -c '
+# Interpreter resolution: probe for a WORKING python, not merely a name on
+# PATH. The Windows py3 shim is a Microsoft Store stub that exits 49 without
+# running anything, so a name-only check leaves every python-backed check
+# silently dead (stderr is discarded and the caller fails open).
+PY=""
+for _c in python3 python; do
+  if command -v "$_c" >/dev/null 2>&1 && "$_c" -c "pass" >/dev/null 2>&1; then
+    PY="$_c"; break
+  fi
+done
+
+PATH_AXIS_MULTI=$(INPUT_JSON="$INPUT" "$PY" -c '
 import json, re, os
 try:
     data = json.loads(os.environ.get("INPUT_JSON", "{}"))
@@ -160,9 +175,53 @@ if [[ "$COUNT_TOKEN" -ge 1 && "$DISPO_VERB" -ge 1 ]]; then
   COUNT_TRIGGER=1
 fi
 
+# Variant: action-bundle-behind-disposition-scope (action-axis, non-finding;
+# 2026-07-25). Bypass case this covers: the finding-keyword/file-path/count-
+# token scans above all miss when a SINGLE option's DESCRIPTION bundles 3+
+# independent fix actions (verb-led clauses) while sibling option LABELS vary
+# only by a scope modifier ("Apply all fixes now" / "Apply fixes except X" /
+# "Leave as report"). Description text is otherwise excluded from axis
+# detection (see the OPT_TEXT comment above — FP guard for single-axis
+# explanations); this variant re-admits description text ONLY when a scope
+# word also appears in an option LABEL, since that combination is the actual
+# signal ("same bundle, sliced by how much of it to apply"), not "one target,
+# explained in detail". Requires >=2 options with files/verb-clauses is NOT
+# needed here — a single option bundling 3+ actions is already the violation.
+SCOPE_WORD_HIT=$(echo "$OPT_TEXT" | grep -ciE "$HG_AXIS_SCOPE_WORD" 2>/dev/null || true)
+SCOPE_WORD_HIT=${SCOPE_WORD_HIT:-0}
+
+ACTION_BUNDLE_TRIGGER=0
+ACTION_BUNDLE_VERBS=""
+if [[ "$SCOPE_WORD_HIT" -ge 1 ]]; then
+  ACTION_BUNDLE_RESULT=$(INPUT_JSON="$INPUT" "$PY" -c '
+import json, re, os
+try:
+    data = json.loads(os.environ.get("INPUT_JSON", "{}"))
+except Exception:
+    print("0"); raise SystemExit(0)
+opts = (data.get("tool_input", {}).get("questions", [{}])[0] or {}).get("options", []) or []
+VERBS = r"\b(sync|remove|add|normalize|clean up|edit|fix|update|register|apply|merge|drop|delete|create|write|implement|revert|keep)\b"
+clause_re = re.compile(r",\s+|;\s+|\band\b|\n+\s*[-*•]?\s*", re.IGNORECASE)
+verb_re = re.compile(VERBS, re.IGNORECASE)
+for o in opts:
+    desc = (o or {}).get("description", "") or ""
+    clauses = [c for c in clause_re.split(desc) if c.strip()]
+    verby = [c.strip()[:40] for c in clauses if verb_re.search(c)]
+    if len(verby) >= 3:
+        print("1|" + "; ".join(verby[:5]))
+        raise SystemExit(0)
+print("0")
+' 2>/dev/null)
+  ACTION_BUNDLE_RESULT=${ACTION_BUNDLE_RESULT:-0}
+  if [[ "$ACTION_BUNDLE_RESULT" == 1\|* ]]; then
+    ACTION_BUNDLE_TRIGGER=1
+    ACTION_BUNDLE_VERBS="${ACTION_BUNDLE_RESULT#1|}"
+  fi
+fi
+
 # Trigger if finding-type signal is 2+ OR per-option file analysis flags multi-axis
-# OR the count-token variant fires
-if [[ "$FINDING_COUNT" -ge 2 || "$PATH_TRIGGER" -eq 1 || "$COUNT_TRIGGER" -eq 1 ]]; then
+# OR the count-token variant fires OR the action-bundle-behind-scope variant fires
+if [[ "$FINDING_COUNT" -ge 2 || "$PATH_TRIGGER" -eq 1 || "$COUNT_TRIGGER" -eq 1 || "$ACTION_BUNDLE_TRIGGER" -eq 1 ]]; then
   {
     echo "DENIED: AskUserQuestion has questions.length == 1 but options span multiple independent axes."
     echo ""
@@ -179,6 +238,11 @@ if [[ "$FINDING_COUNT" -ge 2 || "$PATH_TRIGGER" -eq 1 || "$COUNT_TRIGGER" -eq 1 
       echo "  Finding-count token in question text (N findings disposed via ONE question):"
       echo "    - question: $QTEXT"
       echo "    - Required: one question PER finding (questions array), then a separate disposition ask"
+    fi
+    if [[ "$ACTION_BUNDLE_TRIGGER" -eq 1 ]]; then
+      echo "  Action bundle behind a disposition-scope option (scope word + 3+ verb clauses in one option's description):"
+      echo "    - clauses: $ACTION_BUNDLE_VERBS"
+      echo "    - Required: one question PER independent fix/finding, ask disposition (apply/skip/hold) LAST or as a follow-up"
     fi
     echo ""
     echo "Why blocked:"
