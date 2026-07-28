@@ -12,7 +12,9 @@
 #     assistant response carries cleanup-completion markers — legacy whole-
 #     transcript claudify check (free-text cleanup invocations).
 #
-# Action: emit reminder via stdout (decision:block, exit 2).
+# Action: emit reminder via stdout (decision:block, exit 0). Stop hooks only
+# have their stdout JSON decision parsed on exit 0 — exit 2 discards stdout
+# and reads stderr instead, silently dropping the crafted "reason" text.
 #
 # Background: failed-attempts.md — cleanup claudify Skill call omission recurrences:
 #   1st (2026-05-27): cleanup procedure compressed — claudify improve never invoked
@@ -98,7 +100,7 @@ emit_block() {
   # Build JSON via jq so quotes inside the reason are escaped correctly.
   jq -n --arg reason "Cleanup detected (${context}) but the following Skill call(s) are missing from the relevant transcript segment: ${missing}. A slash-command inject is NOT a Skill invocation (skill-usage.md HARD STOP) — the procedure starts only with a real Skill tool call. cleanup/run.md requires Skill(\"cleanup\") to enter the procedure, Skill(\"claudify\", \"improve\") for Step 2 (Self-Improve), and Skill(\"claudify\", \"persist\") for Step 3 (Knowledge Persist). Inline retrospect/persist text in a summary matrix DOES NOT count. The next response MUST invoke the missing Skill(s) and follow run.md before declaring cleanup complete." \
     '{decision: "block", reason: $reason}'
-  exit 2
+  exit 0
 }
 
 # 6th recurrence fix: a genuine anchor was found, but a compact/rewind boundary
@@ -109,7 +111,7 @@ emit_ask_required() {
   local missing="$1"
   jq -n --arg reason "Cleanup was invoked, but a compact/rewind boundary occurred before the following Skill call(s) could be verified in the transcript: ${missing}. A compact erases Skill tool_use evidence even when the work genuinely completed pre-compact, so 'missing' here does not mean 'never done.' Do NOT blindly re-run the full Self-Improve/Knowledge Persist procedure, and do NOT silently skip it either — call AskUserQuestion first: state that a compact boundary makes pre-compact completion unverifiable, and ask whether to redo Skill(\"claudify\", \"improve\")/Skill(\"claudify\", \"persist\") now or treat the prior summary's claim as sufficient. Proceed only per the user's choice." \
     '{decision: "block", reason: $reason}'
-  exit 2
+  exit 0
 }
 
 # ---------- Gate B: /cleanup slash-command anchor (primary, structural) ----------
