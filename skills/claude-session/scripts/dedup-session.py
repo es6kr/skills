@@ -104,6 +104,9 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
             'unique_lines': int,
             'duplicates_by_type': dict,
             'fixed_chains': int,
+            'null_roots': list,
+            'messages': list of (line, data) tuples — the deduplicated topology,
+                populated regardless of dry_run,
             'output_file': str (only when dry_run=False)
         }
     """
@@ -278,6 +281,10 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
 
     fixed_chains = 0
     final_lines = []
+    # Parsed dicts parallel to final_lines, so callers (repair-session.py's dry-run
+    # path) can operate on the deduplicated topology without re-parsing or falling
+    # back to the pre-dedup original — see 'messages' in the returned result.
+    final_data = []
     # Null-rooted repairs: a non-null parentUuid that resolve_parent could not map to
     # any surviving ancestor (ancestry truly lost — see resolve_parent docstring).
     # Tracked with line/uuid so the caller can disclose exactly WHERE history
@@ -291,6 +298,7 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
         if data is None or not data.get('uuid'):
             # Messages without uuid (e.g. file-history-snapshot) are kept as-is
             final_lines.append(line)
+            final_data.append(data)
             continue
 
         own_uuid = data.get('uuid')
@@ -308,19 +316,18 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
             # unrelated file-order-previous line, which would merge contexts).
             new_parent = resolve_parent(current_parent, own_uuid)
 
-        # The very first surviving message is always a root.
-        if i == 0:
-            new_parent = None
-
         if new_parent != current_parent:
             if new_parent is None and current_parent is not None:
                 null_roots.append({'uuid': own_uuid, 'line': i + 1, 'old_parent': current_parent})
             data = dict(data)
             data['parentUuid'] = new_parent
-            final_lines.append(json.dumps(data, ensure_ascii=False))
+            line = json.dumps(data, ensure_ascii=False)
+            final_lines.append(line)
+            final_data.append(data)
             fixed_chains += 1
         else:
             final_lines.append(line)
+            final_data.append(data)
 
     result = {
         'original_lines': len(messages),
@@ -328,6 +335,10 @@ def dedup_session(session_file: Path, dry_run: bool = False) -> dict:
         'duplicates_by_type': duplicates_by_type,
         'fixed_chains': fixed_chains,
         'null_roots': null_roots,
+        # (line, data) tuples of the deduplicated topology — always populated
+        # (dry_run or not) so callers can operate on it without re-parsing or
+        # falling back to the pre-dedup original.
+        'messages': list(zip(final_lines, final_data)),
     }
 
     if not dry_run:

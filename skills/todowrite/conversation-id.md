@@ -13,7 +13,7 @@ This rule applies to **every output the user can see or that downstream tools re
 | Medium | Self-check timing | Hookable? |
 |--------|-------------------|-----------|
 | **Response text (assistant output)** | Before generating every response. Most frequent violation site | No — cannot be blocked technically; the self-check is the only defense |
-| `AskUserQuestion` option `label` / `description` | Right before each call | Yes — but only for sessions that START after the hook is registered. `block-tasklist-id-in-conversation.sh` (hook-kit/resources/, PreToolUse:AskUserQuestion) blocks bare `#NN`. **Long-running sessions load hooks at session start, so a session predating the hook's registration is NOT protected → the in-session self-check is the only defense there** (4th recurrence 2026-07-07: session started 06-29, hook re-homed 07-06) |
+| `AskUserQuestion` option `label` / `description` | Right before each call | Yes — but only for sessions that START after the hook is registered. `block-tasklist-id-in-conversation.sh` (`todowrite/resources/`, PreToolUse:AskUserQuestion — re-homed here from `hook-kit/resources/`, where it briefly lived bundled inside `ask-guard.sh`) blocks bare `#NN`. **Long-running sessions load hooks at session start, so a session predating the hook's registration is NOT protected → the in-session self-check is the only defense there** (see failed-attempts.md "hook re-homed mid-session, long-running session unprotected") |
 | `TodoWrite` content | Right before each call | No (no hook yet) |
 | `TaskCreate` subject | Right before each call (subject already enforces a prefix → bare `#NNN` is forbidden) | Partially |
 | `Edit` / `Write` description / arguments | Right before each call | No |

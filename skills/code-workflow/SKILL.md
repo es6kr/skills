@@ -30,13 +30,29 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `output-dir` | `docs/generated/` | Directory for research/plan files. Set per project (e.g., `.ralph/docs/generated/`) |
+| `output-dir` | `llm-wiki/generated/` (or `~/ghq/github.com/es6kr/llm-wiki/generated/`) | Directory for generated research and plan files. Default LLM Wiki path maps to `llm-wiki/generated/` in the workspace or global `es6kr/llm-wiki` repository |
 
 Set via project CLAUDE.md or skill invocation argument:
 
 ```text
-/code-workflow --output-dir docs/generated/
+/code-workflow --output-dir llm-wiki/generated/
 ```
+
+### Task Checklist Registration (MANDATORY Tool Call #1 HARD STOP)
+
+Upon invoking `/code-workflow`, **registering/updating the task checklist (`task.md` or `TodoWrite`) MUST be Tool Call #1**. No research commands (`run_command`), file inspection (`view_file`), or search (`grep_search`) may precede task checklist registration.
+
+### TDD Red-First Task Breakdown (MANDATORY Default HARD STOP)
+
+TDD is the default implementation discipline. When breaking down tasks in `task.md` or `implementation_plan.md`, **failing test creation (Red) MUST be registered as an explicit task item BEFORE feature implementation (Green)** (e.g. `- [ ] 🧪 Write failing test (Red)` -> `- [ ] 🛠️ Implement feature (Green)` -> `- [ ] 🔄 Refactor`). Writing production code before tests without explicit `--no-tdd` opt-out is strictly forbidden.
+
+### Walkthrough Topic-Based Slug Policy (HARD STOP)
+
+When creating or copying `walkthrough.md` artifacts to `llm-wiki/generated/`, **NEVER use generic date filenames (e.g. `walkthrough-2026-07-22.md`)**. Always name the file using a descriptive topic-based slug matching the core feature, issue, or plan (e.g. `llm-wiki/generated/walkthrough-agent-lifecycle-abstraction.md`).
+
+### Trade-off Decision Ask (MANDATORY Plan Post-Write HARD STOP)
+
+After authoring or updating any `plan-*.md` file that contains 2+ technical options or a Trade-offs table, **you MUST invoke `AskUserQuestion` specifically presenting the trade-off decision axes and alternatives to the user before proceeding to execution**. Combining or skipping technical trade-off decisions is strictly forbidden.
 
 Trivial tasks such as simple configuration changes or 1~2 line edits may skip this workflow.
 

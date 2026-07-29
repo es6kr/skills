@@ -1,5 +1,5 @@
 #!/bin/bash
-# docxport dependency check and install helper
+# doc-convert dependency check and install helper
 
 set -e
 

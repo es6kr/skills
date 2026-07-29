@@ -74,14 +74,15 @@ Self-check before Edit:
 
 ## Default execution flow
 
-When this skill's main entry point is invoked, run these four steps in order:
+**This topic file does not define its own default-invocation order.** The canonical no-args pipeline is `SKILL.md` "Default invocation (no args)" — five steps in this order:
 
-1. **Sync** — call [sync](./sync.md) to poll GitHub state for `[ ]` items containing `PR #N` / `#N`: auto-`[x]` on MERGED PRs and CLOSED issues; PRs CLOSED-without-merge convert to `[BLOCKED:P2:external]` per the sync contract
-2. **Move completed** — apply [move](./move.md) to relocate `[x]` items with no follow-up notes into the Completed section as one-line summaries
-3. **External RAG dispatch (optional)** — if the caller supplied `--rag=<skill>:<topic>`, dispatch Completed entries to the receiver for semantic indexing
-4. **Add new items** — if the user instructed new work, append `- [ ]` items per [add](./add.md) authoring rules
+1. **Move / Archive** — dispatch to the configured archive receiver (or fall back to [move](./move.md)) to harvest/cleanup Completed entries
+2. **Format** — verify the schema, markers, and section structure of the tracker (this topic)
+3. **Sync** — call [sync](./sync.md) to poll GitHub state for `[ ]` items containing `PR #N` / `#N`: auto-`[x]` on MERGED PRs and CLOSED issues; PRs CLOSED-without-merge convert to `[BLOCKED:P2:external]` per the sync contract
+4. **Priority** — triage and sort the remaining `[BLOCKED]` list based on the synchronized states
+5. **Flowchart Sync** — apply [flowchart](./flowchart.md)'s mechanical drift check against the priority output (only when a `## Flow Chart` section exists)
 
-Order matters: sync first (state truth) → move (clean up Progress) → optional dispatch → add (new work). Reordering breaks the truth-then-cleanup-then-grow chain.
+Order matters: move (clean up Progress) → format (schema truth) → sync (external state truth) → priority (triage on synced state) → flowchart-sync (drift-check the triage output). Reordering breaks the cleanup-then-truth-then-triage-then-drift-check chain. Adding new items (`- [ ]` via [add](./add.md)) is a separate, explicitly-instructed action — it is not part of the no-args default pipeline.
 
 ## Recording-topic ask-skip (HARD STOP)
 

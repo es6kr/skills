@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
 """
-plane_sync.py - Plane REST API Synchronization Engine for fix_plan.md
-Syncs local markdown checklist items ([ ], [x], [BLOCKED]) with Plane Workspace Issues & Cycles.
-Supports graceful degradation if Plane API key is not configured.
+plane_sync.py - Plane REST API Connectivity Probe for fix_plan.md workspaces
+
+CURRENT SCOPE (intentional stub — not a full sync engine yet): this module only
+verifies Plane connectivity and reports the fetched issue count for the active
+workspace's default project. It does NOT read/parse fix_plan.md's checklist
+items, does NOT create/update/close any Plane issue, and does NOT write back
+to fix_plan.md. `--dry-run` is accepted for CLI-shape parity with a future
+sync implementation but currently has no effect (there is nothing to simulate
+yet).
+
+Full checklist<->Plane sync requires a linking convention (how a fix_plan.md
+item maps to a specific Plane issue id — not yet designed/documented anywhere
+in this skill) before it can create/update/close issues safely. Implementing
+that without an agreed linking schema risks silently duplicating or
+mismatching issues. Until that schema exists, this module stays a read-only
+connectivity probe.
 """
 
 import os
@@ -52,7 +65,9 @@ def fetch_plane_issues(profile: dict, project_slug: str) -> list:
 
 
 def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool = False):
-    """Parse fix_plan.md and sync with Plane."""
+    """Connectivity probe only (see module docstring) — does NOT parse fix_plan_path's
+    checklist items and does NOT create/update/close Plane issues or write back to the
+    tracker file. Only verifies the tracker exists and reports Plane's issue count."""
     if not fix_plan_path.exists():
         print(f"Target fix_plan file {fix_plan_path} not found.", file=sys.stderr)
         return
@@ -65,8 +80,13 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
         print("[Plane Sync] Operating in Local Offline Mode (Graceful degradation).")
         return
 
+    if dry_run:
+        print("[Plane Sync] --dry-run has no effect yet — this module does not perform any"
+              " checklist<->Plane mutation (connectivity probe only, see module docstring).")
+
     issues = fetch_plane_issues(profile, profile["default_project"])
-    print(f"[Plane Sync] Fetched {len(issues)} issues from Plane project '{profile['default_project']}'")
+    print(f"[Plane Sync] Fetched {len(issues)} issues from Plane project '{profile['default_project']}' "
+          f"(no checklist parsing / issue create-update-close performed — see module docstring)")
 
 
 if __name__ == "__main__":

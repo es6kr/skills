@@ -10,9 +10,23 @@ fi
 
 if [[ -n "$FILE_PATH" && ( "$FILE_PATH" =~ "fix_plan.md" || "$FILE_PATH" =~ "checklist.md" ) ]]; then
   if [[ -f "$FILE_PATH" ]]; then
+    # Interpreter resolution: probe for a WORKING python, not merely a name on
+    # PATH. The Windows py3 shim is a Microsoft Store stub that exits 49 without
+    # running anything, so a name-only check leaves this validation silently dead.
+    PY=""
+    for _c in python3 python; do
+      if command -v "$_c" >/dev/null 2>&1 && "$_c" -c "pass" >/dev/null 2>&1; then
+        PY="$_c"; break
+      fi
+    done
+    if [[ -z "$PY" ]]; then
+      echo "WARN: no working python/python3 interpreter found — skipping stale-Completed-entry check" >&2
+      exit 0
+    fi
+
     # Run python validation script to check dates of completed items
     # We pass the file path to python
-    RESULT=$(python -c "
+    RESULT=$("$PY" -c "
 import sys
 import re
 import datetime
@@ -53,7 +67,7 @@ if stale_items:
     print('Please run the weekly archiving script before editing.')
     for d, text in stale_items[:5]:
         print(f'  - [{d}] {text}...')
-    sys.exit(1)
+    sys.exit(2)
 else:
     sys.exit(0)
 " "$FILE_PATH" 2>&1)
