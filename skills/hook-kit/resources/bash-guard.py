@@ -157,7 +157,19 @@ def check_pr_create_draft(command: str) -> str | None:
     )
     if not invocation:
         return None
-    has_draft = any(t == "--draft" or t.startswith("--draft=") for t in tokens)
+
+    def _draft_true(token: str) -> bool:
+        # `--draft` alone means true (cobra boolean-flag convention). `--draft=<value>`
+        # must be checked, not just matched as a prefix — `--draft=false` is a valid,
+        # explicit non-draft invocation and must NOT satisfy this guard.
+        if token == "--draft":
+            return True
+        if token.startswith("--draft="):
+            value = token.split("=", 1)[1].strip().lower()
+            return value not in ("false", "0", "no", "n")
+        return False
+
+    has_draft = any(_draft_true(t) for t in tokens)
     has_bypass = any(t == "PR_READY_APPROVED=1" for t in tokens)
     if has_draft or has_bypass:
         return None
@@ -290,6 +302,26 @@ def check_summary_without_internal_review(command: str) -> str | None:
     has_walkthrough = any("<!-- walkthrough_start -->" in (c.get("body") or "") for c in comments)
     has_internal_review = any((c.get("body") or "").startswith("## Internal Code Review") for c in comments)
 
+    if has_walkthrough:
+        # The walkthrough_start marker is present in EVERY CodeRabbit review
+        # comment, whether or not it also posted inline line-by-line comments
+        # — it cannot by itself distinguish a genuinely walkthrough-only
+        # review (the actual Step 3.5 trigger condition) from a full review
+        # (Internal Review Fallback finding #19, PR #197). Inline comments
+        # post via the PR *review comments* endpoint (pulls/{N}/comments),
+        # not the issue-comments endpoint already fetched above — check it
+        # before treating the walkthrough marker as a trigger.
+        try:
+            r = subprocess.run(
+                ["gh", "api", f"repos/{repo}/pulls/{pr_num}/comments"],
+                capture_output=True, text=True, timeout=10,
+            )
+            review_comments = json.loads(r.stdout) if r.stdout else []
+            if any("coderabbit" in (c.get("user", {}).get("login") or "").lower() for c in review_comments):
+                has_walkthrough = False  # full review (has inline comments) — not the Step 3.5 trigger
+        except Exception:
+            pass  # API/infra failure — fall through with has_walkthrough as-is (fail toward the existing behavior)
+
     if has_walkthrough and not has_internal_review:
         # Medium decision: inline-comment reviews post via the reviews API, not
         # an issue comment — scan both media before declaring it missing.
@@ -310,7 +342,7 @@ def check_summary_without_internal_review(command: str) -> str | None:
         f"Posting AI Review Summary without Internal Code Review comment.\n\n"
         f"PR: {repo}#{pr_num}\n"
         "State:\n"
-        "  - CodeRabbit walkthrough_start marker: PRESENT (Step 3.5 trigger met)\n"
+        "  - CodeRabbit review: walkthrough-only, no inline comments found (Step 3.5 trigger met)\n"
         "  - Internal Code Review comment: MISSING\n"
         "  - About to POST: AI Review Summary\n\n"
         "consolidate/internal.md Step 3.5.3 requires an Internal Code Review comment posted "
@@ -353,6 +385,56 @@ def git_scan_text(command: str) -> str:
     scan = re.sub(r"'[^']*'", "", scan)
     scan = re.sub(r'"[^"]*"', "", scan)
     return scan
+
+
+_PROD_BRANCHES = r"(?:production|master|release|prod|stable)"
+_PROD_BRANCH_PATTERNS = [
+    (r"git\s+push\s+.*:" + _PROD_BRANCHES + r"(?:$|\s)", "git push deleting protected branch"),
+    (r"git\s+push\s+.*" + _PROD_BRANCHES + r"(?:$|\s|:)", "git push targeting protected branch"),
+    (r"git\s+branch\s+(?:-[a-zA-Z]+\s+)*" + _PROD_BRANCHES + r"(?:$|\s)", "git branch create/force on protected branch"),
+    (r"git\s+(?:checkout|switch)\s+-[bBcC]\s+" + _PROD_BRANCHES + r"(?:$|\s)", "git branch create via checkout/switch on protected branch"),
+    (r"gh\s+api\s+.*branches/" + _PROD_BRANCHES, "gh api mutation on protected branch"),
+    (r"git\s+worktree\s+add\s+.*" + _PROD_BRANCHES + r"(?:$|\s)", "git worktree add on protected branch"),
+    (r"git\s+update-ref\s+refs/heads/" + _PROD_BRANCHES, "git update-ref on protected branch"),
+    (r"gh\s+workflow\s+run\s+.*(?:--ref|-r)\s+" + _PROD_BRANCHES + r"(?:$|\s)", "gh workflow run (workflow_dispatch) targeting protected branch"),
+]
+
+
+def check_prod_branch_ops(command: str) -> str | None:
+    """Block autonomous git/gh operations that create, push, delete, protect, or
+    workflow_dispatch against release-trigger branches (production/master/release/
+    prod/stable). `main` is deliberately excluded (already gated by the
+    push-confirmation rule). Bypass: prefix the command with
+    ALLOW_PROD_BRANCH_OPS=1 (per-command only — never session-wide).
+
+    Ported from the standalone block-prod-branch-autonomous-ops.sh hook into
+    bash-guard.py to avoid an extra PreToolUse:Bash process spawn per command."""
+    if os.environ.get("ALLOW_PROD_BRANCH_OPS") == "1":
+        return None
+    if re.search(r"ALLOW_PROD_BRANCH_OPS=1", command):
+        return None
+    scan = git_scan_text(command)
+    reason = None
+    for pat, r in _PROD_BRANCH_PATTERNS:
+        if re.search(pat, scan, IM):
+            reason = r
+            break
+    if reason is None and (
+        re.search(r"gh\s+api\s+.*actions/workflows/.*dispatches", scan, IM)
+        and re.search(r"(?:-f|-F|--field|--raw-field)\s+ref=" + _PROD_BRANCHES + r"(?:$|\s)", scan, IM)
+    ):
+        reason = "gh api workflow_dispatch targeting protected branch"
+    if reason is None:
+        return None
+    return (
+        f"{reason}\n\n"
+        "Branches matching /(production|master|release|prod|stable)/ are release triggers. "
+        "A single autonomous operation on them can trigger real user-facing publishes "
+        "(semantic-release, Marketplace stable, npm dist-tag latest, GitOps ArgoCD sync) "
+        "with no dry-run and no rollback.\n\n"
+        "To proceed with a genuinely user-approved operation, prefix the command with "
+        "ALLOW_PROD_BRANCH_OPS=1 (per-command only — never session-wide)."
+    )
 
 
 def evaluate(
@@ -405,6 +487,10 @@ def evaluate(
     summary_reason = check_summary_without_internal_review(command)
     if summary_reason:
         return hard(summary_reason)
+
+    prod_branch_reason = check_prod_branch_ops(command)
+    if prod_branch_reason:
+        return hard(prod_branch_reason)
 
     if LOCAL_OVERLAY is not None:
         overlay_reason = LOCAL_OVERLAY.check(command, tool_name, transcript_path)
@@ -539,6 +625,12 @@ def self_test() -> int:
         # ── gh pr create --draft guard (ported from block-pr-create-without-draft.sh) ──
         (True, False, "gh pr create --title x --body y"),
         (False, False, "gh pr create --draft --title x --body y"),
+        # --draft=false is a valid, explicit non-draft invocation — a naive
+        # `startswith("--draft=")` prefix check would wrongly treat this as
+        # satisfying the draft requirement (Critical finding, PR #197 review).
+        (True, False, "gh pr create --draft=false --title x --body y"),
+        (True, False, "gh pr create --draft=0 --title x --body y"),
+        (False, False, "gh pr create --draft=true --title x --body y"),
         (False, False, "PR_READY_APPROVED=1 gh pr create --title x --body y"),
         (False, False, 'grep "gh pr create" README.md'),
         (False, False, 'echo "run gh pr create --draft next"'),

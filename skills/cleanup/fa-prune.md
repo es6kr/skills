@@ -48,7 +48,7 @@ Apply a self-improving pattern. Classify sections as HOT/COLD based on section d
 | HOT | Occurred within the last 30 days **OR** has recurrence history **OR** has a future hook obligation | Kept in `~/.claude/skills/cleanup/data/failed-attempts.md` |
 | COLD | Older than 30 days + no recurrence + COVERED/SKILL_DONE + no future hook obligation | Moved to `~/.claude/skills/cleanup/data/archive/failed-attempts-archive-<YYYY-MM-DD>.md` (see Section 6) |
 
-**Date detection**: Extract the latest date from the `(YYYY-MM-DD)` or `(YYYY-MM-DD, MM-DD)` pattern in the section title.
+**Date detection**: Extract the latest date from the `(YYYY-MM-DD)` or `(YYYY-MM-DD, MM-DD)` pattern in the section title. Class-format sections (with an `<!-- fa: ... -->` meta line) instead read the meta line's `last=` field as the section's newest date.
 
 **Recurrence detection (HARD STOP — cross-verification mandatory)**:
 
@@ -91,14 +91,26 @@ Demoted sections move to archive + RAG store, so recurrence detection (Section 7
 **Auto-classification script**: `scripts/fa-classify.py` implements the entire classification above (recurrence/hook/resolution detection + COLD verdict) — a successor to fa-analyze.py, including the resolution exception.
 
 ```bash
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py                     # strict summary + COLD candidates (R = demoted via resolution exception)
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed           # relaxed mode (S = stale-recurrence demotion) — default operating policy
+uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py                     # strict summary + COLD candidates (R = resolved-exception, S = stale-recurrence) and hook/FALSE-NEG diagnostics
+uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed           # relaxed mode (S = stale-recurrence demotion) — default operating policy and hook/FALSE-NEG diagnostics
 uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed --cut /tmp/fa-cold  # separate COLD body files + index.json (Section 8 RAG store input)
 ```
 
-**Goal**: no numeric cap — **the relaxed staleness rule is the control mechanism**. In every fa-prune run, demoting sections whose newest date exceeds 30 days naturally converges HOT toward "live patterns from the last 30 days + unresolved hook obligations." (The former "max 20 sections" numeric target is deprecated as incompatible with permanent recurrence-marker triggers.)
+**Script-first (HARD STOP)**: when a deterministic classifier is named in the procedure (`fa-classify.py` here), **run it before** recording your own HOT/COLD verdict. If your LLM judgment disagrees with the script's output, re-verify against the script's result — its recurrence/hook/resolution detection is the authority. Reclassifying a section on LLM judgment alone, without running the script for comparison, is forbidden. Caveat: the classifier's legacy heuristics predate the class format — until its meta-line parser lands, treat its output on class-format sections as advisory and prefer the meta fields (`count`/`last`/`status`) as the authority for those sections.
 
-**Execution trigger threshold = 160 sections** (user-approved threshold): do not create/recommend an fa-prune task while HOT section count is below 160. Only propose a relaxed staleness run when it reaches 160 or more. (The old "threshold 20" notation is a leftover from the deprecated numeric cap — correct it to this value if it reappears in a task subject, etc.)
+**Goal**: no numeric cap — **the relaxed staleness rule is the control mechanism**. In every fa-prune run, demoting stale entries naturally converges HOT toward "live patterns + unresolved hook obligations." (The former "max 20 sections" numeric target is deprecated as incompatible with permanent recurrence-marker triggers.)
+
+**Class-structured HOT (current format)**: the HOT body is organized as behavior-class sections. Each section carries a machine-readable meta line directly under its heading — `<!-- fa: class=<slug> count=N last=<date> status=<state> [hooks=...] -->` (see the data file's header note for the format contract). New cases append to a matching class's recurrence list (bumping `count`/`last` in the meta); a new section is created only when no existing class matches. Pre-reorganization full originals remain recoverable via the snapshot archive + the RAG receiver.
+
+**Execution trigger (class-based — replaces the flat section-count threshold)**: the old flat section-count thresholds (20 → 160 → 90) are deprecated — they measured incident accumulation, which the class structure absorbs by design. Propose an fa-prune pass when ANY of the following axes fires:
+
+| Axis | Default trigger | What it signals |
+|------|-----------------|-----------------|
+| Class count | `grep -c '^## \[class\]' failed-attempts.md` > 50 | Clustering drift — one-off classes accumulating. Run a merge/split review |
+| Unredeemed hook debt | classes with `status=hook-pending` ≥ 8 | Escalation backlog outgrowing implementation. Propose a hook-debt sprint before recording more |
+| Stale incident lines | within a class whose `status` is `hook-active`/`rule-covered`, recurrence lines dated older than 90 days | Compress those lines (keep `count`/`last` meta; originals stay in snapshot + RAG) |
+
+Default values are operating defaults — adjustable by user instruction. HOT/COLD demotion (Section 5 tables) now applies to **incident lines within a class**; a class section itself is removed only when its incident list empties AND its status is a resolved state.
 
 ### 6. Archive file management
 

@@ -1,7 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 GitHub-aligned BLOCKED suffix + external/selfable reason classification), add (Action/Why/How authoring), draft (record a deferred plan stub when full planning is postponed → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete lifecycle). Default (no args): dispatch to configured archive-receiver `<skill>:<topic>` (e.g., weekly report, RAG store) to harvest Completed section + remove from source; falls back to move topic when no receiver registered. Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive".
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -26,35 +28,41 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| completion-criteria | Definition of done per item output type (`Why` = scope narrative vs `How to apply` = deliverable), marker transition rules, residual-scope split | [completion-criteria.md](./completion-criteria.md) |
 | format | Schema: `[ ]` / `[x]` / `[BLOCKED]` markers, Progress/Completed sections, item state changes, section-consistency check | [format.md](./format.md) |
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
+| model-triage | High-capability model triage: 5 fit categories + anti-fit table + cross-section discovery procedure + dedicated `## <Model> Target Tasks` section operation | [model-triage.md](./model-triage.md) |
 | add | New item authoring schema (Action / Why / How), length budget, deliverable separation (research / plan / checklist split) | [add.md](./add.md) |
 | draft | Record a deferred plan **stub** (purpose + defer reason + resume trigger + expected deliverable) in `## Plan Drafts` when full planning is postponed; promote to `code-workflow` research→plan when the trigger fires. Invoked `/fix-plan draft` | [draft.md](./draft.md) |
 | move | `[x]` → Completed summary rules, subtree-move partial completion under unfinished parent, optional abstract RAG dispatch | [move.md](./move.md) |
-| sync | GitHub PR/Issue state polling (`gh pr view` / `gh issue view`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
+| sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
+| flowchart | Mermaid priority-graph authoring + node-plan mappings; `pm`-role default-pipeline step 5 mechanical drift check against priority-triage output | [flowchart.md](./flowchart.md) |
 
 ## Topic Dependencies
 
 ```text
 fix-plan (schema + lifecycle)
-  ├─→ (default, no args) → archive-receiver dispatch (caller-supplied) — falls back to move
+  ├─→ (default, no args) → move (archive-receiver) ──→ format ──→ sync ──→ priority ──→ flowchart-sync
   ├─→ format (entry — section structure + markers)
   ├─→ priority (new convention — BLOCKED P0-P3 + reason)
   │     └─→ depends on sync (Step 0: refresh external state before classifying)
   ├─→ add (authoring act-now items)
+  ├─→ model-triage (cross-section discovery → dedicated section; items authored via add's schema)
   ├─→ draft (deferred plan stub → `## Plan Drafts`)
   │     └─→ code-workflow/steps dispatch on promote (research → plan)
   ├─→ move (completion → Completed)
   │     └─→ optional --rag=<skill>:<topic> dispatch for semantic indexing (caller-supplied)
   ├─→ sync (GitHub state polling) — depends on github-flow gh CLI conventions
+  ├─→ flowchart (Mermaid priority graph) — step 5 of the default pipeline, drift-checks against priority's output
   └─→ issue-drafts (lifecycle of draft files)
 ```
 
 - All topics are independently invocable, **except `priority` which invokes `sync` as Step 0 (HARD STOP)** — triage on stale state is the failure mode the dependency prevents (see [priority.md](./priority.md) Triage workflow Step 0)
-- **Default invocation (no args)** dispatches Completed section to a caller-supplied archive-receiver (`--archive=<skill>:<topic>`); if no receiver is registered, falls back to in-tracker `move` (Completed cleanup only). See "Default invocation" section
+- **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, triages blockers via `priority`, and finally drift-checks the priority graph via `flowchart` (step 5, skipped when the tracker has no `## Flow Chart` section).
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic uses `gh` CLI per `github-flow` skill's conventions
+- `sync` topic optionally dispatches to a secondary-tracker receiver if the caller supplies `--secondary-sync=<skill>:<topic>` — see [sync.md](./sync.md) "Secondary-tracker sync cadence"
 - `draft` topic dispatches to `code-workflow` (`steps`) on promote — turns a deferred stub into a real research → plan
 
 ## Configuration
@@ -64,11 +72,42 @@ fix-plan (schema + lifecycle)
 | `archive-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for **default invocation** (no args). When set, the caller routes the source's `## Completed` section to this receiver for external archiving (weekly report, postmortem log, RAG store, etc.). Receiver harvests + appends to its own report + removes harvested lines from source. Set via `--archive=<skill>:<topic>` CLI flag. See "Default invocation" below |
 | `completed-archive-period` | `monthly` | Period for the **receiver-independent local archive** of the `## Completed` section — `monthly` (`YYYY-MM`) or `weekly` (ISO `YYYY-Www`). On the period boundary, older Completed entries move to `<tracker-dir>/.bak/<tracker-stem>-completed-<period>.md` and are removed from the tracker, keeping the live file small. Set via `--completed-archive-period=weekly\|monthly`. See [move.md](./move.md) "Completed-section size management" |
 | `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing — set via the `--rag=<skill>:<topic>` CLI flag on the `move` topic (see [move.md](./move.md)). No env var or config file is consumed by this skill; the caller routes |
+| `role-profile` | (unset) | Execution-role scoping for the default invocation — CLI `--role=<pm\|deep\|impl>`. Values are **abstract profile names** (`pm` = mechanical bookkeeping/recording, `deep` = large-scale classification & audit, `impl` = implementation); this skill never hardcodes model names. Resolution chain: explicit flag → context self-detection → unset = full pipeline (backward compatible). See "Role-based execution" below |
+| `secondary-sync-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for the `sync` topic — runs a project's non-GitHub backlog tracker (Plane, Jira, etc.) in the same cadence as this skill's GitHub PR/Issue sync, instead of letting it drift independently. Set via the `--secondary-sync=<skill>:<topic>` CLI flag. No tracker name is hardcoded — the receiver owns all tracker-specific details. See [sync.md](./sync.md) "Secondary-tracker sync cadence" |
 | `task-tracker` | `fix_plan.md` | Tracker filename. Use `checklist.md` for non-Ralph workspaces |
 
 ## Default invocation (no args)
 
-When `/fix-plan` is invoked with **no args**, dispatch to the configured **archive receiver** to harvest the `## Completed` section into an external report and remove the harvested items from the source tracker. If no receiver is registered, fall back to the `move` topic (in-tracker Completed cleanup only).
+When `/fix-plan` is invoked with **no args**, it must execute the following sequential pipeline (scoped by the resolved role profile — see "Role-based execution" below):
+1. **Move / Archive**: Dispatch to the configured **archive receiver** (or fall back to the `move` topic) to harvest/cleanup Completed entries.
+2. **Format**: Verify the schema, markers, and section structure of the tracker.
+3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
+4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
+5. **Flowchart Sync**: Apply the [flowchart](./flowchart.md) "Sync procedure" mechanical drift check against the Step 4 priority-triage output (relabel/remove/propose `[P*]` nodes) — only when the tracker has a `## Flow Chart` section; skip (report as not-applicable) otherwise.
+
+**Register BEFORE execute (HARD STOP)**: before Step 1 (Move) begins, `TaskCreate` (or `TodoWrite` if `TaskCreate` is unavailable) must register one task per pipeline step actually being run (Move/Format/Sync/Priority/Flowchart-Sync for the full pipeline, fewer for a role-scoped subset — see "Role-based execution" below). A default-invocation `/fix-plan` run is multi-step by definition; "the tracker looks small" is not an exception. If a `TaskCreate` call errors, retry it with the corrected parameters from its own error message before any Move/Sync/Priority Edit proceeds — treating a retry as unnecessary overhead and silently dropping tracking is the exact violation this line prevents. Mirrors `~/.claude/skills/wip/SKILL.md` "Register BEFORE execute".
+
+### Role-based execution (`role-profile`)
+
+The default pipeline is scoped by the execution role, so a high-capability session is not spent on mechanical bookkeeping — and a bookkeeping session does not attempt deep-analysis passes it is unsuited for.
+
+**Role resolution chain** (first match wins):
+
+1. Explicit `--role=<pm|deep|impl>` CLI flag
+2. **Context self-detection** — when the invoking agent can identify the model it is running on (from its own runtime context, e.g. a model identifier exposed by the harness) AND the workspace declares a model→profile mapping (a local operating note in the tracker, a project rule — caller-side, never in this skill), resolve the profile from that mapping
+3. Neither available → run the **full pipeline** (backward compatible — unchanged behavior for existing users and environments without role mappings)
+
+**Per-profile default pipeline**:
+
+| Profile | Steps executed | Skipped (reported as remainder) |
+|---------|----------------|--------------------------------|
+| `pm` | move → format → sync → priority → flowchart-sync (current full pipeline) | — |
+| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format — surfaced as a delegation remainder for a `pm` session |
+| `impl` | sync → priority, then surface `selfable` implementation candidates | move, format, model-triage |
+| (unresolved) | full pipeline | — |
+
+- A skipped step is never silently dropped: the run report must list the skipped steps and their pending workload (e.g. "N completed `[x]` items awaiting move") so a later `pm` session picks them up.
+- Model names never appear in this skill. The caller-side mapping translates concrete models to `pm` / `deep` / `impl` — the same supply pattern as the `--archive` / `--rag` receiver contracts.
 
 ### Receiver contract
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/github-flow-v0.6.1...github-flow-v0.7.0) (2026-07-23)
+
+
+### Features
+
+* **hook-kit:** add pre-tool AskUserQuestion context gate ([#123](https://github.com/es6kr/skills/issues/123)) ([271b5b3](https://github.com/es6kr/skills/commit/271b5b37df5e64cf3185b2c81c3d97b66789e9ab))
+
+
+### Bug Fixes
+
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+* skills body bundle — consolidate/fix/hook-kit refinements + English-clean guard hooks (Ralph-loop bypass) ([2e26f41](https://github.com/es6kr/skills/commit/2e26f412a5b963984898e13caaca186c3617ca08))
+
+## [0.6.1](https://github.com/es6kr/skills/compare/github-flow-v0.6.0...github-flow-v0.6.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* externalize internal-host detection tokens (edit-guard + sanitize doc) ([0bb7f83](https://github.com/es6kr/skills/commit/0bb7f831c752ecc5272611da752325f44e3c32a6))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/github-flow-v0.5.0...github-flow-v0.6.0) (2026-07-17)
 
 

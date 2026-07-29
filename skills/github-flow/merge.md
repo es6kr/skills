@@ -320,6 +320,14 @@ Before recommending merge (AskUserQuestion option includes "proceed merge" / "sq
 - Order: infra variable-addition PR merged → infra deploy → app code PR merged → app deploy
 - **Forbidden**: merging the app code first and deferring the infra as a "follow-up PR" — at deploy time the missing env var breaks the feature
 
+**Exception — base branch's ROLE is a CI gate, not a review gate**: what matters is *why* the base branch exists, not its literal name. Some long-lived branches (e.g. `next-feat`/`next-fix` in a two-tier staging model) exist purely to accumulate CI-passing commits ahead of a later, separately-reviewed promotion PR (staging → main) — for that role, condition 3 (AI Review Summary) does not apply to PRs merging INTO it. Don't pattern-match on branch name; verify the role: `gh pr checks <N>` reporting `Review skipped: reviews are disabled for this base branch` is the actual signal that this base is a CI-gate-only branch, regardless of what it's called. Do not wait for a walkthrough that will never arrive, and do not run `/consolidate pr` for it. Conditions 1 (CI), 2 (Test Plan), 4 (Mergeable) still apply in full; the real review gate for that commit happens later, at the promotion PR into the branch that IS reviewed.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume the exception applies because the base branch is literally named `next-feat`/`next-fix` | Verify the branch's actual role via `gh pr checks <N>` — the CodeRabbit-disabled signal, not the name, is what confirms this is a CI-gate-only base |
+| 2 | Treat a CI-gate-only base's missing AI Review Summary as "waiting for CodeRabbit" and leave it pending indefinitely | `Review skipped: reviews are disabled for this base branch` means condition 3 is structurally exempt for this base's role, not unmet |
+| 3 | Run `/consolidate pr` on a PR into a CI-gate-only base because a review artifact "should" exist | Skip consolidate for this base — CI green + Test Plan + Mergeable is the full gate; review happens at the later promotion PR |
+
 **If even one condition is unsatisfied, ALL of the following are forbidden**:
 - Including "proceed merge" / "squash merge" / "merge recommended" in AskUserQuestion options
 - Bypassing unsatisfied conditions with phrases like "Playwright will run separately", "ZAP will follow", while still recommending merge

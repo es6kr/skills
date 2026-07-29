@@ -31,7 +31,7 @@ Top-level sections:
 | Section | Purpose | Behavior |
 |---------|---------|----------|
 | `## Progress` | Active and recently-completed items | Always present. Never empty — if no items, keep `(none)` placeholder |
-| `## Completed` | Historical one-line summaries | Append-only chronological. New entries inserted at sort position. **Not unbounded** — older entries are periodically archived to `.bak/` partition files (see [move.md](./move.md) "Completed-section size management"); the live section holds only the current period |
+| `## Completed` | Historical one-line summaries | Temporary holding area. New entries inserted at sort position. **Not unbounded** — older entries are periodically archived to `.bak/` partition files (and index to RAG) and **deleted from the active file** (see [move.md](./move.md) "Completed-section size management"); the live section holds only the current period |
 | `## Hold` (optional) | External-response BLOCKED items separate from active Progress | Used when Progress would otherwise be cluttered with un-actionable items |
 | `## Notes` | Project conventions, project-specific guard rails | Not modified by this skill |
 
@@ -46,15 +46,16 @@ Top-level sections:
 | `-` followed by space, no checkbox | Already-summarised historical line | `## Completed` only |
 | `- [REPEAT]` | Persistent recurring item (Ralph-specific — see ralph/periodic.md) | `## REPEAT` section only (out of scope for this skill) |
 
-## Item state changes
-
 When an item completes, change `- [ ]` → `- [x]` and append session ID + timestamp to the title line.
 
-Format: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, commit <hash>)` or for merged PRs: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, PR #N)`.
+Format: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, commit <hash>)` or for merged PRs: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, [PR #N](https://github.com/<owner>/<repo>/pull/N))`. All PR/Issue references in the tracker must be clickable Markdown links (`[PR #N](URL)` or `[Issue #N](URL)`).
 
 - Session ID: first 8 chars from `.ralph/.claude_session_id` (Ralph environment) or current session ID
 - Timestamp: 24-hour `YYYY-MM-DD HH:mm` of the completion moment
 - Add `**complete**` markers to inner sub-steps where useful
+
+**Completion Migration Rule (HARD STOP)**: When the user explicitly instructs to "mark this as completed" or its locale equivalent (a completion-marking instruction in the user's language), you must **not** just change `- [ ]` (or `- [BLOCKED]`) to `- [x]` in place. You must change the state **AND** move the item to the `## Completed` section (as a summarized one-line entry with the timestamp and session ID) in the **very same edit/turn**. Do not split completion marking and completed section migration into separate turns.
+
 
 ## Section-consistency check (HARD STOP)
 
@@ -73,14 +74,15 @@ Self-check before Edit:
 
 ## Default execution flow
 
-When this skill's main entry point is invoked, run these four steps in order:
+**This topic file does not define its own default-invocation order.** The canonical no-args pipeline is `SKILL.md` "Default invocation (no args)" — five steps in this order:
 
-1. **Sync** — call [sync](./sync.md) to poll GitHub state for `[ ]` items containing `PR #N` / `#N`: auto-`[x]` on MERGED PRs and CLOSED issues; PRs CLOSED-without-merge convert to `[BLOCKED:P2:external]` per the sync contract
-2. **Move completed** — apply [move](./move.md) to relocate `[x]` items with no follow-up notes into the Completed section as one-line summaries
-3. **External RAG dispatch (optional)** — if the caller supplied `--rag=<skill>:<topic>`, dispatch Completed entries to the receiver for semantic indexing
-4. **Add new items** — if the user instructed new work, append `- [ ]` items per [add](./add.md) authoring rules
+1. **Move / Archive** — dispatch to the configured archive receiver (or fall back to [move](./move.md)) to harvest/cleanup Completed entries
+2. **Format** — verify the schema, markers, and section structure of the tracker (this topic)
+3. **Sync** — call [sync](./sync.md) to poll GitHub state for `[ ]` items containing `PR #N` / `#N`: auto-`[x]` on MERGED PRs and CLOSED issues; PRs CLOSED-without-merge convert to `[BLOCKED:P2:external]` per the sync contract
+4. **Priority** — triage and sort the remaining `[BLOCKED]` list based on the synchronized states
+5. **Flowchart Sync** — apply [flowchart](./flowchart.md)'s mechanical drift check against the priority output (only when a `## Flow Chart` section exists)
 
-Order matters: sync first (state truth) → move (clean up Progress) → optional dispatch → add (new work). Reordering breaks the truth-then-cleanup-then-grow chain.
+Order matters: move (clean up Progress) → format (schema truth) → sync (external state truth) → priority (triage on synced state) → flowchart-sync (drift-check the triage output). Reordering breaks the cleanup-then-truth-then-triage-then-drift-check chain. Adding new items (`- [ ]` via [add](./add.md)) is a separate, explicitly-instructed action — it is not part of the no-args default pipeline.
 
 ## Recording-topic ask-skip (HARD STOP)
 
@@ -116,6 +118,16 @@ Exceptions:
 - Do not arbitrarily delete or modify existing entries in `## Completed`
 - Do not touch the `## Notes` section
 - **Do not add AI behavior constraints (e.g. version-change prohibitions, test-bypass prohibitions) to this file or to `fix_plan.md`** — these belong in `.ralph/PROMPT.md` (Ralph environment) or `~/.agents/rules/*.md` (global). `fix_plan.md` is a **task list + completion-log artefact only**
+- **`###` section headers for deferred/PR-specific findings are FORBIDDEN (HARD STOP)** — consolidate, code-review, and other auto-registration paths must **not** create `### PR #N ...` or `### Epic #N ...` sub-sections inside `## Progress` or `## Hold`. Instead:
+  - Register each deferred finding as `- [BLOCKED] [REVIEW_FEEDBACK] ...` list item directly inside the section
+  - Group related findings from the same PR/review round under a single parent `[BLOCKED]` item with sub-bullets
+  - Rationale: `###` headers fragment the file into isolated islands that are hard to batch-process and prevent cleanup.py from properly traversing the item tree. All items at the same depth belong in the same list hierarchy.
+
+  | Don't | Do |
+  |-------|----|
+  | `### PR #56 consolidate deferred — 2026-06-23` + inline narrative | `- [BLOCKED] [REVIEW_FEEDBACK] PR #56 deferred findings — {summary}` list item |
+  | Separate `### PR #409` + `### PR #412` sections | Group related PRs under one parent `- [BLOCKED]` with sub-items per PR |
+
 - **Hybrid `- [ ] [BLOCKED...]` marker is FORBIDDEN (HARD STOP)** — the checkbox marker itself must be either `- [ ]` (pending) or `- [BLOCKED:P0-P3:reason]` (blocked), never both combined on the same list item. A `- [ ]` prefix followed by an inline `[BLOCKED...]` tag mixes the pending and blocked states and breaks the mutually-exclusive marker contract.
 
   | Don't | Do |
@@ -123,7 +135,7 @@ Exceptions:
   | `- [ ] [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` | `- [BLOCKED:P2:selfable] consolidate Step 2.4 PR create` (drop the redundant `[ ] ` prefix) |
   | `- [ ] [BLOCKED] claude-task CLI ID disambiguation rule` | `- [BLOCKED] claude-task CLI ID disambiguation rule` |
 
-  **Format-step self-check**: `grep -nE '^\s*-\s\[ \]\s\[BLOCKED' <fix_plan.md>` — any match is a hybrid-marker violation. Fix with a targeted `sed 's/- \[ \] \[BLOCKED/- [BLOCKED/g'` (or an equivalent per-line Edit) and re-run the grep to confirm zero matches.
+  **Format-step self-check**: `grep -nE '^\s*-\s\[ \]\s\[BLOCKED' <fix_plan.md>` — any match is a hybrid-marker violation. Fix with a line-anchored `sed -E 's/^(\s*)- \[ \] \[BLOCKED/\1- [BLOCKED/'` (unanchored `s/- \[ \] \[BLOCKED/- [BLOCKED/g` would also rewrite the same literal substring inside quoted prose elsewhere on the line, e.g. this file's own Don't/Do table examples) and re-run the grep to confirm zero matches.
 
 ## See also
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/es6kr/skills/compare/fix-plan-v0.3.2...fix-plan-v0.3.3) (2026-07-23)
+
+
+### Bug Fixes
+
+* **fix-plan:** record model name alongside session ID in move.md ([#126](https://github.com/es6kr/skills/issues/126)) ([78b5471](https://github.com/es6kr/skills/commit/78b5471f26b51dd7dc523d7fc1b4e96d7cd77d9c))
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+
 ## [0.3.2](https://github.com/es6kr/skills/compare/fix-plan-v0.3.1...fix-plan-v0.3.2) (2026-07-16)
 
 

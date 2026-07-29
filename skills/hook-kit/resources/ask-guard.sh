@@ -93,6 +93,10 @@ load_user_text() {
   if [[ -z "$TRANSCRIPT" || ! -f "$TRANSCRIPT" ]]; then
     return 0
   fi
+  if [[ -z "$PY" ]]; then
+    echo "WARN: no working python interpreter found — user-text-dependent checks (vendor-leak exemption, supervisor-loop check) are skipped this call" >&2
+    return 0
+  fi
 
   USER_TEXT=$("$PY" - "$TRANSCRIPT" <<'PYEOF' 2>/dev/null
 import json, sys
@@ -172,8 +176,8 @@ check_merge_without_review() {
   # inspect line-by-line on an automated version-bump PR.
   #
   # Allowlist match (PR qualifies if ANY clause holds):
-  #   - author.login  in { github-actions[bot], release-please[bot] }
-  #   - headRefName    starts with  release-please--
+  #   - author.login  in { github-actions[bot], release-please[bot], dependabot[bot], ... }
+  #   - headRefName    starts with  release-please--   OR   dependabot/
   #
   # Fail closed: if gh is unavailable/unauthenticated, the repo cannot be
   # resolved, or any referenced PR lookup fails (404 / network), that PR is
@@ -202,7 +206,7 @@ check_merge_without_review() {
           "github-actions[bot]"|"release-please[bot]"|"app/github-actions"|"app/release-please"|"dependabot[bot]"|"app/dependabot"|"dependabot") continue ;;
         esac
         case "$rp_headref" in
-          "release-please--"*"dependabot/"*) continue ;;
+          "release-please--"*|"dependabot/"*) continue ;;
         esac
         rp_all=0; break            # a non-bot PR is present -> require attestation
       done <<< "$rp_prs"
@@ -307,12 +311,17 @@ check_vendor_leak() {
   local violations=""
   load_user_text
 
-  # Workload context exception (Issue #109): If k8s/cluster workload context tokens are present, skip vendor leak check
-  local workload_pattern='\b(Application|workload|pod|namespace|Prune|selfHeal|StatefulSet|Deployment)\b'
+  # Workload context exception (Issue #109): If k8s/cluster workload context tokens are present, skip vendor leak check.
+  # "Application" is checked case-SENSITIVE (exact ArgoCD CRD Kind casing) — a
+  # case-insensitive match here also catches the ordinary English word
+  # "application" anywhere in prose (e.g. "for this application's vector
+  # search"), which silently disables the entire vendor-leak scan below.
+  local workload_pattern_cs='\bApplication\b'
+  local workload_pattern_ci='\b(workload|pod|namespace|Prune|selfHeal|StatefulSet|Deployment)\b'
   if [[ -n "${HG_ASK_WORKLOAD_CONTEXT_KO:-}" ]]; then
-    workload_pattern="(${workload_pattern}|${HG_ASK_WORKLOAD_CONTEXT_KO})"
+    workload_pattern_ci="(${workload_pattern_ci}|${HG_ASK_WORKLOAD_CONTEXT_KO})"
   fi
-  if echo "$ASK_TEXT" | grep -qiE "$workload_pattern"; then
+  if echo "$ASK_TEXT" | grep -qE "$workload_pattern_cs" || echo "$ASK_TEXT" | grep -qiE "$workload_pattern_ci"; then
     return 0
   fi
 
@@ -366,6 +375,10 @@ check_vendor_leak() {
 # ============================================================================
 check_supervisor_loop_recommend() {
   [[ -z "$OPTIONS_BLOB" ]] && return 0
+  if [[ -z "$PY" ]]; then
+    echo "WARN: no working python interpreter found — supervisor-loop-recommend check skipped this call" >&2
+    return 0
+  fi
 
   # Quick trigger pattern check before loading transcript
   if ! "$PY" -c "

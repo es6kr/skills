@@ -145,16 +145,16 @@ Classify using **CodeRabbit-style dual-label** (category + severity combination)
 | Label | Meaning | Action |
 |-------|---------|--------|
 | 🔴 Critical | Must fix — blocks merge | Fix required |
-| 🟡 Important | Should fix — does not block merge | Should fix |
-| 📝 Minor | Optional fix — Nitpick level | Evaluate with user |
+| 🟠 Important | Should fix — does not block merge | Should fix |
+| 🟡 Minor | Optional fix — Nitpick level | Evaluate with user |
 | 🟢 No issue | No action needed | No action |
 | ⚪ Rejected | Technically inappropriate | Reject with reasoning |
 
-**Notation format**: `Type | Severity` — e.g., `⚠️ Potential issue | 🔴 Critical`, `🛠️ Refactor | 🟡 Important`, `📝 Nitpick | 📝 Minor`
+**Notation format**: `Type | Severity` — e.g., `⚠️ Potential issue | 🔴 Critical`, `🛠️ Refactor | 🟠 Important`, `📝 Nitpick | 🟡 Minor`
 
 **Orthogonal matrix example** (one finding has one value on each axis):
 
-| Type ＼ Severity | 🔴 Critical | 🟡 Important | 📝 Minor |
+| Type ＼ Severity | 🔴 Critical | 🟠 Important | 🟡 Minor |
 |------------------|-------------|--------------|----------|
 | ⚠️ Potential | Security vulnerability (immediate fix) | Suspected 1-day blocking timezone handling | Uncovered edge case |
 | 🛠️ Refactor | Missing API permission guard | Introduce helper for 29 fields | Variable name consistency |
@@ -167,7 +167,7 @@ Classify using **CodeRabbit-style dual-label** (category + severity combination)
 | 1 | "Change Important → Potential" (different axis) | "Downgrade Important → Minor" (within Severity axis) or "Reclassify Potential → Refactor" (within Type axis) |
 | 2 | In AskUserQuestion, presenting handling options bundled by only one axis label | Confirm the intent axis first, then ask: "Downgrade Severity?" vs "Reclassify Type?" |
 | 3 | User says "treat as Potential" → replacing Severity Important with Potential | "Treat as Potential" is a Type change request. Or if user intent is ambiguous, use AskUserQuestion to confirm which axis |
-| 4 | Changing only one axis and omitting the other axis notation | Keep both Type + Severity explicitly (e.g., `⚠️ Potential` + `🟡 Important`) |
+| 4 | Changing only one axis and omitting the other axis notation | Keep both Type + Severity explicitly (e.g., `⚠️ Potential` + `🟠 Important`) |
 
 **Self-check (whenever the user instructs a change with category/severity keywords)**:
 

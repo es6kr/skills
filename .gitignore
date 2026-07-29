@@ -7,10 +7,12 @@ __pycache__/
 .stfolder/
 .stversions/
 .tmp/
+.worktrees/
 *.bak
 *.pyc
 *.tmp
 /checklist.md
+/tasks/
 docs/generated/
 skills/*/data
 skills/*/LICENSE

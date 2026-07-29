@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/consolidate-v0.3.6...consolidate-v0.4.0) (2026-07-23)
+
+
+### Features
+
+* **consolidate:** address PR 134 reviews and reflect orange/yellow severity display rules ([e6118d0](https://github.com/es6kr/skills/commit/e6118d0fb0217a4c4ad388b82e574203a8f9258e))
+* **next-feat:** accumulate features for hook-kit context gate ([df4f73a](https://github.com/es6kr/skills/commit/df4f73ae4d27d4919105da70c6c94a14a32e8056))
+
+
+### Bug Fixes
+
+* **consolidate:** change status column Fixed emoji to green circle (🟢) ([74fa3e5](https://github.com/es6kr/skills/commit/74fa3e58fd655c388454065374c8fcd27e790281))
+* **consolidate:** prohibit using Verified status for valid findings, use Pending or Deferred instead ([8540e4b](https://github.com/es6kr/skills/commit/8540e4b86e0e63e26b295e5beca863dbfefd08a0))
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+* skills body bundle — consolidate/fix/hook-kit refinements + English-clean guard hooks (Ralph-loop bypass) ([2e26f41](https://github.com/es6kr/skills/commit/2e26f412a5b963984898e13caaca186c3617ca08))
+
+## [0.3.6](https://github.com/es6kr/skills/compare/consolidate-v0.3.5...consolidate-v0.3.6) (2026-07-19)
+
+
+### Bug Fixes
+
+* **claude-session,consolidate,next:** promote next-fix staging ([902cfa5](https://github.com/es6kr/skills/commit/902cfa57de68d9f5487425b524ffa4441f81f302))
+* **consolidate:** extend Step 2.3 to three-axis duplicate-review check ([8b07965](https://github.com/es6kr/skills/commit/8b0796549215d4abb0fa349f4d5c5ba361aada88))
+* **consolidate:** skip AI Review Summary posting on draft PRs ([#99](https://github.com/es6kr/skills/issues/99)) ([fa7987a](https://github.com/es6kr/skills/commit/fa7987ab4a082e86e546161279b638f0a3be50c0))
+
 ## [0.3.5](https://github.com/es6kr/skills/compare/consolidate-v0.3.4...consolidate-v0.3.5) (2026-07-16)
 
 

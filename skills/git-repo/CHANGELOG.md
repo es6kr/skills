@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/git-repo-v0.5.0...git-repo-v0.6.0) (2026-07-23)
+
+
+### Features
+
+* **consolidate:** address PR 134 reviews and reflect orange/yellow severity display rules ([e6118d0](https://github.com/es6kr/skills/commit/e6118d0fb0217a4c4ad388b82e574203a8f9258e))
+* **next-feat:** accumulate features for hook-kit context gate ([df4f73a](https://github.com/es6kr/skills/commit/df4f73ae4d27d4919105da70c6c94a14a32e8056))
+* skills topic bundle — brief/email, code-workflow/plan-research-search, git-repo topics, skill-kit/invoke-discipline ([7fd877d](https://github.com/es6kr/skills/commit/7fd877da1b703fcdcdcaf1a3ce912f885abfa3f0))
+
+## [0.5.0](https://github.com/es6kr/skills/compare/git-repo-v0.4.3...git-repo-v0.5.0) (2026-07-19)
+
+
+### Features
+
+* **git-repo,cleanup:** promote next-feat staging ([8ffeb4e](https://github.com/es6kr/skills/commit/8ffeb4e487e68ac034e349bf765fe144eae5d68d))
+* **git-repo:** add local-to-staging-pr.sh for the staging-PR flow ([#105](https://github.com/es6kr/skills/issues/105)) ([166d481](https://github.com/es6kr/skills/commit/166d481836a1812cb8b18cc6ed8d1870fb99cfbc))
+
+
+### Bug Fixes
+
+* **git-repo:** harden worktree checks against ls multi-arg false nega… ([#110](https://github.com/es6kr/skills/issues/110)) ([2c5f1e3](https://github.com/es6kr/skills/commit/2c5f1e3810b9cd67247d26d80e978aa84fd3e07a))
+* **pr111:** resolve 14 consolidated review findings ([38f8833](https://github.com/es6kr/skills/commit/38f88332f03ec3bc5085083ea155f093a536acf2))
+
 ## [0.4.3](https://github.com/es6kr/skills/compare/git-repo-v0.4.2...git-repo-v0.4.3) (2026-07-16)
 
 

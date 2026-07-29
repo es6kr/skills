@@ -149,6 +149,44 @@ def node_to_one_line(node, strip_checkbox=True):
     else:
         return node.text
 
+def node_to_completed_block(node, strip_checkbox=True):
+    """Render a node AND all its descendants as a block of lines for the
+    Completed section — unlike node_to_one_line, this recurses into
+    node.children so a completed subtree's detail is never silently dropped.
+    Synthesizing N child bullets into one prose summary line requires
+    semantic judgment a script cannot safely perform, so this preserves the
+    full text instead (checkbox markers stripped per the Completed-section
+    convention; the caller/human can hand-condense later if desired)."""
+    lines = []
+
+    def marker_for(n):
+        if n.blocked_marker:
+            # All descendants of a node selected for move are checked==True
+            # (is_top_level_complete/is_subtree both require
+            # all_descendants_checked), so a live [BLOCKED] child should not
+            # occur here in practice — kept as a defensive fallback only.
+            return n.marker_type
+        if strip_checkbox:
+            bullet = n.marker_type.strip()
+            return f"{bullet} " if bullet.endswith('.') else "- "
+        if n.checked is True:
+            return f"{n.marker_type.strip()} [x] "
+        if n.checked is False:
+            return f"{n.marker_type.strip()} [ ] "
+        return n.marker_type
+
+    def emit(n):
+        if n.is_list_item:
+            indent_str = " " * n.indent
+            lines.append(f"{indent_str}{marker_for(n)}{n.text}")
+        else:
+            lines.append(n.text)
+        for child in n.children:
+            emit(child)
+
+    emit(node)
+    return lines
+
 def main():
     args = parse_args()
     
@@ -309,7 +347,7 @@ def main():
     # Generate new ## Completed lines
     completed_lines = [""]
     for entry in stay_completed:
-        completed_lines.append(node_to_one_line(entry["node"], strip_checkbox=True))
+        completed_lines.extend(node_to_completed_block(entry["node"], strip_checkbox=True))
         completed_lines.append("") # blank line between items
 
     # Add the new ## Completed section before ## REPEAT or at the right place
@@ -392,8 +430,7 @@ def main():
             if entry["node"].text in existing_content:
                 print(f"Skipping duplicate archive entry: {entry['node'].text}")
                 continue
-            line_to_add = node_to_one_line(entry["node"], strip_checkbox=True)
-            archived_lines.append(line_to_add)
+            archived_lines.extend(node_to_completed_block(entry["node"], strip_checkbox=True))
             archived_lines.append("")
             added_count += 1
             
