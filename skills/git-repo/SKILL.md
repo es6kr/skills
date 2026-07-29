@@ -209,4 +209,4 @@ Key features:
 
 - `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
 - `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)
-- `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch, and print manual commands to push and open a draft PR.
+- `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch; prints manual push/PR commands by default, or pass `--push [--body-file <path>]` to also push and open the draft PR.
