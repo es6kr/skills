@@ -10,8 +10,17 @@
 #
 # On each user prompt, this guard inspects the PRIOR turn and injects a
 # corrective reminder when ALL of:
-#   1. Suppression — the latest next-trigger.debug.log entry for this transcript
-#      is `suppressed=stop_hook_active` (the prior turn's Stop was silenced).
+#   1. No-fresh-evidence — the latest next-trigger.debug.log entry for this
+#      transcript is EITHER `suppressed=stop_hook_active` (the prior turn's
+#      Stop was silenced — the original chain-suppression blind spot) OR
+#      absent/stale (no entry at all, or the newest entry is >10 minutes old).
+#      The second branch covers a DIFFERENT failure mode found via /fix 19th-
+#      recurrence diagnosis (2026-07-29): next-trigger.sh's own blind-spot
+#      guards used to return decision:block WITHOUT writing a log line, so a
+#      turn that hit those guards left zero evidence — indistinguishable from
+#      "the primary hook never ran at all". Both cases mean the primary
+#      detector produced no usable signal for the current window, so this
+#      reactive guard must not rely on "suppressed" being the sole trigger.
 #   2. Completion — the prior turn's assistant text matches the completion
 #      PATTERN (reused verbatim from next-trigger.sh's data/*.regex loader).
 #   3. No next-after-completion — the last Skill("next") call in the prior turn
@@ -57,10 +66,29 @@ if [[ -z "$DEBUG_LOG" ]]; then
 fi
 [[ -z "$DEBUG_LOG" || ! -f "$DEBUG_LOG" ]] && exit 0
 
-# Latest next-trigger entry for THIS transcript must be a stop_hook_active
-# suppression — i.e. the prior turn's Stop hook was silenced (the blind spot).
+# Latest next-trigger entry for THIS transcript. Fire path A: explicit
+# chain-suppression (the original blind spot). Fire path B: no entry at all,
+# or the newest entry predates a 10-minute freshness window — the primary
+# Stop hook produced no usable trace for the current turn (see header comment
+# "No-fresh-evidence" for the 19th-recurrence rationale). A parse failure on
+# the timestamp is treated as "not stale" (fail closed, avoid false-fire).
 LATEST=$(grep -F "transcript=$TRANSCRIPT" "$DEBUG_LOG" 2>/dev/null | tail -1 || true)
-[[ "$LATEST" != *"suppressed=stop_hook_active"* ]] && exit 0
+SUPPRESSED=false
+[[ "$LATEST" == *"suppressed=stop_hook_active"* ]] && SUPPRESSED=true
+
+STALE=false
+if [[ -z "$LATEST" ]]; then
+  STALE=true
+else
+  LATEST_TS=$(printf '%s' "$LATEST" | cut -f1)
+  LATEST_EPOCH=$(date -u -d "$LATEST_TS" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$LATEST_TS" +%s 2>/dev/null || echo 0)
+  NOW_EPOCH=$(date -u +%s)
+  if [[ "$LATEST_EPOCH" -gt 0 && $((NOW_EPOCH - LATEST_EPOCH)) -gt 600 ]]; then
+    STALE=true
+  fi
+fi
+
+[[ "$SUPPRESSED" != "true" && "$STALE" != "true" ]] && exit 0
 
 # --- Completion PATTERN (reused from next-trigger.sh) -----------------------
 DATA_DIR="$SELFDIR/../data"

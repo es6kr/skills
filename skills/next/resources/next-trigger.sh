@@ -113,6 +113,8 @@ LAST_TOOLS=$(jq -R 'fromjson? // empty' "$TRANSCRIPT" 2>/dev/null | jq -rs '
 # The LAST_TOOLS check distinguishes a genuine tool-call-only message from an
 # empty/assistant-less transcript (both yield empty LAST_TEXT).
 if [[ -z "$LAST_TEXT" && -n "$LAST_TOOLS" ]]; then
+  { printf '%s\tguard=tool_call_only\ttranscript=%s\ttools=%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRANSCRIPT" "$LAST_TOOLS" >> "$DEBUG_LOG"; } 2>/dev/null || true
   echo '{"decision":"block","reason":"<skill-trigger name=\"next\">Turn ended with a tool-call-only message (no final text). Emit a final status report for the user; if a task batch completed or control returns to the user (e.g. waiting on CI/wakeup), invoke the `next` skill to offer follow-up options.</skill-trigger>"}'
   exit 0
 fi
@@ -121,6 +123,8 @@ fi
 # ScheduleWakeup (polling/wait handoff). Control returns to the user for a long
 # window, so follow-up options are due even without a completion keyword.
 if [[ ",${LAST_TOOLS}," == *",ScheduleWakeup,"* ]]; then
+  { printf '%s\tguard=schedule_wakeup\ttranscript=%s\ttools=%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$TRANSCRIPT" "$LAST_TOOLS" >> "$DEBUG_LOG"; } 2>/dev/null || true
   echo '{"decision":"block","reason":"<skill-trigger name=\"next\">Waiting-turn detected (ScheduleWakeup registered in the final message). Ensure a final status report was given, then invoke the `next` skill to offer interim follow-up options while waiting.</skill-trigger>"}'
   exit 0
 fi
