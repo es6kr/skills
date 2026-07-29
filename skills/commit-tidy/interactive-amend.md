@@ -117,3 +117,46 @@ Commit 3: test: add user tests      ← no changes needed
 - `--no-verify` is forbidden — fix hook failures instead
 - Force push requires CI status verification per `git.md`
 - Each amend must be a single atomic change — don't batch unrelated fixes into one amend
+
+## Squashing a middle range (already-pushed, N adjacent commits)
+
+**Use this when N adjacent commits in the MIDDLE of already-pushed history need to be combined into 1** — e.g., a repeated single-file streak discovered via `staging-discipline.md`'s full-range squash scan. `soft-reset-amend` explicitly excludes already-pushed shared history from its scope, and a plain `git reset --soft` cannot target a middle range without also dissolving everything above it. This procedure combines `soft-reset-amend`'s reset mechanism with this topic's `rebase --onto` replay — **without ever using `git rebase -i`**.
+
+### Procedure
+
+1. **Acquire worktree** (Step 0 above) — isolate the operation from the main checkout.
+2. **Checkout the range end in detached HEAD**:
+   ```bash
+   git checkout <range-end-SHA>
+   ```
+3. **Soft-reset to just before the range start** — stages the combined diff of every commit in the range:
+   ```bash
+   git reset --soft <range-start-SHA>~1
+   git diff --cached --stat   # verify: should match the combined diff of the whole range
+   ```
+4. **Create the single squashed commit**:
+   ```bash
+   git commit -m "<combined message>"
+   ```
+   Record the new SHA — this is the squashed commit.
+5. **Replay everything after the range onto the squashed commit**:
+   ```bash
+   git rebase --onto HEAD <range-end-SHA> <branch-name>
+   ```
+6. **Verify** — the resulting history should be content-identical to the original at the branch tip:
+   ```bash
+   git diff <original-branch-tip> HEAD --stat   # expect empty output
+   git log --oneline -N                          # confirm the range collapsed to 1 commit, later commits intact
+   ```
+7. **Force push** (Step 3 above) — same CI-check + `--force-with-lease` requirement.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Use `git rebase -i <range-start>~1` with a scripted `GIT_SEQUENCE_EDITOR` to squash a middle range | Use the checkout + `reset --soft` + commit + `rebase --onto` sequence above — achieves the same result without `rebase -i` in any form |
+| 2 | Reason that a scripted/non-interactive `rebase -i` invocation escapes the "interactive mode not supported" ban because no human touched an editor | The ban targets the `-i` flag itself, not just human interaction. Use the reset+onto sequence instead |
+| 3 | Apply `soft-reset-amend`'s plain `git reset --soft HEAD~N` to a middle range | That only works when the target commits are at the **tip**. A middle range needs the detached-HEAD-checkout-at-range-end variant above, followed by `rebase --onto` |
+| 4 | Skip the post-squash content-diff verification (Step 6) | Always confirm `git diff <original-tip> HEAD --stat` is empty — a middle-range squash has more room for accidental content loss than a tip-only squash |
+
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "commit-tidy-forbidden-rebase-i-used" for case history.

@@ -41,6 +41,10 @@ Analyze staged/unstaged changes and recommend whether to split into multiple com
 - Reviewing changes that touch many files
 - Ensuring atomic, reviewable commits
 
+## Squash-scan scope (HARD STOP)
+
+**A user-named commit range is the minimum scope, never the maximum.** The moment any squash candidate is found — whether self-discovered or pointed at by the user — scan the *entire* unpushed range (`git log --name-only @{u}..HEAD`) grouped by file for the same repeated-single-file pattern before proposing a squash plan. See `staging-discipline.md` "Full-range squash-candidate scan" for the procedure. Presenting a squash plan for only the range the user mentioned, while an identical streak sits elsewhere in the same unpushed history, is a violation — the assistant surfaces the full picture, not just the part the user already knew about.
+
 ## Split Decision Criteria
 
 ### Split when

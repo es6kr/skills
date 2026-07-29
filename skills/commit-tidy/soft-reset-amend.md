@@ -13,6 +13,7 @@ Amend the top N commits by soft-resetting them into the staging area, then selec
 
 - Only a **middle commit** needs amending while keeping surrounding commits intact (e.g., fix only HEAD~3, leave HEAD~2 and HEAD~1 as-is) -- use [interactive-amend](./interactive-amend.md) instead
 - Commits are **already pushed** and shared with others (rewriting shared history is destructive)
+  - **Squashing an already-pushed MIDDLE range** (not at the tip) is a distinct case from both exclusions above — see [interactive-amend "Squashing a middle range"](./interactive-amend.md#squashing-a-middle-range-already-pushed-n-adjacent-commits), which combines this topic's reset mechanism with a worktree + `rebase --onto` replay, without `rebase -i`
 - The commit range includes **merge commits** -- soft reset flattens merge structure
 
 ## Comparison: interactive-amend vs soft-reset-amend
