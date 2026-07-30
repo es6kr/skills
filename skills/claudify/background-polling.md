@@ -14,6 +14,7 @@ Mandatory active polling for long-running background work (HARD STOP).
 | **Remote-host nohup detach (e.g. `ssh remote-host 'nohup ... &'`)** | ❌ No automatic notification | **✅ Required** — register `ScheduleWakeup` |
 | **External-system async work (CI run, cloud deploy, etc.)** | Partial (`gh run watch` etc.) | **✅ Required** if no native watch |
 | **User-triggered CI/deploy (user pushes a tag, runs manual workflow_dispatch, or fires an external trigger)** | ❌ No automatic notification | **✅ Required** — poll primary sources (`gh run list` / `gh release list`) immediately before composing the next response |
+| **Assistant-triggered PR creation (`gh pr create` fires CI on the PR)** | ❌ No automatic notification | **✅ Required** — `gh pr checks <N> --watch` (or non-blocking poll if other work is drivable), then `gh pr ready <N>` on green. This is part of the same PR-creation task, not a deferrable follow-up (`github-flow/pr.md` Step 7.5) |
 
 ## `TaskOutput`'s own `block`/`timeout` — same short-cycle discipline applies (HARD STOP)
 
