@@ -434,6 +434,10 @@ The following expressions mean "inspect / review / check" — NOT permission to 
 2. If all satisfied → skip AskUserQuestion, run `gh pr merge --squash`
 3. If any unsatisfied → AskUserQuestion explaining the blocker + suggesting how to clear it (independent of pre-approval)
 
+**Exception — AI Review Summary structurally exempt (CI-gate-only staging base) (HARD STOP)**: "skip AskUserQuestion" in step 2 assumes the AI Review Summary already gave the user visibility into the actual diff before this point. When condition 3 is exempt because the base is CI-gate-only (staging branch, e.g. `next-fix`/`next-feat` — see the CI-gate-only exception above), that visibility never happened, and an explicit merge command + the remaining 4 conditions is not the same thing as the user having seen the content. In this case, do NOT skip AskUserQuestion — present a final content-review ask (the PR URL + a one-line summary of the change) before running `gh pr merge`, even though the user already gave an explicit merge instruction. This is not re-confirming *intent to merge* (already given) — it's the only remaining chance for the user to catch something they'd reject (e.g. a wrongly-scoped skill topic) before an irreversible squash.
+
+**Self-check (before skipping AskUserQuestion in the auto-merge procedure)**: is AI Review Summary satisfied because it was actually posted, or because it's structurally exempt (staging base)? If exempt → this exception applies, ask before merging regardless of pre-approval wording.
+
 **Forbidden patterns**:
 - "Wait for the predecessor PR to merge" answer → after the PR is created + five conditions satisfied → asking "shall I merge?" again (redundant)
 - Mis-interpreting a pre-approval answer as "inspect intent" instead of "merge intent"
@@ -456,6 +460,17 @@ gh pr view <PR_NUMBER> --json mergeable
 - If all five conditions above pass, the PR can be merged.
 
 ## Merge Execution
+
+### Merge-method policy pre-check (HARD STOP — before proposing a merge method)
+
+Squash is the default recommendation below, but some repos treat **merge-commit as policy, not squash** — most notably **release-please / changesets** repos. release-please parses the individual Conventional Commits landed on the default branch, and changesets relies on the per-commit changeset files; squashing collapses that history and breaks the release tooling. Before offering a merge method (or building an AskUserQuestion merge option), confirm the repo's allowed/default method:
+
+```bash
+gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed}}'
+# viewerDefaultMergeMethod = the configured default; mergeCommitAllowed/squashMergeAllowed = the reliable allowed-method booleans (fallback when the default field is unavailable).
+```
+
+Signal that merge-commit is the policy: a release-please manifest/config in the repo root (`.release-please-manifest.json`, `release-please-config.json`) or a `.changeset/` directory. When present, propose `--merge` (below), not `--squash`.
 
 ### Squash Merge (recommended)
 
