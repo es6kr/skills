@@ -15,6 +15,19 @@ Mandatory active polling for long-running background work (HARD STOP).
 | **External-system async work (CI run, cloud deploy, etc.)** | Partial (`gh run watch` etc.) | **✅ Required** if no native watch |
 | **User-triggered CI/deploy (user pushes a tag, runs manual workflow_dispatch, or fires an external trigger)** | ❌ No automatic notification | **✅ Required** — poll primary sources (`gh run list` / `gh release list`) immediately before composing the next response |
 
+## `TaskOutput`'s own `block`/`timeout` — same short-cycle discipline applies (HARD STOP)
+
+**`TaskOutput(block=true, timeout=<large>)` is a synchronous in-turn wait, not a background dispatch — it burns the exact same wall-clock/cache-window cost as an idle loop, and it is invisible to the Bash-only ceiling check (`bash-guard.py` `TIME_BOUND_CEILING`) and to the Stop-hook wait-phrase detector (which only fires when a turn *ends* on a wait). A multi-minute `block=true` call never ends the turn, so neither guard sees it.**
+
+- `block=true` is for a **short confirmation check** (≤30s) right after dispatch — not a way to "wait out" an expected multi-minute task inside one call.
+- If the first short check returns `not_ready`/`running`, do **not** re-issue another near-ceiling blocking call. Either: (a) end the turn and register `ScheduleWakeup` per the delay guide above, or (b) if other pending work exists this turn, drive it now and re-check with `block=false` later.
+- `block=false` (non-blocking poll) is always safe regardless of duration — prefer it over a long `block=true` when you plan to keep working.
+
+| # | Don't | Do |
+|---|-------|-----|
+| — | `TaskOutput(block=true, timeout=180000)` right after a task was just auto-backgrounded, with nothing else queued | `TaskOutput(block=true, timeout=15000..30000)` for a quick check; if still running, end the turn + `ScheduleWakeup`, or drive other pending work and poll with `block=false` |
+| — | Treat "timeout ≤ 240s" as compliance for a `TaskOutput` call the way it is for `bash-guard.py`'s Bash ceiling | The Bash ceiling exists for *background* commands that don't hold the turn hostage. A blocking `TaskOutput` call *does* hold the turn — the safe ceiling for it is much shorter (~30s), not 240s |
+
 ## Don't / Do
 
 | # | Don't | Do |
@@ -54,6 +67,7 @@ Mandatory active polling for long-running background work (HARD STOP).
 5. Multiple concurrent background tasks → one wakeup keyed to the latest-finishing task
 6. **Stale-process scan**: right before a new background dispatch, check the session's tracked background PIDs for 1-hour+ processes with `ps -o pid,etime,command -p <pid,...> | awk 'NR==1 || $2 ~ /-|^[0-9]+:[0-9]{2}:[0-9]{2}$/'`. If found, report to the user and kill after confirmation
 7. **Main-session utilization**: are other pending tasks drivable while the background work runs? Drive them in the same turn — an end-of-turn idle is acceptable only when nothing else is drivable
+8. **`TaskOutput` call ceiling**: about to call `TaskOutput(block=true, timeout=...)`? — keep it ≤30s. If the task is still `running`, end the turn + `ScheduleWakeup` instead of re-blocking near the 240s ceiling — that ceiling is for Bash background commands, not for a synchronous in-turn `TaskOutput` wait
 
 ## Self-check (after user-delegated CI/deploy, immediately before every response)
 
