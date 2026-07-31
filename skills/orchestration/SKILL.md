@@ -12,6 +12,9 @@ description: >-
   worktree management, reading or waiting on terminals, and automation of the
   browser embedded inside Orca. Use Computer Use for browser windows, webviews,
   Orca app UI, or desktop UI outside Orca's embedded browser.
+metadata:
+  author: es6kr
+  version: "0.1.0"
 ---
 
 # Orca Orchestration
