@@ -419,6 +419,8 @@ options: [
 
 ### Context-usage gate (HARD STOP — before offering ANY wrap-up/cleanup option, in any ask)
 
+**Dependency precondition (HARD STOP)**: this entire gate applies ONLY when a session-cleanup skill is available in the current environment. If none is available, skip the context-usage gate and never offer a cleanup / wrap-up / retrospective option — see next SKILL.md "Dependency-gated behaviors". Evaluate the conditions below only after this precondition passes.
+
 A session-cleanup / retrospective / wrap-up option — including as a diversity slot inside a regular next-action ask — may be offered only when at least one of these holds:
 
 1. The user explicitly signaled wrap-up intent (wrap-up keyword, or 2+ consecutive declines of other follow-ups), or
