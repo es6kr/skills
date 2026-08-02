@@ -37,6 +37,27 @@ Use `next` skill in the following scenarios:
 
 After task completion, use `AskUserQuestion` to suggest next steps and get user selection.
 
+## Dependency-gated behaviors (conditional on skill availability)
+
+Two of this skill's behaviors are **mandatory only when their backing skill exists in the current environment**, and must be **skipped entirely when it does not**. Detect availability from the session's available-skills list (the environment's skill registry / available-skills reminder) — never assume a skill is present.
+
+| Behavior | Backing skill | When AVAILABLE | When ABSENT |
+|----------|---------------|----------------|-------------|
+| Context-usage check + session-cleanup / wrap-up recommendation (context-usage gate, cleanup option, retrospective) | a session-cleanup skill | Apply the context-usage gate and offer the cleanup / wrap-up option per its threshold rules | **Skip** — do not measure context usage, do not offer any cleanup / wrap-up option |
+| fix_plan.md / checklist.md change verification during candidate discovery | a fix_plan / checklist skill | **Mandatory** — read the workspace tracker for changed / pending items BEFORE composing options (elevated from optional source to required check) | Treat the tracker as an ordinary optional file; no mandatory read |
+
+**Why**: a next-action ask must not reference or recommend a skill the environment lacks (dead recommendation); conversely, when a fix_plan / checklist skill IS present its tracker is the authoritative source of pending work, and skipping it silently drops real candidates.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Offer a cleanup / wrap-up / retrospective option (or run the context-usage gate) in an environment with no session-cleanup skill | Gate both on session-cleanup availability — absent ⇒ omit entirely |
+| 2 | Treat fix_plan.md / checklist.md as merely one optional source when a fix_plan / checklist skill is available | Available ⇒ reading the tracker for changes is mandatory before composing options |
+| 3 | Assume the backing skill exists because "it usually does" | Check the session's available-skills list each time before applying the gated behavior |
+
+**Self-check (before composing any next-action ask)**:
+1. Is a session-cleanup skill available? → No: skip the context-usage gate + omit cleanup / wrap-up options. Yes: apply them.
+2. Is a fix_plan / checklist skill available? → Yes: reading the workspace tracker for changes is MANDATORY before composing options. No: skip.
+
 ## Instructions
 
 ### Step ordering in Antigravity (resolves the two "runs first" steps below — HARD STOP)
@@ -54,6 +75,8 @@ Step 0-0 and Step 0-1 below each describe themselves as running "first" — that
 ### Step 0-1: Antigravity Session Check & Context Usage Gate (MANDATORY in Antigravity — runs before Step 0-0 in that environment, see "Step ordering" above)
 
 Antigravity offers limited backend hooks, so environment detection and session context size evaluation must be performed before Step 0-0's audit text is composed.
+
+**Dependency precondition (HARD STOP)**: the context-usage measurement and cleanup recommendation in this step apply only when a session-cleanup skill is available in the environment (see "Dependency-gated behaviors"). If none is available, skip this gate entirely — do not measure context usage or set a cleanup option.
 
 1. **Detect Environment**: Check if running in Antigravity / Gemini environment.
 2. **Evaluate Context Usage**: Check the size of `transcript_full.jsonl` in the conversation log directory. In Antigravity (Gemini), compute context usage empirically: `tokens = 30,000 (system prompt baseline) + (transcript_full_bytes / 4)` and `pct = (tokens / 1,000,000) * 100`. Never copy example placeholder numbers.
@@ -93,9 +116,9 @@ Identify the type of task just completed.
 | Just-completed work | Direct follow-ups (commit / push / verify / test / publish) |
 | Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) |
 | Recent commits awaiting CI | `gh run list --limit 5` for pending CI watch |
-| fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) |
+| fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) — **mandatory read when a fix_plan / checklist skill is available** (see "Dependency-gated behaviors"); otherwise an ordinary optional source |
 | Plane | Self-hosted project tracker, if this environment has one configured (check local infra docs for connection details) — check open issues/cycles when the project has one wired up |
-| Session wrap-up | `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage at/above the **per-model** threshold (Fable/Mythos 55%, Opus 50%, others 45% — see suggestion-patterns.md "Context-usage gate") |
+| Session wrap-up | **Only when a session-cleanup skill is available** (see "Dependency-gated behaviors"). `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage at/above the **per-model** threshold (Fable/Mythos 55%, Opus 50%, others 45% — see suggestion-patterns.md "Context-usage gate") |
 | Other (free text) | Auto-provided by AskUserQuestion |
 
 | # | Don't (forbidden) | Do (correct alternative) |
@@ -125,6 +148,7 @@ Identify the type of task just completed.
 5. Does the completed work carry ≥2 discrete findings the user must disposition? → Per-finding questions first (see suggestion-patterns.md "After analysis / review producing multiple findings"), never one option bundling all findings
 6. Does any candidate originate from a pre-compact summary or an old in-progress task rather than this turn's own discovery? → If yes, run the premise-verification check above before including it
 7. Does the candidate's fix_plan item reference a linked plan doc? → Read that doc's own Progress Checklist before composing the ask; do not rely solely on fix_plan's inline summary
+8. Dependency gates (see "Dependency-gated behaviors"): is a session-cleanup skill available? (No → omit any cleanup / wrap-up option AND skip the context-usage gate). Is a fix_plan / checklist skill available? (Yes → reading the workspace tracker for changes is mandatory before composing)
 
 ```typescript
 AskUserQuestion({
