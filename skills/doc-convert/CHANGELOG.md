@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/es6kr/skills/compare/doc-convert-v0.1.1...doc-convert-v0.2.0) (2026-08-03)
+
+
+### Features
+
+* **doc-convert:** rename docxport skill to doc-convert, integrate with raw-ingest ([#180](https://github.com/es6kr/skills/issues/180)) ([5bd57d7](https://github.com/es6kr/skills/commit/5bd57d7150926fee3fa2e85355ad85489103ae1c))
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.1.1](https://github.com/es6kr/skills/compare/docxport-v0.1.0...docxport-v0.1.1) (2026-07-23)
 
 

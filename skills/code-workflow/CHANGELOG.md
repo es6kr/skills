@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/code-workflow-v0.5.1...code-workflow-v0.6.0) (2026-08-03)
+
+
+### Features
+
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/code-workflow-v0.5.0...code-workflow-v0.5.1) (2026-07-28)
 
 
