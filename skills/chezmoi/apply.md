@@ -28,6 +28,14 @@ For each changed file, summarize the change in one line:
 
 ### 4. AskUserQuestion per file (questions array)
 
+**Show the diff before asking (mandatory)**: the user only sees the assistant's own text output, not raw tool-call results — running `chezmoi diff` / `git diff` via Bash does not make the change visible to the user. Paste the relevant diff as a fenced ` ```diff ` code block in the response text immediately before the `AskUserQuestion` call.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Summarize the change in prose only ("removed the default worktree line") | Paste the actual diff hunk as a fenced code block, then call `AskUserQuestion` |
+| 2 | Assume a Bash tool result showing the diff is visible to the user | Re-embed the diff text in your own response — tool results are not user-visible |
+| 3 | End the turn with a declarative report when a prior decision (apply/keep/skip) is still unconfirmed | Re-issue `AskUserQuestion` for the still-open decision — "already asked earlier" is not a reason to skip re-confirming after new changes |
+
 Present all files in a single `AskUserQuestion(questions: [...])` call (max 4 per call, batch if more):
 
 ```
