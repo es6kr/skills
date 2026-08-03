@@ -60,6 +60,16 @@ web-browser (Step 0: environment detection — shared by all topics)
 | 3 | wmux/cmux/Playwright MCP disconnected → fall back to headless CLI | Even on CLI fallback, force `headless: false`. On a Windows desktop OS, a chromium GUI is available |
 | 4 | "headless is faster and more stable by default" mindset | Speed costs user visibility. If the user says "show me", visibility wins |
 | 5 | Playwright MCP disconnected → CLI fallback auto-selects headless | CLI fallback is also `headless: false`. headless is only for explicit non-interactive cases (e.g., CI assertion) |
+| 6 | SaaS/API task lacks credentials → fallback to manual user UI operation | Do NOT recommend manual user UI clicking when API access is available; fallback to `credential-issue` topic to issue token/key first |
+
+## API-capable environment without credentials — fallback to credential-issue (HARD STOP)
+
+**When a task can be performed via API (e.g., Google Forms API, GitHub API, AWS API), but required API tokens or access keys are missing in the environment, do NOT recommend manual user UI clicking or surrender to direct manual UI operation.** You MUST recommend `credential-issue` topic to issue the access key/token via browser login first, then proceed with backend API automation.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | API token missing → "Please edit/click manually on the website" | Recommend `credential-issue` topic to issue API token/key via browser login |
+| 2 | Direct UI automation fails → fallback to manual user operation | Check if API automation is available → issue credential via `credential-issue` → execute API |
 
 ### Self-check (every time before launching Playwright/chromium)
 
