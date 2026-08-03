@@ -64,7 +64,7 @@
 **HARD STOP — every hook must have an owning skill**:
 - Hook scripts must be installed from some skill's `resources/` directory (orphan hooks forbidden)
 - Domain hooks (openclaw, semaphore, ralph, etc.) → store at `resources/<hook>.sh` in the matching domain skill, install via the skill's install procedure
-- Shared/system hooks (Bash guards, session handling, etc.) → **the `hook` skill is the default installer** (`~/.claude/skills/hook/resources/`)
+- Shared/system hooks (Bash guards, session handling, etc.) → **the `hook-kit` skill is the default installer** (`~/.agents/skills/hook-kit/resources/`)
 - Never create a hook in isolation — decide its owning skill at the same time it is added (see `~/.agents/rules/automation.md`)
 
 ### Choose **Distribution Level**
@@ -116,6 +116,24 @@ Consider separation when functionality includes multiple concerns or reusable pa
 - [ ] Does separation reduce complexity?
 
 If one is sufficient, don't separate. Over-separation increases complexity.
+
+## Before Recommending Plugin Bundle Activation (Duplicate/Stale Check)
+
+Before presenting plugin/skill-bundle activation as a decision axis (activate vs don't-activate), check whether the bundle's skills are already live elsewhere.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Present "activate this bundle?" as an open decision without checking overlap | Diff each bundled skill's name against `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/` — if a same-named skill already exists there, this is not a fresh capability decision |
+| 2 | Stop the check at "same-named skill exists" and still offer activation as a live option | Diff the file contents between the bundle copy and the canonical copy. If divergent/stale, activation would introduce a conflicting duplicate source, not new capability — recommend removing the stale bundle copy instead |
+| 3 | Treat "these are duplicates" as a fresh discovery worth re-investigating each time the same bundle is considered | Once a bundle's skills are confirmed to duplicate canonical global skills, that verdict holds until the canonical skills change — no re-investigation needed on a later prompt for the same bundle |
+
+**Self-check (before offering plugin/skill-bundle activation as a decision)**:
+1. List every skill name inside the candidate bundle.
+2. For each name, check both `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/` for a same-named directory.
+3. If any match — diff the bundle copy against the canonical copy.
+4. Identical → activation is a no-op (state this, do not present as a meaningful choice).
+5. Divergent/stale → recommend removing the stale bundle copy; do not frame activation as a viable option.
+6. No match at all → activation is a genuine new-capability decision — proceed with the normal AskUserQuestion.
 
 ## Quick Reference
 
