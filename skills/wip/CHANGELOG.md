@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.2](https://github.com/es6kr/skills/compare/wip-v0.4.1...wip-v0.4.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+* **next,fix,wip:** reduce meta-task over-registration + enforce skill-invocation resume ([beec453](https://github.com/es6kr/skills/commit/beec453da85d70c79ec9403c83259e7a4a28d303))
+* staging bundle — meta-task registration, next-call-gap, bash-guard consolidation, hook-kit FP fixes ([dc1b790](https://github.com/es6kr/skills/commit/dc1b790688808df7649ef390a22caa5f66a8aa40))
+
+## [0.4.1](https://github.com/es6kr/skills/compare/wip-v0.4.0...wip-v0.4.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* hook relocation + Korean-pattern externalization (cc-plugin, fix, wip) ([f4af5b5](https://github.com/es6kr/skills/commit/f4af5b564b2d43387a5d004f875e56b30a36ce13))
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+* **wip:** externalize Korean completion patterns in task-complete-detect hook ([bb6e990](https://github.com/es6kr/skills/commit/bb6e990d17696461469d00db7c58632757f2f9a4))
+* **wip:** resume workflow bundle — defer-to-checklist, background-idle guard ([#125](https://github.com/es6kr/skills/issues/125)) ([7c90dd4](https://github.com/es6kr/skills/commit/7c90dd446121d80dcc2d69d9881c155bb16540a5))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/wip-v0.3.3...wip-v0.4.0) (2026-07-07)
 
 

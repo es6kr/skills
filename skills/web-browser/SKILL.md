@@ -72,6 +72,22 @@ web-browser (Step 0: environment detection — shared by all topics)
 
 During a closed shadow DOM `ak-library` cascade investigation, used a `npx playwright` Bash invocation + `chromium.launch({ headless: true })` and only attached a screenshot in chat. The user requested "show it via web-ui-test" and no visible browser was provided. The user reacted angrily that the Chromium UI never appeared.
 
+## Login wall mid-capture — ask before stopping, don't silently defer (HARD STOP)
+
+**When a capture/documentation task (report evidence, purchase/registration flow guide, etc.) hits a screen that requires login, and completing that login would reveal materially different information than what's already captured (e.g., the real final price vs. a promotional pre-login price, actual post-login UI state vs. an assumption), do NOT silently stop and paper over the gap with a deferral disclaimer.** Ask the user via `AskUserQuestion` whether to continue (via interactive login in a visible backend) or whether the pre-login capture is sufficient for the purpose at hand.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Hit a login wall → write "please have finance/ops enter payment details themselves for security" and stop, without asking | Decompose the remaining flow: **payment/credential entry** should be deferred to the user/business owner, but **login + viewing the resulting screen** is often just informational — ask which is actually needed before deciding to stop |
+| 2 | Treat "login" and "entering payment info" as one bundled decision to skip together | They are different risk levels. Login-then-observe (e.g., see the real cart/checkout price) does not require entering card/account credentials — only the latter needs deferral |
+| 3 | Report a pre-login/promotional price or state as if it were final, without flagging the gap | If the login-gated final screen wasn't verified, explicitly flag it ("actual payment screen not verified — may differ from the listed price") instead of presenting the pre-login figure as authoritative |
+| 4 | Assume the backend can't support interactive login without checking | Check chrome-devtools connection + visibility (per `credential-issue.md` "Fresh-login flow") first; if visible, open the page there and have the user sign in in that same window, then continue capturing |
+| 5 | Decide unilaterally that "this is good enough" when the report's factual accuracy depends on the gated screen | If the gap could make a delivered report/guide factually wrong (e.g., a payment-request report citing a price that turns out incorrect), the stop-vs-continue decision belongs to the user, not the assistant |
+
+### Violation case (2026-07-22, 1st)
+
+While building a domain-registration payment-request report, captured the domain-search-result page (showing a promotional price) and the login screen, then stopped at the login wall with a disclaimer ("have finance/ops enter payment details"), never asking whether to continue via login to verify the real checkout price. The report's stated price differed from the actual payment-screen price. User feedback (paraphrased): "don't arbitrarily skip capturing screens that require login — ask first."
+
 ---
 
 ## Step 0: Environment Detection (MANDATORY — before any browser action)

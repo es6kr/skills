@@ -29,22 +29,45 @@ Environment detection:
 
 If you find yourself in this file with 0 existing tasks and args that request new deliverables (write / create / add / draft verbs), dispatch back to SKILL.md Step 0 and re-classify — you are in the wrong workflow.
 
-## Step 1. Cleanup (FIRST — no user confirmation required)
+## Step 1. Cleanup (`completed` auto only — `pending` deletion always requires user confirmation, HARD STOP)
 
 Remove stale items immediately. The goal is to take them out of the selectable list so the next step's context is not muddied.
 
+**HARD STOP — pending deletion is a user-decision area**: `completed` items are auto-deleted. `pending` items require `AskUserQuestion` confirmation regardless of label. Autonomous "stale/unrelated" reclassification is forbidden.
+
 ### Deletion targets
 
-| Status | Deletion condition |
-|--------|--------------------|
-| `completed` | Completed tasks have no tracking value in the next session (their summary is already reflected in persistent files such as fix_plan.md) |
-| `in_progress` (residue from a prior session) | `in_progress` from before the compact is meaningless due to broken context |
-| `pending` (unrelated) | Stale items unrelated to other pending entries or new work |
+| Status | Sub-category | Deletion action |
+|--------|--------------|-----------------|
+| `completed` | — | **Auto-delete** (no confirmation) — completed tasks have no tracking value in the next session (their summary is already reflected in persistent files such as fix_plan.md) |
+| `in_progress` (residue from a prior session) | — | **Auto-delete** — `in_progress` from before the compact is meaningless due to broken context |
+| `pending` "actionable now" | Immediately actionable, autonomously executable | Keep (target of Step 2 direction ask) |
+| `pending` "waiting on external" | Any label indicating a review/blocked/host-delegated/PR-merge-pending/user-decision-pending state (locale-agnostic — e.g. English `[REVIEW_PENDING]` / `[BLOCKED]`, or the equivalent in the workspace's local language) | **Not a deletion target** — keep. Consider migrating to checklist medium |
+| `pending` "obsolete/unrelated" | Clearly unrelated or long-abandoned (e.g., not mentioned in 3+ sessions, related feature removed) | **Delete ONLY after user confirmation** — present candidate list via `AskUserQuestion` and delete only on explicit approval |
 
-### Do NOT delete
+### Do NOT delete (HARD STOP — no autonomous classification)
 
+- **`pending` items — delete forbidden without explicit user target, regardless of status/label**
+  - The word "unrelated" is not a vocabulary the assistant may autonomously classify by. When classification is needed, present the candidate list via `AskUserQuestion` and delete only on explicit approval
+  - Any label indicating a review/blocked/host-delegated state explicitly signals "waiting on external" → not a deletion target (locale-agnostic — recognize the equivalent label in the workspace's local language, not only English)
 - The user has explicitly asked to "keep completed tasks"
 - Tasks that belong to **an in-flight fix procedure** such as the `fix-*` series
+
+### Don't / Do — pending deletion judgment
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Receive a "delete stale tasks" instruction and autonomously classify pending tasks as stale before deleting | Pending always requires user confirmation. Present the candidate list via `AskUserQuestion` with explicit deletion approval per item |
+| 2 | Reclassify labels that indicate a review-pending or blocked state as "unrelated" | These labels are explicit "waiting on external" states → never stale. Auto-exclude from deletion targets |
+| 3 | Justify pending deletion via the "cleanup is no user confirmation required" clause | That clause applies only to `completed` + `in_progress` residue. Pending is a separate flow |
+| 4 | Delete 4+ items in bulk without per-item judgment rationale | Verify each task's status / label / most-recently-mentioned session before deletion → report to user and get approval |
+
+### Self-check (every time before executing a task-deletion command)
+
+1. Do the deletion candidates include any `pending` status? — If yes, `AskUserQuestion` is immediately mandatory
+2. Do any `pending` candidates carry a label indicating review/blocked/host-delegated state (in any language)? — If yes, exclude from deletion targets and report "this item is waiting on external, so keeping it" to the user
+3. Is the user's instruction ambiguous vocabulary such as "delete stale"? — Present the candidate list and request explicit approval. "What counts as stale" is a user decision
+4. Have per-item judgment rationale been reported to the user? — Blanket "all 4 are stale" is forbidden
 
 ### Per-environment commands
 
@@ -52,6 +75,51 @@ Remove stale items immediately. The goal is to take them out of the selectable l
 |-------------|-----------------|
 | Claude Code | `TaskList` → identify deletion targets → call `TaskUpdate(taskId, status: "deleted")` for each |
 | Antigravity | Read `task.md` → identify lines to delete → remove those lines via `replace_file_content` |
+
+## Step 1.5. Checklist state recovery — context-opaque tasks (MANDATORY before Step 2)
+
+After cleanup, scan the remaining items (`pending` + `in_progress`). For any task whose current state **cannot be verified from the in-context conversation** — post-compact resume, an item inherited from a prior session, or a subject referencing work not visible in context — recover its state from the checklist media (`fix_plan.md` / `checklist.md`) **before composing the Step 2 ask**. Do not guess from the bare task subject, and do not ask the user to re-explain what the tracker already records.
+
+### Trigger — a task is context-opaque when any of these hold
+
+| Signal | Example |
+|--------|---------|
+| Session resumed from a compact and the task predates the summary | Subject references a PR / file / decision absent from visible context |
+| The subject alone does not tell whether the work is done, partial, or blocked | "deploy verification", "sync branch policy" with no in-context trail |
+| The subject cites an artifact not read this session | "fix_plan item: ...", "PR follow-up" with no PR state in context |
+
+### Recovery procedure
+
+**Step 0 — primary-source check for externally-verifiable completion (HARD STOP)**: if the task's completion produces an external, non-rewindable side-effect — a pushed branch, an open/merged PR, a deployed image, an archived/published file — query that side-effect **before** reading any checklist: `gh pr view <N> --json state,mergedAt` / `gh pr list --head <branch>` / `git ls-remote --heads origin <branch>` / `gh run list` / `ls <archived-path>`. If it shows the work is already done, the task is **completed** regardless of what `fix_plan` / `checklist` text says. A rewind or compact reverts tracker text and TaskList status but never the external effect, so the tracker can read "awaiting / remaining" on already-finished work. Mark it completed and do not surface it as remaining in Step 2.
+
+1. Locate the checklist media: `fix_plan.md` / `checklist.md` (workspace root or the project's tracker directory), plus any file the task subject names
+2. Grep the task's key noun(s) in those files → Read only the matching section (Why / How / `[BLOCKED]` label / trigger / progress notes)
+3. Map the recovered state into Step 2:
+
+| Recovered checklist state | Step 2 handling |
+|---------------------------|-----------------|
+| External side-effect present (PR pushed/open/merged, branch on origin, file archived) but checklist reads `[ ]` / "awaiting" | **Primary source wins** — the checklist text is stale (rewind/compact desync). Mark the task completed; do NOT present it as remaining |
+| `[x]` completed in checklist | Completion-sync candidate — mark the task completed/deleted instead of asking direction |
+| `[ ] [BLOCKED]` with trigger | Default option = Defer to checklist (or drop the duplicate task if already recorded there) |
+| `[ ]` open with Why/How recorded | Quote the recorded Why/How in the option description so the user decides from facts |
+| Not found in any checklist | Say so in the ask ("no checklist trace") — the user may hold context the tracker lacks |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compose the Step 2 direction ask from the bare task subject when its state is not verifiable in context | Grep/Read the checklist media first; embed the recovered state in the option descriptions |
+| 2 | Ask the user "what was this task about?" when fix_plan/checklist already records it | The tracker records intent — but for externally-verifiable completions the external side-effect (gh/git/fs) is the authoritative state; check it first, then recover the rest from the tracker, ask direction last |
+| 5 | Trust `fix_plan` / `checklist` `[ ]` / "awaiting" text for a task with an external side-effect (PR / branch / deploy / archived file) | Verify the side-effect at its primary source (`gh pr view`, `git ls-remote`, `gh run list`, `ls`) first — a rewind/compact can leave the tracker stale while GitHub/filesystem show the work already done |
+| 3 | Skip the lookup because "the compact summary probably covers it" | The summary is lossy. Post-compact, any task not explicitly re-verified counts as context-opaque |
+| 4 | Read every checklist end-to-end for every task | Targeted Grep by task keywords → Read only the matching sections |
+
+### Self-check (before composing the Step 2 ask)
+
+1. For each remaining item: can I state its current status from in-context evidence? — If no, it is context-opaque → run the recovery procedure
+2. Does any remaining item have an external side-effect (pushed branch, PR, deploy, archived/published file)? — If yes, I ran Step 0 and verified it at its primary source (`gh`/`git`/`fs`) before calling it remaining, NOT from `fix_plan` text alone
+3. Did any recovered state show `[x]` / `[BLOCKED]` / a completed side-effect? — Apply the mapping table (primary-source row first) before including the item in the ask
+4. Do my Step 2 option descriptions carry recovered facts (not subject-line paraphrases)?
 
 ## Step 2. Per-item direction ask
 
@@ -64,7 +132,8 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 | **Proceed** | Start execution as currently defined |
 | **Split** | Split the larger task into smaller sub-tasks |
 | **Merge** | Combine with another task into a single one |
-| **Hold** | Defer until another task completes (precedence dependency) |
+| **Hold** | Defer until another task completes (precedence dependency) — stays in the task list |
+| **Defer to checklist** | Move the task out of the task list into the checklist file (`fix_plan.md` hold section / `checklist.md`) — for external-wait / long-idle items that need cross-session persistence, not session tracking. Execution: see "Reverse direction — task → checklist demotion" below |
 | **Delete** | No longer needed |
 
 ### Don't / Do — environment-agnostic
@@ -75,6 +144,7 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 | 2 | Compress 5 items into a single ask | One independent question per item (Claude's `questions` array maxes at 4 — report the rest as "deferred") |
 | 3 | Bundle tasks under one ask via `multiSelect` | Each question independently decides the direction of its task |
 | 4 | Mark the first item `in_progress` without the direction ask | Step 3 may only be entered after Step 2 is complete |
+| 5 | Offer only "Hold (keep as task)" for external-wait items (user manual action / merge instruction / reply pending) | Include **Defer to checklist** in the option set — external-wait items belong in the checklist medium per "Medium separation principle" below. Hold keeps them polluting the task list across sessions |
 
 ### Per-environment ask method
 
@@ -106,18 +176,21 @@ Among the items decided as "Proceed" in Step 2, decide the start priority → ma
 
 ### Loop continuation (HARD STOP — do not stop with a report mid-batch)
 
-Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report.
+Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report. Delegating an item to a **background agent** (`run_in_background`) also returns control immediately — the dispatch itself is not a reason to stop.
 
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | A sub-skill (github-flow/fix/…) returns → write a report → end the turn while other Proceed items are pending | Sub-skill return = control is back in the /wip loop. Mark that item done → start the next Proceed item in the same turn |
 | 2 | Treat "the item I just drove via a sub-skill" as the whole batch | Batch = all items marked Proceed in Step 2. One done ≠ batch done |
 | 3 | All Proceed items done → stop with a report | Batch exhausted → invoke `Skill("next")` for next-action options |
+| 4 | Dispatch a background agent for one item → end the turn "waiting for the agent" while other pending/follow-up items are drivable | Background dispatch returns control to the loop at once — drive the next drivable item in the same turn (the agent's completion re-invokes the session by itself). Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached |
+| 5 | Treat multiSelect-unselected ask items as "declined" → declare drivable=0 and idle through a long background wait | Unselected multiSelect items are **deferred, not declined** — they are the first fill candidates for an idle window (drive risk-free local ones; re-ask gated ones). When genuinely nothing is drivable and the expected wait exceeds the cache window, never arm one long silent watcher — use short cycles (`timeout` ≤ 240 s, end → notify → re-arm). Enforced by the idle-wait Stop hook (`block-idle-wait-without-short-cycle.sh`) |
 
 **Self-check (every time a sub-skill returns OR an item is marked completed inside Step 3):**
 1. Are there Proceed items not yet driven? → Yes: start the next one in this turn (no report-and-stop)
 2. Batch exhausted? → invoke `Skill("next")` (not a bare report)
 3. A blocked item (waiting on a predecessor) is skipped, but skipping it does not satisfy the batch
+4. A background agent is running → are other pending/follow-up items drivable now? Drive them in this turn; an idle wait is acceptable only when nothing else is drivable
 
 ### When there are 5 or more items
 
@@ -144,6 +217,15 @@ The ask-medium ceiling (Claude `questions` max 4, Antigravity `ask.md` visibilit
 | 3 | Use `[BLOCKED]` as a task subject prefix | Use the checklist's `## Hold` section: `- [ ] [BLOCKED] <subject> (trigger: ...)` |
 | 4 | Report "BLOCKED still BLOCKED" on every `/wip` for external-wait tasks | If it is not in the task list, it is not a reporting target. When the response arrives, promote it from the checklist to a task |
 
+### Reverse direction — task → checklist demotion (Defer to checklist execution)
+
+The sync above defines promotion (checklist `[ ]` → task). The reverse — demotion — executes the Step 2 "Defer to checklist" decision:
+
+1. Append the item to the checklist file (`fix_plan.md` hold section / `checklist.md`): `- [ ] [BLOCKED] <subject> (trigger: <re-activation condition>)` — the trigger is mandatory, otherwise the item can never be promoted back
+2. Remove the task: `TaskUpdate(taskId, status: "deleted")` (Claude) / delete the line from `task.md` (Antigravity)
+3. Never leave the item in both media — duplicate medium = sync burden (same principle as Don't `#2` above)
+4. Report the demotion with the checklist path so the user knows where it went
+
 ### Ordering principle
 
 Execution tasks (work to do now) come **first (top)**, hold tasks last. Because environment-specific additions append to the end:
@@ -167,6 +249,9 @@ Execution tasks (work to do now) come **first (top)**, hold tasks last. Because 
 Step 1: Cleanup (immediate, no ask)
   ├─ Claude: TaskList → TaskUpdate(status:"deleted") × N
   └─ Antigravity: task.md → replace_file_content
+  ↓
+Step 1.5: Checklist state recovery (context-opaque tasks only)
+  └─ Grep/Read fix_plan.md / checklist.md → feed recovered state into Step 2
   ↓
 Step 2: Per-item direction ask
   ├─ Claude: AskUserQuestion (questions array, 1 question per task, max 4)

@@ -26,6 +26,12 @@
 
 set -uo pipefail
 
+# Ralph autonomous loop (RALPH_LOOP=1) has no interactive user to supply the
+# "no RAG store needed" override, so this Stop hook's exit-2 block would stall
+# the loop every turn until the circuit breaker trips. Headless loops manage RAG
+# persistence via their own wrapper, so pass unconditionally here.
+if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
+
 # Load locale-specific regex patterns from data/. The file is git-ignored so
 # the public repo never sees Korean characters. When absent, the audit signal
 # pattern falls back to an English-only regex.

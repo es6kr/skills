@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.9](https://github.com/es6kr/skills/compare/fix-v0.3.8...fix-v0.3.9) (2026-07-28)
+
+
+### Bug Fixes
+
+* **fix:** add mechanical per-file language gate before Step 2 skill edits ([c457a42](https://github.com/es6kr/skills/commit/c457a428969cff01de0df2e72c06e37387f987a9))
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+* **next,fix,wip:** reduce meta-task over-registration + enforce skill-invocation resume ([beec453](https://github.com/es6kr/skills/commit/beec453da85d70c79ec9403c83259e7a4a28d303))
+* **next,fix:** close the chained-turn next-call gap (12th recurrence) ([dd7c582](https://github.com/es6kr/skills/commit/dd7c58286a355a2451cb9e0a6f08ef1865dbe018))
+* resolve PR [#197](https://github.com/es6kr/skills/issues/197) review findings (CodeRabbit + Copilot + Internal Review) ([b54236a](https://github.com/es6kr/skills/commit/b54236a4fa4b3fef23645dfc3b184916980b7f65))
+* staging bundle — meta-task registration, next-call-gap, bash-guard consolidation, hook-kit FP fixes ([dc1b790](https://github.com/es6kr/skills/commit/dc1b790688808df7649ef390a22caa5f66a8aa40))
+
+## [0.3.8](https://github.com/es6kr/skills/compare/fix-v0.3.7...fix-v0.3.8) (2026-07-23)
+
+
+### Bug Fixes
+
+* **fix:** externalize Korean detection patterns in ambiguity-guard hook ([18dc89f](https://github.com/es6kr/skills/commit/18dc89fe309d035197db4aefb4bb6be920395858))
+* **fix:** step3-resume + SKILL body refinements ([944597d](https://github.com/es6kr/skills/commit/944597df28eab767052a26ced7c4d5ea6ee71a73))
+* hook relocation + Korean-pattern externalization (cc-plugin, fix, wip) ([f4af5b5](https://github.com/es6kr/skills/commit/f4af5b564b2d43387a5d004f875e56b30a36ce13))
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+* skills body bundle — consolidate/fix/hook-kit refinements + English-clean guard hooks (Ralph-loop bypass) ([2e26f41](https://github.com/es6kr/skills/commit/2e26f412a5b963984898e13caaca186c3617ca08))
+
 ## [0.3.7](https://github.com/es6kr/skills/compare/fix-v0.3.6...fix-v0.3.7) (2026-07-16)
 
 

@@ -98,12 +98,22 @@ Claude Code hook events each have different stdout/stderr/exit code semantics. *
 | 1 | In Stop hook, attempt `cat <<EOF ... EOF; exit 0` to deliver message to LLM | `echo '{"decision":"block","reason":"..."}'` or `echo "..." >&2; exit 2` |
 | 2 | Skip 5+ true-positive sample tests after registering a hook | Immediately after registration, force-trigger 5+ times → verify marker/message actually appears in transcript |
 | 3 | Assume "worked in PreToolUse so it works in Stop too" | Check this table each time. Channel semantics differ per event |
+| 4 | Smoke-test only the **condition-detection** logic (e.g. "does it find the missing Skill call?") and trust the **trigger gate** (the marker/keyword that decides whether the hook engages at all) | Test the trigger gate separately with **phrasing variants** — capitalization (`Cleanup` vs `cleanup`), locale synonyms, spacing. A case-sensitive/narrow gate silently no-ops the whole hook: a correct condition check is never reached if the gate never opens. Grep gates default to `grep -qiE` unless case matters (see failed-hooks.md "marker gate case-sensitivity") |
+
+### Two-part smoke test for detection hooks (HARD STOP — before declaring a detection hook done)
+
+A detection hook has **two independent parts**: (a) a **trigger gate** (a marker/keyword regex deciding whether the hook engages) and (b) a **condition check** (the actual thing being enforced). Both must pass real-data smoke tests, and the gate must be tested with phrasing variants — a gate that fails to match a legitimate completion phrase disables the hook regardless of how correct the condition check is.
+
+1. **Gate test**: feed 3+ realistic trigger phrasings including case/locale/spacing variants → gate must open (proceed to condition check) for each.
+2. **Condition test**: with the gate open, feed a payload where the enforced condition is violated → must block; and one where it is satisfied → must pass.
+3. **False-positive test**: feed 5+ normal responses that mention the topic casually but are NOT the trigger event → must NOT block.
 
 ### Self-check (before writing/modifying any hook)
 
 1. Look up the event for the hook being written/modified in this table → classify whether stdout is LLM-exposed
 2. For non-exposed events (Stop, PostToolUse, PreToolUse) — are you trying to deliver a message via stdout marker? → change channel (stderr/JSON decision)
 3. After registering the hook, verify actual marker/message exposure with 5+ samples. Zero matches = channel defect
+4. For detection hooks: did you run the **two-part smoke test** above (gate with phrasing variants + condition present/absent + false-positive set)? A case-sensitive/narrow trigger gate is the silent-no-op failure mode (see failed-hooks.md "marker gate case-sensitivity", cleanup self-compress 5th recurrence)
 
 ## skill-trigger Marker Recognition (LLM behavior contract)
 

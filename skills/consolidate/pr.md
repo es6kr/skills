@@ -46,6 +46,8 @@ If no PR number given, detect from current branch:
 gh pr list --head "$(git branch --show-current)" --json number,title --jq '.[0]'
 ```
 
+**Confirm owner/repo first (HARD STOP)**: before identifying the PR, run `git remote get-url origin` to pin the exact `<owner>/<repo>`, and pass `-R <owner>/<repo>` on every downstream `gh` call. When multiple worktrees/workspaces share the same basename (e.g. two `web` checkouts under different orgs), relying on cwd alone can target another repo's PR of the same number.
+
 ## Step 2: Check Skip Conditions
 
 Skip entirely if any of these are true:

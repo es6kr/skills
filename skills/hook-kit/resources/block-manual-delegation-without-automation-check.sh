@@ -38,6 +38,9 @@ fi
 
 # Korean fallback is empty in non-Korean envs — only English patterns apply.
 HG_MD_KEYWORDS_KO="${HG_MD_KEYWORDS_KO:-}"
+HG_MD_HOLD_KEYWORDS_KO="${HG_MD_HOLD_KEYWORDS_KO:-}"
+HG_MD_ASSISTANT_KO="${HG_MD_ASSISTANT_KO:-}"
+HG_MD_USER_KO="${HG_MD_USER_KO:-}"
 
 # English manual-delegation triggers. Matched case-insensitively (-i in the
 # loop below), so no separate capitalized alternatives are needed here.
@@ -140,6 +143,14 @@ if [[ "${1:-}" == "--test" ]]; then
 
   test_case "Token-context manual with cmux probe evidence" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Manual","description":"User pastes token - chrome-devtools disconnected and cmux not installed, manual only path"},{"label":"skip","description":"skip"}]}]}}'
 
+  test_case "Self-name quotation" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Review","description":"Discuss block-manual-delegation hook rules"},{"label":"skip","description":"skip"}]}]}}'
+
+  test_case "Domain-terminology manual sync near ArgoCD" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Sync","description":"Trigger ArgoCD manual sync for deployment"},{"label":"skip","description":"skip"}]}]}}'
+
+  test_case "Domain-terminology manual sync without context" 2 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Sync","description":"Trigger manual sync for deployment"},{"label":"skip","description":"skip"}]}]}}'
+
+  test_case "Hold option deferring manual task" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Hold","description":"Defer manual token generation and record to fix_plan"},{"label":"skip","description":"skip"}]}]}}'
+
   set -e
   echo ""
   echo "Total: $((PASS+FAIL)), Pass: $PASS, Fail: $FAIL"
@@ -172,6 +183,42 @@ CMUX_VIOLATIONS=()
 while IFS=$'\t' read -r label desc; do
   [[ -z "$label" && -z "$desc" ]] && continue
   combined="${label} ${desc}"
+
+  # 1. Self-name quotation exception
+  if echo "$combined" | grep -qEi "block-manual-delegation"; then
+    continue
+  fi
+
+  # 2. Domain-terminology close proximity exception (ArgoCD/GitOps/k8s/Terraform/PAM)
+  if echo "$combined" | grep -qEi "(manual (sync|apply|deploy|trigger|promotion)|non-automated).{0,40}(ArgoCD|GitOps|k8s|kubernetes|Terraform|PAM|argocd)" \
+     || echo "$combined" | grep -qEi "(ArgoCD|GitOps|k8s|kubernetes|Terraform|PAM|argocd).{0,40}(manual (sync|apply|deploy|trigger|promotion)|non-automated)"; then
+    continue
+  fi
+
+  # 3. Hold/carryover-only exception
+  hold_pattern='\b(hold|defer|carryover|postpone)\b'
+  if [[ -n "$HG_MD_HOLD_KEYWORDS_KO" ]]; then
+    hold_pattern="(${hold_pattern}|${HG_MD_HOLD_KEYWORDS_KO})"
+  fi
+
+  if echo "$combined" | grep -qEi "$hold_pattern"; then
+    assistant_pattern='(I will|assistant|we will)'
+    if [[ -n "$HG_MD_ASSISTANT_KO" ]]; then
+      assistant_pattern="(${assistant_pattern}|${HG_MD_ASSISTANT_KO})"
+    fi
+
+    user_pattern='\b(you|user)\b'
+    if [[ -n "$HG_MD_USER_KO" ]]; then
+      user_pattern="(${user_pattern}|${HG_MD_USER_KO})"
+    fi
+
+    # Allow if assistant is the active subject or if there are no active user-directed nouns/verbs
+    if echo "$desc" | grep -qEi "$assistant_pattern" \
+       || ! echo "$desc" | grep -qEi "$user_pattern"; then
+      continue
+    fi
+  fi
+
   # Negation-lookback: strip "no/not/without/zero ... manual" phrasing before
   # the delegation-keyword check, so an option describing the ABSENCE of
   # manual work (e.g. "no second manual trigger needed") doesn't false-positive
@@ -185,6 +232,16 @@ while IFS=$'\t' read -r label desc; do
     && echo "$combined" | sed -E 's/(^|[^a-zA-Z])(no|not|without|zero)[a-zA-Z ]{0,20}manual/\1/gi' \
     || echo "$combined")
   # Check manual-delegation keyword present (case-insensitive)
+  # NOTE: self-name / hold-carryover / domain-terminology exceptions already
+  # ran once above (checks 1-3, lines ~187-220) — do not duplicate them here.
+  # A prior duplicate copy of these same three checks lived in this exact spot
+  # and (a) used `local` inside this top-level `while` loop, which is not a
+  # function scope and errors ("local: can only be used in a function"),
+  # silently breaking the hold/carryover exemption it implemented, and
+  # (b) re-declared `hold_pattern` with looser/narrower anchors than the
+  # working copy above, so even a fixed `local`->plain-assignment version
+  # would have shadowed the better pattern. Removed rather than repaired —
+  # the first copy already covers everything this one attempted.
   if echo "$md_check_text" | grep -qEi "$MD_PATTERN"; then
     # Check automation evidence in description (case-insensitive)
     if ! echo "$desc" | grep -qEi "$EVIDENCE_PATTERN"; then

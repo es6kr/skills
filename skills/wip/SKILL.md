@@ -1,8 +1,9 @@
 ---
 name: wip
+depends-on: [next]
 description: |
   Track in-session work progress. Register steps for 3+ step tasks, update status per step, handle completion/abort.
-  On /wip invocation, when remaining tasks exist, AskUserQuestion is required for the per-item direction (proceed / split / merge / hold / delete) — asking only about start priority is forbidden.
+  On /wip invocation, when remaining tasks exist, AskUserQuestion is required for the per-item direction (proceed / split / merge / hold / defer-to-checklist / delete) — asking only about start priority is forbidden.
   After a compact, show prior-work summary then AskUserQuestion(multiSelect) for restore selection and re-register via TodoWrite.
   antigravity - task.md artifact-based checklist (Antigravity environment) [antigravity.md],
   claude - TodoWrite/TaskCreate API guide (Claude Code environment) [claude.md],
@@ -82,13 +83,16 @@ Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then 
 **Follow the 3 steps in [resume.md](./resume.md)** in order:
 
 1. **Cleanup**: immediately delete stale completed/in_progress entries (no user confirmation required)
-2. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / delete
-3. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
+2. **Checklist state recovery** (Step 1.5): for tasks whose state cannot be verified from the in-context conversation (post-compact / inherited items), Grep/Read `fix_plan.md` / `checklist.md` to recover their state before asking
+3. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / defer-to-checklist / delete
+4. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
 
 ### Step 1 (alt) — Registration path (Registration mode)
 
+**Register BEFORE execute (HARD STOP)**: `TaskCreate` must run **before any deliverable work** — no `Read` / `Edit` / `Write` / `Bash` on the target artifact until the task exists. "The edit is small / one file / ≤2 steps" is not an exception: an explicit `/wip` means the user asked for the work to be **tracked first**. Registering after the edit (or not at all) is the exact violation this path prevents. Reading a file solely to compose the task's registration is fine; editing/producing the deliverable before the task exists is not.
+
 1. Parse args into discrete work items (one per deliverable)
-2. `TaskCreate` (Claude) or append lines to `task.md` (Antigravity) — one entry per item
+2. `TaskCreate` (Claude) or append lines to `task.md` (Antigravity) — one entry per item — **as the first execution tool call, before touching the deliverable**
 3. If ≥2 items, `AskUserQuestion` for start priority; else mark the sole item `in_progress` and execute
 
 ### Don't / Do
@@ -100,6 +104,7 @@ Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then 
 | 3 | Force resume workflow onto args that request new deliverables | New-work verbs → Registration mode. Resume workflow does not apply to work that does not exist yet |
 | 4 | Skip `TaskList` before deciding mode | `TaskList` is the primary source for existing-task count. Guessing from context memory is unreliable |
 | 5 | Mixed mode: register new tasks + immediately mark in_progress without resume Step 2 direction ask on existing | Mixed mode: (a) register new, (b) then run resume on the combined list — old tasks may still need per-item direction |
+| 6 | Treat an explicit `/wip <small edit>` as a Skip-Condition case and go straight to `Read`/`Edit` of the deliverable | Explicit `/wip` = registration requested. Run Step 0 → Registration/Resume path → `TaskCreate` **first**, then execute. Skip Conditions gate self-invocation, not explicit calls |
 
 Environment implementations:
 - Claude Code → [claude.md](./claude.md) (TaskList/TaskCreate/AskUserQuestion)
@@ -111,7 +116,7 @@ Environment implementations:
 
 ### Resume (environment-agnostic)
 
-`/wip` or "task cleanup + remaining work" → Step 1 cleanup → Step 2 per-item direction ask → Step 3 execute. Per-environment tooling lives in claude / antigravity.
+`/wip` or "task cleanup + remaining work" → Step 1 cleanup → Step 1.5 checklist state recovery (context-opaque tasks) → Step 2 per-item direction ask → Step 3 execute. Per-environment tooling lives in claude / antigravity.
 
 See [detailed guide](./resume.md).
 
@@ -131,7 +136,9 @@ See [detailed guide](./antigravity.md).
 
 ## Skip Conditions
 
-WIP tracking is unnecessary for:
+**Scope (HARD STOP) — these gate the *auto-decision of whether to reach for `/wip` unprompted*. They do NOT override an explicit `/wip` invocation.** When the user explicitly types `/wip` (or "task cleanup / remaining work / register task"), registration is already requested → run Step 0 classification and the Registration/Resume path; do NOT skip `TaskCreate` because the work "looks trivial / is one file / is ≤2 steps". "Tasks with 2 or fewer steps" is a reason not to self-invoke `/wip`, never a reason to skip registration once `/wip` was invoked.
+
+WIP tracking is unnecessary (do not self-invoke `/wip`) for:
 - Single command execution (kubectl get, ls, etc.)
 - Tasks with 2 or fewer steps
 - Read-only queries

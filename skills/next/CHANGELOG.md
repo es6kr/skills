@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/next-v0.6.0...next-v0.7.0) (2026-07-28)
+
+
+### Features
+
+* bundle next-feat — fix-plan expansion, next reactive guard, github-repo extraction ([#195](https://github.com/es6kr/skills/issues/195)) ([cd65a85](https://github.com/es6kr/skills/commit/cd65a8519c88f080321d746ef197e90713039fa6))
+* **next:** add reactive continuation-chain guard (UserPromptSubmit) ([178f434](https://github.com/es6kr/skills/commit/178f4340cd336214ef2c36dfd8d4b45419dfa95e))
+
+
+### Bug Fixes
+
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+* **next,fix,wip:** reduce meta-task over-registration + enforce skill-invocation resume ([beec453](https://github.com/es6kr/skills/commit/beec453da85d70c79ec9403c83259e7a4a28d303))
+* **next,fix:** close the chained-turn next-call gap (12th recurrence) ([dd7c582](https://github.com/es6kr/skills/commit/dd7c58286a355a2451cb9e0a6f08ef1865dbe018))
+* **next:** add Antigravity context-usage cleanup gate; englishize cleanup-selection labels ([e461b22](https://github.com/es6kr/skills/commit/e461b22b456cfaa2efff6d2dcfe805954264b10a))
+* **next:** check linked plan doc's Progress Checklist before premise-verification asks ([57c2614](https://github.com/es6kr/skills/commit/57c261486ffeb63c258d3713a9c28dd1a4a34d17))
+* **next:** check linked plan doc's Progress Checklist before premise-verification asks ([f90828e](https://github.com/es6kr/skills/commit/f90828e168c881af3ddbbed9e43810daadeab843))
+* **next:** check linked plan doc's Progress Checklist before premise-verification asks ([#164](https://github.com/es6kr/skills/issues/164)) ([57c2614](https://github.com/es6kr/skills/commit/57c261486ffeb63c258d3713a9c28dd1a4a34d17))
+* **next:** drop dangling depends-on: hook reference ([#159](https://github.com/es6kr/skills/issues/159)) ([3c0eb46](https://github.com/es6kr/skills/commit/3c0eb46697ec7f468c74cbe9dfc8575a204f3094))
+* **next:** gitignore *.debug.log to prevent path leak on PUBLIC repo ([1f5dd30](https://github.com/es6kr/skills/commit/1f5dd300dc0d9653fe0fd06b32c89fcfd6e18c2a))
+* **next:** log stop_hook_active suppression for reactive-guard signal ([8bf95b9](https://github.com/es6kr/skills/commit/8bf95b9ae8cf9aa1323d4e1f5835052561cb0d50))
+* **next:** require a no-parallel-work check before backgrounding an agent ([#155](https://github.com/es6kr/skills/issues/155)) ([ff5a26b](https://github.com/es6kr/skills/commit/ff5a26b149a19247ce6fd39ca23d7a9afce24ad4))
+* **next:** scope the tool-call-only guard to the whole turn ([31cce42](https://github.com/es6kr/skills/commit/31cce426a6369bd0a99d54a6ac54151aa9c19ae7))
+* **next:** suppress reactive-guard false positive on ask-terminal turns ([2b80f12](https://github.com/es6kr/skills/commit/2b80f12972f173bf3e21d220f5cd62e2e8262e18))
+* **next:** treat TaskList-unavailable as empty + check all session-visited workspaces ([2d401b9](https://github.com/es6kr/skills/commit/2d401b9e5c9002ebd0c5ee13a6957e3788b86ae0))
+* resolve PR [#197](https://github.com/es6kr/skills/issues/197) review findings (CodeRabbit + Copilot + Internal Review) ([b54236a](https://github.com/es6kr/skills/commit/b54236a4fa4b3fef23645dfc3b184916980b7f65))
+* staging bundle — meta-task registration, next-call-gap, bash-guard consolidation, hook-kit FP fixes ([dc1b790](https://github.com/es6kr/skills/commit/dc1b790688808df7649ef390a22caa5f66a8aa40))
+
+## [0.6.0](https://github.com/es6kr/skills/compare/next-v0.5.1...next-v0.6.0) (2026-07-23)
+
+
+### Features
+
+* **consolidate:** address PR 134 reviews and reflect orange/yellow severity display rules ([e6118d0](https://github.com/es6kr/skills/commit/e6118d0fb0217a4c4ad388b82e574203a8f9258e))
+* **hook-kit:** add pre-tool AskUserQuestion context gate ([#123](https://github.com/es6kr/skills/issues/123)) ([271b5b3](https://github.com/es6kr/skills/commit/271b5b37df5e64cf3185b2c81c3d97b66789e9ab))
+* **next-feat:** accumulate features for hook-kit context gate ([df4f73a](https://github.com/es6kr/skills/commit/df4f73ae4d27d4919105da70c6c94a14a32e8056))
+* **next:** wire Stop auto-invocation via script action + jq portability ([de2bed5](https://github.com/es6kr/skills/commit/de2bed5489a247a21eab54c0e13b27ae00d18196))
+* skills topic bundle — brief/email, code-workflow/plan-research-search, git-repo topics, skill-kit/invoke-discipline ([7fd877d](https://github.com/es6kr/skills/commit/7fd877da1b703fcdcdcaf1a3ce912f885abfa3f0))
+
+
+### Bug Fixes
+
+* **next:** require "draft PR" in option descriptions proposing PR creation ([7925177](https://github.com/es6kr/skills/commit/79251773a2aef74b5bc44f12a3a943a73ac37d02))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/next-v0.5.0...next-v0.5.1) (2026-07-19)
 
 

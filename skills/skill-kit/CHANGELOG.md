@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/skill-kit-v0.5.0...skill-kit-v0.6.0) (2026-07-28)
+
+
+### Features
+
+* bundle next-feat — fix-plan expansion, next reactive guard, github-repo extraction ([#195](https://github.com/es6kr/skills/issues/195)) ([cd65a85](https://github.com/es6kr/skills/commit/cd65a8519c88f080321d746ef197e90713039fa6))
+
+
+### Bug Fixes
+
+* **skill-kit:** add skip-condition-before-recommend self-check to invoke-discipline ([0f27fa0](https://github.com/es6kr/skills/commit/0f27fa01379790b56d0cebfbaee3142627218348))
+* **skill-kit:** add skip-condition-before-recommend self-check to invoke-discipline ([9e6503f](https://github.com/es6kr/skills/commit/9e6503f282251094b0eec69c6b207464362040cf))
+
+## [0.5.0](https://github.com/es6kr/skills/compare/skill-kit-v0.4.2...skill-kit-v0.5.0) (2026-07-23)
+
+
+### Features
+
+* **next-feat:** accumulate features for hook-kit context gate ([df4f73a](https://github.com/es6kr/skills/commit/df4f73ae4d27d4919105da70c6c94a14a32e8056))
+* **skill-kit:** add invoke-discipline topic ([5a76602](https://github.com/es6kr/skills/commit/5a76602c0ecab63fa1bff270b600dce78a8628bf))
+* skills topic bundle — brief/email, code-workflow/plan-research-search, git-repo topics, skill-kit/invoke-discipline ([7fd877d](https://github.com/es6kr/skills/commit/7fd877da1b703fcdcdcaf1a3ce912f885abfa3f0))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/skill-kit-v0.4.1...skill-kit-v0.4.2) (2026-07-16)
 
 

@@ -30,12 +30,12 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `output-dir` | `llm-wiki/generated/` (or `~/ghq/github.com/es6kr/llm-wiki/generated/`) | Directory for generated research and plan files. Default LLM Wiki path maps to `llm-wiki/generated/` in the workspace or global `es6kr/llm-wiki` repository |
+| `output-dir` | `llm-wiki/outputs/` (workspace-local) | Directory for generated research and plan files; authoritative plans may be promoted to `pages/<domain>/` per the workspace wiki convention |
 
 Set via project CLAUDE.md or skill invocation argument:
 
 ```text
-/code-workflow --output-dir llm-wiki/generated/
+/code-workflow --output-dir llm-wiki/outputs/
 ```
 
 ### Task Checklist Registration (MANDATORY Tool Call #1 HARD STOP)

@@ -78,7 +78,7 @@ RAG store is not a single tool but a **multi-medium fallback chain** — one med
 
 ### Purpose-fit priority for 3-C.1 session-chunk import (HARD STOP — not a plain availability fallback)
 
-**The (1)→(2)→(3)→(4) order above is an availability fallback chain, not a purpose-fit ranking.** For **3-C.1 whole-session import specifically**, a purpose-built session-importer script (medium 2) is the correct tool **even when medium (1) is available** — check for it FIRST, not as a fallback (see [run.md](file:///Users/david/.agents/skills/cleanup/run.md#L418) for the 3-C.1 "Availability check" HARD STOP).
+**The (1)→(2)→(3)→(4) order above is an availability fallback chain, not a purpose-fit ranking.** For **3-C.1 whole-session import specifically**, a purpose-built session-importer script (medium 2) is the correct tool **even when medium (1) is available** — check for it FIRST, not as a fallback (see [run.md](./run.md#L418) for the 3-C.1 "Availability check" HARD STOP).
 
 A generic `mcp__<vendor>__*-store` MCP call (medium 1) writes one arbitrary text blob with whatever metadata schema the caller supplies. It has no per-turn structure (no `session_id`/`turn_id`/`message_uuid`/`parent_uuid`/`timestamp` fields), no idempotent re-import (re-running upserts a fresh blob instead of skipping already-stored turns), and no dedupe against prior partial imports (e.g., a hook that already imported most of the session mid-conversation). Calling it for 3-C.1 produces a shallow, non-idempotent, hand-summarized substitute — not an actual session import.
 

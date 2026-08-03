@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.4](https://github.com/es6kr/skills/compare/web-browser-v0.2.3...web-browser-v0.2.4) (2026-07-23)
+
+
+### Bug Fixes
+
+* **next-fix:** accumulate bug fixes for docxport, wip, fix-plan, and hook-kit ([6eec083](https://github.com/es6kr/skills/commit/6eec083b7fbc429bdabcfcc89d7778b185dd7497))
+* skills body bundle — consolidate/fix/hook-kit refinements + English-clean guard hooks (Ralph-loop bypass) ([2e26f41](https://github.com/es6kr/skills/commit/2e26f412a5b963984898e13caaca186c3617ca08))
+* **web-browser:** don't abandon automation on a single login-block signal ([fed542e](https://github.com/es6kr/skills/commit/fed542e600d83979d3e31fde597da13e0ce0e18e))
+
 ## [0.2.3](https://github.com/es6kr/skills/compare/web-browser-v0.2.2...web-browser-v0.2.3) (2026-07-07)
 
 

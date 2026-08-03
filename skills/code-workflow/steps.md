@@ -2,7 +2,7 @@
 
 The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](./implement.md).
 
-> **`output-dir`**: All research/plan files are written to the configured `output-dir` (default: `~/ghq/github.com/es6kr/llm-wiki/generated/` or workspace-local `llm-wiki/generated/`). Examples below use `{output-dir}` as placeholder.
+> **`output-dir`**: All research/plan files are written to the configured `output-dir` (default: workspace-local `llm-wiki/outputs/`; authoritative plans may be promoted to `pages/<domain>/` per the workspace wiki convention). Examples below use `{output-dir}` as placeholder.
 
 0. **Task Checklist Registration (Tool Call #1 MANDATORY HARD STOP)**: The very first tool call upon entering `/code-workflow` MUST be creating or updating `task.md` (or `TodoWrite`) with the 4 workflow steps (Research, Plan, Review, Implement). No research commands (`run_command`), file viewing (`view_file`), or search (`grep_search`) are allowed before `task.md` is initialized.
 1. Check if **research/plan files** already exist in `{output-dir}` for the target task. **If the project-local `{output-dir}` has nothing for the task, also check the workspace-root Ralph directory** (e.g. `<workspace-root>/.ralph/docs/generated/`, one level above any individual project repo) before concluding no governing plan exists — cross-cutting or organization-level plans (e.g. a release-branch-strategy decision spanning multiple repos) are often written there instead of inside a single project's `docs/generated/`
@@ -69,6 +69,8 @@ Read and understand the relevant code **deeply**, then write findings to `{outpu
 
 - **Naming Rule**: Always include the GitHub issue number (e.g., `research-176-login-lock.md`). If no issue exists, use `research-<task-slug>.md`.
 - **Mandatory Corpus & RAG Pre-Lookup (HARD STOP)**: Before writing the research document, check existing project knowledge stores and memory backends (LLM Wiki, Qdrant vector memory, Serena RAG, KI summaries) to prevent duplicate analysis and ground findings in established patterns.
+  - **Grounded command (optional, abstract contract — same shape as "Research artifact dispatch" below)**: when the caller supplies `--pre-lookup=<skill>:<topic>`, invoke that skill's topic with the task subject before writing, and embed its output as a `## Prior Knowledge & Context` section at the top of `research-*.md` — the embedded section is the auditable evidence that the pre-lookup actually ran. This generic skill does not name a vendor; the caller wires `<skill>:<topic>` to whichever project skill owns pre-lookup (e.g., a backlog-lifecycle skill's own pre-lookup topic).
+  - When no `--pre-lookup` flag is supplied — or the specified receiver is unavailable in the caller's environment — the mandate still applies via direct store queries (RAG semantic find / wiki `index.md` read); fail-non-blocking (warning + continue), same policy as "Research artifact dispatch" below.
 - Do not skim a file and move on at the signature level
 - Understand existing layers, ORM relationships, and duplicate API presence
 - **Mandatory exploration of existing test files**: Find related `*.test.*`, `*.spec.*` files and understand what cases are already covered

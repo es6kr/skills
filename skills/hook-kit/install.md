@@ -8,6 +8,36 @@ Install hook scripts from skill resources (source) to `~/.claude/hooks/` and reg
 - When syncing the installed copy in hooks/ with the source in skill resources
 - Use when: "hook install", "install hook", "add hook", "hook sync"
 
+## PreToolUse:Bash/PowerShell — bash-guard first (HARD STOP)
+
+**Before writing a new standalone script for a PreToolUse:Bash or PreToolUse:PowerShell constraint, check whether it belongs in `bash-guard.py`** (`~/.claude/skills/hook-kit/resources/bash-guard.py`) instead. Every extra hook entry registered on these matchers is another full process spawn (bash.exe + jq/grep per script) on **every single Bash/PowerShell tool call** — on Windows Git Bash this costs several seconds per spawn (MSYS fork emulation + Defender per-process scanning). A session with 6+ separate scripts on `PreToolUse:Bash` measured a 71% hook-timeout rate (session `opus-fix-plan-bbfd5d27`, 2026-07-24) purely from this stacking, independent of any individual script's own logic being slow.
+
+| Constraint shape | Target |
+|---|---|
+| Pure regex match against the command string (no file I/O, no subprocess), **generic** (no internal IP/hostname/account/project-specific data) | Add a tuple to `SIMPLE_BLOCKS` (or `GIT_BLOCKS` if it's a `git` subcommand) in `bash-guard.py` |
+| Needs shlex tokenization, reading the transcript file, or other non-trivial logic, **generic** | Add a `check_*()` function in `bash-guard.py` and call it from `evaluate()` — still ONE process, just more code |
+| Any of the above but **deployment-specific** (references an internal IP/hostname, an account-only file path, a company/project-specific name) | `resources/bash-guard.py` is git-tracked in the PUBLIC `es6kr/skills` repo — deployment-specific content must NOT go there. Add it to the machine-local overlay instead (see below) |
+| Genuinely needs its own interpreter/runtime `bash-guard.py` can't provide, or is scoped to a different PreToolUse matcher (`Edit`, `Write`, `AskUserQuestion`, etc.) | Standalone script is fine — those matchers don't yet have the stacking problem `bash-guard.py` was built to solve |
+
+### Deployment-specific constraints — the LOCAL overlay (HARD STOP)
+
+**`bash-guard.py` optionally imports `../data/bash-guard.local.py` by path and calls its `check(command, tool_name, transcript_path)` on every command** — same single process, zero extra spawn. That file lives under `skills/hook-kit/data/`, already covered by this repo's `skills/*/data` `.gitignore` pattern, so it is machine-local by construction: absent on any other clone of `es6kr/skills`, and `bash-guard.py`'s overlay hook is a documented no-op when the module can't be imported.
+
+**Interface** the overlay module must expose:
+```python
+def check(command: str, tool_name: str, transcript_path: str) -> str | None:
+    ...  # return a block reason to hard-block, or None to allow
+def self_test() -> int:  # optional — bash-guard.py --test runs it too if present
+    ...
+```
+
+Discovered 2026-07-24 (session `sonnet-fix-plan-256f816a`) after a `/fix` ported two deployment-specific scripts (a Semaphore host IP, an Authentik+terraform-pam gate) straight into `bash-guard.py`'s tracked content — `~/.claude/skills/hook-kit` and `~/.agents/skills/hook-kit` are the same physical tree (`.claude/skills` is a symlink to `.agents/skills` = the `es6kr/skills` repo working copy), so there is no "local-only" path under `~/.claude/skills/` — anything placed there is inside the PUBLIC repo. The `../data/` overlay is the only place in this tree that is both (a) importable by `bash-guard.py` without an extra process spawn and (b) actually excluded from git.
+
+- `bash-guard.sh` (the same `resources/` directory) is **archived, not registered** — it was `bash-guard.py`'s pre-port shell version (one subprocess per pattern) and is kept only for its `--test` self-test harness as a quick regex sanity check. Do not re-register it or add new patterns there; add to `bash-guard.py` or the local overlay per the table above.
+- After adding a check to `bash-guard.py` or the local overlay, run `python bash-guard.py --test` (Instructions Step 5.5 below) before registering/relying on it — it runs the overlay's own `self_test()` too when present.
+- Before any commit that touches `resources/bash-guard.py`, re-run the sanitize grep from `opensource.md`'s "no personal data in PUBLIC repos" rule against the diff — an internal IP/hostname/path landing back in the tracked file is exactly the failure this section exists to prevent.
+- If a genuinely new standalone script is still warranted, follow the Direct Registration procedure below as usual.
+
 ## Registration Patterns (Direct Registration preferred)
 
 **New hooks default to direct registration in resources/.** A single-file structure where the settings.json `command` points directly to the resources path. No cp/sync step needed.
@@ -172,6 +202,15 @@ test -x ~/.claude/hooks/<script>.sh                 || { echo "FAIL: installed n
 
 - Ending with missing source permission causes the same defect on next sync (see Step 3-0)
 - The `audit.md` chmod +x detection check also inspects both source/installed
+
+### 5.5. Smoke-test before relying on it (HARD STOP)
+
+**A registered-but-unverified hook is a silent no-op or a silent block** — settings.json accepting the entry is not evidence the script runs correctly. Before treating any new/edited PreToolUse hook as active:
+
+- `bash-guard.py` changes → `python ~/.claude/skills/hook-kit/resources/bash-guard.py --test` must show `0 failed`
+- Any other new script → run it once with a real BLOCK-triggering payload and once with an ALLOW payload via stdin (`echo '{"tool_name":"Bash","tool_input":{"command":"..."}}' | bash <script>.sh` or `... | python <script>.py`), and check the exit code (0 = allow, 1/2 = block) — do not just eyeball the source
+
+The `python bash-guard.sh` interpreter-mismatch bug found in session `sonnet-fix-plan-256f816a` (2026-07-24) — a `.sh` file registered to run under `python`, which either no-ops or errors on every call — is exactly the failure mode this step catches. It went unnoticed because the entry was never smoke-tested after registration.
 
 ## Import External Script (external hook script → resources)
 

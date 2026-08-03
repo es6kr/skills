@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/claudify-v0.5.0...claudify-v0.5.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **claudify:** add Topic Dispatch section routing topic args to their files ([5a8bf80](https://github.com/es6kr/skills/commit/5a8bf80297802fb1339121a003d736f276f20381))
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+* resolve PR [#197](https://github.com/es6kr/skills/issues/197) review findings (CodeRabbit + Copilot + Internal Review) ([b54236a](https://github.com/es6kr/skills/commit/b54236a4fa4b3fef23645dfc3b184916980b7f65))
+* staging bundle — meta-task registration, next-call-gap, bash-guard consolidation, hook-kit FP fixes ([dc1b790](https://github.com/es6kr/skills/commit/dc1b790688808df7649ef390a22caa5f66a8aa40))
+
+## [0.5.0](https://github.com/es6kr/skills/compare/claudify-v0.4.0...claudify-v0.5.0) (2026-07-23)
+
+
+### Features
+
+* **hook-kit:** add pre-tool AskUserQuestion context gate ([#123](https://github.com/es6kr/skills/issues/123)) ([271b5b3](https://github.com/es6kr/skills/commit/271b5b37df5e64cf3185b2c81c3d97b66789e9ab))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/claudify-v0.3.1...claudify-v0.4.0) (2026-07-17)
 
 
