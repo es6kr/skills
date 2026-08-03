@@ -47,9 +47,13 @@ fi
 # Could not resolve the skill directory — fail open (no reminder, no block).
 [[ -z "$SKILL_MD" ]] && exit 0
 
-# First whitespace-delimited token of args is the candidate topic keyword
-# (args after that are free-text context for the invoked topic/procedure).
-TOPIC_WORD=$(echo "$ARGS" | awk '{print $1}')
+# First whitespace-delimited token of the FIRST LINE of args is the candidate
+# topic keyword (args after that, including any further lines, are free-text
+# context for the invoked topic/procedure). Multi-line args must be truncated
+# to line 1 before word-splitting — otherwise awk emits one first-field per
+# line, and a later line's leading word (e.g. a bullet's topic-like noun) can
+# spuriously match an unrelated Topic Dispatch row.
+TOPIC_WORD=$(echo "$ARGS" | head -1 | awk '{print $1}')
 [[ -z "$TOPIC_WORD" ]] && exit 0
 
 # Topic Dispatch table row format (seen consistently across multi-topic
