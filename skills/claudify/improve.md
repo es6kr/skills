@@ -53,6 +53,8 @@ Scan conversation for mistake signals and record to feedback memory + failed-att
 
 **Skip condition**: None — always run if any hooks registered.
 
+**Self-check (before closing this sub-step)**: did this pass **physically emit** the `**Hook summary**: N registered / M OK / ...` line (with the actual enumerated numbers from settings.json + session behavior classification), or did it collapse to a prose conclusion like "0 ignored" without the enumeration? A conclusion without the format line is not a substitute — go back and produce the line before moving to Skill Check. A "nothing changed since the last pass" judgment does not exempt this sub-step: re-run the enumeration and confirm the counts, even if the conclusion repeats the prior pass's numbers.
+
 #### Skill Check
 
 1. Collect skills invoked via `Skill()` during session
@@ -65,6 +67,8 @@ Scan conversation for mistake signals and record to feedback memory + failed-att
 
 **Skip condition**: No skills invoked, or all skills worked correctly.
 
+**Self-check (before closing this sub-step)**: did this pass **list the actual skills invoked this session** (by name) and run the 4-item self-heal checklist against each, or did it collapse to a single unenumerated sentence? Naming zero skills when 1+ were invoked this session is a skipped sub-step, not a clean result.
+
 ### C. Pattern Detect (Automation Candidate Discovery)
 
 **Always run — no skip.**
@@ -73,6 +77,7 @@ Scan conversation for mistake signals and record to feedback memory + failed-att
 2. On candidate discovery:
    - Maps to existing rule/skill → suggest upgrade in Phase 2
    - **New pattern that fits nowhere → invoke `/skill-kit route`** → auto-chain to upgrade/writer
+   - **Candidate is a bug/behavior fix (a hook, script, or guard producing wrong output — not a new topic/doc/skill) → run the `/fix` skill's Step 1 recurrence pre-check (`failed-attempts.md` grep, and a RAG semantic search if a receiver is available) before implementing it in Phase 2.** Reaching a bug fix via this pattern-detect path does not exempt it from the same recurrence discipline a direct `/fix` invocation would require — a bug surfaced here can still be an Nth recurrence of an already-recorded pattern, and implementing it as if newly discovered risks missing that it needs a status update (or a stronger fix) instead of a fresh entry
 3. Collect candidates for Phase 2 AskUserQuestion
 
 ## Ralph Mode

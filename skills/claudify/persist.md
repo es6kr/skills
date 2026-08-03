@@ -42,12 +42,13 @@ Save session-learned project knowledge to persistent memory.
 
 | Information type | Storage | Example |
 |-----------------|---------|---------|
-| One-time environment fact | **Memory** | Server IP, resource usage, API key location |
+| Volatile session-only fact (no reuse value beyond this session) | **Memory** (only if no domain skill owns the topic) | A one-time debug value, current resource usage snapshot |
+| Tool/credential/config reference tied to an existing domain | **Skill** (`/skill-kit route` — add to the owning domain skill, e.g. a vault/credential-location table) | Server IP, API key location, install path |
 | IaC/infra knowledge | **Skill** (`/skill-kit route`) | Terraform structure, ArgoCD procedures |
 | Domain knowledge, procedures | **Skill** (`/skill-kit route`) | Deploy procedures, troubleshooting guides |
 | Behavior rules, prohibitions | **Rules** | Mistake prevention (handled in improve topic) |
 
-**Decision criteria**: Procedurally reusable → skill. Fits existing skill topic → skill. Reference-only → memory.
+**Decision criteria**: Procedurally reusable → skill. Fits existing skill topic → skill. Tied to a credential/tool a domain skill already documents → that skill (not memory). Purely session-local with no domain skill owning it → memory. Claude Code's project memory is a harness-specific medium — prefer a skill destination whenever one owns the topic.
 
 #### Storage Tool Priority
 
