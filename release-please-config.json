@@ -132,9 +132,9 @@
         }
       ]
     },
-    "skills/docxport": {
-      "package-name": "docxport",
-      "component": "docxport",
+    "skills/doc-convert": {
+      "package-name": "doc-convert",
+      "component": "doc-convert",
       "extra-files": [
         {
           "type": "generic",

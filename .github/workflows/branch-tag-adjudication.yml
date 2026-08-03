@@ -28,6 +28,12 @@ name: branch-tag-adjudication
 #   release-please bump), and the skill-md guard ignores these files. fix/feat
 #   commits touching them remain subject to the branch tag policy because they
 #   do drive release bumps.
+# - Already-in-main exclusion: a main -> next-feat/next-fix sync merge can pull
+#   in a large amount of main's own history as non-merge commits (e.g. an old
+#   release-please branch merge with a single parent and a non-conventional
+#   subject line). Those commits were already adjudicated when they first
+#   landed on main and carry no new content for this PR, so the commit range
+#   excludes anything already reachable from origin/main.
 
 on:
   pull_request:
@@ -104,7 +110,15 @@ jobs:
           declare -A SKILL_TAGS
           declare -A PR_SKILL_HAS
 
-          COMMITS=$(git log --no-merges --format='%H' "$BASE_SHA..$HEAD_SHA")
+          # Exclude commits already reachable from origin/main — a base-sync
+          # merge (main -> next-feat/next-fix) otherwise drags in main's own
+          # history, including old commits with non-conventional subjects.
+          EXCLUDE_MAIN=()
+          if git rev-parse --verify --quiet origin/main >/dev/null; then
+            EXCLUDE_MAIN=("^origin/main")
+          fi
+
+          COMMITS=$(git log --no-merges --format='%H' "$BASE_SHA..$HEAD_SHA" "${EXCLUDE_MAIN[@]}")
           if [ -z "$COMMITS" ]; then
             echo "No commits in range — nothing to adjudicate."
             exit 0

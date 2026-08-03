@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), conflict-dry-run (isolated worktree merge/cherry-pick test), credential-helper (per-org HTTPS token pin for multi-account), fix-worktree (bare repo recovery), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "multi-account clone", "core.sshCommand", "Repository not found", "credential helper", "wrong account", "worktree create", "merge conflict test", "cherry-pick dry run" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), conflict-dry-run (isolated worktree merge/cherry-pick test), credential-helper (per-org HTTPS token pin for multi-account), fix-worktree (bare repo recovery), isolate-hunk (stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing — hash-object + update-index), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "multi-account clone", "core.sshCommand", "Repository not found", "credential helper", "wrong account", "worktree create", "merge conflict test", "cherry-pick dry run", "isolate hunk", "stage isolated content", "concurrent uncommitted edit", "separate my edit from other changes" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -31,6 +31,7 @@ Git repository management and SourceGit GUI client integration.
 | conflict-dry-run | test merge/cherry-pick applicability in an isolated worktree, without touching the main working tree | [conflict-dry-run.md](./conflict-dry-run.md) |
 | credential-helper | pin a per-org GitHub token for HTTPS remotes (fixes recurring `Repository not found` from active-account mismatch); HTTPS counterpart to ssh-key | [credential-helper.md](./credential-helper.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
+| isolate-hunk | stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing (no working-tree changes) | [isolate-hunk.md](./isolate-hunk.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
 | move-worktree | move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
@@ -208,4 +209,4 @@ Key features:
 
 - `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
 - `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)
-- `./scripts/local-to-staging-pr.sh` - Cherry-pick a local commit to a staging branch, and print manual commands to push and open a draft PR
+- `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch; prints manual push/PR commands by default, or pass `--push [--body-file <path>]` to also push and open the draft PR.
