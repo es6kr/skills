@@ -302,9 +302,9 @@ When marking an unchecked Test Plan item as `[x] (post-merge verification — tr
 - The "merge with unchecked items after user consent" path is closed. Even if the user says "go ahead", do not run `gh pr merge` while any `- [ ]` remains
 - "Record and proceed" = "record this fact" + "proceed to the next step (verification / deploy)", NOT "approval to merge unchecked"
 
-#### HARD STOP — Self-check for the merge-option AskUserQuestion (five conditions)
+#### HARD STOP — Self-check for the merge-option AskUserQuestion (six conditions)
 
-Before recommending merge (AskUserQuestion option includes "proceed merge" / "squash merge"), **self-check all five conditions**:
+Before recommending merge (AskUserQuestion option includes "proceed merge" / "squash merge"), **self-check all six conditions**:
 
 | # | Condition | How to verify | If not satisfied |
 |---|-----------|---------------|------------------|
@@ -313,6 +313,7 @@ Before recommending merge (AskUserQuestion option includes "proceed merge" / "sq
 | 3 | AI Review Summary comment posted | `gh pr view <N> --json comments` → confirm a user-authored "AI Review Summary" body | consolidate invocation required |
 | 4 | Mergeable | `gh pr view <N> --json mergeable` → MERGEABLE | Resolve conflicts first |
 | 5 | Cross-repo infrastructure dependency | Inspect PR body / code for cross-repo env-var or infrastructure changes | Block merge until the dependent repo's change is merged + deployed |
+| 6 | Merge method matches repo policy | Run the "Merge-method policy pre-check" above (`viewerDefaultMergeMethod` / `.release-please-manifest.json` / `.changeset/`) | If the repo signals merge-commit policy, the option must use `--merge`, never `--squash` — do not default to squash just because it satisfies conditions 1-5 |
 
 **Condition 5 in detail — cross-repo dependency (HARD STOP)**:
 - The code references a new env var (`process.env.X`, `lookup('env', 'X')`) that is supplied by an infra repo's inventory / template
@@ -471,6 +472,8 @@ gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){viewerDefaul
 ```
 
 Signal that merge-commit is the policy: a release-please manifest/config in the repo root (`.release-please-manifest.json`, `release-please-config.json`) or a `.changeset/` directory. When present, propose `--merge` (below), not `--squash`.
+
+**This pre-check is condition 6 of the "Self-check for the merge-option AskUserQuestion" gate below, not a separate optional step.** Composing a squash-merge option after satisfying only CI/Test Plan/AI Review Summary/Mergeable (conditions 1-4) without re-running this check is a HARD STOP violation — a release-please/changesets repo with a multi-commit PR against an accumulation branch needs `--merge` even when the other four conditions all look green.
 
 ### Squash Merge (recommended)
 
