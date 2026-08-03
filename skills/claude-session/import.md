@@ -14,19 +14,9 @@ Delivers session data to other agents/skills via pipeline.
 
 ### 0. Verify claude-sessions-mcp tool registration
 
-Call `mcp__code-mode__list_tools` to check whether `claude-sessions-mcp` tools are available:
+Check whether `mcp__claude-sessions-mcp__list_projects` is directly available (`ToolSearch("select:mcp__claude-sessions-mcp__list_projects")` or an equivalent tool-list check).
 
-```
-mcp__code-mode__list_tools
-```
-
-If `mcp__claude-sessions-mcp__list_projects` is **not** in the results, register via the utcp skill first:
-
-```
-/utcp register
-```
-
-Verify registration before proceeding.
+If not available, register `claude-sessions-mcp` in the project's MCP config per `mcp-config` skill conventions, then retry the availability check before proceeding.
 
 ### 1. Fetch Session Data
 
