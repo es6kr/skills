@@ -135,8 +135,40 @@ This rule applies not only to the generic skill body text itself but also to **a
 - The generic skill itself implements **meta-dispatch auto-detection**
 - The user explicitly requests a vendor comparison/selection (user intent takes first priority)
 
+## Rule C — Self-reference to a skill's own bundled scripts must be relative (all skills, HARD STOP)
+
+Any skill topic or `SKILL.md` — generic **or** local-only/vendor-specific — referencing its **own** bundled scripts (`scripts/*.sh`, `resources/*`, etc.) must use a bare path relative to the skill's own directory (e.g. `scripts/launch.sh`), never a hardcoded absolute path of any kind.
+
+**Two absolute forms are both wrong**, not just one:
+- (a) the canonical deployed location (`~/.claude/skills/<name>/scripts/...`)
+- (b) the authoring source-repo location (`~/ghq/github.com/<org>/<repo>/skills/<name>/scripts/...`)
+
+**Why**: a skill's actual runtime base directory varies by how/where it's loaded — standalone under `~/.claude/skills/`, via a plugin cache, or (for "directory"-source marketplaces) directly from a ghq source checkout. Claude Code communicates the actually-resolved location at invocation time ("Base directory for this skill: `<path>`"); a hardcoded absolute path matches only ONE of these possible resolutions and silently breaks on every other one — including the exact machine that authored it, the moment the skill's install path changes (e.g. a migration from standalone into a plugin bundle).
+
+This operates on a **different axis than Rule A/B above**: Rule A is about cross-ref direction (skill → rule), Rule B is about content-genericity (does the doc leak vendor specifics?). Rule C is a path-anchoring concern (does the doc name a path that actually exists at every load location the skill could be resolved from?) — it applies to **every** skill, generic or vendor-specific/local-only, because even a personal, local-only skill gets loaded from a location that can change out from under it.
+
+**Established convention**: see `git-repo/SKILL.md` / `git-repo/to-ghq.md` (`scripts/repo-to-ghq.sh`, no prefix) for the correct form already in use elsewhere in this skill set.
+
+### Don't / Do table
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Hardcode `~/.claude/skills/<name>/scripts/foo.sh` in the skill's own doc | `scripts/foo.sh` (bare, relative to the skill's own base directory) |
+| 2 | "Fix" a stale/broken absolute reference by swapping in the authoring source-repo path (`~/ghq/.../skills/<name>/scripts/foo.sh`) | Same fix target: convert to a bare relative reference — don't trade one absolute-path hardcode for another |
+| 3 | Assume "it's my own personal/local-only skill, hardcoding my own path is fine" | The base directory varies across load paths, and across a migration between them (standalone → plugin bundle), even for local-only skills. Relative form is required regardless |
+| 4 | Do a mechanical find/replace of one absolute prefix for another when a skill's files move (e.g. during a plugin-bundling migration) | Find/replace to the bare relative form instead — that is the one substitution that survives future moves too |
+| 5 | Leave some lines in a file relative and others absolute after a partial edit | Grep the whole file for the old absolute prefix before declaring the edit done — an internally inconsistent file (some lines fixed, some not) is itself a signal the edit wasn't finished |
+
+### Self-check (before every Edit/Write of a skill topic referencing its own bundled scripts)
+
+1. Does the content reference the skill's own `scripts/`/`resources/` directory?
+2. Is that reference a bare relative path (no `~`, no absolute drive/host prefix)? If not, convert it.
+3. Is this a "move" edit (updating paths because the skill's files relocated)? If so, the fix target is the relative form, not a different absolute path.
+4. After editing, grep the full file for the old absolute prefix to confirm no instance was missed.
+
 ## Related
 
 - `skill-kit/publish-scope.md` — scope review before extending published skills
 - `skill-kit/upgrade.md` — apply this rule when adding topics
+- Violation case details (Rule C): cleanup/data/failed-attempts.md "skill self-reference path hardcode" keyword entries
 - Violation case details: cleanup/data/failed-attempts.md "vendor-specific reference in shared skill" keyword entries
