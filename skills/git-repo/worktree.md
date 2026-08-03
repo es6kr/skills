@@ -112,24 +112,24 @@ git status --short                   # confirm clean state
 
 ### 4B. Create new worktree
 
-**Default path**: `<repo>/.claude/worktrees/<branch-name>`
+**Default path**: `<repo>/.worktrees/<branch-name>`
 
 ```bash
 cd /path/to/repo
-git worktree add .claude/worktrees/<branch-name> <branch>
+git worktree add .worktrees/<branch-name> <branch>
 ```
 
 If the branch does not exist yet:
 
 ```bash
-git worktree add -b <new-branch> .claude/worktrees/<new-branch> <start-point>
+git worktree add -b <new-branch> .worktrees/<new-branch> <start-point>
 ```
 
 Post-create verification:
 
 ```bash
 git worktree list
-cd .claude/worktrees/<branch-name>
+cd .worktrees/<branch-name>
 git branch --show-current
 ```
 
@@ -185,11 +185,11 @@ For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-firs
 
 | Environment | Worktree path |
 |-------------|--------------|
-| Claude Code (any) | `<repo>/.claude/worktrees/<name>` |
+| Claude Code / Antigravity / Git standard | `<repo>/.worktrees/<name>` |
 | vibe-kanban | Managed by vibe-kanban (do not override) |
 | Other plugins / agents | Honor the path declared in their context (project `CLAUDE.md`, plugin settings, env var) |
 
-**Default**: this skill standardizes on `<repo>/.claude/worktrees/<name>`. If the active environment context (project `CLAUDE.md`, plugin settings such as vibe-kanban, or environment variables) pins a different worktree path, honor that path instead. Creating `<repo>/.worktrees/` ad hoc — without any environment context declaring it — is discouraged because it splinters the worktree root across tools.
+**Default**: this skill standardizes on `<repo>/.worktrees/<name>`.
 
 ## Don't / Do
 
@@ -197,7 +197,7 @@ For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-firs
 |---|-------|-----|
 | 1 | `git worktree add` as first action | `git worktree list` first → check for reusable candidates |
 | 2 | Present only "create new" in AskUserQuestion | Include "reuse worktree X" option when inactive candidates exist |
-| 3 | Create worktree in `.worktrees/` | Use `.claude/worktrees/` |
+| 3 | Create worktree outside `.worktrees/` | Use `.worktrees/` |
 | 4 | Start coding without branch verification | `git branch --show-current` before any Write/Edit |
 | 5 | Chain `git checkout -b <new> <ref>` immediately followed by `git cherry-pick`/`git reset`/other git commands in a repo with a large pre-existing dirty working tree (e.g. `~/.agents`) | In-place checkout can fail silently ("local changes would be overwritten") while staying on the original branch, so the chained command runs on the wrong branch. Prefer `git branch <new> <ref>` (no working-tree switch) + `git worktree add <path> <new>` from the start when the repo is known to carry unrelated uncommitted content; if in-place checkout is used anyway, verify `git branch --show-current` before the next command (see failed-attempts.md "git-checkout-unverified-chain", 2 occurrences) |
 | 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
@@ -359,6 +359,19 @@ git status (changes)
 ### Failure case
 
 See failed-attempts.md HOT entry "worktree split option missing in commit-method ask".
+
+## `push.default=matching` collateral rejection (repo config gotcha)
+
+Some repos (observed in both `es6kr/skills` and other internal workspace repos) are configured with `push.default=matching` — a bare `git push` (no branch argument) attempts to push **every local branch that has a same-named remote counterpart**, not just the current branch. If any other local branch (e.g., a stale `main` checked out behind in another worktree) is non-fast-forward relative to its remote, the push command reports a `[rejected]` error for that unrelated branch alongside a successful push of the branch you actually intended.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat a `git push` rejection as failure without checking which branch it refers to | Read the rejection line carefully — it names the specific branch. Confirm your target branch's line shows a successful SHA range (`<old>..<new> branch -> branch`) |
+| 2 | Attempt to "fix" the rejected branch (force-push, reset, merge) to silence the warning | The rejected branch is very likely one you weren't working on. Investigate the unexpected branch state before touching it, rather than assuming it needs correcting |
+| 3 | Run `git config push.default simple` to "fix" the repo | Changing shared repo config is a user decision — surface the observation, don't silently change config |
+| 4 | Keep using bare `git push` in a repo where this has been observed once | Use `git push origin <branch>` explicitly for the rest of the session to avoid repeated collateral noise |
+
+**Detection**: `git config push.default` reports `matching` (default in git before 2.0, still explicitly set in some older repos).
 
 ## Branch verification before editing code on issue work (HARD STOP)
 
