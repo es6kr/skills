@@ -494,10 +494,10 @@ After upgrade Edit/Write is complete, **commit the changed skill files in the `~
 1. **Identify modified files**: `git -C ~/.agents status --short skills/<skill-name>/`
 2. **Stage by path** (no `git add .` / `-A`): `git -C ~/.agents add skills/<skill-name>/SKILL.md skills/<skill-name>/<topic>.md ...`
 3. **Verify staging**: `git -C ~/.agents status` — confirm only the intended skill files are staged
-4. **Commit**: `git -C ~/.agents commit -m "skill(<skill-name>): <one-line summary>"`
-   - For new topic addition: `feat(skill-<skill-name>): add <topic-name> topic`
-   - For existing topic edit: `docs(skill-<skill-name>): <what changed>`
-   - For frontmatter/structure: `refactor(skill-<skill-name>): <what changed>`
+4. **Commit**: `git -C ~/.agents commit -m "<type>(<skill-name>): <one-line summary>"` — scope is the bare skill name, no `skill-` prefix (verified against actual `es6kr/skills` and `es6kr/claude-plugins` history: `fix(hook-kit): ...`, `feat(fix-plan): ...`, never `fix(skill-hook-kit): ...`)
+   - For new topic addition: `feat(<skill-name>): add <topic-name> topic`
+   - For existing topic edit: `docs(<skill-name>): <what changed>`
+   - For frontmatter/structure: `refactor(<skill-name>): <what changed>`
 
 #### Don't / Do
 
