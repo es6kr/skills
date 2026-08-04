@@ -570,6 +570,53 @@ MSG
   exit 2
 }
 
+check_push_without_details() {
+  # Push-recommendation detail check — options proposing git push must specify target remote/branch AND commit info (SHA or subject)
+  local push_pattern="git push|pushing|push to|푸시|push 진행|push 실행|Push"
+  local push_context_pattern="git push|push"
+  
+  if ! echo "$OPTIONS_BLOB" | grep -qiE "$push_pattern"; then
+    return 0
+  fi
+
+  # Skip if the ask is not actually proposing a git push execution (e.g. asking whether to push or skip, or post-push verification mentions)
+  if echo "$OPTIONS_BLOB" | grep -qiE "do not push|skip push|push skipped|no push"; then
+    return 0
+  fi
+
+  # Require remote/branch details (e.g. origin, main, local, master, or remote name) AND commit info (commit, sha, hash, or hexadecimal SHA-like string or commit subject)
+  local has_remote=0
+  local has_commit_info=0
+
+  if echo "$ASK_TEXT" | grep -qiE "origin/|remote|branch|local|main|master|target:"; then
+    has_remote=1
+  fi
+
+  if echo "$ASK_TEXT" | grep -qiE "commit|hash|sha|[0-9a-f]{7,40}|커밋"; then
+    has_commit_info=1
+  fi
+
+  if [[ "$has_remote" -eq 1 && "$has_commit_info" -eq 1 ]]; then
+    return 0
+  fi
+
+  cat >&2 <<'MSG'
+DENIED: AskUserQuestion option proposes Git Push without explicit remote/branch and commit details.
+
+Why blocked:
+  - Option proposes a Git Push action, BUT
+  - The question/option text lacks explicit target remote/branch details (e.g., origin/local, origin/main) OR commit details (SHA / commit subject).
+
+Per git.md and GEMINI.md "Git Push Recommendation Detail Rule (HARD STOP)":
+  - Whenever recommending or asking for Git Push execution, you MUST state the exact target remote, branch, and commit SHA/subject so the user can immediately evaluate the action.
+
+Required action:
+  - Run 'git remote -v' and 'git log -1' to inspect primary state.
+  - Include explicit target remote/branch and commit SHA/subject in your AskUserQuestion question or option description text.
+MSG
+  exit 2
+}
+
 # Execute checks in cost order
 check_merge_without_review
 check_release_please_close
@@ -577,5 +624,6 @@ check_vendor_leak
 check_supervisor_loop_recommend
 check_stateful_data_safety
 check_pr_creation_without_draft
+check_push_without_details
 
 exit 0
