@@ -140,6 +140,7 @@ Identify the type of task just completed.
 | 3 | Skip Read of suggestion-patterns.md because "I know the patterns" | suggestion-patterns.md is updated with new "After X" templates regularly. Read every time |
 | 4 | Treat just-completed work as the only source | Each candidate discovery source row is a separate enumeration. Cover all rows before stopping |
 | 5 | `/next` receives an explicit file/target argument → proceed straight to a generic TaskList/fix_plan.md-wide sweep (e.g. dumping every `(P0)`/`(P1)` line across unrelated projects) without first reading the argument's own explicit candidates | Read the argument's target first (Step 0.45). Adopt its named follow-up candidates as top priority; run TaskList/fix_plan.md only to confirm nothing else was missed |
+| 6 | Fill a slot with a candidate whose promised effect is already satisfied (e.g. enabling a plugin whose member skills are already loaded via another channel — activation would only double-load) | Verify each newly-discovered candidate against current state (available-skills list, live config) before composing — already-satisfied = availability 0, exclude it. Deferring the check to the option description ("verify duplicates after selecting") is forbidden |
 
 #### Premise verification for stale/prior-session candidates (HARD STOP)
 
