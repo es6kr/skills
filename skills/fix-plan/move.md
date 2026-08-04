@@ -16,12 +16,16 @@ Keep the Completed file minimal — detailed steps, commit hashes, session IDs, 
 - **Result**: The active `fix_plan.md` always stays compact. Leaving months of completed history in the active file is forbidden.
 - **Atomic Move Obligation (HARD STOP)**: When moving an entry to `## Completed` (or marking `[x]`), the original line in the active section (`## Priority Work`, `## Progress`, etc.) **MUST be deleted atomically in the same edit turn**. Marking `[x]` while leaving the original line in place is strictly forbidden — it creates visual confusion and stale state.
 - **Forbidden**: Do **not** manually insert one-line summaries at random locations (such as above `## REPEAT` or in active lists) to keep track of them. Once mapped to RAG or archived, they must be **deleted** from the active file.
+- **Automated Bloated Task Detection (HARD STOP)**: Before executing the move pipeline or wrap-up, run `detect_bloated_tasks.py` script to audit for remaining `[x]` items or unmarked sub-residuals in active sections:
+   ```bash
+   python ~/.gemini/config/skills/fix-plan/scripts/detect_bloated_tasks.py --file <path/to/fix_plan.md>
+   ```
 
 
 
 ```markdown
 # Before (Progress)
-- [x] proxy.ts basePath redirect fix → image build / deploy (2026-03-15 17:30 completed: Session xxxxxxxx, model claude-sonnet-4-6, commit a1b2c3d4)
+- [x] proxy.ts basePath redirect fix → image build / deploy (YYYY-MM-DD HH:mm completed: Session xxxxxxxx, model claude-sonnet-5, commit a1b2c3d4)
   - proxy.ts `new URL` × 5 fixed **complete**
   - callback/route.ts, logout/route.ts edited **complete**
   - Dockerfile ARG BASE_PATH added **complete**
@@ -188,10 +192,13 @@ This script:
 
 **Wholesale move, not semantic summary (HARD STOP)**: the script moves a completed subtree **verbatim** (parent + every child line, checkbox markers stripped) — it does NOT synthesize the "one merged headline" shown in the Summary format / Merge example sections above. Merging N child bullets into one coherent sentence requires semantic judgment a parser/tree-walker cannot safely perform; an earlier version tried to fake this by keeping only the parent's original text and silently dropping every child line (real completion detail lost). If a condensed one-liner is wanted, hand-author it (Summary rules above) either instead of running the script on that entry, or as a follow-up edit after the script's wholesale move has landed the full detail safely.
 
+**Checkbox-blind archiving under a corrupted `## Completed` heading (HARD STOP)**: `cleanup.py`'s `## Completed` branch collects **every** top-level list item under that heading into `completed_entries` — regardless of the item's own checkbox marker (`[x]`, `[ ]`, or `[BLOCKED...]`). This is safe when a `## Completed` heading genuinely contains only completed work. It is **not** safe when a tracker has drifted — e.g. a sync-conflict merge can leave active `[ ]`/`[BLOCKED]` work items structurally nested under a `## Completed` heading, and running the script in write mode on such a file would silently sweep those active items into a `.bak/` archive partition alongside the real completed history. Before running the script (not just `--dry-run` — visually too), confirm every `## Completed` heading in the file is unique (`grep -c "^## Completed$"` should be 1) and spot-check that the items under it are actually done.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Assume the script produces move.md's "one merged headline" format | The script preserves the full subtree verbatim (checkbox-stripped); manual condensing is a separate, optional step |
 | 2 | Trust a single-node-text summary function to represent a subtree with children | Verify the entries mover recurses into children (see `node_to_completed_block` in `cleanup.py`) before relying on it for a multi-line subtree |
+| 3 | Run the script in write mode on a tracker without first confirming its `## Completed` heading is unique and its contents are actually complete | `grep -c "^## Completed$" <file>` before every write-mode run; a count > 1 means the file likely has active work items mis-nested under a stale duplicate heading — resolve that corruption manually first (see fix-plan skill's Cat IV classification) |
 
 ### Line-ending preservation for custom bulk-move scripts (HARD STOP)
 
