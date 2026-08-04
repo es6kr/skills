@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/github-flow-v0.7.0...github-flow-v0.8.0) (2026-08-03)
+
+
+### Features
+
+* **github-flow:** add publish topic ([#206](https://github.com/es6kr/skills/issues/206)) ([4aba1b6](https://github.com/es6kr/skills/commit/4aba1b63fdf7357b636118a30d674a0f7db71706))
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/github-flow-v0.6.1...github-flow-v0.7.0) (2026-07-23)
 
 

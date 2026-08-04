@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/git-repo-v0.6.1...git-repo-v0.7.0) (2026-08-03)
+
+
+### Features
+
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
+
+### Bug Fixes
+
+* **git-repo:** add --push flag to local-to-staging-pr.sh ([#191](https://github.com/es6kr/skills/issues/191)) ([7eec556](https://github.com/es6kr/skills/commit/7eec556a6411352781de33121c42da0e186512b3))
+
 ## [0.6.1](https://github.com/es6kr/skills/compare/git-repo-v0.6.0...git-repo-v0.6.1) (2026-07-28)
 
 

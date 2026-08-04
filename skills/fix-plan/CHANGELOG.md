@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/fix-plan-v0.4.0...fix-plan-v0.5.0) (2026-08-03)
+
+
+### Features
+
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/fix-plan-v0.3.3...fix-plan-v0.4.0) (2026-07-28)
 
 
