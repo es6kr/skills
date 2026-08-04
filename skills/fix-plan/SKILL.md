@@ -28,17 +28,17 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
-| completion-criteria | Definition of done per item output type (`Why` = scope narrative vs `How to apply` = deliverable), marker transition rules, residual-scope split | [completion-criteria.md](./completion-criteria.md) |
-| format | Schema: `[ ]` / `[x]` / `[BLOCKED]` markers, Progress/Completed sections, item state changes, section-consistency check | [format.md](./format.md) |
-| priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
-| model-triage | High-capability model triage: 5 fit categories + anti-fit table + cross-section discovery procedure + dedicated `## <Model> Target Tasks` section operation | [model-triage.md](./model-triage.md) |
 | add | New item authoring schema (Action / Why / How), length budget, deliverable separation (research / plan / checklist split) | [add.md](./add.md) |
+| completion-criteria | Definition of done per item output type (`Why` = scope narrative vs `How to apply` = deliverable), marker transition rules, residual-scope split | [completion-criteria.md](./completion-criteria.md) |
 | draft | Record a deferred plan **stub** (purpose + defer reason + resume trigger + expected deliverable) in `## Plan Drafts` when full planning is postponed; promote to `code-workflow` research→plan when the trigger fires. Invoked `/fix-plan draft` | [draft.md](./draft.md) |
-| move | `[x]` → Completed summary rules, subtree-move partial completion under unfinished parent, optional abstract RAG dispatch | [move.md](./move.md) |
+| flowchart | Priority flowchart (Mermaid `graph TD` dependency graph) authoring, clean syntax rules (no inline `%%`), plan document node mapping (`llm-wiki/outputs/`, `.ralph/plan-drafts/`) without `file://` URLs, and the `pm`-role default-pipeline sync procedure (drift check against priority-triage output) | [flowchart.md](./flowchart.md) |
+| format | Schema: `[ ]` / `[x]` / `[BLOCKED]` markers, Progress/Completed sections, item state changes, section-consistency check | [format.md](./format.md) |
+| issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
+| model-triage | High-capability model triage: 5 fit categories + anti-fit table + cross-section discovery procedure + dedicated `## <Model> Target Tasks` section operation | [model-triage.md](./model-triage.md) |
+| move | `[x]` → Completed summary rules, subtree-move partial completion under unfinished parent, optional abstract RAG dispatch, and `detect_bloated_tasks.py` automated audit | [move.md](./move.md) |
+| priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
-| issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
-| flowchart | Mermaid priority-graph authoring + node-plan mappings; `pm`-role default-pipeline step 5 mechanical drift check against priority-triage output | [flowchart.md](./flowchart.md) |
 
 ## Topic Dependencies
 
@@ -61,9 +61,8 @@ fix-plan (schema + lifecycle)
 ```
 
 - All topics are independently invocable, **except `priority` which invokes `sync` as Step 0 (HARD STOP)** — triage on stale state is the failure mode the dependency prevents (see [priority.md](./priority.md) Triage workflow Step 0)
-- **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, triages blockers via `priority`, and finally drift-checks the priority graph via `flowchart` (step 5, skipped when the tracker has no `## Flow Chart` section).
+- **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, triages blockers via `priority`, and syncs the `## Flow Chart` section's node labels against that triage output via `flowchart` (pm role only — see "Role-based execution").
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
-- `sync` topic uses `gh` CLI per `github-flow` skill's conventions
 - `sync` topic optionally dispatches to a secondary-tracker receiver if the caller supplies `--secondary-sync=<skill>:<topic>` — see [sync.md](./sync.md) "Secondary-tracker sync cadence"
 - `draft` topic dispatches to `code-workflow` (`steps`) on promote — turns a deferred stub into a real research → plan
 
@@ -88,13 +87,15 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 2. **Format**: Verify the schema, markers, and section structure of the tracker.
 3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
 4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
-5. **Flowchart Sync**: Apply the [flowchart](./flowchart.md) "Sync procedure" mechanical drift check against the Step 4 priority-triage output (relabel/remove/propose `[P*]` nodes) — only when the tracker has a `## Flow Chart` section; skip (report as not-applicable) otherwise.
+5. **Flowchart sync**: Compare the `## Flow Chart` section's node labels and dependency edges against the priority tags just produced in step 4 — update any node whose `[P*]` label, or whose backing item's resolved/removed state, has drifted from the live tracker. See [flowchart.md](./flowchart.md) "Sync procedure".
 
 **Recency marker maintenance**: upon completing the full pipeline (through step 5, or through the REPEAT cadence check for the `pm` role profile), stamp/update the "last full pipeline run" marker in the tracker's pinned block with the completion timestamp and the role profile used, so Step 0 of a future invocation can find it. If the tracker has no pinned block, skip this — do not create new tracker structure solely for this marker.
 
-**Register BEFORE execute (HARD STOP)**: before Step 1 (Move) begins — after Step 0's recency check has resolved which steps are actually in scope — `TaskCreate` (or `TodoWrite` if `TaskCreate` is unavailable) must register one task per pipeline step actually being run (Move/Format/Sync/Priority/Flowchart-Sync for the full pipeline, fewer for a role-scoped subset or a Step-0-narrowed run — see "Role-based execution" below). A default-invocation `/fix-plan` run is multi-step by definition; "the tracker looks small" is not an exception. If a `TaskCreate` call errors, retry it with the corrected parameters from its own error message before any Move/Sync/Priority Edit proceeds — treating a retry as unnecessary overhead and silently dropping tracking is the exact violation this line prevents. Mirrors `~/.claude/skills/wip/SKILL.md` "Register BEFORE execute".
+**Register BEFORE execute (HARD STOP)**: before Step 1 (Move) begins — after Step 0's recency check has resolved which steps are actually in scope — `TaskCreate` (or `TodoWrite` if `TaskCreate` is unavailable) must register one task per pipeline step actually being run (Move/Format/Sync/Priority/Flowchart-sync for the full pipeline, fewer for a role-scoped subset or a Step-0-narrowed run — see "Role-based execution" below). A default-invocation `/fix-plan` run is multi-step by definition; "the tracker looks small" is not an exception. If a `TaskCreate` call errors, retry it with the corrected parameters from its own error message before any Move/Sync/Priority/Flowchart Edit proceeds — treating a retry as unnecessary overhead and silently dropping tracking is the exact violation this line prevents. Mirrors `~/.claude/skills/wip/SKILL.md` "Register BEFORE execute".
 
 ### Role-based execution (`role-profile`)
+
+**Plan & Research Reading Prerequisite Gate (HARD STOP)**: When executing tasks from `fix_plan.md` or cited plan snippets, the agent MUST first read the full related research document or plan file (`plan-*.md`, `docs/`) via `view_file` before starting any implementation steps (CLI commands, repo renames, code edits).
 
 The default pipeline is scoped by the execution role, so a high-capability session is not spent on mechanical bookkeeping — and a bookkeeping session does not attempt deep-analysis passes it is unsuited for.
 
@@ -104,17 +105,29 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 2. **Context self-detection** — when the invoking agent can identify the model it is running on (from its own runtime context, e.g. a model identifier exposed by the harness) AND the workspace declares a model→profile mapping (a local operating note in the tracker, a project rule — caller-side, never in this skill), resolve the profile from that mapping
 3. Neither available → run the **full pipeline** (backward compatible — unchanged behavior for existing users and environments without role mappings)
 
+**Pointer-tracker resolution (HARD STOP)**: Before concluding "no candidates" for a workspace's local `fix_plan.md`/`checklist.md`, check whether its active-work section has been replaced with a redirect note pointing to a parent/org-level tracker (e.g. an HTML comment or line like "this repo's items live in `<parent-path>` — see there" / "moved to `<parent-path>`"). If found, resolve the referenced path and treat **that parent tracker's own top-level `##` sections** (not just the specific subsection the note points at) as in-scope for this invocation's Move/Sync/Priority/impl-candidate steps. A redirect narrowing to one subsection (e.g. `## Fable Target Tasks`) is not evidence the rest of the parent tracker (`## Priority Work`, `## REPEAT`, `## TODO`, etc.) is out of scope — those sections are exactly where `pm`/`impl` candidates live.
+
+**Full-header self-check (HARD STOP)**: If you ran `grep "^#"` (or equivalent) to get the tracker's section list, you must Read **every** top-level `##` section from that list before reporting candidate counts — not just the section you most recently wrote to. Recency (having just edited a section) is not grounds to skip sibling sections; it is exactly the bias that causes a populated `## Priority Work` / `## REPEAT` section to be missed while a freshly-touched `## Fable Target Tasks` gets re-read.
+
 **Per-profile default pipeline**:
 
 | Profile | Steps executed | Skipped (reported as remainder) |
 |---------|----------------|--------------------------------|
-| `pm` | move → format → sync → priority → flowchart-sync (current full pipeline) | — |
-| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format — surfaced as a delegation remainder for a `pm` session |
-| `impl` | sync → priority, then surface `selfable` implementation candidates | move, format, model-triage |
+| `pm` | move → format → sync → priority → flowchart-sync → **REPEAT cadence check** (run all due REPEAT items) | — |
+| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format, flowchart-sync — surfaced as a delegation remainder for a `pm` session |
+| `impl` | sync → priority → **REPEAT overdue check** (run REPEAT items overdue by 24h+), then surface `selfable` implementation candidates | move, format, model-triage, flowchart-sync |
 | (unresolved) | full pipeline | — |
+
+- **REPEAT Section Execution Cadence Rule**:
+  - **`/fix-plan --pm`**: Check `## REPEAT` section. If any item's due period (its "period" field) has elapsed since its "last run" field, execute it immediately.
+  - **`/fix-plan --impl`**: Check `## REPEAT` section. Execute ONLY items whose due period has elapsed AND has been neglected for an additional 24+ hours (period + 24h overdue). Skip others.
 
 - A skipped step is never silently dropped: the run report must list the skipped steps and their pending workload (e.g. "N completed `[x]` items awaiting move") so a later `pm` session picks them up.
 - Model names never appear in this skill. The caller-side mapping translates concrete models to `pm` / `deep` / `impl` — the same supply pattern as the `--archive` / `--rag` receiver contracts.
+
+**pm-profile completion handoff**: when a `pm` role-profile default-invocation pipeline finishes (through the REPEAT cadence check), do not close the turn with an open-ended "what's next" prompt. Reuse the `sync`/`priority` state this same run already computed and surface exactly one simple `selfable` candidate from what the `impl` row's own candidate-surfacing step would otherwise report — then confirm it via `AskUserQuestion` (proceed with it / pick something else / skip for now) instead of a generic next-step prompt. This draws from a single already-known role profile's own candidate set computed in this same run, not a speculative multi-source scan — it is a narrower, cheaper handoff than general next-action option construction. If no `selfable` candidate exists this run, skip this step and close normally.
+
+**Mandatory Output Reporting Contract (HARD STOP)**: The agent must physically emit the Step 4 Priority Triage candidate list (P0–P3 sorted by `:selfable` vs `:external`) in the visible response text BEFORE marking the task as completed (`[x]`) or invoking `AskUserQuestion`. Suppressing Step 4's summary table output or marking tasks completed prior to physical output emission is strictly forbidden.
 
 ### Receiver contract
 
