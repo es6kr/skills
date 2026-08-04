@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/commit-tidy-v0.4.3...commit-tidy-v0.5.0) (2026-07-28)
+
+
+### Features
+
+* bundle next-feat — fix-plan expansion, next reactive guard, github-repo extraction ([#195](https://github.com/es6kr/skills/issues/195)) ([cd65a85](https://github.com/es6kr/skills/commit/cd65a8519c88f080321d746ef197e90713039fa6))
+* **commit-tidy:** add hunk-split topic ([050fc07](https://github.com/es6kr/skills/commit/050fc0783c633967d41713ff29de50613a2da4ac))
+* **commit-tidy:** add hunk-split topic + commit-review-trigger hook; PR review findings applied in 67f5cae (stdin JSON parsing, detached-HEAD SHA regex, git apply atomicity note). ([8090e9d](https://github.com/es6kr/skills/commit/8090e9def450fae006f5f0f4ebc2a7e2166a2d49))
+
+
+### Bug Fixes
+
+* **commit-tidy:** correct commit-review-trigger stdin parsing + hunk-split apply note ([67f5cae](https://github.com/es6kr/skills/commit/67f5caefbdd45bfb264f41e25ed62e13a80b6a50))
+* **commit-tidy:** track installed hook commit-review-trigger.sh in resources ([144016a](https://github.com/es6kr/skills/commit/144016a308f79f0751bb47de5480c2f6a2b826a6))
+
 ## [0.4.3](https://github.com/es6kr/skills/compare/commit-tidy-v0.4.2...commit-tidy-v0.4.3) (2026-07-16)
 
 

@@ -54,7 +54,45 @@ link_folder() {
   fi
 }
 
+# Helper: create file hard link (no root required, same filesystem)
+link_file() {
+  local src="$AGENT_DIR/$1"
+  local dst="$2"
+
+  if [[ ! -f "$src" ]]; then
+    echo "❌ Source file not found: $src"
+    return 1
+  fi
+
+  # Check if already hard-linked (same inode)
+  if [[ -f "$dst" ]]; then
+    local src_inode dst_inode
+    src_inode=$(stat -c '%i' "$src" 2>/dev/null || stat -f '%i' "$src" 2>/dev/null)
+    dst_inode=$(stat -c '%i' "$dst" 2>/dev/null || stat -f '%i' "$dst" 2>/dev/null)
+    if [[ "$src_inode" == "$dst_inode" ]]; then
+      echo "✓ Already hard-linked (same inode): $dst"
+      return 0
+    fi
+    # Backup existing file
+    local backup_path="$(dirname "$dst")/.bak/$(basename "$dst")-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$(dirname "$dst")/.bak"
+    echo "⚠️ Backing up: $dst → $backup_path"
+    if ! mv "$dst" "$backup_path"; then
+      echo "❌ Failed to backup $dst. Skipping."
+      return 1
+    fi
+  fi
+
+  mkdir -p "$(dirname "$dst")"
+  echo "→ Creating hard link: $dst → $src"
+  if ! ln "$src" "$dst"; then
+    echo "❌ Failed to create hard link: $dst"
+    return 1
+  fi
+}
+
 # Skills
+link_folder skills "$GEMINI_DIR/config/skills"
 link_folder skills "$CLAUDE_DIR/skills"
 link_folder skills "$CODEX_DIR/skills"
 link_folder skills "$GEMINI_DIR/skills"
@@ -66,3 +104,6 @@ link_folder rules "$CLAUDE_DIR/rules"
 # Agents -> Claude agents, Gemini global_workflows
 link_folder agents "$CLAUDE_DIR/agents"
 link_folder agents "$ANTIGRAVITY_DIR/global_workflows"
+
+# Gemini agent config files
+link_file GEMINI.md "$GEMINI_DIR/GEMINI.md"

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/dotfile-v0.4.2...dotfile-v0.5.0) (2026-08-03)
+
+
+### Features
+
+* **dotfile:** sync ~/.gemini/config/skills path in link scripts ([#181](https://github.com/es6kr/skills/issues/181)) ([9f038fe](https://github.com/es6kr/skills/commit/9f038febb4534ed735eac834aa89a79e43bf8f5f))
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/dotfile-v0.4.1...dotfile-v0.4.2) (2026-06-25)
 
 

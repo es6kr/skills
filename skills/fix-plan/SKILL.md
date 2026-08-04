@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
-  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role".
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), sync-automation (Stop-hook overdue-sync nudge), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
+  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "sync automation", "sync nudge", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -36,6 +36,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | draft | Record a deferred plan **stub** (purpose + defer reason + resume trigger + expected deliverable) in `## Plan Drafts` when full planning is postponed; promote to `code-workflow` research→plan when the trigger fires. Invoked `/fix-plan draft` | [draft.md](./draft.md) |
 | move | `[x]` → Completed summary rules, subtree-move partial completion under unfinished parent, optional abstract RAG dispatch | [move.md](./move.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
+| sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
 | issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
 | flowchart | Mermaid priority-graph authoring + node-plan mappings; `pm`-role default-pipeline step 5 mechanical drift check against priority-triage output | [flowchart.md](./flowchart.md) |
 
@@ -54,6 +55,7 @@ fix-plan (schema + lifecycle)
   ├─→ move (completion → Completed)
   │     └─→ optional --rag=<skill>:<topic> dispatch for semantic indexing (caller-supplied)
   ├─→ sync (GitHub state polling) — depends on github-flow gh CLI conventions
+  │     └─→ sync-automation (Stop-hook nudges this topic when overdue — no direct call dependency)
   ├─→ flowchart (Mermaid priority graph) — step 5 of the default pipeline, drift-checks against priority's output
   └─→ issue-drafts (lifecycle of draft files)
 ```

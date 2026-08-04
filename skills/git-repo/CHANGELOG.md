@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/git-repo-v0.6.1...git-repo-v0.7.0) (2026-08-03)
+
+
+### Features
+
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
+
+### Bug Fixes
+
+* **git-repo:** add --push flag to local-to-staging-pr.sh ([#191](https://github.com/es6kr/skills/issues/191)) ([7eec556](https://github.com/es6kr/skills/commit/7eec556a6411352781de33121c42da0e186512b3))
+
+## [0.6.1](https://github.com/es6kr/skills/compare/git-repo-v0.6.0...git-repo-v0.6.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* **git-repo:** add commit-worktree-cherry-pick-draft-PR section + resolve stray merge markers ([4417701](https://github.com/es6kr/skills/commit/44177013a9e7af8a49cff79e1f7c82436410645e))
+* **git-repo:** add commit-worktree-cherry-pick-draft-PR section + resolve stray merge markers ([9f2dc23](https://github.com/es6kr/skills/commit/9f2dc2351874fda79e9ef4fe7608f51a6a5c5d68))
+* **git-repo:** scope conflict-resolution to next-fix, add missing script ([a23f749](https://github.com/es6kr/skills/commit/a23f749bfbf8ad8702f887ed5e85c0bd6fdff860))
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+* resolve PR [#197](https://github.com/es6kr/skills/issues/197) review findings (CodeRabbit + Copilot + Internal Review) ([b54236a](https://github.com/es6kr/skills/commit/b54236a4fa4b3fef23645dfc3b184916980b7f65))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/git-repo-v0.5.0...git-repo-v0.6.0) (2026-07-23)
 
 

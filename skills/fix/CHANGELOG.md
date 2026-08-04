@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.9](https://github.com/es6kr/skills/compare/fix-v0.3.8...fix-v0.3.9) (2026-07-28)
+
+
+### Bug Fixes
+
+* **fix:** add mechanical per-file language gate before Step 2 skill edits ([c457a42](https://github.com/es6kr/skills/commit/c457a428969cff01de0df2e72c06e37387f987a9))
+* **next-fix:** promote staged fixes across hook-kit, next, cleanup, fix-plan ([34f1c67](https://github.com/es6kr/skills/commit/34f1c67beee3a8279e0e80de4ab3a87ba2223d5c))
+* **next,fix,wip:** reduce meta-task over-registration + enforce skill-invocation resume ([beec453](https://github.com/es6kr/skills/commit/beec453da85d70c79ec9403c83259e7a4a28d303))
+* **next,fix:** close the chained-turn next-call gap (12th recurrence) ([dd7c582](https://github.com/es6kr/skills/commit/dd7c58286a355a2451cb9e0a6f08ef1865dbe018))
+* resolve PR [#197](https://github.com/es6kr/skills/issues/197) review findings (CodeRabbit + Copilot + Internal Review) ([b54236a](https://github.com/es6kr/skills/commit/b54236a4fa4b3fef23645dfc3b184916980b7f65))
+* staging bundle — meta-task registration, next-call-gap, bash-guard consolidation, hook-kit FP fixes ([dc1b790](https://github.com/es6kr/skills/commit/dc1b790688808df7649ef390a22caa5f66a8aa40))
+
 ## [0.3.8](https://github.com/es6kr/skills/compare/fix-v0.3.7...fix-v0.3.8) (2026-07-23)
 
 

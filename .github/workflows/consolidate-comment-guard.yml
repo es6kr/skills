@@ -1,0 +1,89 @@
+name: consolidate-comment-guard
+
+# Server-side backstop for the consolidate skill (un-bypassable by client hooks).
+# Flags a "review-flavored" PR comment that bypassed consolidate — i.e. a comment
+# that reads like an AI-review response but carries none of consolidate's mandatory
+# provenance signals (a receiving-code-review / requesting-code-review link, or a
+# "<!-- consolidate: -->" marker). Such a comment is hidden (minimized OUTDATED),
+# labelled, and answered with a one-line notice so the noise does not persist.
+#
+# This runs regardless of which client posted the comment (Claude Code, Antigravity,
+# a human in the browser) — the destination-side chokepoint the client hooks cannot be.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const ev = context.eventName;
+            const isReview = ev === 'pull_request_review';
+            const payload = context.payload;
+
+            // issue_comment fires on issues too — only act on PR comments.
+            if (ev === 'issue_comment' && !payload.issue.pull_request) return;
+
+            const node = isReview ? payload.review : payload.comment;
+            const author = node.user || {};
+            const body = node.body || '';
+
+            // Skip bots (CodeRabbit / Copilot post their own reviews) and empty bodies.
+            if (author.type === 'Bot') return;
+            if (!body.trim()) return;
+
+            // Review-flavored? require a review-tool/review mention AND a findings/severity
+            // cluster, so casual mentions ("CodeRabbit flagged X, will fix") do not trip.
+            const flavored =
+              /coderabbit|copilot|code[ -]?review|review summary/i.test(body) &&
+              /finding|verif|nitpick|actionable|inline comment|\b(major|minor|critical)\b/i.test(body);
+            if (!flavored) return;
+
+            // Provenance signal present → compliant, leave it alone.
+            if (/receiving-code-review|requesting-code-review|<!--\s*consolidate:/.test(body)) return;
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = isReview ? payload.pull_request.number : payload.issue.number;
+            const nodeId = node.node_id;
+
+            const notice =
+              '> ⚠️ **consolidate-comment-guard**: this review-flavored comment lacks the ' +
+              'consolidate provenance signal (a `receiving-code-review` / `requesting-code-review` ' +
+              'link, or a `<!-- consolidate: -->` marker). Route AI reviews through the consolidate ' +
+              'skill (collect → internal → classify → post) so the Summary / Formal Review carries ' +
+              'its mandatory title. This comment has been minimized.';
+
+            // Label (best-effort — create the label if missing).
+            try {
+              await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: ['needs-consolidate'] });
+            } catch (e) { core.warning(`label add failed: ${e.message}`); }
+
+            // Minimize the comment (issue-comment node) as OUTDATED. Formal reviews cannot be
+            // minimized this way, so for reviews we post the notice + label only.
+            if (!isReview && nodeId) {
+              try {
+                await github.graphql(
+                  `mutation($id: ID!) { minimizeComment(input: { subjectId: $id, classifier: OUTDATED }) { minimizedComment { isMinimized } } }`,
+                  { id: nodeId }
+                );
+              } catch (e) { core.warning(`minimize failed: ${e.message}`); }
+            }
+
+            // One-line notice reply.
+            try {
+              await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: notice });
+            } catch (e) { core.warning(`notice comment failed: ${e.message}`); }
+
+            core.notice(`Flagged non-compliant review-flavored comment on #${prNumber} by ${author.login}`);
