@@ -1,5 +1,5 @@
 {
-  "description": "es6kr plugin hooks — explicit registration for auto-discovered skills whose hooks previously lived only as raw ~/.claude/settings.json path entries. Covers hook-kit (19), fix-plan (1), claude-session (1), wip (1), github-flow (1, registered under 2 matchers), code-workflow (1), claudify (1). Sourced from each skill's own resources/ (skills auto-discover via the plugin's skills/ convention; hooks require this explicit manifest). See ~/.agents/checklist.md 'settings.json 등록 훅 29개 전수조사' and ~/.agents/docs/generated/checklist-settings-json-hook-audit.md.",
+  "description": "es6kr plugin hooks — explicit registration for auto-discovered skills whose hooks previously lived only as raw ~/.claude/settings.json path entries. Covers hook-kit (20), fix-plan (1), claude-session (1), wip (1), github-flow (1, registered under 2 matchers), code-workflow (1), claudify (1). Sourced from each skill's own resources/ (skills auto-discover via the plugin's skills/ convention; hooks require this explicit manifest). See ~/.agents/checklist.md 'settings.json 등록 훅 29개 전수조사' and ~/.agents/docs/generated/checklist-settings-json-hook-audit.md.",
   "hooks": {
     "PreToolUse": [
       {
@@ -121,6 +121,16 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskoutput-long-block.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-agent-spawn-without-model.sh\"",
             "timeout": 5
           }
         ]
