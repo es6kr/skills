@@ -54,7 +54,7 @@ if (filePath && (filePath.includes('fix_plan.md') || filePath.includes('checklis
       // "## " heading (e.g. "## REPEAT") so later sections aren't mis-scanned
       // as Completed entries.
       const rest = content.slice(headingMatch.index + headingMatch[0].length);
-      const nextHeadingMatch = rest.match(/\n## /);
+      const nextHeadingMatch = rest.match(/(?:^|\n)## /);
       const completedSection = nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest;
       const items = completedSection.split('\n').filter((line) => line.trim().startsWith('-'));
 

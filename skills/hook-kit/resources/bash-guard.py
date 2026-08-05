@@ -387,7 +387,7 @@ def git_scan_text(command: str) -> str:
     return scan
 
 
-_PROD_BRANCHES = r"(?:production|master|release|prod|stable)"
+_PROD_BRANCHES = r"(?<![\w-])(?:production|master|release|prod|stable)"
 _PROD_BRANCH_PATTERNS = [
     (r"git\s+push\s+.*:" + _PROD_BRANCHES + r"(?:$|\s)", "git push deleting protected branch"),
     (r"git\s+push\s+.*" + _PROD_BRANCHES + r"(?:$|\s|:)", "git push targeting protected branch"),
