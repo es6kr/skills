@@ -83,6 +83,29 @@ jq . ~/.claude/settings.json > /dev/null
 bash -n ~/.claude/hooks/<script>.sh
 ```
 
+## Auto-fixing via `updatedInput` instead of hard-blocking
+
+A PreToolUse hook is not limited to allow/deny — it can also **rewrite the tool call before it executes**, so a missing/wrong field gets silently corrected instead of forcing a retry. Print JSON to stdout and exit 0 (JSON is only parsed on exit code 0; any extra text on stdout breaks parsing):
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "<why this field was auto-filled>",
+    "updatedInput": { "<field>": "<corrected-value>" }
+  }
+}
+```
+
+`updatedInput` is a **partial merge** into `tool_input` — only the listed keys are overwritten, everything else (prompt, other params) passes through untouched. Confirmed to work for the `Agent`/`Task` tool specifically (no restriction blocking mutation on it), per the official Claude Code hooks docs.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Hard-block (`exit 2`) every time a field is missing when a safe default exists | Auto-inject the default via `updatedInput` + `permissionDecision: "allow"`, exit 0 — the call proceeds corrected instead of forcing a manual retry |
+| 2 | Mix a blocking gate and an auto-fix gate in one script without ordering them | If a hard-block condition and an auto-fix condition can both apply to the same call, evaluate the **block first** — an auto-fix branch that exits 0 early will skip any block check that comes after it in the script |
+| 3 | Print extra log lines alongside the JSON on stdout | stdout must contain **only** the JSON object — banner/debug text breaks parsing |
+
 ## Notes
 
 - Do not confuse Phase 1 (block) and Phase 2 (soft_block/warn) — Phase 1 is grep patterns only, Phase 2 is bash logic
