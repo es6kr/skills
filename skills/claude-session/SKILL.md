@@ -1,11 +1,10 @@
 ---
 name: claude-session
 description: |
-  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (UTCP/code-mode), destroy, dual-sync (Windows/WSL memory path mapping), install (hook), memory-trim (MEMORY.md index byte-budget trim), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session", "session cleanup", "memory trim", "MEMORY.md over budget", "dual sync", "WSL memory", "Windows memory path"
+  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (MCP-direct), destroy, dual-sync (Windows/WSL memory path mapping), install (hook), memory-trim (MEMORY.md index byte-budget trim), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session", "session cleanup", "memory trim", "MEMORY.md over budget", "dual sync", "WSL memory", "Windows memory path"
 metadata:
   author: es6kr
   version: "0.1.5"
-depends-on: [utcp]
 ---
 
 # Session
@@ -43,7 +42,7 @@ Decision procedure:
 | classify | Classify project sessions (delete/keep/extract) | [classify.md](./classify.md) |
 | clean-profanity | Sanitize profanity tokens in a session JSONL file (in-place replacement) | [clean-profanity.md](./clean-profanity.md) |
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
-| compress | AI-compress sessions via UTCP/code-mode | [compress.md](./compress.md) |
+| compress | AI-compress sessions via claude-sessions-mcp | [compress.md](./compress.md) |
 | destroy | Delete current session and restart IDE | [destroy.md](./destroy.md) |
 | dual-sync | Windows ↔ WSL project memory path mapping — keep both environments' memory in sync | [dual-sync.md](./dual-sync.md) |
 | id | Look up current session ID (UUID) | [id.md](./id.md) |
@@ -158,7 +157,7 @@ Classifies sessions as CODE/INFRA/TINY/READ, then moves CODE sessions to worktre
 /session compress                 # batch compress sessions containing "hookEvent":"Stop"
 ```
 
-Register claude-sessions-mcp with UTCP, then call via code-mode.
+Calls `mcp__claude-sessions-mcp__compress_session` directly (registers the MCP server in project config first if not yet available).
 
 [Detailed guide](./compress.md)
 
@@ -296,8 +295,8 @@ bash scripts/rename-session.sh --list
 
 | Actual Path | Project Name |
 |-------------|--------------|
-| `/Users/es6kr/works/.vscode` | `-Users-es6kr-works--vscode` |
-| `/Users/es6kr/Sync/AI` | `-Users-es6kr-Sync-AI` |
+| `/Users/<user>/works/.vscode` | `-Users-user-works--vscode` |
+| `/Users/<user>/Sync/AI` | `-Users-user-Sync-AI` |
 
 Rule: all non-alphanumeric characters → `-` (i.e., `replace(/[^a-zA-Z0-9]/g, '-')`)
 

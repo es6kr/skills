@@ -1,11 +1,11 @@
 ---
-name: doc-convert
+name: docxport
 depends-on:
   - docx
 description: |
-  Convert Markdown / HWP / DOCX / RTF to PDF, PNG, HTML, DOCX. Works alongside raw-ingest for LLM Wiki raw source conversion. LibreOffice is the top-priority converter (watermark-free, MPL 2.0, faithful layout, handles HWP natively). prince / md-to-pdf are internal-only fallbacks — prince stamps a non-commercial watermark, so it must not touch external deliverables. Topics — pandoc (Markdown to PDF/PNG), docx (Word + md-to-docx-to-pdf chain, delegates to the docx skill) [docx.md], legacy (HWP / DOC / RTF via LibreOffice, in this SKILL.md), marp (slides with Mermaid, checklists, overflow) [marp.md]. Rich-format analysis defaults to PDF or HTML with images/tables preserved, never a silent txt fallback. Triggers — "PDF conversion", "PNG conversion", "DOCX conversion", "Word conversion", "HWP conversion", "hwp pdf", "hwp analysis", "legacy document", "document export", "export pdf", "md to pdf", "md to docx", "docx to pdf", "marp mermaid", "official PDF", "watermark-free PDF", "LibreOffice conversion", "document analysis", "raw ingest".
+  Convert Markdown / HWP / DOCX / RTF to PDF, PNG, HTML, DOCX. LibreOffice is the top-priority converter (watermark-free, MPL 2.0, faithful layout, handles HWP natively). prince / md-to-pdf are internal-only fallbacks — prince stamps a non-commercial watermark, so it must not touch external deliverables. Topics — pandoc (Markdown to PDF/PNG), docx (Word + md-to-docx-to-pdf chain, delegates to the docx skill) [docx.md], legacy (HWP / DOC / RTF via LibreOffice, in this SKILL.md), marp (slides with Mermaid, checklists, overflow) [marp.md]. Rich-format analysis defaults to PDF or HTML with images/tables preserved, never a silent txt fallback. Triggers — "PDF conversion", "PNG conversion", "DOCX conversion", "Word conversion", "HWP conversion", "hwp pdf", "hwp analysis", "legacy document", "document export", "export pdf", "md to pdf", "md to docx", "docx to pdf", "marp mermaid", "official PDF", "watermark-free PDF", "LibreOffice conversion", "document analysis".
 metadata:
-  version: "0.1.0"
+  version: "0.0.0"
   type: skill
 ---
 
@@ -19,7 +19,7 @@ All `Markdown | HWP | DOCX → PDF / PNG / HTML / DOCX` conversion **must go thr
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Directly assemble `pandoc ... && prince ...` in Bash | Invoke `/doc-export <file>` → follow the Instructions procedure below |
+| 1 | Directly assemble `pandoc ... && prince ...` in Bash | Invoke `/docxport <file>` → follow the Instructions procedure below |
 | 2 | Reconstruct conversion options from memory each time | Follow "Conversion cautions (recurrence prevention)" + Instructions every time |
 | 3 | For an HWP / DOCX / PDF `document analysis` request, silently fall back to `txt` extraction | Rich-format analysis defaults to **PDF or HTML with images/tables preserved**. txt is opt-in only (user must explicitly say "txt only") |
 | 4 | Use prince / md-to-pdf for official / external-submission documents | Watermark risk (prince inserts "non-commercial" mark). Route official documents through LibreOffice (§Medium policy below) |
@@ -29,14 +29,15 @@ All `Markdown | HWP | DOCX → PDF / PNG / HTML / DOCX` conversion **must go thr
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | docx | Word conversion + md → docx → pdf chain (pandoc + LibreOffice) | [docx.md](./docx.md) |
-| legacy | HWP / DOC / RTF → PDF / HTML via LibreOffice (below in this file) | — |
+| legacy | HWP / DOC / RTF → PDF / HTML via LibreOffice (§5 in this file) | — |
 | marp | Marp slide conversion (Mermaid, checklists, overflow) | [marp.md](./marp.md) |
-| pandoc | Markdown → PDF / PNG (pandoc + LibreOffice or prince) | below in this file |
+
+Pandoc (Markdown → PDF / PNG) is the underlying tool for §4 Execution — not a separate topic. See §2 Tool priority + §4 Execution.
 
 ## Quick Start
 
 ```bash
-/doc-export path/to/document.md
+/docxport path/to/document.md
 ```
 
 ## Instructions
@@ -62,7 +63,7 @@ Use the **first available** tool that satisfies the medium classification from �
 | 2 | pandoc + wkhtmltopdf | `command -v pandoc && command -v wkhtmltopdf` | None | LGPL / GPL | Official + Internal |
 | 3 | pandoc + xelatex | `command -v pandoc && command -v xelatex` | None | LPPL / free | Official + Internal |
 | 4 | pandoc + prince | `command -v pandoc && command -v prince` | **Yes** ("This document was created with the unregistered version of Prince") | Non-commercial free / commercial paid | **Internal only** |
-| 5 | md-to-pdf (npx puppeteer) | `npx --yes md-to-pdf --version` | None (uses headless Chromium) | MIT | Official + Internal (but Chromium install downloads ~150MB) |
+| 5 | md-to-pdf (npx puppeteer) | `npx --yes md-to-pdf --version` | None (uses headless Chromium) | MIT | **Internal only** (Chromium install downloads ~150MB; internal-only per §Usage-mandate row 4) |
 
 **Rank rationale**:
 - LibreOffice is #1 because it is watermark-clean, MPL-licensed, and handles the widest input format list (Markdown via pandoc pre-step, DOCX, HWP, RTF, ODT). It is the only converter that can render HWP without loss.

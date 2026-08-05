@@ -22,6 +22,7 @@ Environment detection:
 1. `TaskList` tool callable → Claude Code
 2. `task.md` artifact exists or `appDataDir` context present → Antigravity
 3. If both, prefer Claude Code (TaskList is more reliable)
+4. **`TaskList` shows as unavailable (`ToolSearch` no-match / disconnect reminder) in a session that is otherwise clearly Claude Code** (Claude-Code-specific context present, no `task.md`/`appDataDir`) — do not conclude "not Claude Code" or "skip task tracking" from this signal alone. `ToolSearch` returning no match does not distinguish "temporarily disconnected" from "disabled in this session's context" from "genuinely absent". Attempt one direct call (e.g. `TaskCreate`) to read the actual error, then report that finding to the user before deciding the fallback — see [claude.md](./claude.md) → "Tool unavailability — verify before falling back" for the full branch table (recoverable vs context-disabled) and the `claude-task` CLI fallback mechanics (persistent `~/.agents/tasks/default/` directory — never the session scratchpad, which does not survive a session/compact boundary). Do not silently drop to `fix_plan.md`/`checklist.md`-only tracking without surfacing this first — a broken task tool is an anomaly worth flagging, not a routine environment branch
 
 ## Precondition — Resume mode selected by SKILL.md Step 0
 
@@ -145,6 +146,7 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 | 3 | Bundle tasks under one ask via `multiSelect` | Each question independently decides the direction of its task |
 | 4 | Mark the first item `in_progress` without the direction ask | Step 3 may only be entered after Step 2 is complete |
 | 5 | Offer only "Hold (keep as task)" for external-wait items (user manual action / merge instruction / reply pending) | Include **Defer to checklist** in the option set — external-wait items belong in the checklist medium per "Medium separation principle" below. Hold keeps them polluting the task list across sessions |
+| 6 | Reference a PR/issue by bare `#N` in the question text or an option's description | Every distinct PR/issue number needs its own clickable full URL (`https://github.com/<owner>/<repo>/pull/<N>`) somewhere in that same ask — this rule is not scoped to any one skill's option-composition path, it applies wherever a PR/issue surfaces in a decision UI. Enforced by `block-pr-url-gate.sh` (PreToolUse:AskUserQuestion) |
 
 ### Per-environment ask method
 
@@ -216,6 +218,24 @@ The ask-medium ceiling (Claude `questions` max 4, Antigravity `ask.md` visibilit
 | 2 | Double-register BLOCKED items under the rationale "having it in the task list helps me not forget" | The checklist is reloaded every session, so it won't be forgotten. Duplicating the medium increases sync overhead |
 | 3 | Use `[BLOCKED]` as a task subject prefix | Use the checklist's `## Hold` section: `- [ ] [BLOCKED] <subject> (trigger: ...)` |
 | 4 | Report "BLOCKED still BLOCKED" on every `/wip` for external-wait tasks | If it is not in the task list, it is not a reporting target. When the response arrives, promote it from the checklist to a task |
+| 5 | Write a task subject like "Consolidate PR #184..." with the repo/URL only in the description | `TaskList` displays subject only, never description. A PR/issue reference in the subject needs its own repo qualifier (e.g. "owner/repo PR #N: ...") in the subject itself. Enforced by `block-pr-url-gate.sh` (PreToolUse:TaskCreate) |
+
+### Exception — Ralph-autonomous-loop-owned checklist files (large backlog)
+
+The "`[ ]` open → register as an execution task" rule above assumes a checklist file scoped to the current session's own work. Some checklist files are instead owned by a separate autonomous loop (Ralph) that runs across many sessions independently of the current interactive one — recognizable by a `## REPEAT` section (or equivalent recurring-task marker). Pulling every `[ ]` item from such a file into the current session's TaskList is disproportionate once the file's open-item count crosses a size threshold — the backlog is designed to be worked off across many future autonomous-loop passes, not exhausted in one sitting.
+
+**Trigger (both must hold)**:
+1. The checklist file has a `## REPEAT` section (or equivalent recurring-task marker), AND
+2. The count of top-level `[ ]` (non-`[BLOCKED]`) open items exceeds ~20
+
+**When triggered**: skip the full mechanical decomposition sync. Instead:
+- Present a scoped `AskUserQuestion` offering only session-relevant candidates (items touching files/topics from this session), plus an option to leave the rest for the autonomous loop's own future passes
+- Do NOT silently drop the sync obligation — state explicitly in the wip report that the full backlog was intentionally not decomposed, and why (trigger condition met)
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Register all of a large Ralph-owned backlog's `[ ]` items as TaskList entries because decomposition is "MANDATORY" | Check the exception trigger first — Ralph-owned (`## REPEAT` present) + oversized backlog → scoped ask instead |
+| 2 | Silently skip decomposition without saying so | State the skip and the reason explicitly in the wip report |
 
 ### Reverse direction — task → checklist demotion (Defer to checklist execution)
 

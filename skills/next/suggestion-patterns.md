@@ -302,6 +302,8 @@ gh api 'orgs/<org>/copilot/billing' --jq '{
 
 **Availability gate (HARD STOP)**: If query 3 returns `active: 0` or `management: "disabled"` or fails with "Not Found", **Copilot reviewer registration is NOT possible for this PR**. The "Request Copilot review" option in the "Copilot absent" branch becomes inactive — skip the option set and self-decide on `consolidate (CodeRabbit only)` instead. Do not present an ask whose Recommended option is impossible to execute.
 
+**CI-gate-only base branch gate (HARD STOP — check BEFORE the reviewer-matrix queries)**: some long-lived branches exist purely to accumulate CI-passing commits ahead of a later, separately-reviewed promotion PR (e.g. a two-tier staging model). What matters is the base branch's *role*, not its literal name — verify via `gh pr checks <N>`: a CodeRabbit line reading `Review skipped: reviews are disabled for this base branch` means this base is CI-gate-only, and no walkthrough will ever arrive (not "pending", not "rate limited"). When this signal is present, skip the reviewer-matrix branches entirely — self-decide "CI green + Test Plan + Mergeable is the full gate for this base" and route straight to `github-flow/merge.md`'s CI-gate-only exception, not any of the four branches below.
+
 Then map to a branch:
 
 | CodeRabbit walkthrough | Copilot requested | Copilot reviewed | Branch (option set) |
@@ -416,6 +418,8 @@ options: [
 **Precondition**: The session's core work is complete and the user signals wrap-up intent (explicit wrap-up keyword such as "wrap up", "cleanup", "end session"), or only asset cleanup (file moves, doc updates) remains. At least one pending/in_progress task remains for carryover.
 
 ### Context-usage gate (HARD STOP — before offering ANY wrap-up/cleanup option, in any ask)
+
+**Dependency precondition (HARD STOP)**: this entire gate applies ONLY when a session-cleanup skill is available in the current environment. If none is available, skip the context-usage gate and never offer a cleanup / wrap-up / retrospective option — see next SKILL.md "Dependency-gated behaviors". Evaluate the conditions below only after this precondition passes.
 
 A session-cleanup / retrospective / wrap-up option — including as a diversity slot inside a regular next-action ask — may be offered only when at least one of these holds:
 

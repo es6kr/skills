@@ -193,6 +193,15 @@ This script:
 | 1 | Assume the script produces move.md's "one merged headline" format | The script preserves the full subtree verbatim (checkbox-stripped); manual condensing is a separate, optional step |
 | 2 | Trust a single-node-text summary function to represent a subtree with children | Verify the entries mover recurses into children (see `node_to_completed_block` in `cleanup.py`) before relying on it for a multi-line subtree |
 
+### Line-ending preservation for custom bulk-move scripts (HARD STOP)
+
+Trackers edited across Windows/WSL and macOS/Linux sessions commonly use CRLF line endings throughout. When hand-rolling a Move-step transformation instead of using `cleanup.py` (e.g. a one-off script for a large batch of `[x]` items), a naive read/transform/write in a scripting language's default text mode silently normalizes CRLF → LF on read, or mixes conventions if only some content passes through that normalization and other content (freshly-authored strings) is written with literal `\n`. The result is either a diff where every unchanged line shows as modified (a false full-file rewrite obscuring the real change), or a file with inconsistent line endings.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Read a CRLF tracker in a language's default text mode, transform, and write back in default text mode without checking terminators | Detect the file's dominant line ending first (byte-count `\r\n` vs `\n`); do the transform logic against `\n`-normalized content, then convert the whole result back to the original convention immediately before writing |
+| 2 | Assume mixed CRLF/LF within one file is harmless | Verify post-write: `\r\n` count equals the total line count (pure CRLF) or is 0 (pure LF) — a partial count means the write mixed conventions |
+
 ### Trigger
 
 - **Period boundary** is the primary trigger — the first `move` / cleanup of a new

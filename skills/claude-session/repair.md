@@ -225,6 +225,20 @@ If no ID argument **and** the hook injection is missing (rare — hook misconfig
 
 **Self-repair caveat**: Repairing the current session while it is loaded by Claude Code may cause the IDE to read stale data. After repair, advise the user to reload the window (`Cmd-R`) or restart the Extension Host. The destroy topic (`/session destroy`) has a related but distinct purpose (delete + restart).
 
+**Active-process caveat (HARD STOP — check before every repair)**: a session ID can also be an actively-running **background agent process**, not just a passive IDE view. A live process can still be writing new turns to the file while the repair script runs. Because the script reads the whole file, computes the dedup/chain fix, then does an atomic `os.replace`, any write landing between the read and the replace is silently discarded — a real risk of dropped conversation turns, not merely staleness.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume "session loaded" means only "open in an IDE tab" | Before repairing, run `claude agents --json` (or the environment's equivalent process listing) and check whether the target session ID appears as a live entry with a `status`/`state` indicating active work |
+| 2 | Proceed straight to repair once the target session ID is resolved | If the session is a live process, disclose this to the user before repairing — the repair is still generally safe (atomic replace + `.bak` backup preserves the pre-repair state), but a write race during the read window cannot be ruled out from the file alone |
+| 3 | Treat a live background agent the same as a stale IDE view after repair | A background agent, unlike an IDE view, is not fixed by `Cmd-R`. After repair, re-check line count/mtime to confirm no writes landed during the repair window, and report this explicitly to the user |
+
+**Self-check (before running `repair-session.py` on any target session)**:
+1. Resolve the target session ID.
+2. Run `claude agents --json` (or equivalent) — does the ID appear as a live process?
+3. If yes, disclose this to the user as part of the repair report; do not silently treat it the same as a merely-stale IDE view.
+4. After repair, re-check line count/mtime to confirm no writes landed during the repair window; report if any did.
+
 ### 2. Session File Path
 
 ```bash

@@ -12,10 +12,10 @@ parameterized flow. It is the credential-issuance counterpart to [ui-test.md](./
 
 | Param | Meaning | Example |
 |-------|---------|---------|
-| `service` | The provider whose console issues the credential | `cloudflare-r2`, `github`, `oci`, `aws`, `authentik` |
-| `command` | What to issue / do once logged in | `issue R2 S3 token`, `issue fine-grained PAT`, `create OAuth app` |
-| `login-url` | Direct URL to the issuance page (when known) | `https://dash.cloudflare.com/?to=/:account/r2/api-tokens` |
-| `handoff` | Follow-up automation to run with the issued credential | `aws s3 cp`, `gh secret set`, `vault kv put` |
+| `service` | The provider whose console issues the credential | `google-forms`, `cloudflare-r2`, `github`, `oci`, `aws`, `authentik` |
+| `command` | What to issue / do once logged in | `issue Google API OAuth token`, `issue R2 S3 token`, `issue fine-grained PAT` |
+| `login-url` | Direct URL to the issuance page (when known) | `https://console.cloud.google.com/apis/credentials`, `https://dash.cloudflare.com/?to=/:account/r2/api-tokens` |
+| `handoff` | Follow-up automation to run with the issued credential | `gcloud auth print-access-token`, `aws s3 cp`, `gh secret set` |
 
 ## Backend selection (Step 0 + credential-specific preference)
 
@@ -65,6 +65,39 @@ disconnected or confirmed headless/invisible — see "Fresh-login flow" below.
 | 5 | See a single anti-automation block screen in chrome-devtools (e.g. Google's "Couldn't sign you in / this browser or app may not be secure") and immediately conclude the backend is unusable → open a second, disconnected Default-browser window | A site-level bot-detection message is not the same as "backend disconnected/headless" (the only two disqualifying conditions in row 3). Ask the user to retry in the **same visible chrome-devtools window** first (click retry, or reload) — the block is sometimes a one-shot heuristic, not a hard wall, and the window stays automatable if it succeeds |
 
 **Case (2026-07-22)**: chrome-devtools showed Google's "Couldn't sign you in" block once; assistant concluded the backend was blocked and opened a separate OS `Start-Process` window, asking the user to log in there instead — creating two windows and abandoning the automatable one. The user, following the original instruction to use "the browser you opened," logged into the **chrome-devtools window** anyway and it succeeded (reached the real cart/checkout page with the actual VAT-inclusive price). A single block screenshot is a data point, not a terminal verdict — retry (or ask the user to retry) in place before downgrading.
+
+**⚠️ Superseded for the services listed below** — see "CDP-hostile services" immediately below (see failed-attempts.md "CDP-hostile services stop-retry").
+
+### CDP-hostile services — stop retrying, escalate immediately (HARD STOP)
+
+**Some providers actively fingerprint and block CDP-attached (remote-debugging-protocol) browser instances — no amount of matcher-switching (Order 1-4 in the automation cascade above) works around this, because the detected signal is the automation connection itself (`navigator.webdriver`, missing browser extensions/plugins, CDP-specific timing/behavior), not the page's markup.** This is a different failure class from a generic login wall or a one-shot anti-bot heuristic (contrast with the "Case" example in the row above, which resolved on retry).
+
+**Known CDP-hostile services** (grows as new cases are confirmed):
+
+| Service | Symptom | Confirmed working alternative | Notes |
+|---------|---------|-------------------------------|-------|
+| Cloudflare (dash.cloudflare.com and any Cloudflare-fronted site) | Turnstile "Verifying you are human" interstitial that does not clear, or clears then re-triggers | **wmux/cmux panel**, when detected (see Backend selection table above) | Self-referential — Cloudflare's own dashboard sits behind Cloudflare's bot protection |
+| Google (accounts.google.com and Google-account-gated consoles) | "Couldn't sign you in — this browser or app may not be secure" | **wmux/cmux panel**, when detected | Google explicitly blocks non-standard/automation-flagged browser sessions for account sign-in |
+
+**A recorded preferred browser (see "Preferred-browser check" above) does not override this table**: even when a specific desktop app is the user's stated preference, if that app is itself automation/CDP-instrumented (e.g. QA/testing-oriented browsers that embed their own remote-debugging or automation daemon), CDP-hostile services will still block it the same way they block chrome-devtools-mcp — confirmed with a browser built on this kind of architecture failing Cloudflare login. For services in this table, escalate to wmux/cmux (or the documented handoff) regardless of the recorded preferred-browser fact; the preferred-browser check governs the generic OS-level-open case, not this escalation ladder.
+
+**Escalation rule**: on the **first** confirmed bot-check/anti-automation screen (or prior knowledge of bot detection) from a listed service in the current session, do not cycle through Order 1-4 matchers and do not retry in place. Escalate in this order:
+
+0. **wmux/cmux panel, if Step 0 already detected it** — this is not a fallback of last resort here, it is the **preferred** backend for these services (see Backend selection table's priority-1 row above). Try it before considering OS-level browser launch or an environment handoff.
+1. **OS-level Default browser with `--new-window`** (`cmd.exe /c start chrome.exe --new-window "<url>"` or `cmd.exe /c start msedge.exe --new-window "<url>"` on Windows, or `open "<url>"` on macOS) — use when wmux/cmux is not available. MANDATORY `--new-window` on Windows when background Chrome/CDP instances exist; plain `Start-Process` silently routes the URL into existing background process tabs without popping up a GUI window.
+   - **Preferred-browser check before naming an app (HARD STOP)**: the browser names above (Chrome, Edge) are illustrative examples, not a default to apply unchecked. Before launching a specific named app (e.g. `open -na "<App>" --args --new-window "<url>"` on macOS), check whether the user's actual preferred desktop browser is already recorded (a rule fact, skill data, or durable memory tied to this machine). If recorded, use it. If not recorded, either use the plain OS opener (`open "<url>"` with no app name, letting the OS pick its registered default) or ask the user once which app to use — do not silently substitute a well-known browser name (Chrome, Edge, Firefox) as a stand-in for "the user's browser".
+   - **Verify the app's actual CLI support before constructing its launch command (HARD STOP)**: once a specific app is identified (recorded preference or a name the user just gave), do not assume it shares Chrome/Edge's flag syntax (`--new-window`, `--args`, etc.) by analogy. A non-standard or unfamiliar app (anything other than a small set of well-known browsers whose CLI surface is already common knowledge) may be a custom Electron app or other wrapper with its own argument parsing that ignores or mishandles borrowed flags. Check the app's actual supported invocation first — `<app-binary> --help`, its bundled documentation, or a documentation lookup tool (e.g. context7) if one is available — before running a launch command built from another tool's convention. Confirm the command actually took effect (the target page/window appeared) rather than trusting a zero exit code, since a misparsed argument can silently no-op instead of erroring.
+2. **Handoff to a different execution environment** (e.g., a different agent harness) when cross-harness execution is explicitly required and neither wmux/cmux nor a fresh OS-level window is viable — write a self-contained handoff document.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Plain `Start-Process chrome.exe <url>` without `--new-window` when background Chrome instances exist | Use `--new-window` or fallback to `msedge.exe --new-window` so OS IPC creates a fresh foreground GUI window |
+| 2 | Output text-only URL instructions when automated CDP browsing is blocked by Cloudflare/Google bot protection | Immediately launch the OS browser (`cmd.exe /c start chrome.exe --new-window "<url>"`) via shell command so the page is presented on the user's screen |
+| 3 | Keep cycling Order 1-4 automation matchers against a CDP-hostile service, burning turns on a signal-level block no matcher can bypass | Recognize CDP-hostile services need a **different backend class** (non-CDP), not a different matcher within the same CDP backend |
+| 4 | Assume a prior one-off success generalizes to "it usually works" | One success does not override a provider's structural bot-detection design. If the user reports repeated failures for a listed service, trust that over a single historical success |
+| 5 | Jump straight to OS-level `--new-window` or an environment handoff when wmux/cmux was already detected by Step 0 | wmux/cmux outranks both — it is the row-0 escalation, not row 1/2. Skipping past it re-creates the exact gap this table exists to close |
+
+**Self-check addition (before opening any browser for issuance)**: is `service` (or the domain being navigated to) in the CDP-hostile table? → If yes: is wmux/cmux detected (Step 0)? → If yes, use it (escalation row 0) — skip the automation cascade but do NOT skip past wmux/cmux to OS-level browser launch. Only when wmux/cmux is unavailable does the cascade skip straight to OS-level browser launch (row 1).
 
 ### Fallback: raw CDP WebSocket scripting when both chrome-devtools-mcp and profile-copy fail
 

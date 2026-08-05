@@ -101,3 +101,36 @@ git status (change list)
 ### Failure case
 
 See `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry for "worktree split option missing in commit-method ask" (Makefile environment targets case, AskUserQuestion presented commit options without a worktree-split option and without pre-commit `git status` check).
+
+---
+
+## Full-range squash-candidate scan (HARD STOP — triggered by any squash finding)
+
+**The moment a squash candidate is found anywhere in the unpushed history, that finding is a signal to scan the ENTIRE unpushed range for the same pattern — not just the range the user happened to mention.** A user pointing at one specific commit range (by hash or description) defines the *minimum* scope, never the *maximum*. Stopping analysis at the user-named range misses adjacent streaks of the identical pattern.
+
+### Procedure
+
+1. Once ANY squashable streak is identified (2+ consecutive commits touching the same single file, or an equivalent repetition pattern), run a full-range scan before reporting or proposing anything:
+   ```bash
+   git log --name-only --oneline @{u}..HEAD   # or origin/<branch>..HEAD if no upstream is set
+   ```
+2. Group the output by file: for each file, list the commits that touch only that file in a contiguous run.
+3. Report **every** contiguous single-file streak found (not just the one the user named) as a squash candidate — even ones the user never mentioned.
+4. Only after the full-range scan is complete does an AskUserQuestion / squash-plan proposal count as ready.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | User names a specific commit-hash range → analyze only that range and stop | Treat the named range as a *trigger*, not a *boundary* — scan the full unpushed range for the same pattern |
+| 2 | Verify a claimed squash candidate with `git log --name-only <user-named-range>` only | Also run `git log --name-only @{u}..HEAD` (whole range) grouped by file, independent of what the user named |
+| 3 | Present a squash plan for one range while other identical streaks sit elsewhere in the same unpushed history | Enumerate all streaks in the same response — the user decides which to include, not the assistant by omission |
+| 4 | Treat "the user will tell me if there's more" as sufficient | The assistant's job is to surface the full picture; a partial squash plan the user must supplement by re-asking is the exact failure this rule prevents |
+
+### Self-check (before presenting any squash plan)
+
+1. Did I run `git log --name-only @{u}..HEAD` (or the equivalent full-unpushed-range command) — not just the range the user named?
+2. Does the output show more than one contiguous single-file streak?
+3. If yes, does my report/plan include ALL of them, not just the one initially pointed at?
+
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "squash-scan-scope-narrowed-to-user-mention" for case history.

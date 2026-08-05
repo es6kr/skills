@@ -105,6 +105,7 @@ Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then 
 | 4 | Skip `TaskList` before deciding mode | `TaskList` is the primary source for existing-task count. Guessing from context memory is unreliable |
 | 5 | Mixed mode: register new tasks + immediately mark in_progress without resume Step 2 direction ask on existing | Mixed mode: (a) register new, (b) then run resume on the combined list — old tasks may still need per-item direction |
 | 6 | Treat an explicit `/wip <small edit>` as a Skip-Condition case and go straight to `Read`/`Edit` of the deliverable | Explicit `/wip` = registration requested. Run Step 0 → Registration/Resume path → `TaskCreate` **first**, then execute. Skip Conditions gate self-invocation, not explicit calls |
+| 7 | Interrupt-stacked instructions arrive right after a registration-mode `/wip` (a newer directive: reword, investigate, etc.) → pivot to the newest instruction and never register the original `/wip` args | The original `/wip` args still require `TaskCreate` **first**. Register them before pivoting to any interrupt-stacked instruction — including Bash investigation for the newer directive. The register-before-execute guard hook only covers the case where `/wip` is the *last* user turn; the interrupt-stacked case (a newer non-`/wip` turn follows) is caught only by this discipline |
 
 Environment implementations:
 - Claude Code → [claude.md](./claude.md) (TaskList/TaskCreate/AskUserQuestion)

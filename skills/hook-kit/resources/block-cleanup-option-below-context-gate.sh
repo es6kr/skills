@@ -17,6 +17,15 @@
 # the user-signal half is handled by the composer via the "user-requested"
 # marker. Recurrence family tracked in failed-attempts.md
 # (grep "context-usage").
+#
+# Under-offer scope (2026-08-03 widened, class
+# context-gate-cleanup-not-marked-recommended 2nd occurrence): the positive-
+# trigger check originally required an explicit end/stop-session OPTION to
+# even consider an ask "wrap-up-scoped" — an ask that doesn't yet frame itself
+# that way (e.g. a plain "decide X" ask mid-work, no end/stop option) bypassed
+# the gate entirely regardless of live usage. The QUESTION TEXT is now also
+# checked for "next action" framing (the next skill's own canonical phrasing,
+# "what would you like to do next?") — either signal now scopes the ask in.
 
 # Fallback only. The live per-model value (fable/mythos 55, opus 50, others 45)
 # is published by context-usage-inject.sh and overrides this below; 45 is the
@@ -46,6 +55,19 @@ if [[ -n "${HG_CONTEXT_GATE_ENDSTOP_KO:-}" ]]; then
   ENDSTOP_PATTERN="${ENDSTOP_PATTERN_EN}|${HG_CONTEXT_GATE_ENDSTOP_KO}"
 else
   ENDSTOP_PATTERN="$ENDSTOP_PATTERN_EN"
+fi
+
+# "Next action" QUESTION-TEXT framing = second deterministic signal that the
+# ask IS wrap-up-scoped, independent of whether an end/stop OPTION was
+# offered. Matches the next skill's own canonical question ("What would you
+# like to do next?") and close variants. Scoped to the question text, not
+# options — see OPT_TEXTS comment below for why options-only scoping exists
+# for the cleanup/end-stop patterns.
+NEXTACTION_PATTERN_EN='what would you like to do next|what.?s next\??|what next\??'
+if [[ -n "${HG_CONTEXT_GATE_NEXTACTION_KO:-}" ]]; then
+  NEXTACTION_PATTERN="${NEXTACTION_PATTERN_EN}|${HG_CONTEXT_GATE_NEXTACTION_KO}"
+else
+  NEXTACTION_PATTERN="$NEXTACTION_PATTERN_EN"
 fi
 
 INPUT=$(cat)
@@ -91,9 +113,20 @@ HAS_ENDSTOP=$(echo "$INPUT" | jq --arg pattern "$ENDSTOP_PATTERN" -r '
   ] | length
 ' 2>/dev/null)
 
-# Neither an offered cleanup option nor an end/stop wrap-up signal → not a
-# wrap-up ask in either direction. Nothing to judge.
-if [[ "$HAS_CLEANUP" == "0" && "$HAS_ENDSTOP" == "0" ]]; then
+# "Next action" framing lives in the QUESTION text, not the options (that's
+# where the composer states the ask's purpose — e.g. "What would you like to
+# do next?"). A second, independent wrap-up-scoping signal from HAS_ENDSTOP.
+HAS_NEXTACTION=$(echo "$INPUT" | jq --arg pattern "$NEXTACTION_PATTERN" -r '
+  [
+    .tool_input.questions[]? | (.question // "") |
+    select(test($pattern; "i"))
+  ] | length
+' 2>/dev/null)
+
+# Neither an offered cleanup option, nor an end/stop wrap-up option, nor
+# next-action question-text framing → not a wrap-up ask in any direction.
+# Nothing to judge.
+if [[ "$HAS_CLEANUP" == "0" && "$HAS_ENDSTOP" == "0" && "$HAS_NEXTACTION" == "0" ]]; then
   exit 0
 fi
 
@@ -169,16 +202,20 @@ if [[ "$HAS_CLEANUP" == "1" && "$BELOW" == "1" ]]; then
   exit 2
 fi
 
-# UNDER-offer (positive-trigger enforcement): the ask IS a wrap-up ask (an
-# end/stop option is present) and context is AT/ABOVE threshold, but NO cleanup/
-# retrospective option was offered. Omitting cleanup at a full session is the
-# mirror failure the gate's positive trigger forbids.
-if [[ "$HAS_ENDSTOP" == "1" && "$HAS_CLEANUP" == "0" && "$BELOW" == "0" ]]; then
+# UNDER-offer (positive-trigger enforcement): the ask IS wrap-up-scoped
+# (either an end/stop option is present, OR the question text uses
+# "next action" framing like "what would you like to do next?") and context
+# is AT/ABOVE threshold, but NO cleanup/retrospective option was offered.
+# Omitting cleanup at a full session is the mirror failure the gate's
+# positive trigger forbids — widened 2026-08-03 so a plain next-action ask
+# (no end/stop option yet) is caught too, not just asks that already frame
+# themselves as ending the session.
+if [[ ( "$HAS_ENDSTOP" == "1" || "$HAS_NEXTACTION" == "1" ) && "$HAS_CLEANUP" == "0" && "$BELOW" == "0" ]]; then
   {
-    echo "DENIED: session wrap-up ask at >= ${THRESHOLD}% context omits the cleanup/retrospective option."
+    echo "DENIED: wrap-up-scoped ask at >= ${THRESHOLD}% context omits the cleanup/retrospective option."
     echo ""
     echo "Live context usage: ${LATEST_PCT}% (>= ${THRESHOLD}% threshold)."
-    echo "The options include an end/stop-session choice but no cleanup/retrospective option."
+    echo "Signal: $( [[ "$HAS_ENDSTOP" == "1" ]] && echo -n "an end/stop-session option is present" )$( [[ "$HAS_ENDSTOP" == "1" && "$HAS_NEXTACTION" == "1" ]] && echo -n " and " )$( [[ "$HAS_NEXTACTION" == "1" ]] && echo -n "the question text uses next-action framing" ) — but no cleanup/retrospective option was offered."
     echo ""
     echo "Why blocked:"
     echo "  - The Context-usage gate's positive trigger: at/above ${THRESHOLD}% in a"
