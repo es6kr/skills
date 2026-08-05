@@ -21,6 +21,11 @@ PY_SCRIPT = REPO_ROOT / "scripts" / "check-hangul.py"
 HANGUL_SAMPLE_1 = chr(0xAC00) + chr(0xB098)
 HANGUL_SAMPLE_2 = chr(0xD55C) + chr(0xAE00)
 
+# Hangul Syllables block boundaries — the exact characters code uses to write
+# a range-literal idiom like `re.compile(r"[가-힣]")`.
+HANGUL_RANGE_START = chr(0xAC00)  # 가
+HANGUL_RANGE_END = chr(0xD7A3)  # 힣
+
 
 def _no_git_env():
     """Environment with every GIT_* variable dropped.
@@ -254,6 +259,30 @@ def test_scanner_ignores_poisoned_grep(tmp_path):
     assert result.returncode == 1, result.stderr
     assert "skill-with-hangul" in result.stdout
     assert "BLOCKED" in result.stdout
+
+
+def test_range_literal_idiom_exempted(tmp_path):
+    """The Unicode-range-literal idiom `<start>-<end>` (e.g. Python
+    `re.compile(r"[<start>-<end>]")`, matching the Hangul syllable block
+    boundaries) is code defining a range, not prose — must not trip the gate."""
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    line = f'HANGUL_RE = re.compile(r"[{HANGUL_RANGE_START}-{HANGUL_RANGE_END}]")\n'
+    (skill / "SKILL.md").write_text("# clean\n" + line, encoding="utf-8")
+    result = _run_py([str(skill)], cwd=REPO_ROOT)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "clean" in result.stdout
+
+
+def test_range_literal_idiom_does_not_mask_real_korean_on_same_line(tmp_path):
+    """Stripping the range-literal substring must not blind the scanner to
+    genuine Korean prose sharing a line with the idiom."""
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    line = f'# [{HANGUL_RANGE_START}-{HANGUL_RANGE_END}] {HANGUL_SAMPLE_2}\n'
+    (skill / "SKILL.md").write_text(line, encoding="utf-8")
+    result = _run_py([str(skill)], cwd=REPO_ROOT)
+    assert result.returncode == 1, result.stdout + result.stderr
 
 
 def test_max_matches_env_limits_printed_lines(tmp_path):
