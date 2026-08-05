@@ -426,21 +426,21 @@ The following expressions mean "inspect / review / check" — NOT permission to 
 | "run it through to the end" + workflow names merge | Approval | ✅ |
 
 **Correct flow** (non-approval pattern + conditions satisfied):
-1. Report the five-condition self-check result as text ("CI ✅, AI Review ✅, Test Plan ✅, Mergeable ✅")
+1. Report the six-condition self-check result as text ("CI ✅, AI Review ✅, Test Plan ✅, Mergeable ✅, Cross-repo dependency ✅, Merge-method policy ✅")
 2. Use AskUserQuestion to **confirm merge intent separately** — "All conditions satisfied. Proceed with merge?" (options: "merge now" / "defer" / "additional review")
 3. Run `gh pr merge --squash` only when the user picks "merge now"
 
 **Auto-merge procedure**:
-1. Self-check the five conditions (CI / Test Plan / AI Review Summary / Mergeable)
+1. Self-check the six conditions (CI / Test Plan / AI Review Summary / Mergeable / Cross-repo dependency / Merge-method policy)
 2. If all satisfied → skip AskUserQuestion, run `gh pr merge --squash`
 3. If any unsatisfied → AskUserQuestion explaining the blocker + suggesting how to clear it (independent of pre-approval)
 
-**Exception — AI Review Summary structurally exempt (CI-gate-only staging base) (HARD STOP)**: "skip AskUserQuestion" in step 2 assumes the AI Review Summary already gave the user visibility into the actual diff before this point. When condition 3 is exempt because the base is CI-gate-only (staging branch, e.g. `next-fix`/`next-feat` — see the CI-gate-only exception above), that visibility never happened, and an explicit merge command + the remaining 4 conditions is not the same thing as the user having seen the content. In this case, do NOT skip AskUserQuestion — present a final content-review ask (the PR URL + a one-line summary of the change) before running `gh pr merge`, even though the user already gave an explicit merge instruction. This is not re-confirming *intent to merge* (already given) — it's the only remaining chance for the user to catch something they'd reject (e.g. a wrongly-scoped skill topic) before an irreversible squash.
+**Exception — AI Review Summary structurally exempt (CI-gate-only staging base) (HARD STOP)**: "skip AskUserQuestion" in step 2 assumes the AI Review Summary already gave the user visibility into the actual diff before this point. When condition 3 is exempt because the base is CI-gate-only (staging branch, e.g. `next-fix`/`next-feat` — see the CI-gate-only exception above), that visibility never happened, and an explicit merge command + the remaining 5 conditions is not the same thing as the user having seen the content. In this case, do NOT skip AskUserQuestion — present a final content-review ask (the PR URL + a one-line summary of the change) before running `gh pr merge`, even though the user already gave an explicit merge instruction. This is not re-confirming *intent to merge* (already given) — it's the only remaining chance for the user to catch something they'd reject (e.g. a wrongly-scoped skill topic) before an irreversible squash.
 
 **Self-check (before skipping AskUserQuestion in the auto-merge procedure)**: is AI Review Summary satisfied because it was actually posted, or because it's structurally exempt (staging base)? If exempt → this exception applies, ask before merging regardless of pre-approval wording.
 
 **Forbidden patterns**:
-- "Wait for the predecessor PR to merge" answer → after the PR is created + five conditions satisfied → asking "shall I merge?" again (redundant)
+- "Wait for the predecessor PR to merge" answer → after the PR is created + six conditions satisfied → asking "shall I merge?" again (redundant)
 - Mis-interpreting a pre-approval answer as "inspect intent" instead of "merge intent"
 
 ### 4. Mergeable status
@@ -458,7 +458,7 @@ gh pr view <PR_NUMBER> --json mergeable
 | Solo-maintained infra repo | Allowed (solo) | Replaced by AI Review APPROVE |
 
 - For an org-protected app repository where self-approve is not allowed, the formal-review condition is skipped.
-- If all five conditions above pass, the PR can be merged.
+- If all six conditions above pass, the PR can be merged.
 
 ## Merge Execution
 
@@ -515,12 +515,12 @@ gh pr merge <PR_NUMBER> --merge
   - **Cross-repo issues apply equally**: if the PR references another repository's issue, update that repository's issue body too (e.g. when an app-repo PR includes work tracked in the infra repo, update both issue bodies)
   - Consequence of skipping: the epic body stays stale; on the next planning pass, "already implemented items" appear unfinished and cause duplicate work / confusion
 - **Deploy follow-up**: after merge, confirm with the user whether to run the related deploy workflow (infra automation, ArgoCD sync, etc.).
-- **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the five conditions to the user is a procedural violation.
+- **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the six conditions to the user is a procedural violation.
 - **Post-hoc review for PRs merged without review** — run `/consolidate pr` for a post-hoc review, and if actionable items appear, ask via AskUserQuestion whether to register them in a follow-up PR or an existing issue.
 
 ## Recording evidence of merge-condition satisfaction (CRITICAL)
 
-**When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all five conditions.**
+**When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all six conditions.**
 
 A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Format:
 
@@ -538,7 +538,7 @@ A bare `✅` leaves no basis to verify "the conditions were really satisfied" af
 
 ## Merge-recommendation AskUserQuestion format (CRITICAL — HARD STOP)
 
-**When recommending PR merge via AskUserQuestion, every option's description must include evidence for the five conditions.**
+**When recommending PR merge via AskUserQuestion, every option's description must include evidence for the six conditions.**
 
 ```typescript
 {
@@ -554,7 +554,7 @@ A bare `✅` leaves no basis to verify "the conditions were really satisfied" af
 
 **Verification procedure (HARD STOP)**:
 
-Right before authoring the merge-recommendation AskUserQuestion, verify all five conditions:
+Right before authoring the merge-recommendation AskUserQuestion, verify all six conditions:
 
 ```bash
 # 1. CI status
