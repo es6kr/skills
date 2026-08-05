@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/next-v0.7.0...next-v0.7.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **next:** gate cleanup and fix_plan behaviors on backing-skill availability ([#208](https://github.com/es6kr/skills/issues/208)) ([5d4fa0f](https://github.com/es6kr/skills/commit/5d4fa0f2f4e0f415196d532436b74fa86573ea1d))
+* **next:** log Stop-hook blind-spot guards + widen reactive-guard fire condition ([ac44eaa](https://github.com/es6kr/skills/commit/ac44eaa0f53401ab2789134c973b67e1e86fe0d0))
+* **next:** log Stop-hook blind-spot guards + widen reactive-guard fire condition ([34c68b5](https://github.com/es6kr/skills/commit/34c68b5fdd57f384e87d17922836ad9a26d999a8))
+* **next:** remove hooks ported to next-invocation-guard plugin ([90d23a9](https://github.com/es6kr/skills/commit/90d23a9a5a29316d90a48639da9394a8ff8e02c1))
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/next-v0.6.0...next-v0.7.0) (2026-07-28)
 
 

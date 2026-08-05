@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/github-flow-v0.8.0...github-flow-v0.8.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **github-flow:** correct stale five/four-condition wording after 6th gate added ([738e92e](https://github.com/es6kr/skills/commit/738e92ed078e6c5f81cdc2325f7b85e91d830d14))
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/github-flow-v0.7.0...github-flow-v0.8.0) (2026-08-03)
 
 
