@@ -70,6 +70,13 @@ Step 0-0 and Step 0-1 below each describe themselves as running "first" — that
 
 **What Step 0-0 still requires — a visible-text audit, NOT a task**: on an explicit `/next` call, before composing options, print the audit in visible text — why the auto-trigger missed (if it did) and a short session-state check. Emitting it as prose satisfies the requirement; do NOT substitute a `[x]`-marked task for the visible analysis, and do NOT skip it.
 
+**Exception — substantial discovery gets one lightweight tracking task (HARD STOP)**: the "no task registration" rule above assumes discovery resolves in a single quick call (e.g., one `TaskList` read). When candidate discovery itself grows beyond that — 3+ tool calls, or spanning 2+ distinct sources (`TaskList` + `fix_plan.md` + `gh pr`/`issue` search, etc.) — register **exactly one** lightweight tracking task for the whole discovery phase (e.g., "next: composing candidate options") before making the first discovery call, so the user retains visibility into in-flight work and can interrupt cleanly. Mark it completed the moment `AskUserQuestion` is composed. This does not reopen the meta-task-pollution problem: it is still one task for the entire phase, not one per source, and it is pruned immediately.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run `TaskList` + a `fix_plan.md` read + multiple `gh` searches across several tool calls with zero task tracking, leaving the user unable to see what discovery is in flight | Register one lightweight tracking task before the first discovery call when 3+ tool calls or 2+ sources are anticipated; mark it completed once options are composed |
+| 2 | Apply the "no task registration" rule uniformly regardless of how many tool calls discovery actually takes | Trivial discovery (single `TaskList` call) → no task, per the base rule above. Substantial discovery (3+ calls / 2+ sources) → one tracking task |
+
 **Environment note**: In Antigravity (Gemini), the `task.md` artifact doubles as the progress-display medium, so a lightweight `task.md` checklist there is acceptable. In Claude Code, `TaskList`/`TaskCreate` is a user-work medium — keep internal procedure steps out of it (narrate them in text) and reserve `TaskCreate` for Step 3's selected work.
 
 ### Step 0-1: Antigravity Session Check & Context Usage Gate (MANDATORY in Antigravity — runs before Step 0-0 in that environment, see "Step ordering" above)
