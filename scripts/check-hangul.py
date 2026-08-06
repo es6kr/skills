@@ -49,6 +49,11 @@ NC = "\033[0m"
 # itself contains no Korean characters (passes check-hangul on its own repo).
 HANGUL_RE = re.compile(f"[{chr(0xAC00)}-{chr(0xD7A3)}]")
 
+# Exempts the common Unicode-range-literal idiom used in code (e.g.
+# `re.compile(r"[가-힣]")`) from the prose-Korean scan — a functional range
+# boundary, not language content this English-only gate exists to catch.
+RANGE_LITERAL_RE = re.compile(f"{chr(0xAC00)}-{chr(0xD7A3)}")
+
 SCAN_EXTS = (".md", ".sh")
 
 # How many matched lines to print per skill. Override with MAX_MATCHES=N
@@ -86,7 +91,7 @@ def _scan_dir(skill_dir: Path, tracked_files: set[Path] | None = None) -> list[t
             try:
                 with file_path.open("r", encoding="utf-8", errors="replace") as fh:
                     for lineno, line in enumerate(fh, start=1):
-                        if HANGUL_RE.search(line):
+                        if HANGUL_RE.search(RANGE_LITERAL_RE.sub("", line)):
                             matches.append((file_path, lineno, line.rstrip("\n")))
             except OSError as exc:  # pragma: no cover — unreadable file is exceptional
                 print(f"WARN: could not read {file_path}: {exc}", file=sys.stderr)
