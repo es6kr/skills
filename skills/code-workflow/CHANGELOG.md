@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/es6kr/skills/compare/code-workflow-v0.6.0...code-workflow-v0.6.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/code-workflow-v0.5.1...code-workflow-v0.6.0) (2026-08-03)
 
 

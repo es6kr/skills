@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/es6kr/skills/compare/choco-v1.0.1...choco-v1.0.2) (2026-08-05)
+
+
+### Bug Fixes
+
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [1.0.1](https://github.com/es6kr/skills/compare/choco-v1.0.0...choco-v1.0.1) (2026-06-27)
 
 

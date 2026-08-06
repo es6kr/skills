@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.5](https://github.com/es6kr/skills/compare/web-browser-v0.2.4...web-browser-v0.2.5) (2026-08-05)
+
+
+### Bug Fixes
+
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+* **web-browser:** CDP-hostile escalation overrides recorded browser preference ([13a13a0](https://github.com/es6kr/skills/commit/13a13a0d6de9a0a9057dbdad1acb9b600710153e))
+* **web-browser:** check locally-recorded preferred browser before naming one in OS-level open ([2b9eef2](https://github.com/es6kr/skills/commit/2b9eef283560c0f0b5b8ec40aab79af9f2629fff))
+* **web-browser:** preferred-browser check + credential-issue fallback for API tasks ([a5a7859](https://github.com/es6kr/skills/commit/a5a7859d6c0c9ebfc2a7a6417b30e6a6299fd3da))
+* **web-browser:** recommend credential-issue instead of manual UI clicking when API access is available ([b127109](https://github.com/es6kr/skills/commit/b127109bcd1fd11c809d1f861c88fcc2cd6c072a))
+* **web-browser:** verify app's actual CLI support before borrowing another tool's flag syntax ([7ce4a28](https://github.com/es6kr/skills/commit/7ce4a28937e1c07e95eecfc511802c445385ee6b))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [0.2.4](https://github.com/es6kr/skills/compare/web-browser-v0.2.3...web-browser-v0.2.4) (2026-07-23)
 
 
