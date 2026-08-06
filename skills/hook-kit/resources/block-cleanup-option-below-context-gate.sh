@@ -30,7 +30,11 @@ HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
 if [[ -f "$HG_DATA_FILE" ]]; then
   . "$HG_DATA_FILE"
 fi
-WRAPUP_PATTERN_EN='wrap[- ]?up|/cleanup|session cleanup|retrospect'
+# Negative lookbehind on "/cleanup" excludes a bare substring match inside
+# unrelated slash-delimited text (e.g. "resume/shutdown/cleanup/agent-messages")
+# — only a standalone "/cleanup" token (not preceded by alnum or another slash)
+# counts as the slash-command reference.
+WRAPUP_PATTERN_EN='wrap[- ]?up|(?<![a-zA-Z0-9/])/cleanup|session cleanup|retrospect'
 if [[ -n "${HG_CONTEXT_GATE_WRAPUP_KO:-}" ]]; then
   WRAPUP_PATTERN="${WRAPUP_PATTERN_EN}|${HG_CONTEXT_GATE_WRAPUP_KO}"
 else
