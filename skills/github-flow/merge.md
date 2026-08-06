@@ -522,17 +522,19 @@ gh pr merge <PR_NUMBER> --merge
 
 **When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all six conditions.**
 
+**Format authority**: `fix_plan.md`'s schema (section layout, marker syntax) is owned by `fix-plan/format.md` — that file's `## Completed` convention (flat `-` line, no checkbox, no `###` headers) governs here too. This section only adds *what evidence to include*, not a competing structure.
+
 A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Format:
 
 ```markdown
-### PR #N (branch-name) — ✅ MERGED YYYY-MM-DD
-- CI: 4/4 SUCCESS (test ubuntu, test windows, e2e, CodeRabbit)
-- AI Review: CodeRabbit ✅ addressed (3 actionable), Copilot ✅ addressed (1 comment)
-- Test Plan: 5/5 checked
-- Formal Review: APPROVED by @user (or "not required by repo policy")
+- PR #N (branch-name) — ✅ MERGED YYYY-MM-DD
+  - CI: 4/4 SUCCESS (test ubuntu, test windows, e2e, CodeRabbit)
+  - AI Review: CodeRabbit ✅ addressed (3 actionable), Copilot ✅ addressed (1 comment)
+  - Test Plan: 5/5 checked
+  - Formal Review: APPROVED by @user (or "not required by repo policy")
 ```
 
-**Forbidden pattern**: `### PR #N — ✅ MERGED YYYY-MM-DD` alone (no condition evidence)
+**Forbidden pattern**: `- PR #N — ✅ MERGED YYYY-MM-DD` alone (no condition evidence). Also forbidden: a `### PR #N ...` heading — `fix-plan/format.md`'s "Forbidden actions" bans `###` section headers in `fix_plan.md` entirely (they fragment the file into islands that break batch-processing tooling).
 
 **For post-hoc verifiability**: a post-hoc supervision flow (e.g., a Ralph wrapper's improve 5-A2 step, or the workflow.md supervision checklist Step 7) reads this information for verification. Without evidence, `✅`-only entries are classified as "merged without checking conditions" suspects during supervision.
 
