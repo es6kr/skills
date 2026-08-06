@@ -479,6 +479,8 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 
 **"Squash Merge (recommended)" below is the default only for PRs whose commits are not independently meaningful.** A PR with 3+ commits spanning genuinely distinct concerns (e.g. separate hook registrations, separate bug fixes bundled together, separate feature slices) loses that per-concern traceability when squashed — the option description must disclose this trade-off, not silently default to squash.
 
+**Concrete operational cost, not just traceability**: in a workspace running multiple concurrent worktree branches against the same target branch (a common pattern here), squashing collapses commits that other in-flight branches may already share as ancestors — those branches then hit avoidable conflicts the next time they rebase onto the target, because the target's history no longer contains the individual commit objects they diverged from. `--merge` (preserving the original commits) avoids this. This is a second, independent reason (beyond traceability) to route distinct-concern multi-commit PRs to `--merge`.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api repos/{owner}/{repo}/pulls/<N>/commits --jq 'length'` before composing the option. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
@@ -491,6 +493,8 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 2. If yes, do the commits span distinct concerns (different subsystems/files/one-line summaries)? — if unclear, list them and let the user judge, don't decide unilaterally
 3. Does the option set include the commit count + a one-line list where relevant, and (when concerns are distinct) both squash and merge-commit as co-equal options?
 4. If any answer above was skipped, the AskUserQuestion is incomplete — add it before presenting
+
+**Stale-knowledge trap in multi-PR sessions (HARD STOP)**: this gate — like the rest of "Merge Execution" — can change between when you first Read this file and the Nth merge decision later in the same long session (e.g. a just-merged PR updated this very file). Recalling "CI + Test Plan + Mergeable were the conditions" from an early-session Read and never re-checking the *current* six conditions per PR is exactly how a real gate (commit count queried, but its consequence unknown/forgotten) gets silently skipped. Before each individual merge-recommendation ask in a session touching 2+ PRs, treat your in-context knowledge of this file as a snapshot, not a live source — run the commit-count query fresh and apply its current consequence, don't just reuse conclusions from earlier in the session.
 
 ### Squash Merge (recommended)
 
