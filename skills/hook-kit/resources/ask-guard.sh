@@ -572,7 +572,12 @@ MSG
 
 check_push_without_details() {
   # Push-recommendation detail check — options proposing git push must specify target remote/branch AND commit info (SHA or subject)
-  local push_pattern="git push|pushing|push to|푸시|push 진행|push 실행|Push"
+  # Locale-specific phrasing comes from data/hangul-patterns.regex (HG_ASK_PUSH_KO);
+  # the English-only fallback is sufficient when the data file is absent.
+  local push_pattern="git push|pushing|push to|Push"
+  if [[ -n "$HG_ASK_PUSH_KO" ]]; then
+    push_pattern="$push_pattern|$HG_ASK_PUSH_KO"
+  fi
   local push_context_pattern="git push|push"
   
   if ! echo "$OPTIONS_BLOB" | grep -qiE "$push_pattern"; then
@@ -592,7 +597,13 @@ check_push_without_details() {
     has_remote=1
   fi
 
-  if echo "$ASK_TEXT" | grep -qiE "commit|hash|sha|[0-9a-f]{7,40}|커밋"; then
+  # Locale-specific phrasing comes from data/hangul-patterns.regex (HG_ASK_COMMIT_KO);
+  # the English-only fallback is sufficient when the data file is absent.
+  local commit_pattern="commit|hash|sha|[0-9a-f]{7,40}"
+  if [[ -n "$HG_ASK_COMMIT_KO" ]]; then
+    commit_pattern="$commit_pattern|$HG_ASK_COMMIT_KO"
+  fi
+  if echo "$ASK_TEXT" | grep -qiE "$commit_pattern"; then
     has_commit_info=1
   fi
 
