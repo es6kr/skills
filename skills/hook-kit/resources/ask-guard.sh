@@ -44,8 +44,14 @@ HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
 HG_ASK_RETROSPECT_CLOSE="${HG_ASK_RETROSPECT_CLOSE:-close deferred|deferred[^.]{0,15}close|cannot close|not close|closeable|becomes close}"
 HG_ASK_VERIFICATION_ATTESTATION="${HG_ASK_VERIFICATION_ATTESTATION:-gh pr (view|diff)|base=|pinned|counter only|verified|diff URL|issuecomment}"
+HG_ASK_PUSH_KO="${HG_ASK_PUSH_KO:-}"
+HG_ASK_COMMIT_KO="${HG_ASK_COMMIT_KO:-}"
 HG_ASK_PR_STRONG_KO="${HG_ASK_PR_STRONG_KO:-}"
 HG_ASK_PR_READY_KO="${HG_ASK_PR_READY_KO:-}"
+HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:-longhorn|replica|PVC|persistentvolume|volume\.longhorn|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume}"
+HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:-PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume}"
+HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:-no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)}"
+HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:-kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*(verified)|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified}"
 
 INPUT=$(cat)
 
