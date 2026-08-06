@@ -475,6 +475,23 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 
 **This pre-check is condition 6 of the "Self-check for the merge-option AskUserQuestion" gate below, not a separate optional step.** Composing a squash-merge option after satisfying only CI/Test Plan/AI Review Summary/Mergeable (conditions 1-4) without re-running this check is a HARD STOP violation — a release-please/changesets repo with a multi-commit PR against an accumulation branch needs `--merge` even when the other four conditions all look green.
 
+### Commit-count / distinctness gate (HARD STOP — before defaulting to squash)
+
+**"Squash Merge (recommended)" below is the default only for PRs whose commits are not independently meaningful.** A PR with 3+ commits spanning genuinely distinct concerns (e.g. separate hook registrations, separate bug fixes bundled together, separate feature slices) loses that per-concern traceability when squashed — the option description must disclose this trade-off, not silently default to squash.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api repos/{owner}/{repo}/pulls/<N>/commits --jq 'length'` before composing the option. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
+| 2 | Treat "3+ commits" as automatically requiring `--merge` | Commit count alone is not the trigger — count *distinct concerns* among the commits (different files/subsystems touched, different one-line summaries). 5 commits from one incremental refactor still squash cleanly; 3 commits fixing 3 unrelated bugs do not |
+| 3 | Present only "Squash merge (Recommended)" as an option when commit count ≥ 3 and concerns are distinct | Present both `Squash merge` and `Merge commit (preserve history)` as co-equal options — let the user weigh the trade-off, do not silently pick one |
+| 4 | Bury the commit list in a follow-up message after the user asks for it | Include the commit SHA + one-line summary list directly in the option description (or the question text) the first time a multi-commit PR's merge is proposed |
+
+**Self-check (before composing ANY merge-recommendation option, in addition to the six-condition gate)**:
+1. Run the commit-count query above. Is it ≥ 3?
+2. If yes, do the commits span distinct concerns (different subsystems/files/one-line summaries)? — if unclear, list them and let the user judge, don't decide unilaterally
+3. Does the option set include the commit count + a one-line list where relevant, and (when concerns are distinct) both squash and merge-commit as co-equal options?
+4. If any answer above was skipped, the AskUserQuestion is incomplete — add it before presenting
+
 ### Squash Merge (recommended)
 
 Most feature work / bug fixes use squash merge. Clean up the commit message per the rules:
