@@ -8,7 +8,11 @@
 INPUT=$(cat)
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
-if [[ "$TOOL_NAME" != "AskUserQuestion" && "$TOOL_NAME" != "default_api:ask_question" && "$TOOL_NAME" != "default_api:ask_user_question" ]]; then
+# Antigravity's ask tool surfaces as one of these two `default_api:` names;
+# Claude Code's native tool is the bare "AskUserQuestion" — this hook is
+# Antigravity-only per its own header, so the bare Claude Code name must
+# exit early here, not fall through to the physical-measurement check below.
+if [[ "$TOOL_NAME" != "default_api:ask_question" && "$TOOL_NAME" != "default_api:ask_user_question" ]]; then
   exit 0
 fi
 
