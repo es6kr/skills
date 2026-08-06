@@ -63,9 +63,36 @@ AskUserQuestion({
 })
 ```
 
+### Step 3.5: Verify current state before applying (HARD STOP — merged-PR / stale-tracker case)
+
+**Before editing any code, check the target PR's merge state and the finding's target file/line against current reality.** A `[REVIEW_FEEDBACK]` item can go stale between when it was recorded and when review-apply runs — the target PR may have already merged, and the finding itself may have already been resolved by unrelated work (or its target file may no longer exist).
+
+```bash
+gh pr view <N> -R <repo> --json state,mergedAt
+```
+
+**Branch on the result, per item:**
+
+| PR state | Finding's current-code check | Action |
+|----------|------------------------------|--------|
+| OPEN | (n/a — Step 4 flow applies as written) | Proceed to Step 4 normally |
+| MERGED | Target file/line still shows the described defect | Genuinely still broken — proceed, but **Step 6 has no open branch to push to** (see below) |
+| MERGED | Target file/line already matches the fix, or the target file no longer exists | **Already resolved / moot** — do NOT re-apply. Correct the tracker instead (see below) |
+
+**Already-resolved / moot handling**: mark the item `[x]` in `fix_plan.md`/`checklist.md` with a one-line note that the code already matched the fix at verification time (not a re-application), and skip Step 4-6 for that item — there is nothing to edit, commit, or push.
+
+**Genuinely-still-broken on a MERGED PR**: Step 4's code edit still applies, but Step 6 cannot push to the original PR's branch (it no longer accepts pushes post-merge). Open a **new** branch + PR for the fix instead, following the repo's normal branching convention (e.g. `fix/<slug>-...` based on the appropriate staging branch) — do not attempt to reopen or force-push the merged PR's branch.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Apply a `[REVIEW_FEEDBACK]` item's code change without checking whether the underlying PR already merged | Run the `gh pr view --json state,mergedAt` check first, every item |
+| 2 | Treat "finding recorded as unresolved" as proof it's still unresolved | Read the target file/line before editing — the tracker can lag behind actual code state |
+| 3 | Try to push a fix commit to a MERGED PR's branch | Open a new branch/PR for genuinely-still-broken findings on a merged PR |
+| 4 | Silently drop an already-resolved finding with no tracker update | Mark `[x]` + one-line "already resolved at verification" note — the correction itself is the deliverable for that item |
+
 ### Step 4: Apply to code
 
-Process the approved items sequentially:
+Process the approved items sequentially (skip items resolved as already-fixed/moot in Step 3.5):
 
 1. **Edit code**: change the code to address the review point
 2. **Verify**: confirm the build/tests pass after the change (`pnpm typecheck`, `pnpm test`, etc.)
@@ -94,6 +121,8 @@ Update the AI Review Summary status line on the PR that was just addressed:
 git push origin <branch>
 gh pr checks <N>  # wait for CI to pass
 ```
+
+**MERGED-PR case**: if Step 3.5 opened a new branch/PR (original PR already merged), push to that new branch and watch the new PR's CI — not the original PR number. If Step 3.5 resolved every approved item as already-fixed/moot, there is no commit to push; skip this step entirely.
 
 ## Don't / Do
 
