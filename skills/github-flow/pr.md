@@ -283,6 +283,8 @@ EOF
 - **At least 1 classification label required**: enhancement, bug, documentation, test, chore, etc.
 - **Milestone from Step 6** → add `--milestone "<title>"` flag
 
+**Non-standard creation path — verify via authoritative fields, not `gh pr diff` (HARD STOP)**: if PR creation required a workaround (the standard `gh pr create --head owner:branch` shorthand fails and you fall back to `gh api graphql -f query='mutation { createPullRequest(...) }'`, or any other non-standard path), `gh pr diff --name-only` can print misleading file names even when the PR is registered with 0 commits — it is not proof the PR has real content. Immediately after creation, verify with `gh pr view <N> --json commits,additions,deletions,changedFiles` and confirm `commits` is non-empty before treating creation as successful, marking the PR ready, or reporting the URL to the user as done. A `gh pr ready`/`gh pr merge` guard checks this too as a backstop, but catching it here — right after creation — avoids wasted turns on a broken PR.
+
 Report the PR URL after creation.
 
 **Without gh CLI:** output the body in a code block for manual use.
