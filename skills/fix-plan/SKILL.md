@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), sync-automation (Stop-hook overdue-sync nudge), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), sync-automation (Stop-hook overdue-sync nudge), verify (commit-hash/file-path staleness check against local git state), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
   Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "sync automation", "sync nudge", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role".
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "sync automation", "sync nudge", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role", "verify tracker reference", "stale commit hash".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -39,6 +39,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
+| verify | Cross-check commit-hash/file-path references cited in tracker items against local git/filesystem state before trusting a "still unresolved" claim (distinct from `sync`'s external GitHub polling) | [verify.md](./verify.md) |
 
 ## Topic Dependencies
 
@@ -56,11 +57,13 @@ fix-plan (schema + lifecycle)
   │     └─→ optional --rag=<skill>:<topic> dispatch for semantic indexing (caller-supplied)
   ├─→ sync (GitHub state polling) — depends on github-flow gh CLI conventions
   │     └─→ sync-automation (Stop-hook nudges this topic when overdue — no direct call dependency)
+  ├─→ verify (local git/filesystem staleness check — complements sync's external-state polling)
   ├─→ flowchart (Mermaid priority graph) — step 5 of the default pipeline, drift-checks against priority's output
   └─→ issue-drafts (lifecycle of draft files)
 ```
 
 - All topics are independently invocable, **except `priority` which invokes `sync` as Step 0 (HARD STOP)** — triage on stale state is the failure mode the dependency prevents (see [priority.md](./priority.md) Triage workflow Step 0)
+- `verify` is a recommended pre-check before triaging any `[BLOCKED]`/`[ ]` item that cites a specific commit hash or file path — see [verify.md](./verify.md)
 - **Default invocation (no args)**: first runs `move` (or archive-receiver dispatch), then verifies schema via `format`, syncs external state via `sync`, triages blockers via `priority`, and syncs the `## Flow Chart` section's node labels against that triage output via `flowchart` (pm role only — see "Role-based execution").
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic optionally dispatches to a secondary-tracker receiver if the caller supplies `--secondary-sync=<skill>:<topic>` — see [sync.md](./sync.md) "Secondary-tracker sync cadence"
