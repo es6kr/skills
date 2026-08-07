@@ -6,6 +6,7 @@ mapping logic added to replace the former connectivity-probe stub.
 """
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -102,6 +103,56 @@ class TestComputeUpdates(unittest.TestCase):
         ):
             updates = plane_sync.compute_updates([completed_line], self._profile())
         self.assertEqual(updates, [])
+
+
+class TestSyncChecklistWithPlane(unittest.TestCase):
+    def _profile(self):
+        return {
+            "workspace_name": "myworkspace",
+            "plane_host": "https://plane.example.com",
+            "plane_token": "tok",
+            "plane_token_env": "PLANE_TOKEN",
+        }
+
+    def test_concurrent_edit_aborts_without_writing(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "fix_plan.md"
+            path.write_text(PHASE3_LINE + "\n", encoding="utf-8")
+
+            def fetch_and_mutate(*args, **kwargs):
+                # Simulate another process editing the tracker mid-sync
+                # (between the initial read and the final write).
+                path.write_text(
+                    path.read_text(encoding="utf-8") + "- [ ] concurrent edit\n",
+                    encoding="utf-8",
+                )
+                return {"state_detail": {"group": "completed"}}
+
+            with patch.object(plane_sync, "fetch_issue_state", side_effect=fetch_and_mutate):
+                plane_sync.sync_checklist_with_plane(path, self._profile())
+
+            content = path.read_text(encoding="utf-8")
+            # Sync aborted before applying its update — original marker untouched.
+            self.assertIn("[BLOCKED:P3:external]", content)
+            # Concurrent edit preserved, not clobbered by a stale-snapshot write.
+            self.assertIn("concurrent edit", content)
+            # No leftover temp file from the atomic-write attempt.
+            self.assertFalse((Path(d) / "fix_plan.md.tmp").exists())
+
+    def test_write_succeeds_atomically_no_tmp_file_left(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "fix_plan.md"
+            path.write_text(PHASE3_LINE + "\n", encoding="utf-8")
+
+            with patch.object(
+                plane_sync, "fetch_issue_state",
+                return_value={"state_detail": {"group": "completed"}},
+            ):
+                plane_sync.sync_checklist_with_plane(path, self._profile())
+
+            content = path.read_text(encoding="utf-8")
+            self.assertIn("[x]", content)
+            self.assertFalse((Path(d) / "fix_plan.md.tmp").exists())
 
 
 if __name__ == "__main__":

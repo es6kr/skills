@@ -149,7 +149,8 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
         print("[Plane Sync] Operating in Local Offline Mode (Graceful degradation).")
         return
 
-    lines = fix_plan_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    original_bytes = fix_plan_path.read_bytes()
+    lines = original_bytes.decode("utf-8").splitlines(keepends=True)
     # splitlines(keepends=True) preserves each line's own newline so we can
     # write the file back verbatim except for the replaced marker text.
     stripped_lines = [l.rstrip("\n") for l in lines]
@@ -166,10 +167,27 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
         print(f"[Plane Sync] --dry-run: {len(updates)} line(s) would change. No write performed.")
         return
 
+    # compute_updates() above made one HTTP request per linked issue, so an
+    # editor could have changed the tracker during that window. Re-read and
+    # compare against the original snapshot before writing — an unconditional
+    # write from the stale snapshot would silently discard any such edit.
+    if fix_plan_path.read_bytes() != original_bytes:
+        print(
+            f"[Plane Sync] Aborted: {fix_plan_path} changed on disk since sync started "
+            "(concurrent edit detected). Re-run sync.",
+            file=sys.stderr,
+        )
+        return
+
     for u in updates:
         newline = "\n" if lines[u["line_no"]].endswith("\n") else ""
         lines[u["line_no"]] = u["new"] + newline
-    fix_plan_path.write_text("".join(lines), encoding="utf-8")
+
+    # Atomic write: write to a sibling temp file, then rename over the target
+    # so a crash/interrupt mid-write never leaves a partially-written tracker.
+    tmp_path = fix_plan_path.with_name(fix_plan_path.name + ".tmp")
+    tmp_path.write_text("".join(lines), encoding="utf-8")
+    tmp_path.replace(fix_plan_path)
     print(f"[Plane Sync] {len(updates)} line(s) updated in {fix_plan_path}.")
 
 
