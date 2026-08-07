@@ -437,6 +437,48 @@ def check_prod_branch_ops(command: str) -> str | None:
     )
 
 
+_STAGING_BRANCH_TARGET = re.compile(
+    r"(?:git\s+worktree\s+add|git\s+switch\s+-[cC]|git\s+checkout\s+-[bB]|"
+    r"gh\s+pr\s+create[^\n]*--base)\b[^\n]*\b(?:origin/)?(next-fix|next-feat)\b",
+    IM,
+)
+_STAGING_DIVERGENCE_EVIDENCE = re.compile(
+    r"git\s+(?:log|diff)\s+origin/main\.\.\.?origin/next-|baseRefName",
+    IM,
+)
+
+
+def check_staging_branch_without_divergence(command: str) -> str | None:
+    """Block creating/targeting a worktree, branch, or PR base on next-fix/next-feat
+    without evidence (in the same command) that the branch's actual staging-branch
+    home was checked first. next-fix and next-feat independently diverge from main and
+    from each other — assuming "this is a fix/* change so next-fix" (or the reverse)
+    without checking has caused repeated scope-contamination and wrong-base incidents
+    (failed-attempts.md class pr-base-divergence-check-reactive-not-preemptive, 3rd
+    occurrence triggered this check).
+
+    Evidence accepted (same command string): a divergence check
+    (`git log/diff origin/main..origin/next-*`) or a `baseRefName` lookup
+    (`gh pr view --json baseRefName`) confirming an existing PR's real base."""
+    if not _STAGING_BRANCH_TARGET.search(command):
+        return None
+    if _STAGING_DIVERGENCE_EVIDENCE.search(command):
+        return None
+    return (
+        "git worktree/branch/PR-base targets next-fix or next-feat without a "
+        "divergence check in the same command.\n\n"
+        "next-fix and next-feat independently diverge from main and from each other — "
+        "assuming one is the right base for a given branch (e.g. \"this is a fix/* "
+        "change so next-fix\") has repeatedly caused wrong-base branches (unrelated "
+        "commits pulled in, or a rebase mixing in another staging branch's history).\n\n"
+        "Run one of these first (in the same command, or a preceding one this turn), "
+        "then retry:\n"
+        "  gh pr view <N> --json baseRefName   # if a PR already exists for this branch\n"
+        "  git log origin/main..origin/next-fix --oneline   # + reverse, to see actual divergence\n"
+        "  git log origin/main..origin/next-feat --oneline  # + reverse"
+    )
+
+
 def evaluate(
     command: str,
     run_bg: bool,
@@ -483,6 +525,10 @@ def evaluate(
     pm2_reason = check_pm2_start_without_resurrect(command)
     if pm2_reason:
         return hard(pm2_reason)
+
+    staging_branch_reason = check_staging_branch_without_divergence(command)
+    if staging_branch_reason:
+        return hard(staging_branch_reason)
 
     summary_reason = check_summary_without_internal_review(command)
     if summary_reason:
@@ -652,6 +698,16 @@ def self_test() -> int:
         (False, False, "gh pr comment 123 --body 'plain review comment'"),
         (False, False, "gh pr view 123"),
         (False, False, 'echo "posting AI Review Summary later"'),
+        # ── staging-branch divergence guard (pr-base-divergence-check-reactive-not-preemptive,
+        # failed-attempts.md — 3rd occurrence) ──
+        (True, False, "git switch -C fix/x origin/next-fix"),
+        (True, False, "git checkout -b fix/y origin/next-feat"),
+        (True, False, "git worktree add ../wt origin/next-fix"),
+        (True, False, "gh pr create --base next-fix --draft --title x --body y"),
+        (False, False, "git log origin/main..origin/next-fix --oneline; git switch -C fix/x origin/next-fix"),
+        (False, False, "gh pr view 238 --json baseRefName; git switch -C fix/x origin/next-feat"),
+        (False, False, "git status --short"),
+        (False, False, "git switch -c fix/unrelated-thing"),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:
