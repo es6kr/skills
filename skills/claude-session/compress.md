@@ -61,7 +61,7 @@ Compress only that session.
 Batch compress all sessions containing `"hookEvent":"Stop"` or `"type":"saved_hook_context"`:
 
 1. **Confirm project path**: Generate project_name from current working directory (cwd)
-   - Example: `/Users/es6kr/works/.vscode` → `-Users-es6kr-works--vscode`
+   - Example: `/Users/<user>/works/.vscode` → `-Users-user-works--vscode`
 
 2. **Find target sessions**: Search for session files containing hook-related messages
    ```bash
@@ -90,9 +90,9 @@ cp ~/.claude/projects/<project_name>/<session_id>.jsonl ~/.claude/projects/.bak/
 
 **When directly registered via MCP:**
 
-```
+```text
 Call mcp__claude-sessions-mcp__compress_session tool:
-- project_name: "<project folder name>"  // e.g. "-Users-es6kr-works--vscode"
+- project_name: "<project folder name>"  // e.g. "-Users-user-works--vscode"
 - session_id: "<session UUID>"
 - keep_snapshots: "first_last"  // options: "first_last", "all", "none"
 - max_tool_output_length: 5000  // optional: 0 means unlimited
@@ -100,7 +100,7 @@ Call mcp__claude-sessions-mcp__compress_session tool:
 
 **When using UTCP/code-mode:**
 
-```
+```text
 Call mcp__code-mode__call_tool_chain tool:
 - code: `claude_sessions.claude_sessions_compress_session({
     project_name: "<project folder name>",
