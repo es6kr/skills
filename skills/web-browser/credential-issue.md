@@ -13,7 +13,7 @@ parameterized flow. It is the credential-issuance counterpart to [ui-test.md](./
 | Param | Meaning | Example |
 |-------|---------|---------|
 | `service` | The provider whose console issues the credential | `google-forms`, `cloudflare-r2`, `github`, `oci`, `aws`, `authentik` |
-| `command` | What to issue / do once logged in | `issue Google API OAuth token`, `issue R2 S3 token`, `issue fine-grained PAT` |
+| `command` | What to issue / do once logged in | `issue Google API OAuth token`, `issue R2 S3 token`, `issue fine-grained PAT`, `revoke <key-id>` (see "Revoke flow" below) |
 | `login-url` | Direct URL to the issuance page (when known) | `https://console.cloud.google.com/apis/credentials`, `https://dash.cloudflare.com/?to=/:account/r2/api-tokens` |
 | `handoff` | Follow-up automation to run with the issued credential | `gcloud auth print-access-token`, `aws s3 cp`, `gh secret set` |
 
@@ -354,6 +354,37 @@ Order 1 failure (most common: `eval` cross-origin or JS exception) → try Order
 | 3 | "User mentioned the form is open, they can just fill it" — frame as user convenience | User said the form is open ≠ user wants to fill it. Backend automation contract stays in force |
 | 4 | Justify handoff by token being one-time-shown (Phase 5 user-copy exception) | Phase 5 user-copy fallback applies only when the token is **DOM-invisible** (masked behind `••••`, behind clipboard-only API). Visible plain-text token field is backend-extractable via Order 1-4 |
 
+## Revoke flow (`command: revoke`)
+
+Revoking an existing key/token/secret is the same backend-selection + login-wait shape as issuance
+(Procedure steps 1-4 above), but the terminal action is a **delete**, not a create — and the delete
+target is an *existing* credential, not a freshly generated one.
+
+1. **Check for an API-level revoke first** (step 2 of the main Procedure) — many providers expose a
+   revoke/delete endpoint (`gh api -X DELETE`, a cloud provider's key-management API). Prefer it over
+   a browser flow whenever a parent credential with sufficient scope is already available.
+2. **No API path → login-assisted revoke**: open the provider's key/token management console (same
+   backend-selection table as issuance) and, once signed in, **drive the actual revoke click**
+   (Order 1-4 automation cascade, same as the token-generation boundary table — do not delegate the
+   click to the user unless automation genuinely fails).
+3. **Identify the correct entry before deleting** — revoke targets an existing row in a list (by key
+   ID, name, or creation date), not a freshly-created one. Confirm the identified row matches the
+   caller-supplied identifier (`command`'s `<key-id>`/name) before clicking delete; a wrong-row delete
+   is unrecoverable.
+4. **No Persist step** — step 6 (Persist) of the main Procedure does not apply to a revoke: there is no
+   new credential to store. If the revoke was prompted by rotation (issuing a replacement), that
+   replacement follows the normal issuance Procedure (including Persist) as a **separate**, prior or
+   subsequent step — never skip Persist on the new credential because "we just did a revoke flow."
+5. **Report the revoked identifier** (key ID/name) in the completion report — the same way issuance
+   reports the issued credential's identifier — so the user can cross-check against the provider's
+   audit log.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Treat "no revoke-specific scenario row exists" as license to skip backend automation and hand the whole flow to the user | Revoke uses the same backend-selection + automation-cascade discipline as issuance — only the terminal click differs |
+| 2 | Delete the first/most-recent row in a key list without confirming it matches the caller's target identifier | Confirm the specific row (by ID/name) before the delete click |
+| 3 | Skip the Persist step check because "nothing to persist" | Correct for a pure revoke. But if a replacement credential is also being issued in the same task, that replacement still needs Persist — don't let the revoke's "no Persist" apply to it by association |
+
 ## Scenarios
 
 | service / command | API issuance? | Login-assisted issuance (console URL) | handoff |
@@ -367,6 +398,7 @@ Order 1 failure (most common: `eval` cross-origin or JS exception) → try Order
 | `vsce` (VS Code Marketplace publisher) / issue Azure DevOps PAT for `vsce publish` | ❌ UI-only (Azure DevOps Personal Access Token) | `https://dev.azure.com/<org>/_usersSettings/tokens` — `<org>` is the Azure DevOps organization linked to the Marketplace publisher (if not provided by caller, **ask via AskUserQuestion** before opening the page). Sign in via "Sign in with GitHub" SSO (see "Login provider preference" above). Token scope: `Marketplace > Manage` | `gh secret set VSCE_PAT -R <owner>/<repo>` + local `npx vsce publish --packagePath <vsix> --pat $VSCE_PAT` |
 | `ovsx` (Open VSX Registry publisher) / issue Open VSX PAT for `ovsx publish` | ❌ UI-only | `https://open-vsx.org/user-settings/tokens` — sign in via the **GitHub** option (Open VSX is GitHub-SSO native) | `gh secret set OVSX_PAT -R <owner>/<repo>` + local `npx ovsx publish <vsix> -p $OVSX_PAT` |
 | any / register a GitHub Secret | ✅ `gh secret set` | (not needed) | — |
+| `tailscale` / revoke an auth key | ❌ console-only (no anonymous/API-token-free revoke path found in practice) | `https://login.tailscale.com/admin/settings/keys` → sign in → locate the key by its ID/name → delete | none (revoke has no follow-up handoff — see "Revoke flow" above) |
 
 ## Note on GitHub PR image hosting (why R2)
 
