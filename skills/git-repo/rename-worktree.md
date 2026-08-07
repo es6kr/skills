@@ -10,6 +10,8 @@ Rename an existing git worktree — both the directory and all internal metadata
 - Fix a misleading worktree name after branch rename
 - Reclaim a worktree created by vibe-kanban or Claude Code isolation
 
+**Scope limitation (HARD STOP)**: this script assumes `<old-name>` already lives directly under `--wt-base` (default `.worktrees`) — it renames the leaf directory and re-branches in place, it does **not** relocate a worktree that lives entirely outside any `--wt-base` tree (a legacy `.claude/worktrees/`, a sibling `<repo>-wt/` next to `<repo>/`, a bare `~/.worktrees/`, or a path an external tool created on its own). Running this script against such a worktree perpetuates its wrong location — it will rename/re-branch it in place at the wrong path, not move it. Check the worktree's parent directory first (`git worktree list`); if it is not already `<repo>/.worktrees/`, apply [move-worktree](./move-worktree.md) Scenario B to relocate it before calling this script.
+
 ## Supported layouts
 
 - **Standard layout** — `<repo>/.git/worktrees/<name>` is the metadata location
@@ -29,7 +31,8 @@ bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh <repo> <old-name> <new
 | `<old-name>` | Current directory name under the worktree base | `claude` |
 | `<new-name>` | New directory name | `chore-cleanup-pr17-leftovers` |
 | `--branch` | (optional) Branch to switch to. Checkout if local, create otherwise | `chore/cleanup-pr17-leftovers` |
-| `--wt-base` | (optional) Worktree base dir relative to `<repo>` (default `.claude/worktrees`). Set for repos that keep worktrees elsewhere (e.g. `.worktrees`) | `.worktrees` |
+| `--wt-base` | (optional) Worktree base dir relative to `<repo>` (default `.worktrees`). Set for repos that keep worktrees elsewhere | `.worktrees` |
+
 
 Only the **worktree directory** base is affected by `--wt-base`. The `.git/worktrees/<name>` metadata location is auto-resolved from the worktree's `.git` pointer (see "Supported layouts"), so no metadata flag is needed.
 
