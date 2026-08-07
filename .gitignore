@@ -16,3 +16,4 @@ __pycache__/
 docs/generated/
 skills/*/data
 skills/*/LICENSE
+skills/es6kr-personal-hooks/
