@@ -670,7 +670,7 @@ A session has **two identity axes**, and the cleanup end-report must carry **bot
 
 | # | Don't | Do |
 |---|-------------|-----------------|
-| 1 | Prefix-only notation like `session jsonl(de2cee91)` | Full UUID like `session jsonl(de2cee91-8ffa-46f4-a8b4-26571bb66bd2)` |
+| 1 | Prefix-only notation like `session jsonl(a1b2c3d4)` | Full UUID like `session jsonl(a1b2c3d4-e5f6-7890-abcd-ef1234567890)` |
 | 2 | Truncated notation like `session abc123...` | The exact, full 36-character UUID |
 | 3 | Abbreviating "for readability" | UUID is an identifier for copy·grep·API matching. Truncation = the user cannot use it directly |
 | 4 | Using a prefix UUID in the cleanup completion report | Full UUID in both the completion report + checklist item |
