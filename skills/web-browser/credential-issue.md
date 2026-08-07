@@ -354,11 +354,14 @@ Order 1 failure (most common: `eval` cross-origin or JS exception) → try Order
 | 3 | "User mentioned the form is open, they can just fill it" — frame as user convenience | User said the form is open ≠ user wants to fill it. Backend automation contract stays in force |
 | 4 | Justify handoff by token being one-time-shown (Phase 5 user-copy exception) | Phase 5 user-copy fallback applies only when the token is **DOM-invisible** (masked behind `••••`, behind clipboard-only API). Visible plain-text token field is backend-extractable via Order 1-4 |
 
-## Revoke flow (`command: revoke`)
+## Revoke flow (`command: revoke <key-id>`)
 
-Revoking an existing key/token/secret is the same backend-selection + login-wait shape as issuance
-(Procedure steps 1-4 above), but the terminal action is a **delete**, not a create — and the delete
-target is an *existing* credential, not a freshly generated one.
+Revoking an existing key/token/secret reuses the same backend selection (Step 0) and login-wait UI
+pattern as issuance, but the terminal action is a **delete**, not a create — and the delete target is
+an *existing* credential (identified by the `<key-id>` embedded in `command`), not a freshly generated
+one. The numbered steps below are revoke-specific and do not map 1:1 onto the issuance Procedure's
+steps 1-7 — e.g. issuance's step 1 ("skip to handoff if already stored") has no revoke equivalent,
+since there is nothing to skip to when the goal is deletion.
 
 1. **Check for an API-level revoke first** (step 2 of the main Procedure) — many providers expose a
    revoke/delete endpoint (`gh api -X DELETE`, a cloud provider's key-management API). Prefer it over
