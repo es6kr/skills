@@ -43,12 +43,17 @@ TOTAL_LINES=$(wc -l < "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)
 START=$(( TOTAL_LINES > WINDOW ? TOTAL_LINES - WINDOW : 1 ))
 
 # Last genuine user-typed slash-command line: excludes tool_result user-lines
-# (quoting another session's invocation, e.g. RAG search hits) and assistant
-# lines (their inner quotes are JSON-escaped and never match this pattern).
+# (quoting another session's invocation, e.g. RAG search hits), assistant
+# lines (their inner quotes are JSON-escaped and never match this pattern),
+# and compact-summary lines (`"isCompactSummary":true` — a summary's own
+# narrative quotes prior turns verbatim, including a `<command-name>/<slug>`
+# that was already invoked+resolved pre-compact; without this exclusion the
+# stale quoted text reads identically to a live re-invocation).
 CMD_MATCH=$(tail -n +"$START" "$TRANSCRIPT_PATH" 2>/dev/null \
   | grep -n '<command-name>/' \
   | grep '"type":"user"' \
   | grep -v 'tool_result' \
+  | grep -v '"isCompactSummary":true' \
   | tail -1)
 [[ -z "$CMD_MATCH" ]] && exit 0
 
