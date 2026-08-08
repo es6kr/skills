@@ -13,22 +13,40 @@
 
 INPUT="${CLAUDE_TOOL_INPUT:-$(cat)}"
 
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [ -z "$FILE_PATH" ] && exit 0
 
-# Only target plan artifacts: plan-*.md, or paths containing plan + .md
+# Only target one-shot plan ARTIFACTS in their established directories:
+#   docs/generated/plan-*.md, .ralph/docs/generated/plan-*.md, .omc/plans/*.md
+# NOT the fix-plan tracker family (fix_plan.md, checklist.md) — those are a
+# distinct, persistent, multi-session artifact class owned by the fix-plan
+# skill, where [BLOCKED]/deferred markers are the intended long-lived state,
+# not an unresolved decision awaiting this turn's AskUserQuestion. A bare
+# `*plan.md` substring glob previously matched `fix_plan.md` by accident
+# (the `*` absorbs the `fix_` prefix) and re-litigated months of already-
+# resolved history on every unrelated edit.
 case "$FILE_PATH" in
-  *plan-*.md|*plan.md|*/plans/*.md|*/generated/*plan*.md) ;;
+  */docs/generated/plan-*.md|*/.ralph/docs/generated/plan-*.md|*/.omc/plans/*.md) ;;
   *) exit 0 ;;
 esac
 
-# Read the saved plan file if available (PostToolUse: the file is already updated)
-if [ -f "$FILE_PATH" ]; then
-  BODY=$(cat "$FILE_PATH")
-else
-  # Fall back to the tool input written/edited chunk
-  BODY=$(echo "$INPUT" | jq -r '(.tool_input.content // .tool_input.new_string) // empty' 2>/dev/null)
-fi
+case "$TOOL_NAME" in
+  Write)
+    # A Write is a fresh full-file replace — whole-file scan is equivalent to
+    # a diff scan (there is no "prior content" distinct from what was written).
+    BODY=$(echo "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null)
+    ;;
+  Edit)
+    # An Edit only changes a slice of a file that may span many prior turns
+    # or sessions. Scanning the whole file re-fires on markers that were
+    # already resolved by an earlier ask-cycle. Scope to the new content only.
+    BODY=$(echo "$INPUT" | jq -r '.tool_input.new_string // empty' 2>/dev/null)
+    ;;
+  *)
+    exit 0
+    ;;
+esac
 [ -z "$BODY" ] && exit 0
 
 # Undecided-marker detection (2 kinds):
@@ -51,6 +69,13 @@ if [ -z "${PATTERN:-}" ]; then
 fi
 
 MATCHES=$(echo "$BODY" | grep -nEi "$PATTERN" 2>/dev/null | head -8)
+
+# Drop code-reference lines before reporting.
+# A line that cites source locations (`file.ts:120-127`, `L45`) is describing WHERE
+# something lives, not leaving a decision open — " vs " inside such a line compares
+# two code sites, not two options. Without this filter the guard blocks on prose like
+# "uuid set `validation.ts:72-77` vs skip logic `86-88`", which has no decision in it.
+MATCHES=$(printf '%s\n' "$MATCHES" | grep -vE '`[^`]*\.(ts|tsx|js|jsx|py|sh|md|json|ya?ml)[^`]*`|`[^`]*:[0-9]+(-[0-9]+)?`|\bL[0-9]+(-L?[0-9]+)?\b' || true)
 
 [ -z "$MATCHES" ] && exit 0
 
