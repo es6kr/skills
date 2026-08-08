@@ -95,7 +95,11 @@ PATH_COUNT=${PATH_COUNT:-0}
 # PATH. The Windows py3 shim is a Microsoft Store stub that exits 49 without
 # running anything, so a name-only check leaves every python-backed check
 # silently dead (stderr is discarded and the caller fails open).
-PY=""
+# Fallback is the real `false` command, not an empty string — "$PY" -c '...'
+# with PY="" invokes an empty command word, which still fails (and is still
+# silenced by 2>/dev/null + the downstream :-0 defaults) but is an accidental
+# empty-arg invocation rather than an intentional, self-documenting failure.
+PY="false"
 for _c in python3 python; do
   if command -v "$_c" >/dev/null 2>&1 && "$_c" -c "pass" >/dev/null 2>&1; then
     PY="$_c"; break
