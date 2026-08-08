@@ -16,6 +16,7 @@
 | 4 | "Stop hook re-triggered next, but I already asked once this turn → skip" | The just-completed work is the trigger condition, not "have I asked in this turn". If the work changed (new artifact, new state), ask again |
 | 5 | "TaskList has just one item and it depends on user → no decision axis → skip" | Even single-item TaskList has progress / refine / hold axes for the just-produced artifact. Ask the artifact-level decision |
 | 6 | "User said 'stop working this session' → skip ALL asks including the wrap-up/cleanup ask" | "Stop working" forbids proposing *new task work*, not asking about the wrap-up mechanism itself. Treat it as an explicit wrap-up-intent signal (Context-usage gate condition 1 in suggestion-patterns.md) — if context-usage also reads at/above the session model's threshold (condition 2 — Fable/Mythos 55%, Opus 50%, others 45%), the cleanup ask is *more* warranted, not skipped. Present the ask; do not silently auto-run cleanup either — the user still decides |
+| 7 | "The invocation string contains `fix-plan` → matches the skip row" (skill-name surface match) | Match by the run's **actual step composition**, not the skill name: any run that executed priority / triage / model-triage — including every role-scoped `--deep` / `--impl` / role-mapped no-arg run — is NOT a skip target. Only pure add / move / check bookkeeping skips |
 
 ### Skip-target topic list
 
@@ -23,6 +24,7 @@
 |---------------|----------------------|-----------|
 | `/ralph fix-plan` **add / move / check only** | User message: `fix-plan`, `fix_plan`, "record in checklist" | ✅ Skip |
 | `/ralph fix-plan` **priority / triage / sync** | User message: `fix-plan priority`, "triage", "prioritize blocked" | ❌ **NOT skip** — triage surfaces immediate-action candidates (top-N selfable). Route the start decision to `Skill("wip")`, not skip and not `next` single-select (see Step 0.4 "Surfacing/triage → wip delegation") |
+| `/fix-plan` **role-scoped default run** (`--deep` / `--impl` / `--role=*`, or a no-arg run resolved via a workspace role mapping) | Run report shows sync + priority executed (deep adds model-triage) | ❌ **NOT skip** — role runs include triage by definition. After the report, surface **role-fitting continuable candidates** in the same turn: `deep` → design/audit-fit work, `impl` → `selfable` implementation candidates, `pm` → bookkeeping remainder. Multi-item → route via `Skill("wip")`; single next-step → `next` ask |
 | `/archive`, `/safe-delete` | User message: `archive`, `delete`, `move to .bak` | ✅ Skip |
 | `/todo`, `/todowrite` add/move | User message: `todo add`, `task register` | ✅ Skip |
 | `/wip` start/register | User message: `wip`, "track progress" | ⚠️ Conditional (multi-step task → ask allowed) |
@@ -52,15 +54,16 @@
 ### Antigravity Environment Context Usage Reporting Gate & Cleanup Selection Execution (HARD STOP)
 
 When running in Antigravity (Gemini), backend hooks are limited. You MUST:
-1. **Explicitly state current context usage % & token estimate** in the `AskUserQuestion` question text header (e.g. `[Context Usage: XX% (~YYK tokens)]`). In Antigravity (Gemini), context usage % MUST be calculated based on the **1M token capacity (1,000,000 tokens)**: `pct = (tokens / 1,000,000) * 100`. (e.g., 40,000 tokens = ~4%).
-2. **Mandatory `/cleanup` Recommendation**: If context usage >= 45% (>=450K tokens in Antigravity or transcript log size indicates high usage), set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 in `AskUserQuestion`.
+1. **Explicitly state current context usage % & token estimate** in the `AskUserQuestion` question text header (e.g. `[Context Usage: XX% (~YYK tokens)]`). In Antigravity (Gemini), token count MUST be physically computed from transcript JSONL bytes (`tokens = transcript_file_bytes / 3.5`), NOT arbitrarily guessed or fabricated. Context usage % MUST be calculated based on the **1M token capacity (1,000,000 tokens)**: `pct = (tokens / 1,000,000) * 100`. (e.g., ~140KB transcript = ~40,000 tokens = ~4%).
+2. **Mandatory `/cleanup` Recommendation Gate**: If context usage >= 40% (>=400K tokens in Antigravity or transcript log size indicates high usage), set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 in `AskUserQuestion`. **HARD STOP**: If context usage is strictly less than 40% (<400K tokens), attaching the `(Recommended)` tag to `/cleanup` is STRICTLY FORBIDDEN; tag the primary domain/technical follow-up action as `(Recommended)` instead.
 3. **Mandatory Session Cleanup Execution (HARD STOP)**: When the user selects any option whose label denotes session cleanup (`/cleanup`, or its session-language equivalent), the agent MUST NOT conclude the turn with a plain text wrap-up message alone. The agent MUST immediately register cleanup tasks in `task.md` / `TaskList` and execute the `cleanup` skill protocol (via `Skill("cleanup")` or environment-appropriate autoloader such as `view_file` with `IsSkillFile: true` under Antigravity).
 
 | # | Don't | Do |
 |---|---|---|
 | 1 | Omit context usage % or token count in `AskUserQuestion` question text when running in Antigravity | Include `[Context Usage: XX% (~YYK tokens)]` in the question text |
-| 2 | Recommend forward work options without `/cleanup` when context usage >= 45% | Set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 when usage >= 45% |
-| 3 | Conclude with text greeting when user selects a session-cleanup option (`/cleanup` or its session-language equivalent) | Immediately register cleanup tasks and execute `cleanup` skill protocol (`Skill("cleanup")` or `view_file IsSkillFile:true`) |
+| 2 | Recommend forward work options without `/cleanup` when context usage >= 40% | Set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 when usage >= 40% |
+| 3 | Attach `(Recommended)` tag to `/cleanup` when context usage is below 40% | Attach `(Recommended)` to `/cleanup` ONLY when usage >= 40%; when < 40%, attach `(Recommended)` to the primary technical follow-up task |
+| 4 | Conclude with text greeting when user selects a session-cleanup option (`/cleanup` or its session-language equivalent) | Immediately register cleanup tasks and execute `cleanup` skill protocol (`Skill("cleanup")` or `view_file IsSkillFile:true`) |
 
 ### How to skip (procedure)
 
@@ -158,12 +161,12 @@ Otherwise → proceed to Step 0.5.
 
 **Trigger scope (HARD STOP)**: this step applies whenever `TaskList` yields no actionable pending items — whether because it is genuinely empty, all items are done, **or the TaskList/TaskCreate tool is disconnected/unavailable this turn**. "Unavailable" is not a different case from "empty" — both mean the session-local task medium cannot surface backlog, so the persistent checklist medium (`fix_plan.md`) becomes the primary source. Do not read the word "empty" literally and treat a disconnected tool as exempt.
 
-1. **Locate Workspace Root(s)**: Determine the active workspace root(s) containing `.git` or `.ralph/`. **Do not derive this from current cwd alone** — a session can move across multiple workspaces (e.g., start in a project directory debugging an issue, then pivot to a skills/rules repo). Enumerate every workspace root visited during the session (via Bash cwd changes, Read/Edit/Grep paths, or `cd`/`git -C` targets seen in the transcript), not just the one matching the cwd at the moment `next` fires.
-2. **Find fix_plan.md**: For each workspace root from step 1, read its project backlog checklist (`<workspace-root>/.ralph/fix_plan.md` or `<workspace-root>/fix_plan.md`) if present. A workspace without one (e.g., a skills/rules repo with no Ralph loop) is skipped, not treated as proof no other workspace has one.
+1. **Locate Workspace Root(s)**: Determine the active workspace root(s) containing `.git`, `.ralph/`, **or Ralph-marker files** (`PROMPT.md` + `AGENT.md` alongside `progress.json` / `status.json` / `.circuit_breaker_state`) — a Ralph-loop-owned workspace is not always a git repo and does not always name its state directory `.ralph/`. **Do not derive this from current cwd alone** — a session can move across multiple workspaces (e.g., start in a project directory debugging an issue, then pivot to a skills/rules repo). Enumerate every workspace root visited during the session (via Bash cwd changes, Read/Edit/Grep paths, or `cd`/`git -C` targets seen in the transcript), not just the one matching the cwd at the moment `next` fires.
+2. **Find fix_plan.md**: For each workspace root from step 1, read its project backlog checklist at any of `<workspace-root>/.ralph/fix_plan.md`, `<workspace-root>/fix_plan.md`, or `<workspace-root>/.agents/fix_plan.md` if present. The third pattern is a **workspace-LOCAL** `.agents/` state directory (some Ralph workspaces name their loop directory `.agents/` instead of `.ralph/`) — this is a different thing from the global `~/.agents` skills/rules repo; do not skip it because `.agents` "already means the global skills repo" in this session. A workspace without any of the three is skipped, not treated as proof no other workspace has one.
 3. **Extract Pending Backlog**: Extract pending checklist items (`- [ ]`) from the `## Priority Work` (or equivalent priority) section.
-4. **Context & Relevance Filtering**: Filter these tasks to identify those related to the current session (e.g., matching files edited, directories touched, or keywords from the conversation history).
+4. **Context & Relevance Filtering**: Filter these tasks to identify those related to the current session (e.g., matching files edited, directories touched, or keywords from the conversation history). **Relevance-filter fallback (HARD STOP)**: if this filter yields zero session-related items but the unfiltered, priority-sorted backlog (step 5) has entries, do NOT conclude "no candidates" — fall back to surfacing the top priority-sorted items regardless of session relevance. `fix_plan.md` is the workspace's standing backlog, not merely a continuation thread for the current session's topic; a real P0/P1 item is worth surfacing even when it has nothing to do with what the session just did.
 5. **Sort by Priority**: Sort the remaining candidates by priority level: `P0` -> `P1` -> `P2` -> `[REPEAT]`.
-6. **Compose Options**: Surface the top 2-3 prioritized and related tasks as options in `AskUserQuestion`. Place them above generic options like "End session", using concise labels with their priority level indicated in the description (e.g. `[P0]`).
+6. **Compose Options**: Surface the top 2-3 prioritized and related tasks as options in `AskUserQuestion`. Place them above generic options like "End session", using concise labels with their priority level indicated in the description (e.g. `[P0]`). **When surfaced via the step 4 relevance-filter fallback** (session-unrelated but top-priority), the option description MUST also carry an explicit "(workspace backlog, unrelated to this session)" qualifier — the user needs to know these are not a continuation of what was just discussed.
 7. **Write-back when the user selects (HARD STOP)**: this step is entered when `TaskList`/`TaskCreate` is empty, done, **or unavailable** — so `SKILL.md` Step 3's default "register each via `TaskCreate`" cannot be assumed to succeed for a selection made here. If `TaskCreate` is still unavailable at selection time, follow `SKILL.md` Step 3's `TaskCreate`-unavailable fallback (write the selection back into `fix_plan.md`/`checklist.md` instead of silently treating "options were shown" as "the selection is tracked").
 
 ### Don't / Do table
@@ -176,12 +179,58 @@ Otherwise → proceed to Step 0.5.
 | 4 | Present all `fix_plan.md` tasks blindly | Filter for tasks that are relevant to the files or topics touched in the current session first |
 | 5 | Treat "TaskList tool disconnected/unavailable" as outside this step's scope because the trigger says "empty" | Unavailable = equivalent to empty for this step's purpose. The fix_plan.md check is the fallback specifically when the session-local task medium cannot be read at all |
 | 6 | Derive "the workspace" solely from the cwd at the moment `next` fires, especially when that cwd (e.g. a skills/rules repo) has no `fix_plan.md` | Check every workspace root the session actually touched. A session that started in a project directory and later moved to a different repo still has backlog in the first one |
+| 7 | Grep the tracker's `##` header list once, then re-read only the section you most recently edited before reporting "no candidates" | Read **every** top-level `##` section from that header list before concluding — recency (just-edited section) is not grounds to skip siblings. This is exactly how a populated `## Priority Work` / `## REPEAT` section gets missed while a freshly-touched section (e.g. `## Fable Target Tasks`) gets re-read |
+| 8 | Apply row 2's "don't pull from a parent workspace's fix_plan.md" when the **local** tracker's active-work section has itself been replaced with a redirect note pointing to that parent (e.g. "this repo's items live in `<parent-path>` — see there") | An explicit redirect note is the local tracker delegating scope — follow it, and treat the parent tracker's own top-level `##` sections as in-scope for this session. Row 2 bans *assuming* a parent's backlog is relevant; it does not ban following a redirect the local tracker itself declares |
+| 9 | Skip checking `<workspace-root>/.agents/fix_plan.md` because the session already used `~/.agents` heavily this turn (skills/rules repo) and the name "`.agents`" reads as "that global repo" | The two are unrelated: `~/.agents` (absolute, home-rooted, git-tracked skills/rules repo) vs `<workspace-root>/.agents/` (relative to a *different* project's root, untracked Ralph state dir). A workspace-relative `.agents/` is always a candidate under step 2, regardless of how much `~/.agents` was touched this session |
+| 10 | Step 4's session-relevance filter returns zero matches → conclude "no candidates" and fall through to Step 0.65's free-text ask, discarding the priority-sorted backlog entirely | Zero relevance matches ≠ zero candidates. Apply the step 4 fallback: surface the top priority-sorted items from the unfiltered backlog, labeled "(workspace backlog, unrelated to this session)" |
 
 ### Self-check (before declaring "no work" / "session complete")
 
 1. Is TaskList empty, done, or **did the TaskList/TaskCreate call itself fail or return unavailable**? → Either case triggers this step
 2. Did the session's cwd change at any point (project debugging → skills/rules repo, or similar)? → If yes, check `fix_plan.md` in **each** workspace root visited, not just the final cwd
 3. Does the final-cwd workspace lack a `fix_plan.md`? → That is not evidence no other visited workspace has one — check them all before concluding no backlog exists
+4. If you grepped the tracker's `##` header list, did you actually Read every top-level section on that list — or only the one you most recently wrote to? → Read all of them before reporting a candidate count
+5. Does the local tracker's active-work section contain a redirect note pointing to a parent/org-level tracker? → Follow it and scan that parent's own top-level `##` sections (not just the subsection the note names)
+6. Did you check for a **workspace-LOCAL** `<workspace-root>/.agents/fix_plan.md`, not just `.ralph/fix_plan.md` or bare `fix_plan.md`? → Some Ralph workspaces (non-git, no `.ralph/`) use `.agents/` as their loop state directory — a plain `ls <root>/fix_plan.md <root>/.ralph/fix_plan.md` misses it
+
+## Step 0.65: Repeated no-candidate invocation → forced direct ask (HARD STOP)
+
+**When `next` fires again in the same session and Step 0.5/0.6 again surface zero candidates (TaskList empty AND fix_plan.md's unfiltered priority-sorted backlog is also empty — not merely "no session-relevant item", see Step 0.6 item 4's relevance-filter fallback) — the same "no-candidate" outcome as a prior `next` firing this session — do not silently end the turn or repeat a generic "nothing to do" report.** Force an `AskUserQuestion` that asks the user directly what to work on next, using free text (no guessed/speculative options), even though there is no discovered candidate to offer.
+
+This is narrower than the general "avoid guess options" guidance below — it specifically targets **repeated zero-candidate firings**, where staying silent turn after turn reads as the assistant giving up on discovery duty.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Second (or later) zero-candidate `next` firing this session → end with "no work found" text again | Compose an `AskUserQuestion`: "What would you like to work on next?" with a free-text-first option (no guessed candidates) + "End session" |
+| 2 | Treat "no candidates found" as license to skip the ask entirely | Absence of a discovered candidate is not absence of a decision — the user still decides what's next |
+| 3 | User answers one specific ask (e.g. a re-auth/verification offer) with frustration/anger/a terse dismissal, and the assistant reads that as "stop asking anything for the rest of the session" → every later Stop-hook `next` re-trigger ends on generic standby/completion text instead of this step's forced ask | Scope the frustration to the **specific declined candidate only** — drop that one candidate, but the Step 0.65 forced direct ask (a fresh, different decision: "what next") still fires. Anger at a repeated/low-value ask is not consent to stop being asked entirely; it is a signal to stop repeating *that* ask |
+
+### Self-check
+
+1. Did `next` fire more than once this session with a zero-candidate outcome each time? → If yes, this step applies
+2. Am I about to end the turn with a repeat "nothing to do" report? → Forbidden. Compose the direct-input ask instead
+3. Did the user's most recent reply express frustration/anger toward a *specific* prior ask (not a general "stop working" instruction)? → That drops the declined candidate only — this step's forced direct ask is still owed, not exempted
+
+## Step 0.66: Unchanged-candidate-set re-fire within the same chain (HARD STOP)
+
+**When `next` fires again within the same `stop_hook_active` continuation chain and the candidate/decision set is identical to the immediately-prior `next`-ask in that same chain (no new item, no state change, no new answer received), do not compose a fresh full `AskUserQuestion`.** This is distinct from Step 0.65 (zero-candidate repeated firing) — here candidates DO exist, but they are the same ones already surfaced and either answered or explicitly deferred moments earlier in the same chain. Re-presenting them as a new ask reads as not having listened to the prior answer.
+
+**Same-set test**: compare the current candidate list (post Step 0.5/0.6 discovery) against the immediately-prior `next`-ask's candidate list in this chain. Identical if every item matches by subject/target (ignoring cosmetic wording) AND none has a new state (no new TaskList entry, no fix_plan change, no user reply that altered scope).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compose a new full `AskUserQuestion` with the same options as the previous ask in this chain, just reworded | End the turn with a short status report ("carried over: X, Y, Z — no new candidates this fire") and no ask |
+| 2 | Keep re-asking until the user manually breaks out (rejects the tool call, issues an unrelated command) | Recognize the unchanged-set condition before the ask, not after the user has to reject it |
+| 3 | Treat "the hook fired again" as proof a fresh ask is owed regardless of content | The hook firing is a *reminder to check*, not a mandate to always ask — check the same-set test first |
+| 4 | Silently drop the carryover items on grounds of "already asked" | Still report their carryover status in plain text (per Step 0.3's skip-still-reports discipline) — silence is the ask-gates violation this table exists to prevent elsewhere |
+
+**Exception**: if the one item that is still genuinely open differs from the rest (e.g., 3 items already deferred, 1 item newly blocking), a minimal single-item confirmation for that one item is allowed — do not fold it back into a full 4-option re-ask of the whole set.
+
+### Self-check
+
+1. Is this `next` firing within the same `stop_hook_active` continuation chain as an earlier `next`-ask this turn/chain? → If no, this step does not apply
+2. Does the candidate/decision set match the immediately-prior ask's set exactly (same-set test above)? → If yes, skip the full ask; end with a status report or a single-item confirmation for the one genuinely-new item
+3. Am I about to re-ask the same set a 2nd+ time in this chain hoping for a different answer? → Forbidden. Report and stop, or escalate to Step 0.65's direct free-text ask only if the set is now genuinely empty
 
 ## Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
 
@@ -295,6 +344,22 @@ options: [
 ```
 
 After receiving both answers, compose the actual next-action options based on the answered current state + waiting items.
+
+## Context-usage citation on every next-composed ask (HARD STOP — not scoped to cleanup options)
+
+**Every `AskUserQuestion` this skill composes states the live context-usage percentage in the question text, regardless of whether a cleanup/wrap-up option is being offered.** The `context-usage-stale` guard class (17+ recurrences, hooks `context-usage-inject.sh` + `block-cleanup-option-below-context-gate.sh`) only covers citation accuracy **inside a cleanup option** — it cannot detect a plain next-action ask that omits the number entirely, because a hook sees only the tool-call payload and cannot tell "this ask was composed by `next`" from any other skill's ask. This gate exists precisely to cover that hook-blind spot at the skill-composition layer.
+
+Get the number the same way the cleanup-gate section does: the latest injected `Context usage: ... (NN%)` line, or a live re-check via the injection script when the last reading predates this turn's tool-call chain (see suggestion-patterns.md "Live-check fallback").
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compose a next-action ask with zero cleanup candidates and omit the context percentage because "no cleanup option is being offered, so the citation rule doesn't apply" | Cite the live percentage in the question text regardless — it is baseline situational awareness for the user, independent of whether cleanup is being recommended |
+| 2 | Assume `block-cleanup-option-below-context-gate.sh` will catch a missing percentage | That hook only fires when a cleanup/wrap-up option is present in the payload. A plain "what next" ask with no such option is invisible to it — this is a skill-level obligation, not a hook-enforced one |
+
+### Self-check (every time before calling `AskUserQuestion` from this skill)
+
+1. Does the question text include the live percentage (`NN%` or `NN.N%`)? → If no, add it before calling
+2. Is the reading fresh (post-compact, not from a stale earlier turn in a long tool-call chain)? → If stale, get a live reading first (suggestion-patterns.md "Live-check fallback")
 
 ---
 
