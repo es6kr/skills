@@ -482,6 +482,37 @@ done
 
 **Report row format**: append BROKEN_COUPLING entries to the Step C table.
 
+**Skill-to-skill body reference check (same Step D, second pass)**: `VENDOR_PAT` above only catches vendor wrapper paths (`.ralph/`, `.omc/`, etc.) — it does not catch a skill's body file quietly depending on **another skill's own resources** (e.g. a hook script owned by a different skill). Run this second regex against the same body-file set:
+
+```bash
+SKILL_PAT='~/\.claude/skills/([a-z0-9-]+)/|~/\.agents/skills/([a-z0-9-]+)/'
+
+for skill_dir in ~/.claude/skills/*/ ~/.agents/skills/*/; do
+  skill_name=$(basename "$skill_dir")
+  skill_md="$skill_dir/SKILL.md"
+  [ -f "$skill_md" ] || continue
+
+  declared=$(awk '
+    /^depends-on:[[:space:]]*\[/ { gsub(/^depends-on:[[:space:]]*\[|\]$|,/, " "); print; exit }
+    /^depends-on:[[:space:]]*$/ { block=1; next }
+    block && /^[[:space:]]+-[[:space:]]+/ { sub(/^[[:space:]]+-[[:space:]]+/, ""); printf "%s ", $0; next }
+    block && /^[^[:space:]]/ { exit }
+  ' "$skill_md")
+
+  for body in "$skill_dir"*.md; do
+    [ "$(basename "$body")" = "SKILL.md" ] && continue
+    grep -ohE "$SKILL_PAT" "$body" 2>/dev/null | sed -E 's#.*/skills/([a-z0-9-]+)/.*#\1#' | sort -u | while read -r ref; do
+      [ "$ref" = "$skill_name" ] && continue   # self-reference, not a dependency
+      if ! echo "$declared" | grep -qw "$ref"; then
+        echo "BROKEN_COUPLING: $skill_name → $(basename "$body") references skill '$ref' without depends-on"
+      fi
+    done
+  done
+done
+```
+
+Same allowed exception (sanitize/strip lists) and report format as the vendor-path pass above.
+
 #### Don't / Do
 
 | # | Don't | Do |

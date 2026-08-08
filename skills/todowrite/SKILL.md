@@ -4,8 +4,10 @@ metadata:
   author: es6kr
   version: "0.1.0"
 depends-on:
+  - cleanup
   - wip
-description: Route TODO checklists to the right storage + TaskList conversational discipline. session - in-session tracking via /wip, file - persistent TODO (fix_plan.md, TODO.md), issue - team-shared via GitHub Issues, conversation-id - subject-prefix references in user-visible output (no internal TaskList IDs), completion-report - TaskUpdate completion message format + file-change disclosure, fix-plan-sync - two-way sync between task medium and checklist medium, priority-prefix - encode task priority + execution order via subject prefix when TaskUpdate has no priority field, media-separation - 3-layer model: tracking (files) vs recording (RAG) vs knowledge (Wiki) [media-separation.md]. "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue", "task ID", "completion report", "task transfer", "task priority", "prefix ordering", "3-layer separation", "RAG vs wiki", "work record media" triggers.
+description: |
+  Route TODO checklists to the right storage + TaskList conversational discipline. Topics — session (/wip), file (fix_plan.md), issue (GitHub Issues), completion-report, fix-plan-sync, priority-prefix, media-separation (tracking vs recording vs knowledge). Use when: "TODO management", "checklist", "todowrite", "fix_plan cleanup", "register as issue", "completion report", "task priority", "media-separation".
 ---
 
 # TodoWrite

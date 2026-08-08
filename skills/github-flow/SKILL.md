@@ -4,6 +4,7 @@ metadata:
   author: es6kr
   version: "0.1.0"
 depends-on:
+  - cleanup
   - code-workflow
   - web-browser
 description: |

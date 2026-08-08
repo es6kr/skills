@@ -3,6 +3,8 @@ metadata:
   author: es6kr
   version: "0.1.5"
 name: fix
+depends-on:
+  - cleanup
 description: |
   User behavior correction skill. Triggered by "fix:" prefix feedback (e.g., "fix: why didn't you commit?").
   Analyzes the mistake, improves the relevant prompt (skill/rule/agent/memory/hook) to prevent recurrence,
