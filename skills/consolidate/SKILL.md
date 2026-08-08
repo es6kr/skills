@@ -1,10 +1,6 @@
 ---
 name: consolidate
-depends-on:
-  - git-repo
-  - github-flow
-  - hook-kit
-  - superpowers
+depends-on: [git-repo, github-flow, hook-kit, superpowers]
 metadata:
   author: es6kr
   version: "0.5.0" # x-release-please-version
