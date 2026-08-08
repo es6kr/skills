@@ -216,6 +216,68 @@ check_merge_without_review() {
     fi
   fi
 
+  # Solo-infra-repo exemption (personal repos with no CI + no reviewers).
+  # When EVERY referenced PR sits in a repo that has NO CI checks AND NO
+  # requested reviewers / submitted reviews, there is no pipeline or reviewbot
+  # for a /consolidate AI Review Summary to attest against — the two attestation
+  # gates below are structurally unsatisfiable, so a merge ask gets endlessly
+  # reworded. Exempt such asks. (Recurs on solo infra repos: no CI, no reviewers.)
+  #
+  # Fail closed: gh unavailable/unauthenticated, repo unresolved, or ANY per-PR
+  # lookup failure -> NOT exempt (existing gates run). Never fail open. Any CI
+  # check OR any requested-reviewer/review present -> NOT a solo-infra repo.
+  if command -v gh >/dev/null 2>&1; then
+    local si_repo si_prs si_all=1 si_seen=0 si_n si_rev si_checks
+    si_repo="${GH_REPO:-$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)}"
+    si_prs=$(echo "$OPTIONS_BLOB" | grep -oE '#[0-9]+|pull/[0-9]+' | grep -oE '[0-9]+' | sort -u)
+    if [[ -n "$si_repo" && -n "$si_prs" ]]; then
+      while IFS= read -r si_n; do
+        [[ -z "$si_n" ]] && continue
+        si_seen=1
+        si_rev=$(gh pr view "$si_n" --json reviewRequests,reviews \
+          -q '((.reviewRequests|length)+(.reviews|length))' -R "$si_repo" 2>/dev/null)
+        [[ -z "$si_rev" ]] && { si_all=0; break; }   # lookup failure -> fail closed
+        [[ "$si_rev" != "0" ]] && { si_all=0; break; }  # reviewer/review present
+        si_checks=$(gh pr checks "$si_n" -R "$si_repo" 2>/dev/null | grep -c .)
+        [[ "$si_checks" != "0" ]] && { si_all=0; break; }  # CI present
+      done <<< "$si_prs"
+      if [[ "$si_seen" -eq 1 && "$si_all" -eq 1 ]]; then
+        return 0                   # all referenced PRs: CI-less + reviewer-less repo
+      fi
+    fi
+  fi
+
+  # CI-gate-only accumulation-branch exemption.
+  # When EVERY referenced PR sits on a base branch where reviews are structurally
+  # disabled (a CI-gate-only accumulation branch — e.g. a two-tier staging model
+  # whose real review gate is the later promotion PR), no AI Review Summary can
+  # ever exist for it, so the two attestation gates below are unsatisfiable and a
+  # merge ask gets endlessly reworded. Detect this generically via the reviewer
+  # bot's own "reviews are disabled for this base branch" check line — no
+  # hardcoded branch names (same signal consolidate/pr.md's CI-gate-only gate
+  # keys on), so the exemption stays portable across repos.
+  #
+  # Fail closed: gh unavailable/unauthenticated, repo unresolved, or ANY per-PR
+  # `gh pr checks` failure / missing signal -> NOT exempt (existing gates run).
+  if command -v gh >/dev/null 2>&1; then
+    local cg_repo cg_prs cg_all=1 cg_seen=0 cg_n cg_checks
+    cg_repo="${GH_REPO:-$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)}"
+    cg_prs=$(echo "$OPTIONS_BLOB" | grep -oE '#[0-9]+|pull/[0-9]+' | grep -oE '[0-9]+' | sort -u)
+    if [[ -n "$cg_repo" && -n "$cg_prs" ]]; then
+      while IFS= read -r cg_n; do
+        [[ -z "$cg_n" ]] && continue
+        cg_seen=1
+        cg_checks=$(gh pr checks "$cg_n" -R "$cg_repo" 2>/dev/null || true)
+        [[ -z "$cg_checks" ]] && { cg_all=0; break; }   # lookup failure -> fail closed
+        echo "$cg_checks" | grep -qiE 'reviews are disabled for this base branch' \
+          || { cg_all=0; break; }                       # base not review-disabled
+      done <<< "$cg_prs"
+      if [[ "$cg_seen" -eq 1 && "$cg_all" -eq 1 ]]; then
+        return 0                   # all referenced PRs sit on a review-disabled base
+      fi
+    fi
+  fi
+
   # Gate 1: AI Review Summary attestation
   # Locale variants in data/hangul-patterns.regex (HG_ASK_SUMMARY_ATTESTATION).
   if ! echo "$OPTIONS_BLOB" | grep -qE "$HG_ASK_SUMMARY_ATTESTATION"; then
