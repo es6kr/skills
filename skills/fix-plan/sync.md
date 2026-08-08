@@ -64,10 +64,19 @@ When a project mirrors its backlog into a second external tracker (a project-man
 
 The fix-plan skill stays vendor-agnostic here too: no tracker name is hardcoded. Dispatch via `--secondary-sync=<skill>:<topic>` (same caller-supplied receiver pattern as `--archive=<skill>:<topic>` — see the top-level Configuration table). The caller wires this to whichever skill owns that tracker's sync script (e.g., a project-management-tool skill's own dry-run sync command); this skill only documents the cadence contract.
 
+**Example receiver — `scripts/plane_sync.py`**: parses `- [<marker>] [<IDENT>-<seq>] <title> -> Plane (<issue URL>)` index lines (the format `plane-backlog`'s Phase-3 migration produces), and maps each issue's `state_detail.group` back onto the fix_plan marker — `completed` -> `[x]`, `cancelled` -> `[BLOCKED:P2:external]`, mirroring this file's own MERGED/CLOSED-without-merge rules above. Non-terminal states and API errors leave the line untouched, same as the GitHub rules table.
+
+### Auto-supplying the secondary-sync receiver from a workspace profile
+
+`--secondary-sync` is caller-supplied, but the caller should not have to remember it per workspace. When the workspace ships a resolvable Plane profile — `scripts/workspace_profile.py --json` returns a **non-empty `plane_host`** for the current cwd (config lives in `~/.config/plane-backlog/config.json`) — the caller MUST auto-supply `--secondary-sync=plane-backlog:sync` on every `/fix-plan` sync / default invocation for that workspace, matching the generic "auto-supply available vendor dispatch" contract. A workspace that has adopted Plane as its canonical backlog (its local tracker demoted to an index) is signalled precisely by that profile; skipping the dispatch silently reverts sync to GitHub-only and lets the local index drift from the canonical tracker.
+
+Degrade cleanly when the profile exists but its token env resolves empty (`plane_token` blank): emit one report line that Plane sync is wired but skipped for want of credentials, and continue the GitHub sync — do not fail the whole pipeline.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Run only the GitHub sync and assume the secondary tracker stays current on its own | If `--secondary-sync` is configured, run it in the same pass as this GitHub sync |
 | 2 | Hardcode a specific tracker's domain/skill name into this file | Dispatch through the abstract `--secondary-sync=<skill>:<topic>` flag; the receiver owns vendor specifics |
+| 3 | Require the user to type `--secondary-sync` by hand every run when a Plane profile is already configured for the workspace | Detect a non-empty `plane_host` via `workspace_profile.py` and auto-supply `--secondary-sync=plane-backlog:sync`; if the token is absent, wire-but-skip with a report line |
 
 ## Sync-specific prohibitions
 
