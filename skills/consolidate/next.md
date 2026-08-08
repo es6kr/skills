@@ -88,9 +88,22 @@ ME=$(GH_TOKEN="$(gh auth token --user "$ACCOUNT_FOR_REPO")" gh api /user --jq '.
 
 To pass the `block-merge-without-review.sh` guard, **the merge option description must explicitly include "AI Review Summary posted (URL)"**.
 
+**Merge-method precheck before labeling any option "Squash merge" (HARD STOP)**: before composing a "Squash merge" option label, run `github-flow/merge.md`'s condition-6 "Merge-method policy pre-check" (release-please/changesets marker detection) — do not defer this check to the later `/github-flow merge` invocation. A "Squash merge" label composed here reaches the user as a recommendation before that later gate runs; if the repo turns out to require merge-commit (release-please parses individual Conventional Commits), the recommendation itself was already wrong.
+
+```bash
+gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed}}'
+# Signal: .release-please-manifest.json / release-please-config.json / .changeset/ at repo root
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compose a "Squash merge" option label first, run the merge-method check only inside the later `/github-flow merge` invocation | Run the release-please/changesets marker check in this step, before the option label is written — label "Merge commit" instead when the marker is present |
+| 2 | Treat "the 6-condition self-check in merge.md will catch it later" as sufficient | That check is a pre-merge gate on the already-approved recommendation, not a substitute for composing the correct recommendation in the first place |
+
 | Merge 4-condition satisfaction | Recommended options (Recommended at top) |
 |-------------------------------|------------------------------------------|
-| 4/4 satisfied | (1) Squash merge — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
+| 4/4 satisfied, no release-please/changesets marker | (1) Squash merge — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
+| 4/4 satisfied, release-please/changesets marker present | (1) Merge commit — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
 | 1+ Test Plan unchecked | (1) Verify unchecked items (web-browser/curl) (2) File separate issue then merge (3) Defer |
 | 1+ CI failures | (1) Investigate CI cause (2) If failure unrelated to PR, file separate issue (3) Defer |
 | Formal Review unapproved | (1) Self-approve (2) Request reviewer (3) Defer |
