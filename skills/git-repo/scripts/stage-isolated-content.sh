@@ -32,10 +32,23 @@ if [[ ! -f "$CONTENT_FILE" ]]; then
   exit 1
 fi
 
-BLOB=$(git hash-object -w "$CONTENT_FILE")
-git update-index --cacheinfo 100644,"$BLOB","$TARGET_PATH"
+# Preserve the target's existing tracked mode (100644 vs 100755) — hardcoding
+# 100644 here would silently drop the executable bit on any script being
+# isolated (caught in session precedent: an isolated .sh file lost +x, and a
+# follow-up `update-index --chmod=+x` on the cacheinfo-only entry made git
+# re-read the blob from the working tree, reintroducing the very unrelated
+# content this technique exists to keep out — fix the mode in the same
+# --cacheinfo call instead of a separate chmod step).
+MODE=$(git ls-tree HEAD -- "$TARGET_PATH" | awk '{print $1}')
+if [[ -z "$MODE" ]]; then
+  echo "Could not determine tracked mode for $TARGET_PATH (not found in HEAD) — falling back to 100644." >&2
+  MODE=100644
+fi
 
-echo "== staged $TARGET_PATH as blob $BLOB"
+BLOB=$(git hash-object -w "$CONTENT_FILE")
+git update-index --cacheinfo "$MODE","$BLOB","$TARGET_PATH"
+
+echo "== staged $TARGET_PATH as blob $BLOB (mode $MODE)"
 
 if git show ":$TARGET_PATH" | diff -q - "$CONTENT_FILE" >/dev/null; then
   echo "== verified: staged content matches $CONTENT_FILE exactly"
