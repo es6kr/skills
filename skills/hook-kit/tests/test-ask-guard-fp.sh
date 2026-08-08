@@ -76,6 +76,21 @@ check "fp5 merge --abort" 0 "$(run "$(mk \
 check "fp6 retrospective validation only" 0 "$(run "$(mk \
   'PR #63 post-merge validation::verification only, no code change. Squash type was already chosen')")"
 
+# 7. task-clustering "merge/split" (non-PR merge noun) co-present with a real PR #.
+check "fp7 clustering merge/split" 0 "$(run "$(mk \
+  'Start FA corpus clustering::review the 200-class merge/split candidates in a dedicated session' \
+  'Hold::leave for later; PR #255 unrelated')")"
+
+# 8. PR-state "await-merge" description (not a merge proposal) + real PR #s.
+check "fp8 await-merge PR state" 0 "$(run "$(mk \
+  'Ready drafts, hold for review::transition PR #258 to ready; all three await-merge until your go-ahead' \
+  'Leave as draft::no change; PR #255 stays open')")"
+
+# 9. meta-discussion of this very guard ("ask-guard merge-keyword false positive").
+check "fp9 ask-guard merge-keyword meta" 0 "$(run "$(mk \
+  'Proceed now::fix ask-guard.sh merge-keyword false-positive and run regression tests, relates to finding #3' \
+  'Hold::start another guard first')")"
+
 # ---- TP cases: must BLOCK (exit 2) — attestation/verification genuinely absent ----
 
 # 7. active "Squash and merge PR #N" without AI Review Summary attestation.
@@ -85,6 +100,11 @@ check "tp1 active merge no attestation" 2 "$(run "$(mk \
 # 8. active close of a release-please PR without verification attestation.
 check "tp2 active release-please close no verify" 2 "$(run "$(mk \
   'Close release-please PR #55::close the release-please PR #55 directly, then re-cascade')")"
+
+# 9. plain (non-strong) merge proposal for a real PR, no attestation — the new
+#    retrospect exclusions must NOT let this slip through.
+check "tp3 plain merge proposal no attestation" 2 "$(run "$(mk \
+  'Land it::merge PR #90 into next-fix now')")"
 
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then echo "ALL PASS"; else echo "SOME FAILED"; fi

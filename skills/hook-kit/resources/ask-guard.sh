@@ -33,12 +33,25 @@ HG_ASK_ACTIVE_MERGE_KO="${HG_ASK_ACTIVE_MERGE_KO:-}"
 HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this}"
 # Known limitation: bare \bmerge\b over-matches git branch-merge / conflict-resolution
 # asks (e.g. "merge origin/main into next-fix"), non-PR "merge" nouns (e.g. "plan
-# merge", "doc merge", "consolidation"), not just PR-merge recommendations.
+# merge", "doc merge", "consolidation"), task-clustering "merge/split", PR-state
+# "await-merge", and meta-discussion of this very guard ("ask-guard merge-keyword
+# false positive") — none of which are PR-merge recommendations.
 # Mitigated by HG_ASK_RETROSPECT_MERGE below (includes "merge origin/", "conflict
-# resolution", "resolve conflict", "plan merge", "consolidat*") — phrase such asks
-# with those tokens to pass.
+# resolution", "resolve conflict", "plan merge", "consolidat*", "merge/split",
+# "merge-keyword", "await-merge", "ask-guard") — phrase such asks with those tokens
+# to pass. Strong merge intent ("Squash and merge", "merge it") still hits
+# HG_ASK_ACTIVE_MERGE_EN and is gated regardless of these exclusions.
 HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-\bmerge\b|\bMerge\b|\bMERGE\b|\bSquash\b|\bsquash\b}"
 HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/|plan merge|doc merge|docs? merge|consolidat[a-z]*|merges? into|merge target|merge base|base branch}"
+# Append-guarantee (recurrence fix): the locale data file (data/hangul-patterns.regex)
+# fully REDEFINES HG_ASK_RETROSPECT_MERGE (Korean + a snapshot of the English set).
+# A stale locale snapshot silently drops English exclusions added to the :- default
+# above — the recurring root cause of the merge-keyword false positive. Append the
+# English non-PR-merge exclusions unconditionally AFTER any override so no stale
+# locale file can re-open them. Append-only is safe: retrospect exclusions only ever
+# make an ask PASS. NEW English non-PR-merge senses belong on THIS append line, not
+# the :- default, so they survive a locale override.
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE}|merge/split|split/merge|merge[- ]?keyword|merge[- ]?fp|merge[- ]?false[- ]?positive|await[- ]?merge|awaiting[- ]?merge|class[- ]?merge|merge[- ]?class|ask-guard"
 HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:-AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+}"
 HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅}"
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
