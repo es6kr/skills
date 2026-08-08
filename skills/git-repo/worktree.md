@@ -99,6 +99,8 @@ Delegate to the appropriate sub-topic:
 
 **Path-canonicality applies regardless of which row is taken.** `rename-worktree.sh`'s `--wt-base` flag assumes `<old-name>` already lives directly under that base directory — it renames/re-branches in place, it does not relocate a worktree that lives entirely outside any `--wt-base` tree (e.g. `<repo>-wt/<name>` sitting next to `<repo>/`, or vibe-kanban's own worktree layout). Reusing such a worktree via `rename-worktree.sh` alone perpetuates its wrong location indefinitely — check the parent directory first, and route through Scenario B before renaming when it's not already `<repo>/.worktrees/`.
 
+**Automated pre-check**: `scripts/check-worktree-canonical.sh <repo> <worktree-name-or-path>` performs this parent-directory check mechanically — it exits `0` (canonical — safe to reuse in place), `1` (non-canonical — prints the Scenario B `git worktree move` command to run first), or `2` (not registered — orphan dir, Scenario A). It is detect-only (never mutates a worktree); run it before `rename-worktree.sh` to catch a wrong location without acting on it.
+
 After rename/move, verify:
 
 ```bash
@@ -209,6 +211,8 @@ For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-firs
 1. Is the candidate's path already `<repo>/.worktrees/<name>`? Check with `git worktree list` — the path column shows the full location.
 2. If not (a legacy `.claude/worktrees/`, a sibling `<repo>-wt/`, a bare `~/.worktrees/`, or anything else) → relocate via move-worktree.md Scenario B **before** renaming/switching branch — do not reuse in place and leave the wrong location to persist across future reuse cycles.
 3. Only after the path is confirmed canonical, proceed with rename-worktree.sh or the manual branch switch.
+
+Steps 1-2 can be run mechanically: `scripts/check-worktree-canonical.sh <repo> <candidate-name>` (exit 0 = canonical / 1 = non-canonical, prints the Scenario B move command / 2 = not registered).
 
 ## Inactive Worktree Count Limit (HARD STOP)
 
