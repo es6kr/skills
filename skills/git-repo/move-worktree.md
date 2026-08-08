@@ -62,7 +62,7 @@ git worktree add .worktrees/<name> <branch>
 When a worktree was used for a now-merged PR and you want to reuse it:
 
 1. **If the worktree is still registered** (`git worktree list` shows it):
-   - **Check the parent directory first.** If it is NOT already `<repo>/.worktrees/` (e.g. it sits at a legacy `.claude/worktrees/`, a sibling `<repo>-wt/`, a bare `~/.worktrees/`, or was created by an external tool at an arbitrary path), apply **Scenario B above to relocate it first** — `rename-worktree.sh` alone will not fix the location, it only renames/re-branches in place under whatever base it's already at.
+   - **Check the parent directory first.** If it is NOT already `<repo>/.worktrees/` (e.g. it sits at a legacy `.claude/worktrees/`, a sibling `<repo>-wt/`, a bare `~/.worktrees/`, or was created by an external tool at an arbitrary path), apply **Scenario B above to relocate it first** — `rename-worktree.sh` alone will not fix the location, it only renames/re-branches in place under whatever base it's already at. Run `scripts/check-worktree-canonical.sh <repo> <name>` to make this check mechanically (exit 0 canonical / 1 non-canonical + prints the relocation command / 2 not registered).
    - Once the path is confirmed (or corrected to) `<repo>/.worktrees/`, use [rename-worktree](./rename-worktree.md) procedure to rename + switch branch
 
 2. **If the worktree is orphaned** (not in `git worktree list`):
