@@ -29,7 +29,7 @@ Guide users to convert functionality into the appropriate Claude Code automation
 | `persist` | [persist.md](./persist.md) | Knowledge persistence: documentation + memory save |
 | `background-polling` | [background-polling.md](./background-polling.md) | ScheduleWakeup/timeout polling discipline for 5min+ background dispatches |
 
-For any topic arg other than `create` / `agentify` / (none), **Read that topic file and follow it** — the Decision Matrix and creation Workflow below apply only to the `create`/`agentify`/(none) creation path.
+For `improve` / `persist` / `background-polling`, **Read that topic file and follow it** — the Decision Matrix and creation Workflow below apply only to the `create`/`agentify`/(none) creation path. For any other/unrecognized topic arg, fall back to the `create`/`agentify`/(none) creation workflow below rather than assuming a matching topic file exists.
 
 ## Decision Matrix
 
