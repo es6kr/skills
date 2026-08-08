@@ -12,7 +12,7 @@ import json
 import argparse
 import subprocess
 from pathlib import Path
-from workspace_profile import get_profile
+from workspace_profile import get_profile, resolve_tracker_root
 
 
 def ingest_md_to_qdrant(md_path: Path, profile: dict):
@@ -57,7 +57,7 @@ def resolve_fix_plan_path(explicit: str = None, target_path: str = None) -> Path
     candidate = base / "fix_plan.md"
     if candidate.exists():
         return candidate
-    candidate = base / ".ralph" / "fix_plan.md"
+    candidate = base / resolve_tracker_root(target_path) / "fix_plan.md"
     if candidate.exists():
         return candidate
     return base / "checklist.md"
