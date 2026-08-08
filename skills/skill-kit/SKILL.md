@@ -3,6 +3,8 @@ name: skill-kit
 depends-on:
   - cc-plugin
   - clawhub
+  - cleanup
+  - es6kr
 metadata:
   author: es6kr
   version: "0.1.2"
