@@ -18,8 +18,11 @@ if [ -z "$COMMAND" ]; then
   exit 0
 fi
 
-# Check if this is a git commit command
-if [[ "$COMMAND" != *"git commit"* ]]; then
+# Check if this is a git commit command. Require "git commit" to appear as an actual
+# command invocation (right after a command-boundary or the start of the string), not
+# merely mentioned as substring text — e.g. `echo "run git commit later"` or
+# `git log --grep="git commit"` must NOT trigger this hook.
+if ! grep -qE '(^|[;&|`]|\bthen\b)[[:space:]]*git[[:space:]]+commit([[:space:]]|$)' <<< "$COMMAND"; then
   exit 0
 fi
 
@@ -42,7 +45,9 @@ echo "<commit-review-trigger>"
 echo "Commit completed: $COMMIT_SHA"
 echo "Project: $PROJECT_PATH"
 echo "Launch code-reviewer agent with: Task tool, subagent_type='code-reviewer'"
-echo "Prompt: \"Project path: $PROJECT_PATH\nCommit SHA: $COMMIT_SHA\nReview this commit.\""
+# printf %b (not `echo`) so the embedded \n sequences render as real line breaks —
+# plain `echo` treats \n as literal backslash-n in POSIX-mode bash (xpg_echo off).
+printf '%b\n' "Prompt: \"Project path: $PROJECT_PATH\nCommit SHA: $COMMIT_SHA\nReview this commit.\""
 echo "</commit-review-trigger>"
 
 exit 0
