@@ -14,9 +14,64 @@ Searches past sessions by keyword and returns matching session IDs, with validat
 /session search <keyword>                  # search current project sessions
 /session search --today <keyword>          # only sessions modified today
 /session search --project <path> <keyword> # search a specific project path
+/session search --engine antigravity <keyword>  # search Antigravity (Gemini IDE) sessions instead
 ```
 
 For backward compatibility, `/session id <keyword>` is routed to this topic.
+
+## Engine Selection
+
+This skill's default engine is **Claude Code** (`~/.claude/projects/*.jsonl`). A second engine, **Antigravity (Gemini IDE)**, stores sessions in a different location and format — pass `--engine antigravity` to search there instead. Auto-detect the engine from context when the user references a known Antigravity session UUID (found under `~/.gemini/antigravity-ide/brain/<uuid>/`) even without the flag.
+
+| Engine | Session store | Readable transcript |
+|--------|---------------|---------------------|
+| `claude` (default) | `~/.claude/projects/<project>/<uuid>.jsonl` | JSONL directly |
+| `antigravity` | `~/.gemini/antigravity-ide/brain/<uuid>/` | `.system_generated/logs/transcript.jsonl` (JSONL, one step per line) |
+
+### Antigravity Search Procedure
+
+Antigravity's `transcript.jsonl` is plain, greppable JSON-per-line (`{"step_index":N,"source":"...","type":"...","created_at":"...","content":"..."}`) — no protobuf decoding needed for the common case. Only fall back to the raw SQLite conversation DB (`~/.gemini/antigravity-ide/conversations/<uuid>.db`, protobuf-encoded blobs) when a keyword hit is expected but absent from `transcript.jsonl` (e.g. tool-call metadata not mirrored into the transcript).
+
+```bash
+# Search a single known session
+grep -n "<keyword>" ~/.gemini/antigravity-ide/brain/<uuid>/.system_generated/logs/transcript.jsonl
+
+# Search across all Antigravity brain sessions (unknown session ID)
+for f in ~/.gemini/antigravity-ide/brain/*/.system_generated/logs/transcript.jsonl; do
+  grep -l "<keyword>" "$f" 2>/dev/null
+done
+
+# Extract clean readable context around a match (content field only, timestamps included)
+grep -n "<keyword>" <transcript.jsonl> | uv run python -c "
+import sys, json
+for line in sys.stdin:
+    ln, rest = line.split(':', 1)
+    try:
+        obj = json.loads(rest)
+    except Exception:
+        obj = {'raw': rest[:300]}
+    c = obj.get('content', '')
+    print('LINE', ln, '| created_at:', obj.get('created_at'), '|', str(c)[:400].replace(chr(10), ' '))
+"
+```
+
+**Fallback — SQLite conversation DB (rare)**: when `transcript.jsonl` genuinely lacks a signal that must be in the raw session (e.g. exact tool-call arguments, embedded fetched-page HTML), the source DB lives at `~/.gemini/antigravity-ide/conversations/<uuid>.db` (SQLite tables: `steps`, `gen_metadata`, `trajectory_meta`, `trajectory_metadata_blob`, `executor_metadata`, `parent_references`, `battle_mode_infos`). It has no `sqlite3` CLI dependency assumption — read it with `uv run python -c "import sqlite3; ..."` (Windows: `python3` fails via Microsoft Store redirect, per `common.md`). Blob columns are protobuf-encoded; extract readable substrings with a printable/UTF-8 regex scan rather than attempting full protobuf decode:
+
+```bash
+uv run python -c "
+import sqlite3, re
+conn = sqlite3.connect(r'<path-to-db>')
+cur = conn.cursor()
+cur.execute('SELECT data FROM trajectory_metadata_blob WHERE id=\"main\"')
+data = cur.fetchone()[0]
+strings = re.findall(rb'[\x20-\x7e]{4,}|(?:[\xc0-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}){2,}', data)
+print(b'\n'.join(strings).decode('utf-8', errors='replace'))
+"
+```
+
+If the DB file is locked (Antigravity IDE running, holds an exclusive handle), `sqlite3.connect` raises `unable to open database file` even though the file exists — copy it to a scratch path first (`cp` the `.db` file, no `-wal`/`-shm` needed for read-only string extraction) and query the copy.
+
+Result Validation (below) applies identically regardless of engine — a keyword hit in an Antigravity transcript still needs verb/artifact/action-class classification before being reported as proof of completion.
 
 ## Search Procedure
 
