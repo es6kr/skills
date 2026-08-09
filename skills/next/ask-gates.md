@@ -119,6 +119,22 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 3. Is the decision a real branch (≥2 executable options)? Compose those as options + Other.
 4. This gate **overrides** Step 0.3 skip: even right after a recording/management topic, a deferred decision forces the ask.
 
+### Chain-continuation carry-forward check (HARD STOP — every turn inside a `stop_hook_active`-suppressed chain)
+
+**A prose-phrased decision asked in an earlier turn of the same chain does not resolve itself just because later turns are driven by background task-notifications instead of a user reply.** `check-ask-bypass-keywords.sh` (the hook backing this gate) only fires on the *first* stop of a `stop_hook_active`-suppressed chain — every later stop in that same chain is structurally silent (same limitation already documented for the `next`-invocation duty in the "Post-task-completion" table's row 7 below). A turn that only reacts to the newest notification, without checking whether an earlier turn in this chain left a question unanswered, silently drops that decision.
+
+Before driving any new or unrelated work in a turn that resumed from a background task-notification (not a genuine user reply):
+
+1. Scan your own most recent turn(s) in this chain for a Step 0.4-pattern prose question (or a properly-composed `AskUserQuestion` that the user has not yet answered).
+2. If one exists and remains unanswered → resolve it first: either compose the missed `AskUserQuestion` now (if it was asked as prose), or explicitly re-state the still-open decision in this turn's text before continuing — do not silently proceed with unrelated work as if the question had been withdrawn.
+3. Only after that check is clear may the turn continue driving other work (polling, re-dispatch, status checks, etc.).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Ask a real decision as prose, then treat every subsequent background-notification turn as "nothing to report on that, move on" | Re-surface the decision (as a proper `AskUserQuestion`) at the first opportunity after noticing it's still unanswered — do not let notification turns silently roll past it |
+| 2 | Assume the hook will catch a missed prose question because it's "hook-active" for this class | The hook only fires on the chain's first stop. Turns 2+ in the same chain are the self-check's sole coverage |
+| 3 | Wait for the user to notice and re-ask ("what about X?") before resolving the dropped decision | Self-detect on the very next turn that touches related work, not on user prompting |
+
 ### Surfacing/triage → `wip` delegation (HARD STOP — route target, not just "ask")
 
 When the deferred decision is **"which of N surfaced candidates to start"** (the output of a triage / surfacing topic — `fix-plan priority`, a candidate list, a "top-N actionable" report), the forced ask is **not** a `next` single-select "what next?". Route it to `Skill("wip")` — the surfaced candidates are multi-item work needing task registration + per-item direction (proceed / split / hold), which is wip's resume procedure. This generalizes the cleanup→wip rule ([[feedback_cleanup_wip_not_next]]) to every surfacing topic.
