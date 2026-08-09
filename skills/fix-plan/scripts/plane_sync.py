@@ -136,6 +136,9 @@ def compute_updates(lines: list, profile: dict) -> list:
         state_id = issue_data.get("state")
         if not state_id:
             continue
+        # Key includes project because fetch_state_group() calls the
+        # project-scoped states/ endpoint -- resolving a state_id requires
+        # knowing which project it belongs to.
         cache_key = (um["project"], state_id)
         if cache_key not in state_group_cache:
             state_data = fetch_state_group(profile, um["workspace"], um["project"], state_id)
