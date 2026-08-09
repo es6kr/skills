@@ -21,7 +21,7 @@ allowed-tools:
 
 GitHub repository configuration, integrations, and prerequisite verification.
 
-Extracted from the `github` skill (formerly `skills/github/`) and tracked under `.agents/skills/github-repo/` for git management.
+Extracted from the `github` skill (formerly `skills/github/`) and tracked under `skills/github-repo/` (repo-relative path — the repo root itself is checked out at `~/.agents/`) for git management.
 
 ## Topics
 

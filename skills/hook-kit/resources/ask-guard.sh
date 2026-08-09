@@ -33,12 +33,25 @@ HG_ASK_ACTIVE_MERGE_KO="${HG_ASK_ACTIVE_MERGE_KO:-}"
 HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this}"
 # Known limitation: bare \bmerge\b over-matches git branch-merge / conflict-resolution
 # asks (e.g. "merge origin/main into next-fix"), non-PR "merge" nouns (e.g. "plan
-# merge", "doc merge", "consolidation"), not just PR-merge recommendations.
+# merge", "doc merge", "consolidation"), task-clustering "merge/split", PR-state
+# "await-merge", and meta-discussion of this very guard ("ask-guard merge-keyword
+# false positive") — none of which are PR-merge recommendations.
 # Mitigated by HG_ASK_RETROSPECT_MERGE below (includes "merge origin/", "conflict
-# resolution", "resolve conflict", "plan merge", "consolidat*") — phrase such asks
-# with those tokens to pass.
+# resolution", "resolve conflict", "plan merge", "consolidat*", "merge/split",
+# "merge-keyword", "await-merge", "ask-guard") — phrase such asks with those tokens
+# to pass. Strong merge intent ("Squash and merge", "merge it") still hits
+# HG_ASK_ACTIVE_MERGE_EN and is gated regardless of these exclusions.
 HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-\bmerge\b|\bMerge\b|\bMERGE\b|\bSquash\b|\bsquash\b}"
-HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/|plan merge|doc merge|docs? merge|consolidat[a-z]*|merges? into|merge target|merge base|base branch}"
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/|plan merge|doc merge|docs? merge|consolidat[a-z]*|merges? into|merge target|merge base|base branch|merge option|merge ask|merge gating|merge check|[a-z-]*-merge-[a-z-]*\.sh|block-merge-without-review}"
+# Append-guarantee (recurrence fix): the locale data file (data/hangul-patterns.regex)
+# fully REDEFINES HG_ASK_RETROSPECT_MERGE (Korean + a snapshot of the English set).
+# A stale locale snapshot silently drops English exclusions added to the :- default
+# above — the recurring root cause of the merge-keyword false positive. Append the
+# English non-PR-merge exclusions unconditionally AFTER any override so no stale
+# locale file can re-open them. Append-only is safe: retrospect exclusions only ever
+# make an ask PASS. NEW English non-PR-merge senses belong on THIS append line, not
+# the :- default, so they survive a locale override.
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE}|merge/split|split/merge|merge[- ]?keyword|merge[- ]?fp|merge[- ]?false[- ]?positive|await[- ]?merge|awaiting[- ]?merge|class[- ]?merge|merge[- ]?class|ask-guard"
 HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:-AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+}"
 HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅}"
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
@@ -152,18 +165,20 @@ check_merge_without_review() {
   fi
 
   if [[ "$active_merge" -eq 0 ]]; then
-    # Plain merge keyword — check whether all mentions are retrospective
-    # (past tense / technical reference) vs forward-looking.
-    # Retrospective uses ("merged already", "squash type", "squash subject")
-    # describe historical or release-please cascade mechanics and are not
-    # merge proposals. Skip the gate when retrospective uses dominate
-    # (>= plain mentions).
+    # Plain merge keyword — check whether any mention survives after removing
+    # retrospective/non-PR-merge context lines (past tense, technical
+    # reference, git branch-history sync, hook/script filenames containing
+    # "merge"). A count-ratio comparison (plain vs retrospect line counts)
+    # previously missed same-line co-occurrences whenever the JSON payload
+    # put a retrospect phrase and the "merge" token on different structural
+    # lines (e.g. "merge origin/next-fix" split across a multi-line question
+    # object) — filtering out retrospect-matched lines FIRST, then checking
+    # the remainder, is co-occurrence-independent and closes that gap.
     echo "$OPTIONS_BLOB" | grep -qE "$HG_ASK_MERGE_KEYWORDS" || return 0
 
-    local retrospect_lines plain_lines
-    plain_lines=$(echo "$OPTIONS_BLOB" | grep -cE "$HG_ASK_MERGE_KEYWORDS")
-    retrospect_lines=$(echo "$OPTIONS_BLOB" | grep -cE "$HG_ASK_RETROSPECT_MERGE")
-    if [[ "$retrospect_lines" -ge "$plain_lines" ]]; then
+    local non_retrospect_merge_lines
+    non_retrospect_merge_lines=$(echo "$OPTIONS_BLOB" | grep -vE "$HG_ASK_RETROSPECT_MERGE" | grep -cE "$HG_ASK_MERGE_KEYWORDS")
+    if [[ "$non_retrospect_merge_lines" -eq 0 ]]; then
       return 0
     fi
   fi
@@ -212,6 +227,69 @@ check_merge_without_review() {
       done <<< "$rp_prs"
       if [[ "$rp_seen" -eq 1 && "$rp_all" -eq 1 ]]; then
         return 0                   # all referenced PRs are bot release PRs
+      fi
+    fi
+  fi
+
+  # Solo-infra-repo exemption (personal repos with no CI + no reviewers).
+  # When EVERY referenced PR sits in a repo that has NO CI checks AND NO
+  # requested reviewers / submitted reviews, there is no pipeline or reviewbot
+  # for a /consolidate AI Review Summary to attest against — the two attestation
+  # gates below are structurally unsatisfiable, so a merge ask gets endlessly
+  # reworded. Exempt such asks. (Recurs on solo infra repos: no CI, no reviewers.)
+  #
+  # Fail closed: gh unavailable/unauthenticated, repo unresolved, or ANY per-PR
+  # lookup failure -> NOT exempt (existing gates run). Never fail open. Any CI
+  # check OR any requested-reviewer/review present -> NOT a solo-infra repo.
+  if command -v gh >/dev/null 2>&1; then
+    local si_repo si_prs si_all=1 si_seen=0 si_n si_rev si_checks
+    si_repo="${GH_REPO:-$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)}"
+    si_prs=$(echo "$OPTIONS_BLOB" | grep -oE '#[0-9]+|pull/[0-9]+' | grep -oE '[0-9]+' | sort -u)
+    if [[ -n "$si_repo" && -n "$si_prs" ]]; then
+      while IFS= read -r si_n; do
+        [[ -z "$si_n" ]] && continue
+        si_seen=1
+        si_rev=$(gh pr view "$si_n" --json reviewRequests,reviews \
+          -q '((.reviewRequests|length)+(.reviews|length))' -R "$si_repo" 2>/dev/null)
+        [[ -z "$si_rev" ]] && { si_all=0; break; }   # lookup failure -> fail closed
+        [[ "$si_rev" != "0" ]] && { si_all=0; break; }  # reviewer/review present
+        si_checks=$(gh pr checks "$si_n" -R "$si_repo" --json bucket -q 'length' 2>/dev/null)
+        [[ -z "$si_checks" ]] && { si_all=0; break; }   # lookup failure -> fail closed
+        [[ "$si_checks" != "0" ]] && { si_all=0; break; }  # CI present
+      done <<< "$si_prs"
+      if [[ "$si_seen" -eq 1 && "$si_all" -eq 1 ]]; then
+        return 0                   # all referenced PRs: CI-less + reviewer-less repo
+      fi
+    fi
+  fi
+
+  # CI-gate-only accumulation-branch exemption.
+  # When EVERY referenced PR sits on a base branch where reviews are structurally
+  # disabled (a CI-gate-only accumulation branch — e.g. a two-tier staging model
+  # whose real review gate is the later promotion PR), no AI Review Summary can
+  # ever exist for it, so the two attestation gates below are unsatisfiable and a
+  # merge ask gets endlessly reworded. Detect this generically via the reviewer
+  # bot's own "reviews are disabled for this base branch" check line — no
+  # hardcoded branch names (same signal consolidate/pr.md's CI-gate-only gate
+  # keys on), so the exemption stays portable across repos.
+  #
+  # Fail closed: gh unavailable/unauthenticated, repo unresolved, or ANY per-PR
+  # `gh pr checks` failure / missing signal -> NOT exempt (existing gates run).
+  if command -v gh >/dev/null 2>&1; then
+    local cg_repo cg_prs cg_all=1 cg_seen=0 cg_n cg_checks
+    cg_repo="${GH_REPO:-$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)}"
+    cg_prs=$(echo "$OPTIONS_BLOB" | grep -oE '#[0-9]+|pull/[0-9]+' | grep -oE '[0-9]+' | sort -u)
+    if [[ -n "$cg_repo" && -n "$cg_prs" ]]; then
+      while IFS= read -r cg_n; do
+        [[ -z "$cg_n" ]] && continue
+        cg_seen=1
+        cg_checks=$(gh pr checks "$cg_n" -R "$cg_repo" 2>/dev/null || true)
+        [[ -z "$cg_checks" ]] && { cg_all=0; break; }   # lookup failure -> fail closed
+        echo "$cg_checks" | grep -qiE 'reviews are disabled for this base branch' \
+          || { cg_all=0; break; }                       # base not review-disabled
+      done <<< "$cg_prs"
+      if [[ "$cg_seen" -eq 1 && "$cg_all" -eq 1 ]]; then
+        return 0                   # all referenced PRs sit on a review-disabled base
       fi
     fi
   fi

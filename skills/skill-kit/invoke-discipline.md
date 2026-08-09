@@ -148,6 +148,7 @@ Before calling generic skill:
 
 ### Self-check (before composing any AskUserQuestion or report that recommends invoking a skill's specific procedure)
 
-1. Does the target skill document skip conditions / preconditions for this action? (grep its topic file's "Skip Condition" / "Step 2" / precondition section)
+1. Does the target skill document skip conditions / preconditions for this action? Grep for a "Skip Condition" / "Step 2" / precondition section — in the relevant **topic file** for a multi-topic skill, or directly in **SKILL.md** for a single-topic (SKILL.md-only) skill. Don't assume a separate topic file exists; check whichever file actually documents the action.
 2. Have you verified those conditions against the current state (not assumed from a prior session or a similar-looking case)?
 3. If a skip condition applies, do not offer the action — state the blocked reason instead, or route to the skill's actual next applicable step.
+4. If step 1 finds **no documented precondition at all** (neither a topic file nor SKILL.md defines one for this action), that is not the same as "no precondition applies" — it means the skill's own author never specified one. Proceed with the recommendation, but note in the recommendation that no precondition check exists for this action (so the user can catch a case the skill itself doesn't guard against).
