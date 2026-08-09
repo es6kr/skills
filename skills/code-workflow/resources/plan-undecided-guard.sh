@@ -26,8 +26,12 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 # `*plan.md` substring glob previously matched `fix_plan.md` by accident
 # (the `*` absorbs the `fix_` prefix) and re-litigated months of already-
 # resolved history on every unrelated edit.
+# The `*/docs/generated/plan-*.md` arm alone already matches any path ending
+# in that suffix regardless of what precedes it (including a `.ralph/` or
+# `.omc/`-style prefix), so a dedicated `.ralph` arm would be unreachable —
+# kept as a single arm instead of a redundant/dead second branch.
 case "$FILE_PATH" in
-  */docs/generated/plan-*.md|*/.ralph/docs/generated/plan-*.md|*/.omc/plans/*.md) ;;
+  */docs/generated/plan-*.md|*/.omc/plans/*.md) ;;
   *) exit 0 ;;
 esac
 
