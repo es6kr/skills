@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.2](https://github.com/es6kr/skills/compare/next-v0.7.1...next-v0.7.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit/Copilot review findings on PR [#270](https://github.com/es6kr/skills/issues/270) ([3b11a73](https://github.com/es6kr/skills/commit/3b11a730b5ad68803d35a8264eda540e48265d75))
+* **next:** register a lightweight tracking task for substantial candidate discovery ([#242](https://github.com/es6kr/skills/issues/242)) ([29c18d6](https://github.com/es6kr/skills/commit/29c18d6c6714f4c1d30b59aa50a277f8dbf998cd))
+* **next:** skip re-asking an unchanged candidate set within the same stop_hook_active chain ([2f763c5](https://github.com/es6kr/skills/commit/2f763c50ed1ff34d5ffab2ce5432d692160dbc0b))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/next-v0.7.0...next-v0.7.1) (2026-08-05)
 
 

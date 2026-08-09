@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.2](https://github.com/es6kr/skills/compare/git-repo-v0.7.1...git-repo-v0.7.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit/Copilot review findings on PR [#270](https://github.com/es6kr/skills/issues/270) ([3b11a73](https://github.com/es6kr/skills/commit/3b11a730b5ad68803d35a8264eda540e48265d75))
+* **git-repo:** add worktree-reuse path-canonicality pre-check helper ([#267](https://github.com/es6kr/skills/issues/267)) ([020a94e](https://github.com/es6kr/skills/commit/020a94ee989596941c5669995a7f7ba340742313))
+* **git-repo:** preserve tracked mode in stage-isolated-content.sh cacheinfo ([#259](https://github.com/es6kr/skills/issues/259)) ([161f07d](https://github.com/es6kr/skills/commit/161f07d13bd19f17b190800062955d767e83bf04))
+* **git-repo:** validate worktree path canonicality before reuse ([#240](https://github.com/es6kr/skills/issues/240)) ([e44076b](https://github.com/es6kr/skills/commit/e44076bebe2e952bd042f0539b45322984cd3d72))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/git-repo-v0.7.0...git-repo-v0.7.1) (2026-08-05)
 
 
