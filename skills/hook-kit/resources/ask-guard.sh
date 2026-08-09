@@ -608,6 +608,16 @@ check_push_without_details() {
     return 0
   fi
 
+  # Skip meta-discussion of this very gate (fixing/describing the push-detail
+  # requirement itself, not proposing an actual push) — same class of FP the
+  # merge-gate's HG_ASK_RETROSPECT_MERGE already exempts via a bare "ask-guard"
+  # self-reference. Without this, an option like "fix ask-guard.sh's Git Push
+  # gate false positive" collaterally blocks the whole call, including any
+  # co-occurring option that never mentions push at all.
+  if echo "$OPTIONS_BLOB" | grep -qiE "push[- ]?(gate|detail)|ask-guard.*push|push.*ask-guard|push.*(false[- ]?positive|\bFP\b)"; then
+    return 0
+  fi
+
   # Require remote/branch details (e.g. origin, main, local, master, or remote name) AND commit info (commit, sha, hash, or hexadecimal SHA-like string or commit subject)
   local has_remote=0
   local has_commit_info=0
