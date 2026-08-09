@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.2](https://github.com/es6kr/skills/compare/skill-kit-v0.6.1...skill-kit-v0.6.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* declare undeclared skill-to-skill dependencies (7 skills) ([#271](https://github.com/es6kr/skills/issues/271)) ([36a9f9d](https://github.com/es6kr/skills/commit/36a9f9d7c1fac9bb1c4c96b325a067ab92ad0da7))
+* PR [#195](https://github.com/es6kr/skills/issues/195) review findings batch 2 (github-repo/skill-kit/commit-tidy/hook-kit) ([#264](https://github.com/es6kr/skills/issues/264)) ([d8d9df0](https://github.com/es6kr/skills/commit/d8d9df04bdf178fffa6822c44199a416668c6423))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
 ## [0.6.1](https://github.com/es6kr/skills/compare/skill-kit-v0.6.0...skill-kit-v0.6.1) (2026-08-05)
 
 

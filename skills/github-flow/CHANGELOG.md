@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.2](https://github.com/es6kr/skills/compare/github-flow-v0.8.1...github-flow-v0.8.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit/Copilot review findings on PR [#270](https://github.com/es6kr/skills/issues/270) ([3b11a73](https://github.com/es6kr/skills/commit/3b11a730b5ad68803d35a8264eda540e48265d75))
+* declare undeclared skill-to-skill dependencies (7 skills) ([#271](https://github.com/es6kr/skills/issues/271)) ([36a9f9d](https://github.com/es6kr/skills/commit/36a9f9d7c1fac9bb1c4c96b325a067ab92ad0da7))
+* **github-flow:** add merged-PR/stale-tracker branch to review-apply.md ([#237](https://github.com/es6kr/skills/issues/237)) ([5a880fb](https://github.com/es6kr/skills/commit/5a880fb936cc474ea791f2fa2e24edc2fd018142))
+* **github-flow:** align merge.md evidence format with fix-plan/format.md schema ([#244](https://github.com/es6kr/skills/issues/244)) ([ea609cf](https://github.com/es6kr/skills/commit/ea609cf3a1725298383d96a297252f19596d0e10))
+* **github-flow:** always disclose commit list in merge asks, not just 3+-commit ones ([#248](https://github.com/es6kr/skills/issues/248)) ([8c19508](https://github.com/es6kr/skills/commit/8c19508d6b3967af783fb372d452fecceec6953c))
+* **github-flow:** document rebase-conflict cost of squashing distinct-concern PRs ([#245](https://github.com/es6kr/skills/issues/245)) ([dc6cb34](https://github.com/es6kr/skills/commit/dc6cb3417ae945c8e9393d18d700aa6eccb0dfd5))
+* **github-flow:** gate squash-merge recommendation on commit count/distinctness ([45176ab](https://github.com/es6kr/skills/commit/45176ab8ee4d7a9e80c58f4062035e64143bc1bf))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/github-flow-v0.8.0...github-flow-v0.8.1) (2026-08-05)
 
 

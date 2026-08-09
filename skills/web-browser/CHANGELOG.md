@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.6](https://github.com/es6kr/skills/compare/web-browser-v0.2.5...web-browser-v0.2.6) (2026-08-09)
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit/Copilot review findings on PR [#270](https://github.com/es6kr/skills/issues/270) ([3b11a73](https://github.com/es6kr/skills/commit/3b11a730b5ad68803d35a8264eda540e48265d75))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+* **web-browser:** add revoke command type to credential-issue topic ([306cf63](https://github.com/es6kr/skills/commit/306cf63752638d2cae7b924978cb036467382b00))
+* **web-browser:** add revoke command type to credential-issue topic ([cbd7121](https://github.com/es6kr/skills/commit/cbd712145d6faf293409df956706b1afae8ef969))
+* **web-browser:** clarify revoke command shape and step mapping ([ed6ce6e](https://github.com/es6kr/skills/commit/ed6ce6e2ec36fea2b4125d67baceacdba3761dcf))
+* **web-browser:** correct stale priority-1 row reference to priority-3 ([#250](https://github.com/es6kr/skills/issues/250)) ([dd823e7](https://github.com/es6kr/skills/commit/dd823e7596fc4a4d1fb51f6fe81ddac4eda06602))
+
 ## [0.2.5](https://github.com/es6kr/skills/compare/web-browser-v0.2.4...web-browser-v0.2.5) (2026-08-05)
 
 

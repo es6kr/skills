@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.3](https://github.com/es6kr/skills/compare/claudify-v0.5.2...claudify-v0.5.3) (2026-08-09)
+
+
+### Bug Fixes
+
+* **claudify:** narrow topic-dispatch carve-out to declared topics only ([#260](https://github.com/es6kr/skills/issues/260)) ([ca87372](https://github.com/es6kr/skills/commit/ca87372594647e79ca8e623c4157429e3d9f0c87))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
 ## [0.5.2](https://github.com/es6kr/skills/compare/claudify-v0.5.1...claudify-v0.5.2) (2026-08-05)
 
 
