@@ -64,6 +64,8 @@ When a project mirrors its backlog into a second external tracker (a project-man
 
 The fix-plan skill stays vendor-agnostic here too: no tracker name is hardcoded. Dispatch via `--secondary-sync=<skill>:<topic>` (same caller-supplied receiver pattern as `--archive=<skill>:<topic>` — see the top-level Configuration table). The caller wires this to whichever skill owns that tracker's sync script (e.g., a project-management-tool skill's own dry-run sync command); this skill only documents the cadence contract.
 
+**Example receiver — `scripts/plane_sync.py`**: parses `- [<marker>] [<IDENT>-<seq>] <title> -> Plane (<issue URL>)` index lines (the format `plane-backlog`'s Phase-3 migration produces), and maps each issue's `state_detail.group` back onto the fix_plan marker — `completed` -> `[x]`, `cancelled` -> `[BLOCKED:P2:external]`, mirroring this file's own MERGED/CLOSED-without-merge rules above. Non-terminal states and API errors leave the line untouched, same as the GitHub rules table.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Run only the GitHub sync and assume the secondary tracker stays current on its own | If `--secondary-sync` is configured, run it in the same pass as this GitHub sync |

@@ -103,4 +103,3 @@ If choco refuses to update for any reason, directly modify the `<version>` node 
 
 - [UniGetUI repo](https://github.com/Devolutions/UniGetUI)
 - [chocolatey/choco repo](https://github.com/chocolatey/choco)
-- "choco metadata" keyword in `~/.claude/skills/cleanup/data/failed-attempts.md` (if present)

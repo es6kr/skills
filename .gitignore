@@ -14,5 +14,6 @@ __pycache__/
 /checklist.md
 /tasks/
 docs/generated/
+rules/
 skills/*/data
 skills/*/LICENSE
