@@ -483,11 +483,13 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api repos/{owner}/{repo}/pulls/<N>/commits --jq 'length'` before composing the option. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
+| 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api --paginate repos/{owner}/{repo}/pulls/<N>/commits \| jq -s 'add \| length'` before composing the option — the bare (non-paginated) form silently caps at the API's default page size (30), undercounting larger PRs; `--paginate` alone still applies `--jq` per page rather than aggregating, so slurp+combine with an external `jq -s`. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
 | 2 | Treat "3+ commits" as automatically requiring `--merge` | Commit count alone is not the trigger — count *distinct concerns* among the commits (different files/subsystems touched, different one-line summaries). 5 commits from one incremental refactor still squash cleanly; 3 commits fixing 3 unrelated bugs do not |
-| 3 | Present only "Squash merge (Recommended)" as an option when commit count ≥ 3 and concerns are distinct | Present both `Squash merge` and `Merge commit (preserve history)` as co-equal options — let the user weigh the trade-off, do not silently pick one |
+| 3 | Present only "Squash merge (Recommended)" as an option when commit count ≥ 3 and concerns are distinct | Present both `Squash merge` and `Merge commit (preserve history)` as co-equal options **only when repository policy permits both** — let the user weigh the trade-off, do not silently pick one |
 | 4 | Bury the commit list in a follow-up message after the user asks for it | Include the commit SHA + one-line summary list directly in the option description (or the question text) the first time a multi-commit PR's merge is proposed |
 | 5 | State only a commit **count** ("1 commit", "3 commits") without listing the actual commit(s) — even for a single-commit PR | Always show the commit SHA + one-line summary for every commit being merged, regardless of count. A bare count is an unverifiable assertion; the list lets the user check it themselves instead of having to ask |
+
+**Policy-required exception (release-please / changesets repos)**: when the merge-method policy pre-check above (condition 6) signals that individual commits must be preserved, `Squash merge` is not a valid co-equal option for that PR — squashing collapses the Conventional Commit history release-please/changesets parses per-commit, breaking their version-bump detection. Present `Merge commit (preserve history)` as the only method, still disclosing the commit count and per-commit summaries so the user can verify the list, but do not offer squash as a choice to weigh.
 
 **Why disclosure isn't just a 3+-commit rule**: the count-only pattern above reads as scoped to the distinctness trigger (3+ commits), but the underlying reason — don't make the user trust an assertion they can't independently verify — applies to every merge ask, including 1-commit ones. A miscounted or mischaracterized single commit is just as much a trust problem as an undisclosed multi-commit bundle.
 
@@ -548,13 +550,16 @@ gh pr merge <PR_NUMBER> --merge
 
 **Format authority**: `fix_plan.md`'s schema (section layout, marker syntax) is owned by `fix-plan/format.md` — that file's `## Completed` convention (flat `-` line, no checkbox, no `###` headers) governs here too. This section only adds *what evidence to include*, not a competing structure.
 
-A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Format:
+A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Record evidence for all six conditions from the self-check table above (CI / Test Plan / AI Review Summary / Mergeable / Cross-repo dependency / Merge method). Format:
 
 ```markdown
 - PR #N (branch-name) — ✅ MERGED YYYY-MM-DD
   - CI: 4/4 SUCCESS (test ubuntu, test windows, e2e, CodeRabbit)
-  - AI Review: CodeRabbit ✅ addressed (3 actionable), Copilot ✅ addressed (1 comment)
   - Test Plan: 5/5 checked
+  - AI Review: CodeRabbit ✅ addressed (3 actionable), Copilot ✅ addressed (1 comment) (or "exempt — CI-gate-only base")
+  - Mergeable: MERGEABLE
+  - Cross-repo dependency: none (or "infra PR #M merged + deployed first")
+  - Merge method: squash (or "merge — release-please-preserving repo policy")
   - Formal Review: APPROVED by @user (or "not required by repo policy")
 ```
 

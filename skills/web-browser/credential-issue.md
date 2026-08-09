@@ -370,15 +370,25 @@ since there is nothing to skip to when the goal is deletion.
    backend-selection table as issuance) and, once signed in, **drive the actual revoke click**
    (Order 1-4 automation cascade, same as the token-generation boundary table — do not delegate the
    click to the user unless automation genuinely fails).
-3. **Identify the correct entry before deleting** — revoke targets an existing row in a list (by key
-   ID, name, or creation date), not a freshly-created one. Confirm the identified row matches the
-   caller-supplied identifier (`command`'s `<key-id>`/name) before clicking delete; a wrong-row delete
-   is unrecoverable.
-4. **No Persist step** — step 6 (Persist) of the main Procedure does not apply to a revoke: there is no
-   new credential to store. If the revoke was prompted by rotation (issuing a replacement), that
-   replacement follows the normal issuance Procedure (including Persist) as a **separate**, prior or
-   subsequent step — never skip Persist on the new credential because "we just did a revoke flow."
-5. **Report the revoked identifier** (key ID/name) in the completion report — the same way issuance
+3. **Identify the correct entry before deleting — require an exact key-ID match** — revoke targets an
+   existing row in a list. Name or creation-date matching may be used only to *locate* a candidate row;
+   names and timestamps are not guaranteed unique. Before clicking delete, confirm the row's exact key
+   ID matches the caller-supplied identifier (`command`'s `<key-id>`) — if `command` supplied only a
+   name/date and multiple rows match it, **abort and ask** rather than guessing; a wrong-row delete is
+   unrecoverable.
+4. **Verify revocation before reporting success** — after the delete click, re-read the key list (or
+   the specific key's state) and confirm the exact identifier no longer appears / shows revoked. Do not
+   report success from the click alone — some consoles show a stale row until a refresh, or the click
+   can silently fail.
+5. **No Persist step, but clean up existing local copies** — step 6 (Persist) of the main Procedure does
+   not apply to a revoke: there is no new credential to store. However, a revoked secret must not remain
+   in any local cache (`skill data/`, memory, `.env`, a secret store) — delete or invalidate persisted
+   copies of the just-revoked credential so a stale cached copy isn't picked up on a later "already
+   stored, skip to handoff" issuance check. If the revoke was prompted by rotation (issuing a
+   replacement), that replacement follows the normal issuance Procedure (including Persist) as a
+   **separate**, prior or subsequent step — never skip Persist on the new credential because "we just
+   did a revoke flow."
+6. **Report the revoked identifier** (key ID/name) in the completion report — the same way issuance
    reports the issued credential's identifier — so the user can cross-check against the provider's
    audit log.
 
@@ -401,7 +411,7 @@ since there is nothing to skip to when the goal is deletion.
 | `vsce` (VS Code Marketplace publisher) / issue Azure DevOps PAT for `vsce publish` | ❌ UI-only (Azure DevOps Personal Access Token) | `https://dev.azure.com/<org>/_usersSettings/tokens` — `<org>` is the Azure DevOps organization linked to the Marketplace publisher (if not provided by caller, **ask via AskUserQuestion** before opening the page). Sign in via "Sign in with GitHub" SSO (see "Login provider preference" above). Token scope: `Marketplace > Manage` | `gh secret set VSCE_PAT -R <owner>/<repo>` + local `npx vsce publish --packagePath <vsix> --pat $VSCE_PAT` |
 | `ovsx` (Open VSX Registry publisher) / issue Open VSX PAT for `ovsx publish` | ❌ UI-only | `https://open-vsx.org/user-settings/tokens` — sign in via the **GitHub** option (Open VSX is GitHub-SSO native) | `gh secret set OVSX_PAT -R <owner>/<repo>` + local `npx ovsx publish <vsix> -p $OVSX_PAT` |
 | any / register a GitHub Secret | ✅ `gh secret set` | (not needed) | — |
-| `tailscale` / revoke an auth key | ❌ console-only (no anonymous/API-token-free revoke path found in practice) | `https://login.tailscale.com/admin/settings/keys` → sign in → locate the key by its ID/name → delete | none (revoke has no follow-up handoff — see "Revoke flow" above) |
+| `tailscale` / revoke an auth key | ✅ API revoke available — `DELETE /api/v2/tailnet/:tailnet/keys/:keyID` (requires an access token / fine-grained trust-credential with key-management scope; console-only if no such token is already available) | `https://login.tailscale.com/admin/settings/keys` → sign in → locate the key by its ID/name → delete (fallback when no API token exists) | none (revoke has no follow-up handoff — see "Revoke flow" above) |
 
 ## Note on GitHub PR image hosting (why R2)
 

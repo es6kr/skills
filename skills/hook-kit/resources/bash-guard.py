@@ -437,8 +437,11 @@ def check_prod_branch_ops(command: str) -> str | None:
     )
 
 
+_GIT_GLOBAL_OPTS = r"(?:-C\s+\S+\s+|--no-pager\s+|-c\s+\S+=\S+\s+)*"
 _STAGING_BRANCH_TARGET = re.compile(
-    r"(?:git\s+worktree\s+add|git\s+switch\s+-[cC]|git\s+checkout\s+-[bB]|"
+    r"(?:git\s+" + _GIT_GLOBAL_OPTS + r"worktree\s+add|"
+    r"git\s+" + _GIT_GLOBAL_OPTS + r"switch\s+-[cC]|"
+    r"git\s+" + _GIT_GLOBAL_OPTS + r"checkout\s+-[bB]|"
     r"gh\s+pr\s+create[^\n]*--base)\b[^\n]*\b(?:origin/)?(next-fix|next-feat)\b",
     IM,
 )
@@ -471,8 +474,7 @@ def check_staging_branch_without_divergence(command: str) -> str | None:
         "assuming one is the right base for a given branch (e.g. \"this is a fix/* "
         "change so next-fix\") has repeatedly caused wrong-base branches (unrelated "
         "commits pulled in, or a rebase mixing in another staging branch's history).\n\n"
-        "Run one of these first (in the same command, or a preceding one this turn), "
-        "then retry:\n"
+        "Run one of these first (in the same command), then retry:\n"
         "  gh pr view <N> --json baseRefName   # if a PR already exists for this branch\n"
         "  git log origin/main..origin/next-fix --oneline   # + reverse, to see actual divergence\n"
         "  git log origin/main..origin/next-feat --oneline  # + reverse"

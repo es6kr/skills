@@ -75,9 +75,12 @@ gh pr view <N> -R <repo> --json state,mergedAt
 
 | PR state | Finding's current-code check | Action |
 |----------|------------------------------|--------|
-| OPEN | (n/a — Step 4 flow applies as written) | Proceed to Step 4 normally |
+| OPEN | Search current code by symbol/behavior — the defect may already be gone (another commit on the same PR, a rename/move) | Still present → proceed to Step 4 normally. Already resolved → **Already resolved / moot** (see below) |
 | MERGED | Target file/line still shows the described defect | Genuinely still broken — proceed, but **Step 6 has no open branch to push to** (see below) |
 | MERGED | Target file/line already matches the fix, or the target file no longer exists | **Already resolved / moot** — do NOT re-apply. Correct the tracker instead (see below) |
+| CLOSED (not merged) | Search current code by symbol/behavior, same as OPEN | Defect present → the original PR is dead; open a **new** branch + PR for the fix (same as the "Genuinely-still-broken on a MERGED PR" path below). Defect absent → **Already resolved / moot** |
+
+**Every state requires the current-code check** — do not rely on the finding's recorded file/line alone; search by symbol or behavior, since a rename/move can relocate the defect even on an OPEN PR. Mark a finding moot only after confirming the defect is actually absent, not merely that the originally-recorded path no longer matches.
 
 **Already-resolved / moot handling**: mark the item `[x]` in `fix_plan.md`/`checklist.md` with a one-line note that the code already matched the fix at verification time (not a re-application), and skip Step 4-6 for that item — there is nothing to edit, commit, or push.
 

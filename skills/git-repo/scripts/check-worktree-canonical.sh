@@ -25,6 +25,7 @@
 #   1  NON-CANONICAL  — parent dir != canonical base    → relocate (Scenario B) first
 #   2  NOT-REGISTERED — not found in `git worktree list` → orphan dir (Scenario A) / not a repo
 #   3  usage / argument error
+#   4  AMBIGUOUS      — bare name matches 2+ registered worktrees → re-run with an explicit path
 
 set -euo pipefail
 
@@ -84,24 +85,44 @@ fi
 
 WT_LIST="$(git -C "$REPO_ABS" worktree list --porcelain 2>/dev/null || true)"
 
+# The main repository worktree is always the first `worktree` entry in the porcelain
+# output; it is not a linked/reusable worktree, so exclude it from matching entirely
+# (both by path and by basename) — otherwise a bare-name target that happens to equal
+# the repo's own directory name would incorrectly "match" it.
+MAIN_NORM="$(normpath "$REPO_ABS")"
+
 MATCH=""
+MATCH_COUNT=0
+ALL_MATCHES=""
 while IFS= read -r line; do
   case "$line" in
     "worktree "*)
       wt="${line#worktree }"
       wt_norm="$(normpath "$wt")"
+      [[ "$wt_norm" == "$MAIN_NORM" ]] && continue
       if [[ $is_pathlike -eq 1 ]]; then
-        [[ "$wt_norm" == "$TARGET_NORM" ]] && { MATCH="$wt_norm"; break; }
+        [[ "$wt_norm" == "$TARGET_NORM" ]] && { MATCH="$wt_norm"; MATCH_COUNT=1; break; }
       else
-        [[ "$(basename "$wt_norm")" == "$TARGET" ]] && { MATCH="$wt_norm"; break; }
+        if [[ "$(basename "$wt_norm")" == "$TARGET" ]]; then
+          MATCH_COUNT=$((MATCH_COUNT + 1))
+          MATCH="$wt_norm"
+          ALL_MATCHES="${ALL_MATCHES}${ALL_MATCHES:+$'\n'}  $wt_norm"
+        fi
       fi
       ;;
   esac
 done <<< "$WT_LIST"
 
+if [[ $is_pathlike -eq 0 && $MATCH_COUNT -gt 1 ]]; then
+  echo "AMBIGUOUS: '$TARGET' matches $MATCH_COUNT registered worktrees by basename:" >&2
+  echo "$ALL_MATCHES" >&2
+  echo "  → re-run with an explicit path (not a bare name) to disambiguate." >&2
+  exit 4
+fi
+
 if [[ -z "$MATCH" ]]; then
   echo "NOT-REGISTERED: '$TARGET' not found in \`git worktree list\` for $REPO_ABS" >&2
-  echo "  → orphan directory (move-worktree.md Scenario A) or <repo> is not a git repo." >&2
+  echo "  → orphan directory (move-worktree.md Scenario A), the main repository worktree (not a linked worktree), or <repo> is not a git repo." >&2
   exit 2
 fi
 
@@ -119,5 +140,7 @@ echo "  parent    = $WT_PARENT" >&2
 echo "  canonical = $CANON_BASE" >&2
 echo "  → relocate to the canonical base BEFORE reuse (move-worktree.md Scenario B):" >&2
 echo "      git -C $REPO_ABS worktree move '$MATCH' '$CANON_BASE/$(basename "$MATCH")'" >&2
+echo "    NOTE: \`git worktree move\` is known to be unreliable on Windows — on Windows," >&2
+echo "    delegate to the rename-worktree.sh script/procedure instead (see move-worktree.md)." >&2
 echo "    then proceed with rename-worktree.sh / the branch switch." >&2
 exit 1
