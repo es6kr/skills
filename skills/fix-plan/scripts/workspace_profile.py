@@ -82,7 +82,7 @@ def detect_workspace(target_path: str = None) -> str:
     return next(iter(profiles), "default")
 
 
-def resolve_tracker_root(target_path: str = None) -> str:
+def resolve_tracker_root(target_path: str = None, workspace_name: str = None) -> str:
     """Resolve the tracker root directory (the dir holding fix_plan.md) for a workspace.
 
     Priority:
@@ -94,13 +94,17 @@ def resolve_tracker_root(target_path: str = None) -> str:
     Note: step 2 reads the RAW configured value, not the merged DEFAULT_PROFILE, so a
     workspace that does not set "tracker_root" falls through to auto-detect rather than
     being pinned to ".ralph".
+
+    workspace_name, when given, takes precedence over re-detecting from target_path —
+    callers that already resolved an explicit/forced workspace (e.g. get_profile's
+    --workspace override) must keep using that same workspace here.
     """
     env_root = os.environ.get("FIXPLAN_TRACKER_ROOT")
     if env_root:
         return env_root
 
     profiles = load_user_config().get("profiles", {})
-    name = detect_workspace(target_path)
+    name = workspace_name or detect_workspace(target_path)
     configured = profiles.get(name, {}).get("tracker_root")
     if configured:
         return configured
@@ -129,7 +133,7 @@ def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
 
     # Resolve the tracker root dynamically (env > raw config > auto-detect > ".ralph"),
     # overriding the static DEFAULT_PROFILE value so consumers get the real root.
-    profile["tracker_root"] = resolve_tracker_root(target_path)
+    profile["tracker_root"] = resolve_tracker_root(target_path, workspace_name=name)
 
     return profile
 

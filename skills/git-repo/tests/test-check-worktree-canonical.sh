@@ -73,6 +73,29 @@ check "custom --wt-base match" 0 "$(run "$CUSTOM" foo --wt-base wt)"
 # 8. --wt-base override: default .worktrees is non-canonical when base is 'wt'
 check "custom --wt-base mismatch" 1 "$(run "$CANON" foo --wt-base wt)"
 
+# 9. bare name matches 2+ registered worktrees (canonical + a stray same-named dir) → AMBIGUOUS
+AMBIG="worktree $REPO/.worktrees/dup
+HEAD 0000000
+branch refs/heads/dup
+worktree ${REPO}-wt/dup
+HEAD 0000000
+branch refs/heads/dup-other"
+check "ambiguous basename" 4 "$(run "$AMBIG" dup)"
+
+# 9b. ambiguous by basename does NOT fire on an exact-path target (unambiguous, exact match)
+check "ambiguous basename, disambiguated by path" 0 "$(run "$AMBIG" "$REPO/.worktrees/dup")"
+
+# 10. the main repository's own worktree entry (always first in `git worktree list`) is
+#     excluded from matching — a bare name equal to the repo's own dirname must not match it
+MAIN_PLUS_LINKED="worktree $REPO
+HEAD 0000000
+branch refs/heads/main
+worktree $REPO/.worktrees/foo
+HEAD 0000000
+branch refs/heads/foo"
+check "main worktree excluded (by repo basename)" 2 "$(run "$MAIN_PLUS_LINKED" "$(basename "$REPO")")"
+check "main worktree excluded, linked worktree still matches" 0 "$(run "$MAIN_PLUS_LINKED" foo)"
+
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
 exit "$FAIL"

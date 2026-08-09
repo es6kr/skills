@@ -21,7 +21,7 @@ Verifies that a GitHub repository has the prerequisites needed to run `github-fl
 |---|------|--------------|---------------|
 | 7 | CODEOWNERS | `.github/CODEOWNERS` exists | File present + valid format |
 | 8 | CodeRabbit | `.coderabbit.yaml` exists | File present |
-| 9 | Copilot | `.github/copilot-instructions.md` exists | Public repos only |
+| 9 | Copilot | `.github/copilot-instructions.md` exists | Repos with Copilot seat/policy enabled (any visibility) |
 | 10 | GitHub Actions | `.github/workflows/` exists | At least 1 workflow file |
 | 11 | CONTRIBUTING | `CONTRIBUTING.md` exists | File present |
 | 12 | LICENSE | `LICENSE` exists | File present |

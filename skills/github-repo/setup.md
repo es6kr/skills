@@ -30,14 +30,13 @@ chat:
 
 **User confirmation**: Use AskUserQuestion to ask whether additional `path_instructions` are needed.
 
-### 2. GitHub Copilot (Public repositories)
+### 2. GitHub Copilot
 
-Adds Copilot instructions for repositories where Copilot review/suggestions are actually enabled. Public visibility alone does not turn Copilot on — it also requires an org/billing prerequisite (a Copilot seat or an org-level Copilot policy allowing the repo). Creating `.github/copilot-instructions.md` on a repo without that prerequisite is a no-op file with nothing consuming it.
+Adds Copilot instructions for repositories where Copilot review/suggestions are actually enabled — this is a seat/policy prerequisite, not a visibility restriction. Copilot custom repository instructions apply through `.github/copilot-instructions.md` for any repository where Copilot is available, including private repositories in qualifying organizations. Creating the file without that prerequisite is a no-op with nothing consuming it.
 
 **Procedure**:
-1. Check visibility with `gh repo view --json isPrivate`.
-2. Check the org's Copilot seat/policy status is in place (e.g. `gh api orgs/{org}/copilot/billing` or the org's Copilot settings page) — do not assume public visibility implies an active seat.
-3. If public AND Copilot is actually enabled for the repo, create `.github/copilot-instructions.md`.
+1. Check the org's Copilot seat/policy status is in place (e.g. `gh api orgs/{org}/copilot/billing` or the org's Copilot settings page), and confirm write access to the repo — do not gate on repo visibility.
+2. If Copilot is actually enabled for the repo (seat/policy + access confirmed), create `.github/copilot-instructions.md`.
 
 **Standard configuration**:
 ```markdown
@@ -109,11 +108,12 @@ Configure branch protection rules via `gh api`.
 **Procedure**:
 1. Confirm which branches to protect via AskUserQuestion (default: main).
 2. **Read the existing protection first**: `gh api repos/{owner}/{repo}/branches/{branch}/protection` (404 = none configured yet). The branch-protection endpoint is a full-replace `PUT` — omitting a field that was previously set (e.g. an existing required status check, dismissal restriction, or reviewer count) deletes it, not merely "leaves it unspecified".
-3. Choose protection options, merging into the existing payload from step 2 rather than starting from a blank template:
+3. **Normalize the GET response before reusing it as a PUT body — the GET shape is read-only and does not match what PUT expects.** Do not pipe the GET response straight into the PUT body. At minimum: `enforce_admins` is `{"url": ..., "enabled": true|false}` in GET but a plain `true|false|null` in PUT — extract `.enforce_admins.enabled`. Cross-check other fields you carry forward (`required_status_checks`, `required_pull_request_reviews`, `restrictions`) the same way before assuming the GET shape is PUT-safe.
+4. Choose protection options, merging into the **normalized** payload from step 3 rather than starting from a blank template:
    - Required review count
    - Required status checks
    - Prohibit force push
-4. Call `gh api repos/{owner}/{repo}/branches/{branch}/protection` with the **full merged payload** (existing settings + the new/changed ones).
+5. Call `gh api repos/{owner}/{repo}/branches/{branch}/protection` with the **full merged, normalized payload** (existing settings + the new/changed ones).
 
 **Note**: If protection rules already exist, AskUserQuestion is required before overwriting — show the user which existing fields step 2 found so they can confirm nothing is being silently dropped.
 

@@ -253,7 +253,8 @@ check_merge_without_review() {
           -q '((.reviewRequests|length)+(.reviews|length))' -R "$si_repo" 2>/dev/null)
         [[ -z "$si_rev" ]] && { si_all=0; break; }   # lookup failure -> fail closed
         [[ "$si_rev" != "0" ]] && { si_all=0; break; }  # reviewer/review present
-        si_checks=$(gh pr checks "$si_n" -R "$si_repo" 2>/dev/null | grep -c .)
+        si_checks=$(gh pr checks "$si_n" -R "$si_repo" --json bucket -q 'length' 2>/dev/null)
+        [[ -z "$si_checks" ]] && { si_all=0; break; }   # lookup failure -> fail closed
         [[ "$si_checks" != "0" ]] && { si_all=0; break; }  # CI present
       done <<< "$si_prs"
       if [[ "$si_seen" -eq 1 && "$si_all" -eq 1 ]]; then

@@ -99,10 +99,14 @@ gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){viewerDefaul
 |---|-------|-----|
 | 1 | Compose a "Squash merge" option label first, run the merge-method check only inside the later `/github-flow merge` invocation | Run the release-please/changesets marker check in this step, before the option label is written — label "Merge commit" instead when the marker is present |
 | 2 | Treat "the 6-condition self-check in merge.md will catch it later" as sufficient | That check is a pre-merge gate on the already-approved recommendation, not a substitute for composing the correct recommendation in the first place |
+| 3 | Recommend "Squash merge" from the release-marker branch alone when the queried `squashMergeAllowed` is `false` (repo setting disables it) | Branch on the queried capabilities (`mergeCommitAllowed`/`squashMergeAllowed`, and `rebaseMergeAllowed` if rebase is a supported fallback) **before** the release-marker branch — recommend only a method the repo actually allows |
+
+**Capability branch precedes the marker branch**: the GraphQL query above returns the repo's actual allowed methods. If the release-marker branch would recommend a method the repo disables (e.g. `squashMergeAllowed: false` with no release-please/changesets marker), fall back to whichever of `mergeCommitAllowed`/`rebaseMergeAllowed` is `true` instead — matching the capability policy in `skills/github-flow/merge.md`'s condition-6 pre-check.
 
 | Merge 4-condition satisfaction | Recommended options (Recommended at top) |
 |-------------------------------|------------------------------------------|
-| 4/4 satisfied, no release-please/changesets marker | (1) Squash merge — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
+| 4/4 satisfied, no release-please/changesets marker, `squashMergeAllowed: true` | (1) Squash merge — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
+| 4/4 satisfied, no release-please/changesets marker, `squashMergeAllowed: false` | (1) Merge commit (or Rebase merge, whichever the repo allows) — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
 | 4/4 satisfied, release-please/changesets marker present | (1) Merge commit — AI Review Summary posted (URL) (2) Apply Minor then merge (3) Defer |
 | 1+ Test Plan unchecked | (1) Verify unchecked items (web-browser/curl) (2) File separate issue then merge (3) Defer |
 | 1+ CI failures | (1) Investigate CI cause (2) If failure unrelated to PR, file separate issue (3) Defer |
