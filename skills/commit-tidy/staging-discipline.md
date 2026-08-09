@@ -134,3 +134,34 @@ See `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry for "worktree s
 3. If yes, does my report/plan include ALL of them, not just the one initially pointed at?
 
 See `~/.claude/skills/cleanup/data/failed-attempts.md` "squash-scan-scope-narrowed-to-user-mention" for case history.
+
+---
+
+## Shared hardlinked-checkout HEAD-diff sanity check (HARD STOP — concurrent-session drift)
+
+**Before staging/committing a file that lives in a checkout shared across concurrent sessions (e.g. a hardlinked skills repo checkout under `~/.agents`), run `git diff --stat <file>` against HEAD and sanity-check the reported insertion/deletion counts against the intended edit size.** A concurrent session's commit can advance HEAD past this session's Read-time baseline — the on-disk file may already carry someone else's change by the time this session stages it, and a plain `git add` bundles that unrelated change into the commit silently.
+
+### Procedure
+
+1. Right before `git add <file>` (not right after Edit — right before staging), run `git diff --stat <file>` comparing the working tree to HEAD.
+2. Compare the reported insertions/deletions against the edit this session actually made.
+3. Diff size matches the intended edit → proceed to stage.
+4. Diff size is larger than the intended edit (extra hunks, unfamiliar lines, sections not touched this session) → **halt, do not stage**. A concurrent session's commit already landed on this file.
+5. Re-`Read` the file for its current on-disk state, reconcile the intended change against it (re-apply the edit on top of the new baseline if it still applies cleanly), then re-check `git diff --stat` before staging again.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Stage a shared-checkout file immediately after Edit without a fresh `git diff --stat` check | Run `git diff --stat <file>` right before `git add`, not right after Edit — HEAD can move in between |
+| 2 | Assume the Read-time content is still current because no tool reported a conflict | Hardlinked/shared checkouts have no built-in conflict signal — the sanity check is the only defense |
+| 3 | Treat a bigger-than-expected diff as "must be my edit, just measured differently" | A diff larger than the intended edit is a concurrent-commit signal — re-Read and reconcile before staging, don't rationalize it away |
+| 4 | Limit this check to skill files specifically | Applies to any shared-checkout path where concurrent sessions commit independently (skills, rules, shared docs under a hardlinked repo) |
+
+### Self-check (every time, right before `git add` on a shared-checkout file)
+
+1. `git diff --stat <file>` — does the reported change size match this session's own edit?
+2. Larger than expected → halt, re-Read, reconcile, re-check before retrying `git add`
+3. Only stage once the diff matches this session's edit exactly
+
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "concurrent-session-overwrites-hardlinked-shared-config" for case history (related failure mode: a prior Edit lost, not just an unrelated edit bundled into a commit).
