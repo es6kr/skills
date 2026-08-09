@@ -56,38 +56,49 @@ class TestParseIndexLines(unittest.TestCase):
 
 
 class TestComputeUpdates(unittest.TestCase):
+    """
+    The real Plane REST API v1 issue-detail response has no `state_detail`
+    field -- it returns `state` as a bare state-UUID. Resolving that UUID to
+    its group (backlog/unstarted/started/completed/cancelled) requires a
+    second call to GET .../states/{state_id}/. Discovered via a live
+    round-trip check against a real workspace (fixed 2026-08-09) -- the
+    earlier `state_detail`-shaped mocks below encoded the wrong API contract
+    and never caught this, so compute_updates() silently no-op'd on every
+    real issue regardless of its actual state.
+    """
+
+    STATE_ID = "55555555-5555-5555-5555-555555555555"
+
     def _profile(self):
         return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
 
+    def _patch_state(self, group):
+        return patch.multiple(
+            plane_sync,
+            fetch_issue_state=lambda *a, **kw: {"state": self.STATE_ID},
+            fetch_state_group=lambda *a, **kw: {"group": group},
+        )
+
     def test_completed_state_updates_marker_to_x(self):
-        with patch.object(
-            plane_sync, "fetch_issue_state",
-            return_value={"state_detail": {"group": "completed"}},
-        ):
+        with self._patch_state("completed"):
             updates = plane_sync.compute_updates([PHASE3_LINE], self._profile())
         self.assertEqual(len(updates), 1)
         self.assertIn("[x]", updates[0]["new"])
         self.assertNotIn("[BLOCKED:P3:external]", updates[0]["new"])
 
     def test_cancelled_state_updates_marker_to_blocked_external(self):
-        with patch.object(
-            plane_sync, "fetch_issue_state",
-            return_value={"state_detail": {"group": "cancelled"}},
-        ):
+        with self._patch_state("cancelled"):
             updates = plane_sync.compute_updates([PHASE3_LINE], self._profile())
         self.assertEqual(len(updates), 1)
         self.assertIn("[BLOCKED:P2:external]", updates[0]["new"])
 
     def test_open_state_no_change(self):
         for group in ("backlog", "unstarted", "started"):
-            with patch.object(
-                plane_sync, "fetch_issue_state",
-                return_value={"state_detail": {"group": group}},
-            ):
+            with self._patch_state(group):
                 updates = plane_sync.compute_updates([PHASE3_LINE], self._profile())
             self.assertEqual(updates, [], f"unexpected update for state_group={group}")
 
-    def test_api_error_no_change(self):
+    def test_issue_fetch_api_error_no_change(self):
         with patch.object(
             plane_sync, "fetch_issue_state",
             return_value={"error": "timeout"},
@@ -95,14 +106,43 @@ class TestComputeUpdates(unittest.TestCase):
             updates = plane_sync.compute_updates([PHASE3_LINE], self._profile())
         self.assertEqual(updates, [])
 
+    def test_state_fetch_api_error_no_change(self):
+        with patch.multiple(
+            plane_sync,
+            fetch_issue_state=lambda *a, **kw: {"state": self.STATE_ID},
+            fetch_state_group=lambda *a, **kw: {"error": "timeout"},
+        ):
+            updates = plane_sync.compute_updates([PHASE3_LINE], self._profile())
+        self.assertEqual(updates, [])
+
     def test_already_matching_marker_no_change(self):
         completed_line = PHASE3_LINE.replace("[BLOCKED:P3:external]", "[x]")
-        with patch.object(
-            plane_sync, "fetch_issue_state",
-            return_value={"state_detail": {"group": "completed"}},
-        ):
+        with self._patch_state("completed"):
             updates = plane_sync.compute_updates([completed_line], self._profile())
         self.assertEqual(updates, [])
+
+    def test_state_group_resolved_once_per_state_id(self):
+        """Multiple issues sharing the same state UUID must only trigger one
+        states/{id}/ lookup -- projects have a small fixed state set, so
+        resolving it per-issue would be a wasteful N+1 API-call pattern."""
+        second_line = PHASE3_LINE.replace(
+            "22222222-2222-2222-2222-222222222222",
+            "66666666-6666-6666-6666-666666666666",
+        )
+        calls = []
+
+        def fake_fetch_state_group(*args, **kwargs):
+            calls.append(args)
+            return {"group": "completed"}
+
+        with patch.multiple(
+            plane_sync,
+            fetch_issue_state=lambda *a, **kw: {"state": self.STATE_ID},
+            fetch_state_group=fake_fetch_state_group,
+        ):
+            updates = plane_sync.compute_updates([PHASE3_LINE, second_line], self._profile())
+        self.assertEqual(len(updates), 2)
+        self.assertEqual(len(calls), 1, "state group should be resolved once and cached")
 
 
 class TestSyncChecklistWithPlane(unittest.TestCase):
@@ -126,9 +166,13 @@ class TestSyncChecklistWithPlane(unittest.TestCase):
                     path.read_text(encoding="utf-8") + "- [ ] concurrent edit\n",
                     encoding="utf-8",
                 )
-                return {"state_detail": {"group": "completed"}}
+                return {"state": "55555555-5555-5555-5555-555555555555"}
 
-            with patch.object(plane_sync, "fetch_issue_state", side_effect=fetch_and_mutate):
+            with patch.multiple(
+                plane_sync,
+                fetch_issue_state=fetch_and_mutate,
+                fetch_state_group=lambda *a, **kw: {"group": "completed"},
+            ):
                 plane_sync.sync_checklist_with_plane(path, self._profile())
 
             content = path.read_text(encoding="utf-8")
@@ -144,9 +188,10 @@ class TestSyncChecklistWithPlane(unittest.TestCase):
             path = Path(d) / "fix_plan.md"
             path.write_text(PHASE3_LINE + "\n", encoding="utf-8")
 
-            with patch.object(
-                plane_sync, "fetch_issue_state",
-                return_value={"state_detail": {"group": "completed"}},
+            with patch.multiple(
+                plane_sync,
+                fetch_issue_state=lambda *a, **kw: {"state": "55555555-5555-5555-5555-555555555555"},
+                fetch_state_group=lambda *a, **kw: {"group": "completed"},
             ):
                 plane_sync.sync_checklist_with_plane(path, self._profile())
 

@@ -9,10 +9,12 @@ lines a workspace's Phase-3 migration produces (see
 
     - [<marker>] [<IDENT>-<seq>] <title> -> Plane (<issue URL>)
 
-queries each referenced Plane issue's current `state_detail.group`, and
-updates the marker when the issue is `completed` (-> `[x]`) or `cancelled`
-(-> `[BLOCKED:P2:external]`) — the same two terminal states GitHub sync acts
-on (PR MERGED / PR CLOSED-without-merge). Non-terminal states (backlog /
+queries each referenced Plane issue's current state, resolves that state's
+`group` (a second API call -- the issue-detail response only carries the
+state as a bare UUID, not an inline `state_detail` object), and updates the
+marker when the issue is `completed` (-> `[x]`) or `cancelled` (->
+`[BLOCKED:P2:external]`) — the same two terminal states GitHub sync acts on
+(PR MERGED / PR CLOSED-without-merge). Non-terminal states (backlog /
 unstarted / started) and API errors leave the line untouched, matching
 sync.md's "no change on OPEN" / "no change on API error" rules.
 """
@@ -102,8 +104,17 @@ def parse_index_lines(lines: list) -> list:
 
 
 def fetch_issue_state(profile: dict, workspace: str, project: str, issue: str) -> dict:
-    """Fetch a single Plane issue's detail (for its state_detail.group)."""
+    """Fetch a single Plane issue's detail. The real API v1 response carries
+    the issue's current state as a bare state-UUID in `state` (no inline
+    `state_detail` object) -- resolve the group via fetch_state_group()."""
     path = f"workspaces/{workspace}/projects/{project}/issues/{issue}/"
+    return make_plane_request(profile, path)
+
+
+def fetch_state_group(profile: dict, workspace: str, project: str, state_id: str) -> dict:
+    """Resolve a Plane state UUID to its detail (for its `group`:
+    backlog/unstarted/started/completed/cancelled)."""
+    path = f"workspaces/{workspace}/projects/{project}/states/{state_id}/"
     return make_plane_request(profile, path)
 
 
@@ -112,13 +123,24 @@ def compute_updates(lines: list, profile: dict) -> list:
     anything. Returns [{line_no, old, new}, ...] for lines whose Plane issue
     is completed/cancelled and whose current marker doesn't already match."""
     updates = []
+    # A project's states are a small fixed set (Todo/In Progress/Done/...),
+    # so many tracked issues share the same state id -- resolve each state
+    # id's group at most once per sync run instead of once per issue.
+    state_group_cache = {}
     for entry in parse_index_lines(lines):
         um = entry["url_match"]
         issue_data = fetch_issue_state(profile, um["workspace"], um["project"], um["issue"])
         if "error" in issue_data:
             # sync.md rule: never change state on API error.
             continue
-        state_group = (issue_data.get("state_detail") or {}).get("group")
+        state_id = issue_data.get("state")
+        if not state_id:
+            continue
+        cache_key = (um["project"], state_id)
+        if cache_key not in state_group_cache:
+            state_data = fetch_state_group(profile, um["workspace"], um["project"], state_id)
+            state_group_cache[cache_key] = None if "error" in state_data else state_data.get("group")
+        state_group = state_group_cache[cache_key]
         new_marker = STATE_TO_MARKER.get(state_group)
         if new_marker is None:
             # Non-terminal state (backlog/unstarted/started) -> no change.
