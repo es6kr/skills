@@ -91,6 +91,16 @@ check "fp9 ask-guard merge-keyword meta" 0 "$(run "$(mk \
   'Proceed now::fix ask-guard.sh merge-keyword false-positive and run regression tests, relates to finding #3' \
   'Hold::start another guard first')")"
 
+# 10. meta-discussion of check_push_without_details() itself — fixing/describing
+#     the push-detail gate, not proposing an actual push (2026-08-09 live repro:
+#     this exact option text collaterally blocked an unrelated co-occurring
+#     option in the same AskUserQuestion call). Second option deliberately has
+#     no push/no-push/negation wording of its own, isolating the new
+#     meta-discussion exemption from the pre-existing "no push" negation one.
+check "fp10 push-gate meta discussion" 0 "$(run "$(mk \
+  'Fix ask-guard.sh Git Push gate false positive::the hooks Git Push detail-requirement gate blocks pure-commit option text with no push token present' \
+  'Apply pending review findings::PR seven and PR two-thirteen, both self-authored')")"
+
 # ---- TP cases: must BLOCK (exit 2) — attestation/verification genuinely absent ----
 
 # 7. active "Squash and merge PR #N" without AI Review Summary attestation.
@@ -105,6 +115,11 @@ check "tp2 active release-please close no verify" 2 "$(run "$(mk \
 #    retrospect exclusions must NOT let this slip through.
 check "tp3 plain merge proposal no attestation" 2 "$(run "$(mk \
   'Land it::merge PR #90 into next-fix now')")"
+
+# 10. genuine active push proposal with no remote/branch or commit detail —
+#     the new push-gate-meta exemption (fp10) must NOT let this slip through.
+check "tp4 active push no detail" 2 "$(run "$(mk \
+  'Push it::just push the changes now, no further detail')")"
 
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
