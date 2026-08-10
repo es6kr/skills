@@ -506,6 +506,8 @@ TaskList   # use pending/in_progress entries as the source
 
 **"End session" must never be the default Recommended option.** It carries no actionable value beyond what the user already implies by stopping responding; suggesting it autonomously is an autonomous proposal of a work-progression decision (branching / session termination / skipping), which is forbidden. If the user wants to end the session, they will say so or simply stop — `next` does not need to nominate it.
 
+**Scope + class test (HARD STOP)**: this rule is NOT confined to this wrap-up section — it applies to **every** ask composed anywhere in this skill's flow (including mid-flow disposition/remainder asks and Step 0.66 minimal confirmations), and "End session" is judged by **effect, not label**: any option whose selection ends the session's work ("stop here", "delegate the remainder and finish", hand-off-and-close variants) belongs to this class and must not carry `(Recommended)`.
+
 Instead, the **Recommended** option is always **the most actionable follow-up** available. In priority order:
 
 1. **A helper skill invocation that adds value at session boundary** (retrospective cleanup, knowledge persistence, weekly report, file cleanup, etc.) — referenced by **purpose, not by skill name**. Example: `"Run session-cleanup retrospective"` or `"Run session wrap-up tooling"` — the user's skill router picks the matching skill. **Never hardcode an external skill name in this skill's body** — published skill names are out-of-tree dependencies and may rename without notice.
