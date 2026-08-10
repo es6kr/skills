@@ -44,14 +44,48 @@ INPUT=$(cat)
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 case "$TOOL_NAME" in
-  Edit|Write) ;;
+  Edit|Write|write_to_file) ;;
   *) exit 0 ;;
 esac
 
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.TargetFile // .tool_input.target_file // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 
-NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty' 2>/dev/null)
+NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // .tool_input.CodeContent // empty' 2>/dev/null)
+
+# ============================================================================
+# Check 0: Block write_to_file / Write with Overwrite: true on existing files
+# ============================================================================
+check_write_file_overwrite() {
+  case "$TOOL_NAME" in
+    Write|write_to_file) ;;
+    *) return 0 ;;
+  esac
+
+  local overwrite
+  overwrite=$(echo "$INPUT" | jq -r '.tool_input.Overwrite // .tool_input.overwrite // false' 2>/dev/null)
+
+  if [[ -f "$FILE_PATH" && "$overwrite" == "true" ]]; then
+    case "$FILE_PATH" in
+      */task.md|*/scratch/*) return 0 ;;
+    esac
+
+    cat >&2 <<MSG
+DENIED: write_to_file with Overwrite: true on an existing file is strictly prohibited (HARD STOP).
+
+Target file: $FILE_PATH
+
+Why blocked:
+  - Editing an existing file with write_to_file (Overwrite: true) causes accidental content loss and truncates un-targeted sections.
+  - You MUST use replace_file_content or multi_replace_file_content for incremental edits on existing files.
+
+Required action:
+  - Switch to replace_file_content or multi_replace_file_content to edit only the target lines/sections.
+  - Preserve all existing file content and docstrings.
+MSG
+    exit 2
+  fi
+}
 
 # Lazy SKILL_ROOT resolution (only when a skill scope check runs)
 SKILL_ROOT=""
@@ -294,7 +328,7 @@ check_stub_file_substantive_edit() {
   #                    declared in the first 10 lines. Explicit author intent.
   #   AXIS B (loose):  body pointer phrase + size < 2KB + `## section count <= 1`.
   #                    True stubs are small pointer files with at most one ##
-  #                    section ("Location pointer" or equivalent). Topic files that
+  #                    section (a location-pointer marker, or equivalent). Topic files that
   #                    happen to contain a body phrase like "Use X instead"
   #                    typically carry 2+ ## sections (Method, Example, etc.)
   #                    — the section-count gate filters those out.
@@ -541,6 +575,7 @@ MSG
 }
 
 # Execute checks in cost order (no-I/O → file I/O → transcript I/O)
+check_write_file_overwrite
 check_date_in_skill_rule
 check_skill_language_mismatch
 check_vendor_in_generic_skill
