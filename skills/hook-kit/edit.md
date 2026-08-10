@@ -106,6 +106,50 @@ A PreToolUse hook is not limited to allow/deny — it can also **rewrite the too
 | 2 | Mix a blocking gate and an auto-fix gate in one script without ordering them | If a hard-block condition and an auto-fix condition can both apply to the same call, evaluate the **block first** — an auto-fix branch that exits 0 early will skip any block check that comes after it in the script |
 | 3 | Print extra log lines alongside the JSON on stdout | stdout must contain **only** the JSON object — banner/debug text breaks parsing |
 
+## Cross-platform (Claude Code + Antigravity) dual I/O
+
+A hook meant to run in **both** Claude Code and Antigravity needs to detect which runtime invoked it and speak that runtime's I/O contract — the two use different payload shapes and different blocking mechanisms, and a script written for one silently never fires on the other's real payload.
+
+| | Claude Code | Antigravity |
+|---|---|---|
+| stdin shape | `{tool_name, tool_input, transcript_path}` | `{toolCall: {name, args}}` |
+| block mechanism | stderr message + `exit 2` | stdout `{"decision":"deny","reason":...}` + `exit 0` |
+| allow mechanism | `exit 0` (no stdout) | `exit 0` (no stdout, or omit the `decision` key) |
+| registration | `~/.claude/settings.json` | `~/.gemini/config/hooks.json` |
+
+**Detection**: branch on which runtime-specific field is present, not on an env var or file check — `tool_name` (Claude) vs `toolCall.name` (Antigravity) are mutually exclusive in the real payload.
+
+```bash
+CLAUDE_TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
+AG_TOOL=$(echo "$INPUT" | jq -r '.toolCall.name // empty')
+
+if [[ -n "$AG_TOOL" ]]; then
+  # Antigravity branch — block via stdout JSON, exit 0
+  [[ "$AG_TOOL" == "<target-tool>" ]] || exit 0
+  # ...condition check on toolCall.args...
+  echo '{"decision":"deny","reason":"<message>"}'
+  exit 0
+elif [[ -n "$CLAUDE_TOOL" ]]; then
+  # Claude Code branch — block via stderr, exit 2
+  [[ "$CLAUDE_TOOL" == "<target-tool>" ]] || exit 0
+  # ...condition check on tool_input...
+  echo "<message>" >&2
+  exit 2
+fi
+exit 0
+```
+
+The same shape applies in Python (`payload.get("tool_name")` vs `payload.get("toolCall", {}).get("name")`) — see `block-wip-register-before-execute.py` for a full worked example, including a `deny_antigravity()` helper that wraps the stdout-JSON branch.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write a hook against only `tool_name`/`tool_input` and register it in `~/.gemini/config/hooks.json` too, assuming the Claude Code shape "should" also work there | Antigravity never populates `tool_name` — a Claude-only hook registered there silently never fires. Add the `toolCall.name`/`toolCall.args` branch before dual-registering |
+| 2 | Block on `stderr` + `exit 2` in the Antigravity branch (copy-pasting the Claude Code block path) | Antigravity does not read stderr/exit-code as a block signal — it reads stdout `{"decision":"deny"}` with `exit 0`. Wrong branch = silent allow, not a loud failure |
+| 3 | Guess Antigravity arg key names (`TargetFile` vs `path` vs `file_path`) without flagging the guess | Antigravity's exact key casing is often unconfirmed until live-verified in a real session — try multiple candidate keys and document the guess as an explicit unverified note rather than presenting it as confirmed |
+| 4 | Register the dual-I/O script in only one runtime's config file | Register in **both** `~/.claude/settings.json` and `~/.gemini/config/hooks.json` — that's the entire point of writing the dual branch |
+
+**Precedent implementations**: `consolidate/resources/block-noncompliant-review-comment.sh`, `hook-kit/resources/block-wip-register-before-execute.py`, `hook-kit/resources/block-write-file-overwrite.sh`.
+
 ## Notes
 
 - Do not confuse Phase 1 (block) and Phase 2 (soft_block/warn) — Phase 1 is grep patterns only, Phase 2 is bash logic
