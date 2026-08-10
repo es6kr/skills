@@ -25,7 +25,7 @@ import urllib.request
 import urllib.parse
 import argparse
 from pathlib import Path
-from workspace_profile import get_profile
+from workspace_profile import get_profile, resolve_tracker_root
 
 
 INDEX_LINE_RE = re.compile(
@@ -203,6 +203,6 @@ if __name__ == "__main__":
 
     fix_plan_file = Path(args.fix_plan) if args.fix_plan else Path(target_path) / "fix_plan.md"
     if not fix_plan_file.exists():
-        fix_plan_file = Path(target_path) / ".ralph" / "fix_plan.md"
+        fix_plan_file = Path(target_path) / resolve_tracker_root(target_path) / "fix_plan.md"
 
     sync_checklist_with_plane(fix_plan_file, profile, dry_run=args.dry_run)
