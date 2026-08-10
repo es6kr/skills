@@ -19,8 +19,9 @@
 #   1. $CC_CONTEXT_WINDOW env override (integer tokens), else
 #   2. model-id heuristic: fable/mythos/opus/sonnet-5 -> 1000000 (1M-context tiers),
 #      anything else -> 200000.
-# Cleanup-recommend tier: at >= $CC_CLEANUP_RECOMMEND_PCT (default 50) a second
-# directive line is injected obligating a /cleanup recommendation at the turn's
+# Cleanup-recommend tier: at >= $CC_CLEANUP_RECOMMEND_PCT (default is per-model —
+# 55 for fable/mythos, 50 for opus, 45 for everything else) a second directive
+# line is injected obligating a /cleanup recommendation at the turn's
 # wrap-up. Rationale: the 45% gate lives in next-skill docs and the deny-hook
 # (block-cleanup-option-below-context-gate.sh) can only judge asks it can
 # classify as wrap-ups — session-tail asks without end/stop wording escaped
@@ -166,12 +167,14 @@ try:
     # adds a caveat, never blocks anything.
     stale_min_env = os.environ.get("CC_CONTEXT_STALE_MIN", "")
     stale_min = int(stale_min_env) if stale_min_env.isdigit() else 15
+    is_stale = False
     if last_ts:
         try:
             from datetime import datetime, timezone
             last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
             gap_min = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60
             if gap_min >= stale_min:
+                is_stale = True
                 print(
                     f"[CONTEXT-STALE] This reading is based on an assistant message "
                     f"from ~{gap_min:.0f} min ago. A compaction may have happened "
@@ -218,6 +221,12 @@ try:
             "files to resume working state), not accumulating budget pressure. Do NOT "
             "recommend /cleanup off this number; the gate resumes from the next reading."
         )
+    elif is_stale:
+        # [CONTEXT-STALE] above already told the reader not to act on this figure —
+        # emitting [CLEANUP-GATE] here too would contradict that warning in the same
+        # breath. Suppress the gate for this stale reading; it resumes on the next
+        # (fresh) one, same as the first-post-compact suppression above.
+        pass
     elif pct >= rec_pct:
         print(
             f"[CLEANUP-GATE] usage {pct:.1f}% >= {rec_pct}% — RECOMMEND /cleanup at this "
