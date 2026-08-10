@@ -429,11 +429,123 @@ PYEOF
   exit 2
 }
 
+# ============================================================================
+# Check 6: skill .md Edit without a same-turn Skill("skill-kit", ...) call
+# ============================================================================
+# skill-usage.md HARD STOP: skill file creation/modification must go through
+# skill-kit (writer/upgrade/lint/...), not a direct Read-topic-then-inline-Edit.
+# 3 recurrences of the exact same pattern (Read the topic .md, silently apply
+# its guidance inline, never call Skill("skill-kit", ...)) — see
+# failed-attempts.md class skill-kit-invoke-bypass-via-direct-topic-read.
+check_skill_edit_without_skill_kit() {
+  [[ "$FILE_PATH" == *.md ]] || return 0
+  case "$FILE_PATH" in
+    */skills/*/*) ;;
+    *) return 0 ;;
+  esac
+
+  # Path-based exemption: case-history / data files are not skill procedural
+  # body (same exemption class as checks 1-3, 5 above).
+  case "$FILE_PATH" in
+    */data/failed-attempts*.md|*/data/failed-hooks*.md|*/data/archive/*.md|*/data/case-studies/*.md)
+      return 0
+      ;;
+  esac
+
+  resolve_skill_root
+  [[ -z "$SKILL_ROOT" ]] && return 0
+  [[ -f "$SKILL_ROOT/SKILL.md" ]] || return 0
+
+  local skill_name
+  skill_name="$(basename "$SKILL_ROOT")"
+  # Editing skill-kit's own files doesn't need to route through itself.
+  [[ "$skill_name" == "skill-kit" ]] && return 0
+
+  [[ -z "$NEW_CONTENT" ]] && return 0
+
+  local transcript
+  transcript=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+  [[ -z "$transcript" ]] && return 0
+  [[ -f "$transcript" ]] || return 0
+
+  local called
+  called=$(python3 - "$transcript" <<'PYEOF' 2>/dev/null
+import json, sys
+path = sys.argv[1]
+entries = []
+with open(path, encoding="utf-8", errors="ignore") as fh:
+    for line in fh:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except Exception:
+            continue
+
+# Find the start of the current turn: scan backward from the end for the most
+# recent genuine user prompt (role=user, string content — not a tool_result
+# array, which also carries role=user in this transcript format).
+turn_start = 0
+for i in range(len(entries) - 1, -1, -1):
+    ent = entries[i]
+    msg = ent.get("message") or {}
+    if msg.get("role") == "user" and isinstance(msg.get("content"), str):
+        turn_start = i
+        break
+
+found = False
+for ent in entries[turn_start:]:
+    msg = ent.get("message") or {}
+    c = msg.get("content")
+    if not isinstance(c, list):
+        continue
+    for b in c:
+        if not isinstance(b, dict) or b.get("type") != "tool_use":
+            continue
+        if b.get("name") != "Skill":
+            continue
+        inp = b.get("input") or {}
+        if inp.get("skill") == "skill-kit":
+            found = True
+            break
+    if found:
+        break
+print("1" if found else "0")
+PYEOF
+)
+  called="${called:-0}"
+  [[ "$called" == "1" ]] && return 0
+
+  cat >&2 <<MSG
+DENIED: skill file Edit/Write without a same-turn Skill("skill-kit", ...) call.
+
+Target file:  $FILE_PATH
+Skill:        $skill_name
+
+Why blocked:
+  - Reading a topic .md and applying its guidance inline (without an actual
+    Skill("skill-kit", ...) tool call) has recurred 3 times — the topic's
+    guidance gets followed, but skill-kit's own validation (duplicate check,
+    Topics-table sync, frontmatter/language lint) never runs.
+  - skill-usage.md HARD STOP: skill file edits must route through the
+    skill-kit skill, not a direct topic-.md Read followed by an inline Edit.
+
+Required action:
+  1. Call Skill("skill-kit", "<writer|upgrade|lint|...>") first this turn.
+  2. Then retry this Edit/Write.
+
+Reference: failed-attempts.md class skill-kit-invoke-bypass-via-direct-topic-read.
+MSG
+  exit 2
+}
+
 # Execute checks in cost order (no-I/O → file I/O → transcript I/O)
 check_date_in_skill_rule
 check_skill_language_mismatch
 check_vendor_in_generic_skill
 check_stub_file_substantive_edit
 check_fa_edit_without_rag_search
+check_skill_edit_without_skill_kit
 
 exit 0
