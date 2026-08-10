@@ -37,7 +37,7 @@ If cleanup calls next, it becomes "select 1 → execute immediately → session 
 - Example: writing only text like "A deploy pattern is repeating → agentify candidate" and stopping there ❌ → call the `claudify improve` skill to actually detect and propose ✅
 - **Reporting a step as "skipped" in prose without the step's own documented skip condition being met** — e.g. saying "no RAG receiver registered, skipped" when the step's own rule (see "RAG store failure = cleanup failure" below) requires a recovery attempt + FAILED status + retry-task registration, not a silent skip. A step-level "skip" in the completion report is only valid when the exact skip condition text from that step's own section is quoted alongside it.
 
-**Task pre-registration (when Task tools are available)**: before executing Steps 1-5, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report and fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to skip the *tracking mechanism* for them.
+**Task pre-registration (when Task tools are available)**: before executing Steps 1-5, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report and fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to skip the *tracking mechanism* for them. **Pre-registration creates tasks that Step 0's prune (below) structurally cannot catch** — Step 0 runs once, at entry, and can only see tasks that were already `completed` *before* this cleanup run started. The tasks created by this pre-registration mechanism only reach `completed` status *during* Steps 1-5, after Step 0 has already run — see Step 5.5 "Self-Task Cleanup" for the closing half of this lifecycle.
 
 ## Execution Order
 
@@ -58,11 +58,13 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step 1 | `Skill("commit-tidy")` or `/commit-tidy` | Decide split strategy (internal ask inside the skill) | When there is 1+ uncommitted change |
 | Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
 | Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) | **Always** + auto-import when the RAG receiver readyz responds |
-| **3-C.1 session RAG import** | **Automatic execution — no ask** | — | Immediately import with the `--raw` flag when the RAG receiver readyz responds OK |
+| **3-C.1 session RAG import** | **Automatic execution — no ask** | — | Immediately import when the RAG receiver readyz responds OK |
 | **3-C.2 structured discovery chunk (mode B — HARD STOP)** | **Automatic execution — no ask** | — | If the session produced **reusable discoveries/decisions/deployments** (bug root-cause, infra gotcha, a config/URL/MTU/version that took effort to find, an architecture decision), store each as a keyword-searchable chunk via the **RAG receiver's structured-store dispatch (mode B)** — separate from 3-C.1. Session import (3-C.1 mode A) has **weak keyword retrieval**: it preserves turns but does NOT make a finding queryable (e.g. "DinD MTU hang", "dev-36 k3s runner"). Skip ONLY when the session had zero reusable discovery (pure Q&A / trivial edits) — and say so explicitly in the report row |
 | **3-C.3 check for missed active-artifact RAG store** | **Automatic execution — no ask** | — | Glob → identify this-session mtime artifacts → RAG receiver scroll → immediately store missing files. Matches plan/research/analysis/report/postmortem-*.md patterns |
+| **3-C.4 workspace fix_plan-history sync (mode C)** | **Automatic execution — no ask** | — | If this session added `## Completed` entries to `fix_plan.md` AND the current workspace exposes a fix_plan→RAG sync script (per `rag-store.md` "fix_plan.md Completed Item RAG Sync + Delete Obligation"), run it. Session import (3-C.1) and structured chunks (3-C.2) are conversation-shaped; this sync is deliverable-shaped (task/decision history) — neither of the other two modes substitutes for it |
 | Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) | When this session has artifacts |
 | Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) | **Always** — state preservation for next-session resume at cleanup end |
+| Step 5.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4.5+5 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
 
 **Don't / Do**:
 
@@ -85,6 +87,7 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 6. **Self-check immediately before writing the wrap-up report table**: does the report table explicitly include a "RAG store (N chunks added — receiver)" row as required? If missing, add it immediately. This row ensures user visibility — preventing "missed without even knowing" omission
 7. **Self-check immediately before writing Step 5 next options (HARD STOP)**: among the option candidates, is there **an unexecuted defect found by Step 2 self-improve** (especially one that caused a failure/error this session)? — if so, that is **not** a next option but something to execute immediately in Phase 3. Do not demote it into the next menu (competing with "End session"). Only enter Step 5 after the improve result has been executed
 8. **Verify claudify call trace (HARD STOP — immediately before entering Step 2/3 every time)**: if there's no `Skill("claudify", "improve")` call trace in this response turn's tool-call history right before entering Step 2, call it immediately. If there's no `Skill("claudify", "persist")` call trace right before entering Step 3, call it immediately. **Filling in an inline retrospect report + a comprehensive-matrix table's "claudify improve results" row ≠ a Skill call.** A Skill call = quoting the tool response result. Filling the table with self-written text = a violation of Don't #1. On repeated occurrences, this is a candidate for hook escalation (`block-cleanup-without-claudify.sh` — blocks when the cleanup-completion response's transcript has no `Skill("claudify",` trace)
+9. **Verify the Step 2-B mandatory output format was actually produced (HARD STOP — a Skill call alone does not satisfy this)**: a `Skill("claudify", "improve")` trace existing in the transcript proves the call happened, but NOT that its internal B sub-step (Hook Review + Skill Check, see `improve.md`) produced its documented output. Check the response text for the literal `**Hook summary**: N registered / M OK / ...` line and a named enumeration of skills invoked this session. If either is missing — replaced by an unenumerated conclusion like "0 ignored" or "all skills worked correctly" with no per-hook/per-skill breakdown — the B sub-step was skipped even though the Skill call happened. Re-run it and produce the format before reporting Step 2 as done. A "nothing changed since the last cleanup pass" judgment does not exempt this check — re-confirm the counts explicitly, even if they repeat the prior pass's numbers.
 
 ### Step 5 Completion Report Table Mandatory Rows (HARD STOP — applies to both cleanup wrap-up and session-end reporting)
 
@@ -92,13 +95,14 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 
 | Step | Result |
 |------|------|
-| **Session identity (mandatory)** | **`Session ID: <full-36-UUID>` + `Recommend: /rename <name>` (2-3 candidates from the session's dominant work)** |
+| **Session identity (mandatory)** | **`Session ID: <full-36-UUID>` + Recommend running: `/rename <model>-<topic>-<sessid8>` (2-3 candidates; each = model family token + dominant-work topic + UUID's leading 8 hex; keep the `/rename ...` command in its own code span with no label or colon inside it, so a single copy-paste is directly runnable)** |
 | 0. TaskList | (cleanup result) |
 | 1. Commit | (commit result or skip reason) |
 | 2. Self-Improve | `claudify improve` result |
 | 3. Knowledge Persist | `claudify persist` result |
-| **3-C.1 RAG Store (mandatory row)** | **State which medium actually fired ([rag-store.md](./rag-store.md) Medium Matrix (1)-(4)) — the wording differs by medium, do not reuse one fixed template for all: purpose-built importer (medium 2) → "N chunks added (session import, receiver: `<importer>`) — session UUID `<uuid>`. N turns imported."; generic MCP store used as 3-C.1 substitute (medium 1, no purpose-built importer found) → "1 ad-hoc summary chunk added (receiver: MCP store) — session UUID `<uuid>`. NOT a full session import (no purpose-built importer found)."; medium (4) local pending queue → "❌ FAILED — queued to local pending-import queue (`<queue-file>`), retry task registered."** |
+| **3-C.1 RAG Store (mandatory row)** | **State which medium actually fired ([rag-store.md](./rag-store.md) Medium Matrix (1)-(4)) — the wording differs by medium, do not reuse one fixed template for all: purpose-built importer (medium 2) → "N JSONL log step entries / turns recorded (session import, receiver: `<importer>`) — session UUID `<uuid>`. M artifacts imported."; generic MCP store used as 3-C.1 substitute (medium 1, no purpose-built importer found) → "1 ad-hoc summary chunk added (receiver: MCP store) — session UUID `<uuid>`. NOT a full session import (no purpose-built importer found)."; medium (4) local pending queue → "❌ FAILED — queued to local pending-import queue (`<queue-file>`), retry task registered."** |
 | **3-C.2 Structured discovery chunk (mode B — mandatory row)** | **M discovery chunks added (receiver structured-store dispatch, mode B) — keys: `<key1>`, … OR "none — no reusable discovery this session". Session import (mode A) alone ≠ knowledge persisted; discoveries need mode B to be searchable.** |
+| **3-C.4 fix_plan-history sync (mode C — mandatory row when `fix_plan.md` gained Completed entries this session)** | **P points synced (workspace `<name>` sync script) OR "none — no new Completed entries this session" OR "no sync script for this workspace".** |
 | 4. Weekly Report | (skip / write result) |
 | 5. **wip task registration (mandatory row)** | **`Skill("wip")` call result — N tasks registered (next-session resume possible). Enumerate candidates** |
 
@@ -116,6 +120,8 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | 4 | The cleanup wrap-up table explicitly states the RAG row, but the subsequent separate session-end report (e.g., "## ✅ Session Ended") buries the RAG result in a 1-line prose list | The session-end report carries the same obligation — highlight visibility with a separate markdown table row / bold line / dedicated header section |
 | 5 | Fill the "Self-Improve / Knowledge Persist" rows with a self-written inline retrospect text + FA Prune non-execution report + comprehensive-matrix text (0 claudify Skill call traces) | **Only quoting Skill call results is allowed.** Quote only the `Skill("claudify", "improve")` tool response result text + `Skill("claudify", "persist")` tool response result text into the rows. Filling the row with a self-written retrospect report = bypassing the call = a violation |
 | 6 | Omitting the active session UUID (`<uuid>`) or substituting a placeholder in the RAG store row or report header | Always extract conversation ID and explicitly format as `session UUID <full-36-UUID>` in row 3-C.1 and report header |
+| 7 | Omit the physical numerical chunk count `N` (e.g. replacing `N chunks added` with vague prose omitting `N`) | Always include the concrete integer number of chunks `N` (e.g., `12 chunks added`) and imported artifacts count `M` in row 3-C.1 (e.g. `12 chunks added (receiver: RAG import dispatch) — session UUID <uuid>. 0 artifacts imported.`) |
+| 8 | On a 2nd+ `/cleanup` invocation in the same session, reconstruct this table from memory of the prior pass's report shape | Re-read this section's literal row text before composing — a remembered shape silently drops compound sub-clauses (e.g., the Session identity row's `/rename` sub-clause) that a fresh read would catch. Enforced by `block-cleanup-missing-rename.sh` (Stop) for the Session identity row specifically |
 
 For accumulated violation cases, see failed-attempts.md HOT (occurrence classification + escalation specification). Escalation from the 3rd occurrence: hook automation — `~/.agents/skills/hook-kit/resources/block-cleanup-without-rag.sh` registered. Injects a reminder when the cleanup/session-end response text matches the marker + lacks a RAG-visual-highlight row + has RAG-receiver call traces.
 
@@ -184,6 +190,7 @@ Clean up `completed`-status tasks from TaskList and reflect their completion in 
 **Procedure**:
 1. Call `TaskList`
 2. For each `completed` task, **find the corresponding item in fix_plan.md and check `[x]`** + record completion info (apply the workflow.md "bidirectional task ↔ checklist sync" rule)
+   - **Plane-index precondition (HARD STOP)**: before flipping the marker, check whether the matched line carries a Plane index reference (the `→ Plane (<issue URL>)` suffix `plane-backlog`'s Phase-3 migration produces, per `fix-plan/sync.md` "Secondary-tracker sync cadence"). If present, the fix_plan.md line is an **index**, not the source of truth — Plane is. Complete the Plane issue first (see "Plane-indexed item completion order" below); only then check `[x]` locally.
 3. After the checklist update completes, `TaskUpdate(status: "deleted")`
 4. Report the cleanup count: `**Task cleanup**: N completed → deleted (fix_plan reflected)`
 
@@ -191,6 +198,26 @@ Clean up `completed`-status tasks from TaskList and reflect their completion in 
 |---|-------------|-----------------|
 | 1 | Skip the fix_plan update after deleting a task | Update fix_plan **first** → then delete |
 | 2 | Skip the update by saying "no corresponding item in fix_plan" | Determine this by grepping the task subject keywords |
+| 3 | Check `[x]` on a Plane-indexed fix_plan.md line before the Plane issue itself is completed | Run the "Plane-indexed item completion order" gate below **before** flipping the marker |
+
+### Plane-indexed item completion order (HARD STOP — applies to Step 0 item 2 and Step 4 Step B "matches existing item" below)
+
+When a workspace has adopted Plane as its canonical backlog (its local `fix_plan.md`/`checklist.md` demoted to an **index** — signalled by a `workspace_profile.py --json` non-empty `plane_host`, or a pinned note in the tracker itself stating Plane is the source of truth), a matched line carrying a `→ Plane (<issue URL>)` suffix must **not** be marked `[x]` locally until the indexed Plane issue itself reflects completion. The local marker is a pointer, not the record — completing the pointer while the record it points at is still open leaves the canonical backlog wrong.
+
+**Procedure**:
+1. Extract the Plane issue URL/ID from the matched line's `→ Plane (...)` suffix (real-world example: `[INFRA-6] ... → Plane (https://plane.dgs.ai.kr/.../issues/<id>) *(Phase 3 indexing ...)*`).
+2. No script in this environment currently **pushes** completion state to Plane (`plane_sync.py` is pull-only — Plane state → fix_plan marker, per `fix-plan/sync.md`). So: either (a) the Plane issue was already completed independently (verify via `plane-backlog sync --dry-run` or a direct issue-state read) — if so, the pull already reconciled it, proceed to check `[x]` locally, or (b) it has not — in that case do **not** mark local `[x]` autonomously. Surface the Plane issue URL to the user (report line or, if other decisions are already being asked this turn, fold it into that `AskUserQuestion`) and hold the local marker at its current state until the user confirms the Plane issue is completed (manually, or via a future push-capable script).
+3. Never silently complete the local index while the canonical Plane record remains open — that is the exact drift this gate prevents.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Mark `[x]` on a Plane-indexed line because the session's own work is done, without checking Plane's state | Verify Plane reflects completion first (pull-sync or direct read) — only then flip the local marker |
+| 2 | Invent a PATCH-to-Plane call inline because none exists yet | No push script exists — surface the Plane URL to the user instead of fabricating a write path |
+| 3 | Treat "no push script" as license to skip the check entirely and just mark local `[x]` | Absence of automation is not absence of the obligation — ask/report, don't silently complete the index |
+
+**Self-check (before flipping any fix_plan.md marker to `[x]` — Step 0 or Step 4)**:
+1. Does the matched line carry a `→ Plane (<url>)` suffix? → If no, proceed as normal.
+2. If yes, does Plane's own state already show completion (via sync or direct check)? → If yes, flip the local marker. If no/unknown, hold the marker and surface the Plane URL instead.
 
 **Skip condition**: skip if TaskList has no completed tasks
 
@@ -246,9 +273,14 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 
 ---
 
-## Step 2: Self-Improve (mistake analysis + automation check + pattern detection)
+## Step 2: Self-Improve (Mistake Analysis + Review + Pattern Detection)
 
-**Topic reference**: [claudify/improve.md](../claudify/improve.md) — planned conversion to a `Skill("claudify", "improve")` call.
+Analyze session mistakes, review hooks/skills, and detect patterns.
+
+**Automated Script Execution**:
+- Run `python ~/.gemini/config/skills/cleanup/scripts/fa-analyze.py` to automatically analyze `failed-attempts.md` rules, status tags, and detect recurring error classes.
+
+[claudify/improve.md](../claudify/improve.md) — planned conversion to a `Skill("claudify", "improve")` call.
 Currently the procedure below runs directly within cleanup.
 
 Analyze the session's episodic data (mistakes, hook/skill behavior, repeated patterns) to improve the system.
@@ -356,9 +388,9 @@ Currently the procedure below runs directly within cleanup.
 
 Store knowledge discovered in the session to the appropriate location.
 
-### 3-A. Documentation recommendation
+### 3-A. Documentation recommendation (including LLM Wiki scope check — HARD STOP)
 
-Suggest a location to document new information discovered during the conversation.
+Suggest a location to document new information discovered during the conversation. **This is an explicit check, not a silent skip** — same discipline level as 3-C.1/3-C.2, just a different destination.
 
 **Detection targets**: troubleshooting solutions, project/infra structure, failed attempts, external service usage, environment configuration
 
@@ -367,13 +399,37 @@ Suggest a location to document new information discovered during the conversatio
 | Information type | Recommended location |
 |----------|----------|
 | Project structure/configuration | The project's `CLAUDE.md` or `README.md` |
-| Infra/server information | `pages/` or Logseq |
+| Personal/dev-machine infra fact (VPN client quirk, local tool path, this-session-only debugging) | Domain skill topic (`/skill-kit route`) + RAG fact point (3-C.2) — **not** the LLM Wiki |
+| Company/domain knowledge (a concept, process, or fact relevant to teammates outside the current chat — the kind of thing a new hire or another department would need explained) | The workspace's **LLM Wiki** (`<workspace>/llm-wiki/`), if one exists — see below |
 | Failed attempts | `pages/FAILED_ATTEMPTS.md` |
 | External service integration | The project's `docs/` |
 | Personal workflow | `~/.claude/CLAUDE.md` (global) |
 | Troubleshooting record | Today's Logseq journal |
 
 - Exclude information that's already documented, or sensitive information (API keys, etc.)
+
+**LLM Wiki scope check (trigger: does `<workspace>/llm-wiki/AGENTS.md` exist for the current workspace?)**:
+
+1. If no `llm-wiki/` exists in the workspace, skip this sub-check (report "no LLM Wiki in this workspace").
+2. If it exists, **read `<workspace>/llm-wiki/index.md`'s category list first** (the `## <Category> (\`pages/<domain>/\`)` headers) — this is the Wiki's actual, currently-in-use scope, not just its abstract `AGENTS.md` definition. A category like "Harness & Tools" can already cover exactly the kind of personal-tooling/harness-debugging knowledge that the abstract "company/domain knowledge for teammates" framing (below) would wrongly exclude on its own.
+3. Only after checking the real category list, ask: does anything this session discovered fit an **existing category** (including a tooling/harness category if one exists), or the Wiki's abstract scope per `AGENTS.md` (curated domain knowledge — concepts, processes, meeting outcomes, terms someone outside this chat would need explained) — **as opposed to** genuinely session-local/one-off debug values that belong in RAG only?
+4. Never write directly to `pages/*.md` — the Wiki's own HARD STOP requires raw knowledge ingestion first (`raw/<slug>.md` with a real `source_path`), then `pages/` updates derive from that raw source. Dispatch to the raw knowledge ingest skill (e.g. `raw-ingest` if available); do not hand-author `pages/` content inline from cleanup.
+5. State the outcome explicitly in the Step 5 comprehensive report, even when the answer is "nothing this session belongs in the Wiki" — silence here is exactly the gap this section closes.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat writing to a skill file (e.g., an infra fact added to a domain skill topic) as satisfying the LLM Wiki check too | They're different destinations for different audiences — skill files are Claude Code's own operational knowledge; the Wiki is curated for human teammates. Doing one doesn't exempt checking the other |
+| 2 | Recommend the Wiki for every infra/troubleshooting fact discovered this session, regardless of audience | Personal dev-machine/session-local facts (a VPN client quirk on *this* machine, a local file path) stay in skill/RAG — pushing them into the company Wiki is scope creep the Wiki's own curation principle doesn't want |
+| 3 | Silently omit the Wiki row from the Step 5 report when there's nothing to store | Always state the outcome — "N candidates found" or "0 candidates — session content was tooling-local, not company-facing" |
+| 4 | Author `pages/*.md` directly from cleanup to save a step | Raw knowledge ingestion first (HARD STOP per the Wiki's own `AGENTS.md`) — cleanup dispatches to the ingest skill, it does not hand-write pages |
+| 5 | Apply only the abstract "company/domain knowledge for teammates" definition from `AGENTS.md` and conclude "0 candidates" without reading `index.md`'s actual category list first | Read `index.md`'s categories before judging scope — a category already covering harness/tooling knowledge (e.g. "Harness & Tools") means session-local-sounding tooling facts can still be in-scope. The abstract definition alone under-scopes relative to the Wiki's real, curated content |
+
+**Self-check (every cleanup run, before the Step 5 report)**:
+1. Does `<workspace>/llm-wiki/AGENTS.md` exist? If no, report N/A and move on.
+2. If yes, did you Read `index.md`'s category list before judging scope? If not, do that first — do not judge from the abstract `AGENTS.md` definition alone.
+3. Does any session discovery meet an existing category's actual scope (not just the abstract "company knowledge" framing), or the Wiki's abstract scope for teammates?
+4. If yes, dispatch to the raw knowledge ingest skill — never hand-author `pages/`.
+4. State the explicit outcome (candidates found + dispatched, or none) in the Step 5 report — this row is mandatory whenever `llm-wiki/` exists in the workspace, matching the RAG row's mandatory-reporting discipline.
 
 ### 3-B. Infra documentation check
 
@@ -389,12 +445,15 @@ Store project knowledge learned in this session to memory.
 
 | Information type | Storage location | Example |
 |----------|----------|------|
-| One-off environment fact | **Memory** | Server IP, current resource usage, API key location |
+| Volatile session-only fact (changes every run, no reuse value beyond this session) | **Memory** (only if no domain skill owns the topic) | Current resource usage snapshot, a one-time debug value |
+| Tool/credential/config reference tied to an existing domain (Vault path, API key location, server IP, install path) | **Skill** (`/skill-kit route` — add to or create a topic in the owning domain skill, e.g. `es6kr/vault.md`'s credential-location tables) | Where a PAT/token/config file lives, which CLI manages a service |
 | Infra/IaC configuration knowledge | **Skill** (`/skill-kit route`) | Terraform structure, ArgoCD management procedure |
 | Domain knowledge, procedure, guide | **Skill** (`/skill-kit route`) | Deployment procedure, troubleshooting guide |
 | Behavioral rule, prohibition | **Rules** | Mistake-prevention rule (handled in Step 2 retrospect) |
 
-**Judgment criterion**: usable procedurally → skill, addable to an existing skill topic → skill, purely for reference → memory
+**Judgment criterion**: usable procedurally → skill, addable to an existing skill topic → skill, tied to a credential/tool that a domain skill already documents → that skill (not memory), purely session-local with no domain skill owning it → memory.
+
+**Why this table changed**: Claude Code's project memory (`~/.claude/projects/*/memory/*.md`) is a harness-specific, non-portable medium — it disappears in other environments (Antigravity, OpenClaw) and doesn't travel with the workspace's own rule/skill system. A credential-location or tool-reference fact is exactly the kind of thing a future session (in any environment) needs to rediscover — routing it to memory silently ties it to "this Claude Code project only." Prefer the domain skill that already owns the topic (see the existing credential-location tables in `es6kr/vault.md`, `es6kr/infra.md` as the established pattern) over creating a new memory file.
 
 #### Storage tools (usable in parallel — different purposes)
 
@@ -402,9 +461,9 @@ Store project knowledge learned in this session to memory.
 |------|------|------|------|
 | **RAG receiver import dispatch** | RAG receiver available (readyz responds) | **Whole-session semantic chunk** — searchable via the receiver's find tool for conversation flow in the next session | 3-C.1 procedure below |
 | Serena MCP | `activate_project` responds | Structured key-value facts (memory_set/memory_get) | `list_memories` → `edit_memory` / `write_memory` |
-| Claude Code auto memory | Fallback when Serena is absent | Markdown file (`memory/MEMORY.md` + individual) | Edit/Write |
+| Claude Code auto memory | Only for facts genuinely valid in Claude Code alone (this harness's own settings/session state) — NOT a default fallback for domain/reference facts. See "Pre-review" table above; most facts route to a skill instead | Markdown file (`memory/MEMORY.md` + individual) | Edit/Write |
 
-The three tools are used **in parallel** — not a priority order, since they serve different purposes rather than storing the same information. Store to every available medium.
+RAG and Serena are used in parallel where available. Claude Code auto memory is conditional, not a third parallel default — check the Pre-review table first; a skill destination usually applies instead.
 
 #### 3-C.1 Session semantic chunk storage (RAG receiver dispatch)
 
@@ -529,21 +588,29 @@ For importing other sessions (past sessions, sessions planned for external shari
 | 1 | Only import the session (3-C.1) and leave distilled facts buried in turns | Record reusable facts to both (a) domain skill/memory + (b) RAG receiver fact point |
 | 2 | Write an ad-hoc script on the spot to record a single fact in the RAG receiver | Reuse the receiver's fact-storage script |
 | 3 | Only a RAG receiver point, no domain skill | Source of truth (skill/memory) first. The RAG receiver is a search aid, not the source of truth |
+| 4 | Treat "I wrote a memory/skill file this session" as evidence that dual-write is already satisfied, and report 3-C.2 as "none — already covered by the memory files above" | A memory file write is (a) only. It is not evidence against doing (b) — it is evidence a fact was distilled, which is exactly 3-C.2's trigger. Writing (a) without (b) is the Don't-row-3 violation restated with different wording |
+
+**Self-check (immediately before writing the Step 5 "3-C.2" report row)**: for **each** memory/skill file (a) written or edited in this session's Step 3-C, was a corresponding RAG receiver fact-point (b) also stored for that same fact? Enumerate them by filename — if any (a) has no matching (b), that is an open dual-write, not a completed one; store it now before reporting 3-C.2. "Already covered by memory files" is never a valid 3-C.2 skip justification — the only valid skip is "no reusable discovery this session" (no memory/skill files were written at all).
 
 #### 3-C.3 Check for missed active plan/research/analysis RAG store (HARD STOP)
 
 The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **immediately after writing** is the store trigger. However, without an enforcement medium (a hook, etc.), the write-time trigger is sometimes missed. cleanup serves as that fallback — check active artifacts generated in this session for anything missing from RAG + store them.
 
-**Check targets (Glob patterns)**:
+**Check targets (Hybrid Sweep — Option C)**:
 - `**/.ralph/docs/generated/{plan,research,analysis,report,postmortem}-*.md`
 - `**/.omc/plans/*.md`
-- `**/walkthrough.md` (including walkthroughs in `<appDataDir>/brain/<conversation-id>/walkthrough.md`)
-- `**/implementation_plan.md` (same `<appDataDir>/brain/<conversation-id>/implementation_plan.md` location class as the walkthrough.md row above — an IDE-native session-brain directory outside every other Glob root in this list, easy to omit when only the sibling `walkthrough.md` pattern is copied forward)
+- **Session-Brain Root Sweep (`<appDataDir>/brain/<conversation-id>/*.md`)**:
+  - Direct non-recursive check of all `.md` files in the active session's brain root.
+  - **Automation Helper Script**: `python .agents/skills/cleanup/scripts/hybrid_sweep_rag.py <session_brain_dir>`
+  - If a `.metadata.json` sidecar exists (`<file>.md.metadata.json`), check `userFacing` value.
+  - Fallback: If no `.metadata.json` or schema differs, exclude known internal control files (`task.md`, `ask.md`), and treat all other unrecognized `.md` files (e.g. `outputs_classification_report.md`, `llm_wiki_structure_report.md`) as active artifact candidates for RAG store.
+- **Dual LLM Wiki Sync Helper**:
+  - `python .agents/skills/cleanup/scripts/sync_dual_wiki.py` (Syncs public artifacts between the workspace's own internal LLM Wiki repos)
 
 
 **Procedure**:
 
-1. **Identify files via Glob with mtime ≥ session start time** — only artifacts Written/Edited in this session (artifacts written in other sessions are handled in that session's cleanup)
+1. **Identify files via Glob/Hybrid Sweep with mtime ≥ session start time** — active artifacts written/edited in this session (including unrecognized session-brain `.md` files captured via Option C)
 2. **Query the RAG receiver's scroll for each file**: search for chunks whose `filename` or `source_path` metadata matches that file path
 3. **Branch**:
    - 1+ existing chunk → already stored. Skip
@@ -573,6 +640,27 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 **Ralph mode**: only record the artifact list + un-stored files to `.ralph/improvements.md`. No direct store.
 
 **Ralph mode**: 3-A~3-C all perform detection+recording only (`.ralph/improvements.md`). No direct modification/storage. Skip RAG storage too (unsuited to autonomous execution).
+
+#### 3-C.4 Workspace fix_plan-history sync (mode C — HARD STOP)
+
+**3-C.1/3-C.2 alone do not satisfy a workspace's "all deliverables must be persisted" obligation** — session chunks and discovery chunks are conversation-shaped, not deliverable-shaped. When `fix_plan.md` gained new `## Completed` entries this session, the deliverable record itself (not just the conversation about it) must reach the RAG store. `rag-store.md`'s "fix_plan.md Completed Item RAG Sync + Delete Obligation" section owns the full sync/delete procedure — this sub-step's only job is to make sure that procedure actually gets invoked as part of cleanup, instead of remaining a rule that's easy to forget because nothing in this checklist named it.
+
+**Procedure**:
+1. Did this session add any `## Completed` entries to the current workspace's `fix_plan.md`? If no, skip (report "none — no new Completed entries this session")
+2. Does the current workspace expose a fix_plan→RAG sync script (e.g. a `fix-plan-to-qdrant`-style topic under that workspace's own skill)? Search installed skills' Topics tables for a description matching "fix_plan Completed → RAG" / "workspace fix-plan history". If none exists, report "no sync script for this workspace" — this sub-step does not mandate building one
+3. If both hold, run `rag-store.md`'s "fix_plan.md Completed Item RAG Sync + Delete Obligation" procedure (bulk-sync → delete synced `## Completed` body) and report the point count
+
+**Don't / Do**:
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat 3-C.1 (session import) as covering fix_plan's Completed history because the conversation that produced it was imported | Session import preserves turn-by-turn dialogue; it does not make "what got completed, and when" independently queryable. Run the workspace sync script separately |
+| 2 | Skip this sub-step silently because it's new and easy to forget | Report one of the three outcomes explicitly (synced P points / none this session / no script for this workspace) in the Step 5 table |
+
+**Self-check (every time during cleanup Step 3, after 3-C.3)**:
+1. Grep this session's `fix_plan.md` diff for new `## Completed` lines — count ≥1?
+2. If yes, does a workspace-specific sync script exist? (Topics-table search, not a guess)
+3. If both yes, run it and get the point count before reporting Step 5
 
 ---
 
@@ -607,7 +695,7 @@ cleanup's core purpose is **tidying (state refresh + pruning completed items)**,
 
 | Matching result | Handling |
 |----------|----------|
-| Matches an existing `- [ ]` or `[BLOCKED]` item | **Update that item to `- [x]`** + append 1 line of completion info (commit/file/verification). Do not add a new row |
+| Matches an existing `- [ ]` or `[BLOCKED]` item | **Update that item to `- [x]`** + append 1 line of completion info (commit/file/verification). Do not add a new row. **If the line carries a `→ Plane (<url>)` index suffix, apply the "Plane-indexed item completion order" gate (Step 0 above) first** — do not flip to `[x]` until Plane itself reflects completion |
 | Matches an existing `- [x]` item (already complete) | **Skip the update** (already complete) |
 | No matching item + work is complete | Append `- [x] {summary} (session <UUID>)` at the end of the `## Completed` section |
 | No matching item + remaining work | Append `- [ ]` to `## Priority Work` or the appropriate category |
@@ -624,6 +712,7 @@ cleanup's core purpose is **tidying (state refresh + pruning completed items)**,
 | 3 | "The incomplete item and this session's work are phrased differently" → add new | Keyword grep matches if it's the same domain/environment/target. Ignore phrasing differences and update the item |
 | 4 | Skip Step A grep and directly add a `### Session Work` section | Step A is mandatory immediately before recording each work item. Fewer than 1 grep call = procedure violation |
 | 5 | Create a new section without getting user approval | Confirm in advance via AskUserQuestion: "N new-domain work items don't match any existing item, so creating a new section" |
+| 6 | Flip a Plane-indexed line (`→ Plane (<url>)` suffix) to `[x]` because this session's work on it is done | Apply the "Plane-indexed item completion order" gate (Step 0 above) — the Plane issue is the source of truth, the local line is its index |
 
 #### Self-check (immediately before editing fix_plan every time)
 
@@ -632,6 +721,7 @@ cleanup's core purpose is **tidying (state refresh + pruning completed items)**,
 3. If there's a matching existing item, update that line via Edit (do not add a new row)
 4. If no match, append 1 line at the end of the appropriate existing section (`## Completed` / `## Priority Work` / `## Hold`)
 5. **If you're about to create a new `##`/`###` date header, stop immediately** → return to AskUserQuestion or self-check #3-4
+6. **If you're about to flip a matched line to `[x]` and it carries a `→ Plane (<url>)` suffix, stop and run the "Plane-indexed item completion order" gate (Step 0 above) first** — do not flip until Plane itself reflects completion
 
 #### Violation cases
 
@@ -666,7 +756,14 @@ A session has **two identity axes**, and the cleanup end-report must carry **bot
 
 **UUID**: when citing a session identifier in a session jsonl, RAG chunk, session id, checklist work item, etc., **full 36-character UUID output is mandatory**. This applies equally to the cleanup end-report text. **Missing the UUID output entirely is also a violation** — not just truncation, complete omission is forbidden too.
 
-**Name recommendation (mandatory in the end-report)**: the cleanup end-report must also propose **2-3 `/rename <name>` candidates** synthesized from the session's main work (same convention as the `/session name` capability). Emitting only the UUID and no name recommendation is a violation — the UUID is not human-findable in the session list. Keep each candidate short and descriptive (the dominant theme — a skill / PR / feature), in the session's own working language. `/rename` is a built-in the agent cannot run itself, so present the candidates for the user to copy.
+**Name recommendation (mandatory in the end-report)**: the cleanup end-report must also propose **2-3 `/rename` candidates** synthesized from the session's main work. Emitting only the UUID and no name recommendation is a violation — the UUID is not human-findable in the session list. `/rename` is a built-in the agent cannot run itself, so present the candidates for the user to copy.
+
+**Format — `<model>-<topic>-<sessid8>` (mandatory)**: each candidate fuses machine identity and human identity into one copy-pasteable name so the session list entry says *which model produced it* and *which transcript it maps to*:
+- `<model>` — the family token of the current model ID (`claude-opus-4-8` → `opus`, `claude-sonnet-5` → `sonnet`, `claude-haiku-4-5` → `haiku`, `claude-fable-5` → `fable`). Read it from the SessionStart `Current model:` line.
+- `<topic>` — the session's single dominant theme (a skill / PR / feature), kebab-case, short (a few tokens), in the session's own working language.
+- `<sessid8>` — the session UUID's leading 8 hex characters (the first hyphen-delimited group), so the name greps straight back to the transcript / RAG chunk.
+
+Example: `opus-vsix-release-a1b2c3d4` (the `<sessid8>` shown is illustrative — always substitute the real session's leading 8 hex). This is cleanup's own recommendation format: it deliberately extends the bare single-slug convention the standalone `/rename` skill uses, adding the model prefix + session-id suffix for end-of-session findability + greppability.
 
 | # | Don't | Do |
 |---|-------------|-----------------|
@@ -675,6 +772,8 @@ A session has **two identity axes**, and the cleanup end-report must carry **bot
 | 3 | Abbreviating "for readability" | UUID is an identifier for copy·grep·API matching. Truncation = the user cannot use it directly |
 | 4 | Using a prefix UUID in the cleanup completion report | Full UUID in both the completion report + checklist item |
 | 5 | **The comprehensive/end report omits the UUID entirely** (only mentions commits/files/RAG) | **The end report's first line or table must include an explicit "Session ID: <UUID>" row** |
+| 6 | Propose a bare topic-slug name (no model prefix, no session-id suffix) in the cleanup end-report | Use the `<model>-<topic>-<sessid8>` format — e.g. `opus-vsix-release-a1b2c3d4` — so the name carries model + session-id for findability + grep |
+| 7 | Glue a label and colon inside the same code span as the command (e.g. `` `Recommend: /rename <name>` ``) — copying that span pastes "Recommend: /rename <name>" as one broken string | Keep the command in its own clean span — `` `/rename <name>` `` — with the label as plain text outside it, so a single copy-paste of the span is directly runnable |
 
 **Applicable timing**: all text throughout this skill's steps — progress reports, AskUserQuestion descriptions, completion reports, checklist items.
 
@@ -692,7 +791,8 @@ A session has **two identity axes**, and the cleanup end-report must carry **bot
 2. Is the UUID the full 36 characters? Prefix-only/truncated/absent are all forbidden
 3. Does the location match the per-medium obligation table?
 4. Ending the report without outputting the UUID = a rule violation
-5. Does the report include a `/rename` **name recommendation** (2-3 candidates synthesized from the session's work)? — a UUID-only report is incomplete (the UUID is not findable in the session list)
+5. Does the report include a `/rename` **name recommendation** (2-3 candidates) in the `<model>-<topic>-<sessid8>` format (model family token + dominant-work topic + UUID leading 8 hex)? — a UUID-only report, or a bare topic-slug missing the model prefix / session-id suffix, is incomplete
+6. Is the `/rename <name>` command isolated in its own code span, with no label text or colon inside that span? — a glued `` `Recommend: /rename <name>` `` span breaks copy-paste-to-run
 
 For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "session UUID omitted from wrap-up report."
 
@@ -704,18 +804,36 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 
 **Immediately before** calling the Step 5 next skill, report the entire session's artifacts as a **single comprehensive matrix**. The Step 4 inline report is just a per-step progress report, not a comprehensive report. It's a separate medium.
 
+### Walkthrough file — persist the comprehensive report, not just chat text (HARD STOP)
+
+Chat text alone is not a state-preservation medium — it scrolls away and is not resumable across a compact/session boundary the way a file is. Antigravity's `wip/antigravity.md` already mandates a persistent `walkthrough.md` artifact with incremental updates as work progresses (its own environment's "Mandatory Incremental Walkthrough Update" rule); Claude Code sessions never got the equivalent, so this comprehensive report existed only as ephemeral response text.
+
+**Procedure**: in addition to emitting the comprehensive matrix as response text (unchanged), write (or, on a 2nd+ cleanup pass this session, incrementally update) the same content to a file named `walkthrough-<topic>-<sessid8>.md`, using the storage-location fallback logic from `vibe-coding/artifact-rules.md` "Artifact Storage Locations" (`{ws}/llm-wiki/generated/` → `{ws}/.ralph/docs/generated/` (or the workspace's equivalently-named Ralph-loop directory, e.g. `.agents/docs/generated/`) → `{ws}/.omc/plans/` → `{ws}/docs/generated/` fallback). `<topic>` and `<sessid8>` follow the same convention as the `/rename` recommendation (dominant-work topic, kebab-case; session UUID's leading 8 hex).
+
+**Content**: the walkthrough file body is a narrative account of the session's work — not merely a copy of the comprehensive matrix table. Include what was attempted, what was found, what decisions were made and why, and what the matrix's rows summarize in table form. The matrix table itself may be embedded at the end of the file as a quick-reference appendix.
+
+**Incremental update, not overwrite-then-forget**: if `/cleanup` fires more than once in the same session, append/update the existing walkthrough file (matching the file already written earlier in the session) rather than creating a second one — mirrors Antigravity's incremental-update requirement.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat the chat-text comprehensive report as sufficient state preservation | Also write it to a `walkthrough-<topic>-<sessid8>.md` file — chat text is ephemeral, the file persists |
+| 2 | Copy the matrix table verbatim as the entire file body | Write a narrative account (what/why/decisions), with the matrix as an appendix |
+| 3 | Create a new walkthrough file on every `/cleanup` firing within the same session | Update the existing session walkthrough file incrementally |
+| 4 | Guess a storage path | Follow `vibe-coding/artifact-rules.md`'s Artifact Storage Locations fallback logic |
+
 **Mandatory report-medium items** (all included in a single response text):
 
 | Row | Content |
 |---|------|
 | Session ID | `Session ID: <full-36-UUID>` (consistent with the Step 4 "Session Identity Rule") |
-| Session name | `Recommend: /rename <name>` — 2-3 candidates synthesized from the session's dominant work (findability in the session list) |
+| Session name | Recommend running: `/rename <model>-<topic>-<sessid8>` — 2-3 candidates (model family token + dominant-work topic + UUID leading 8 hex), e.g. `/rename opus-vsix-release-a1b2c3d4` (findability + greppability in the session list; keep the `/rename ...` command in its own code span with no label/colon glued to it, so copy-paste runs directly) |
 | Commits | This session's created commit SHA + repository + branch matrix |
 | Files | List of files changed via Edit/Write this session (path + line changes) |
 | FA Prune | Demoted sections + archive file path + HOT line count change |
 | Rules added | Newly added/strengthened rules/skills/agents/hooks files + sections |
 | Pattern detection | Discovered patterns + fix_plan registration result |
 | BLOCKED | Items handled as BLOCKED in this session + next-session trigger conditions |
+| **Walkthrough file (mandatory row)** | **Path of the `walkthrough-<topic>-<sessid8>.md` file written/updated per the "Walkthrough file" subsection above** |
 
 ### Don't / Do
 
@@ -724,17 +842,19 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 | 1 | Enter the Step 5 next call using only the Step 4 inline report | Output the Step 4.5 comprehensive matrix report, then call Step 5 next |
 | 2 | Interpret the "no direct recommendation text output" rule as "the comprehensive report is also forbidden" | Comprehensive report ≠ next-action recommendation. Only the Step 5 recommendation ask is forbidden; the Step 4.5 comprehensive report is mandatory |
 | 3 | Reason that "accumulated per-step inline reports are sufficient" | Per-step reports = progress reports. Comprehensive matrix = whole-session summary. Separate media. The user must be able to review everything at once |
-| 4 | Omit some items like Session ID, commits, files | All 7 rows above are mandatory. State "N/A" explicitly for any that don't apply |
+| 4 | Omit some items like Session ID, commits, files | All 8 rows above are mandatory. State "N/A" explicitly for any that don't apply |
 | 5 | Compress the comprehensive report text into the next option description | The comprehensive report is a separate response text. next options are a separate medium for deciding the next action |
+| 6 | Emit the comprehensive matrix as response text only, with no `walkthrough-<topic>-<sessid8>.md` file written | The walkthrough file is a mandatory row, not an optional enhancement — chat text alone does not persist across compact/session boundaries |
 
 ### Self-check (immediately before the Step 5 next call every time)
 
-1. Does the response text contain the 36-character Session ID UUID at least once?
-2. Are all 7 rows of the matrix above included? (also state N/A explicitly)
+1. Does the response text contain the 36-character Session ID UUID at least once? **Cross-check the exact UUID against the most recent hook-injected `Current session ID:` line in this turn (or a marker-method result) — a UUID copied from a memory file's `originSessionId` frontmatter, an old chat reference, or "the one I've been using all session" is not a valid source. If a RAG import earlier in the session used a different UUID than what's injected right now, that import targeted the wrong session's JSONL — re-run it with the correct UUID before finalizing this row.**
+2. Are all 8 rows of the matrix above included, INCLUDING a literal `3-C.1 RAG Store` row (bold/highlighted per the mandatory-rows table)? A comprehensive report that reports RAG results only in earlier prose and omits the dedicated row is incomplete — go back and add it. (also state N/A explicitly for any non-applicable row)
 3. Does the commits row state this session's SHA + repository + branch?
 4. Does the files row state all paths Edit/Write-targeted this session?
 5. Are the Step 4.5 comprehensive report and the Step 5 next call clearly separated as separate responses or separate sections?
 6. **Does the BLOCKED row contain a RAG store failure item?** If yes, entering Step 5 next is **forbidden** — try all of workflow.md's "session-end RAG persistence obligation" medium matrix (MCP / vendor script / direct REST API). Only after all three media fail is entering next allowed. **Simply "stating BLOCKED" ≠ "qualified to enter next" — attempting medium alternatives is a prior obligation**
+7. **Has the `walkthrough-<topic>-<sessid8>.md` file actually been written/updated on disk (not just planned in text)?** Verify with a real file check before citing its path in the Walkthrough file row — a described-but-unwritten path is a violation of this same gate
 
 **Skip condition**: same as the Step 4 skip condition (no conversation content or only simple questions)
 
@@ -806,9 +926,47 @@ Among remaining incomplete tasks, ones that the **Ralph autonomous loop can exec
 
 ---
 
+## Step 5.5: Self-Task Cleanup (status-based prune — MANDATORY, HARD STOP)
+
+**After the Step 5 wip call completes, prune this cleanup run's own tracking tasks before declaring cleanup done.** Step 0 (top of this file) only prunes tasks that were already `completed` *before* this cleanup run started — by construction it cannot see the Step 0-4.5+5 tracking tasks that line 40's "Task pre-registration" mechanism creates, since those only reach `completed` status *during* this very run, after Step 0 already executed. Without this step, cleanup's own step-tracking tasks accumulate as `completed`-but-undeleted noise in every session that uses Task tools.
+
+This mirrors `fix/step4-wrapup.md` Measure 3 (status-based, not prefix-based prune) — the same gap, in the sibling skill that also pre-registers its own step-tracking tasks.
+
+### Prune target matrix
+
+| Task kind | Status | Cleanup target? |
+|-----------|--------|-----------------|
+| **This cleanup run's own Step 0-4.5+5 tracking tasks** (from line 40 pre-registration) | completed | ✅ mark deleted |
+| **This cleanup run's own tracking tasks** | in_progress / pending | ❌ should not happen once cleanup finishes — investigate before pruning |
+| **Other tasks created and completed during this cleanup run** (e.g. a fix-* chain nested inside cleanup) | completed | ✅ mark deleted |
+| **Tasks that predate this cleanup run** | any status | out of scope — already handled by Step 0, or intentionally left pending/BLOCKED |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume Step 0's prune already covers this because "TaskList cleanup" already ran once this session | Step 0 runs at entry, before this run's own tracking tasks exist. Re-check `TaskList` at the very end, after Step 5 |
+| 2 | Leave completed Step 0-4.5+5 tracking tasks in TaskList "for history" | History lives in the Step 4.5 comprehensive report + fix_plan.md + git log. TaskList completed-but-undeleted entries are stale noise |
+| 3 | Prune only tasks literally prefixed with a cleanup-step label and miss other same-run completions | Criterion is status (completed) + creation time (this cleanup run), not a naming prefix |
+| 4 | Delete pending/in_progress tasks along with completed ones | Only `completed` tasks are pruned. `pending`/`in_progress` remaining work stays |
+
+### Self-check (every time, immediately before declaring cleanup complete)
+
+1. Call `TaskList` one more time — this is a **second** call, after Step 5, not a re-read of Step 0's earlier result
+2. Identify this cleanup run's own pre-registered tracking tasks (Step 0/1/2/3/4/4.5+5) by their creation point in this run
+3. Any of them still `completed`? → `TaskUpdate(status: "deleted")` for each
+4. Any other task created and completed during this run (not part of the pre-registered set)? → same prune
+5. State the prune count in the completion report: `**Self-task cleanup**: N tracking tasks deleted`
+
+**Skip condition**: skip only if `TaskCreate`/`TaskList` were disconnected for the entire run (already stated per line 40's fallback) — do not skip because "the count looks small."
+
+**Ralph-mode carve-out (HARD STOP — do not conflate "no autonomous decision-work" with "leave your own tracking task open")**: the Ralph-mode short-circuit below skips the *decision-making* parts of Steps 1-5 (commit strategy, retrospect judgment calls, RAG-store choices), not this run's own bookkeeping. Before emitting the "cleanup complete" text in Ralph mode too, call `TaskList` and `TaskUpdate(status: "completed")` on this run's own pre-registered tracking task(s) from line 40 — closing your own procedural bookkeeping is not a "direct modification" in the sense Ralph mode restricts (rules/memory/hooks, skill/agent creation, delegated execution). A declared-complete report with the run's own tracking task still `pending`/`in_progress` is a self-contradiction the reader can immediately catch, and is exactly the failure the `check-self-task-open-at-wrapup.js` Stop hook now flags (see failed-attempts.md `self-task-prune-gap-at-skill-wrapup`, 3rd occurrence).
+
 ---
 
-**⚠️ In Ralph mode, end here — declare cleanup complete after recording to improvements.md**
+---
+
+**⚠️ In Ralph mode, end here — declare cleanup complete after recording to improvements.md AND after the Ralph-mode carve-out above**
 
 In Ralph mode (`.ralph/` exists + `RALPH_LOOP=1`), Phase 2/3 cannot be entered since they depend on AskUserQuestion. Once the steps up to this point finish:
 1. Confirm that all findings collected in Steps 0-5 have been recorded to `.ralph/improvements.md` with the `[NEEDS_REVIEW]` tag
@@ -829,6 +987,7 @@ Create a **separate question** for each step that has findings and add it to the
 
 **Key principles**:
 - **Each step is an independent question** — do not combine Weekly Report and next-action recommendation into one
+- **LLM Wiki Recommendation**: If Step 3-A LLM Wiki Scope Check identified findings/candidates, **must include an independent question or option under Persist** proposing raw knowledge ingest dispatch (e.g. `raw-ingest` skill if available) for the discovered candidates.
 - **Options must contain concrete content** — no abstract labels. Put the actual work title+reason in the label/description
 - **Skip option**: for a multi-question set, if an individual question has 3 or fewer options, adding `{ label: "Skip", description: "Skip this item" }` is allowed
 
@@ -837,7 +996,7 @@ Create a **separate question** for each step that has findings and add it to the
 | Group | Included steps | header |
 |------|----------|--------|
 | Improve | Retrospect + Automation Review + Pattern Detect | "Improve" |
-| Persist | Knowledge storage (documentation+infra+memory) | "Persist" |
+| Persist | Knowledge storage (documentation+infra+memory+LLM Wiki ingest) | "Persist" |
 | Work | Weekly Report | "Work" |
 | Next | Next-action recommendation | "Next" |
 
@@ -856,7 +1015,7 @@ Create a **separate question** for each step that has findings and add it to the
 | Retrospect | Create a feedback memory file + add to the MEMORY.md index + record to failed-attempts.md |
 | Automation Review | Fix the hook script or call `/skill-kit upgrade` |
 | Pattern Detect | `/skill-kit route` → chaining (upgrade/writer) |
-| Knowledge | Write/edit documentation + add missing items to CLAUDE.md + store to Serena/Claude Code memory |
+| Knowledge | Write/edit documentation + add missing items to CLAUDE.md + store to Serena/Claude Code memory + **dispatch raw knowledge ingest skill (if available) for LLM Wiki candidates** |
 | Weekly | Call `/weekly-report generate` |
 | Next | Register the selected recommendation via TodoWrite and execute immediately |
 
