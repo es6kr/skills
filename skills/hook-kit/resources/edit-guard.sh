@@ -520,11 +520,23 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
 # Find the start of the current turn: scan backward from the end for the most
 # recent genuine user prompt (role=user, string content — not a tool_result
 # array, which also carries role=user in this transcript format).
+#
+# Harness-injected stub messages ("Skill /<name> is already loaded above;
+# instructions unchanged.") also arrive as role=user string content whenever
+# a skill is re-invoked mid-session — indistinguishable from a real prompt by
+# role+type alone. Left unfiltered, this resets turn_start to AFTER the very
+# Skill("skill-kit", ...) call this check is looking for, permanently hiding
+# every re-invocation once skill-kit has loaded once in the session.
+STUB_MARKER = "is already loaded above; instructions unchanged."
+
 turn_start = 0
 for i in range(len(entries) - 1, -1, -1):
     ent = entries[i]
     msg = ent.get("message") or {}
-    if msg.get("role") == "user" and isinstance(msg.get("content"), str):
+    content = msg.get("content")
+    if msg.get("role") == "user" and isinstance(content, str):
+        if STUB_MARKER in content:
+            continue
         turn_start = i
         break
 
