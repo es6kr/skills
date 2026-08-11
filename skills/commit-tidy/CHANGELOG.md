@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.3](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.2...commit-tidy-v0.5.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **commit-tidy:** require explicit HEAD ref and hunk inspection in the shared-checkout sanity check ([7274f14](https://github.com/es6kr/skills/commit/7274f143863f27040b4379ea60ee6a4e8a2afbfd))
+* **commit-tidy:** require HEAD-diff sanity check before staging shared hardlinked skill files ([b77b597](https://github.com/es6kr/skills/commit/b77b5972350bec1d7f83ea4bcaa45214b9748b10))
+* **commit-tidy:** require HEAD-diff sanity check before staging shared hardlinked skill files ([174d27a](https://github.com/es6kr/skills/commit/174d27a2be3512148cd569381958d92908da467e))
+
 ## [0.5.2](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.1...commit-tidy-v0.5.2) (2026-08-09)
 
 
