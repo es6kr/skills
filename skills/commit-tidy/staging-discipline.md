@@ -134,3 +134,34 @@ See `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry for "worktree s
 3. If yes, does my report/plan include ALL of them, not just the one initially pointed at?
 
 See `~/.claude/skills/cleanup/data/failed-attempts.md` "squash-scan-scope-narrowed-to-user-mention" for case history.
+
+---
+
+## Shared hardlinked-checkout HEAD-diff sanity check (HARD STOP — concurrent-session drift)
+
+**Before staging/committing a file that lives in a checkout shared across concurrent sessions (e.g. a hardlinked skills repo checkout under `~/.agents`), run `git diff HEAD --stat -- <file>` against HEAD and inspect the actual diff hunks (`git diff HEAD -- <file>`), not just the reported insertion/deletion counts.** A concurrent session's commit can advance HEAD past this session's Read-time baseline — the on-disk file may already carry someone else's change by the time this session stages it, and a plain `git add` bundles that unrelated change into the commit silently. Without an explicit `HEAD` ref, `git diff` compares the working tree to the **index**, not HEAD — if the index already carries staged content, the check under-reports or shows 0. Insertion/deletion counts alone are also insufficient: two unrelated edits can produce identical `--stat` totals, so a concurrent overwrite with the same line-delta can silently pass a count-only check.
+
+### Procedure
+
+1. Right before `git add <file>` (not right after Edit — right before staging), run `git diff HEAD --stat -- <file>` comparing the working tree to HEAD.
+2. Inspect `git diff HEAD -- <file>` and verify that every hunk belongs to this session's edit — use the `--stat` totals only as a preliminary signal, not the acceptance criterion.
+3. Every hunk matches the intended edit → proceed to stage.
+4. Any hunk is unfamiliar or doesn't match the intended edit (extra hunks, unfamiliar lines, sections not touched this session) → **halt, do not stage**, even if the `--stat` totals look right. A concurrent session's commit already landed on this file.
+5. Re-`Read` the file for its current on-disk state, reconcile the intended change against it (re-apply the edit on top of the new baseline if it still applies cleanly), then re-check `git diff HEAD -- <file>` before staging again.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Stage a shared-checkout file immediately after Edit without a fresh `git diff HEAD --stat -- <file>` check | Run `git diff HEAD --stat -- <file>` right before `git add`, not right after Edit — HEAD can move in between |
+| 2 | Assume the Read-time content is still current because no tool reported a conflict | Hardlinked/shared checkouts have no built-in conflict signal — the sanity check is the only defense |
+| 3 | Treat matching insertion/deletion totals as proof the diff contains only this session's edit | Two different edits can have identical `--stat` totals — inspect `git diff HEAD -- <file>` hunks and reconcile before staging, don't rationalize a size match away |
+| 4 | Limit this check to skill files specifically | Applies to any shared-checkout path where concurrent sessions commit independently (skills, rules, shared docs under a hardlinked repo) |
+
+### Self-check (every time, right before `git add` on a shared-checkout file)
+
+1. `git diff HEAD -- <file>` — does every hunk belong to this session's own edit? (`--stat` totals are a preliminary signal only, not the acceptance criterion)
+2. Any unfamiliar hunk → halt, re-Read, reconcile, re-check before retrying `git add`
+3. Only stage once every hunk matches this session's edit exactly
+
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "concurrent-session-overwrites-hardlinked-shared-config" for case history (related failure mode: a prior Edit lost, not just an unrelated edit bundled into a commit).
