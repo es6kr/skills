@@ -14,7 +14,7 @@ Route backlog items to the model tier best suited to them. High-capability (deep
 Maintain a dedicated tracker section named `## <Model> Target Tasks` (e.g., a top-tier model's name). Items follow the same authoring schema as [add.md](./add.md) (Action / Why / How) plus:
 
 - **Draft/Plan** line pointing to existing plan artifacts (or `(none — greenfield)`)
-- Marker `[BLOCKED:P<N>:selfable]` — the block reason is "awaiting the target model", so any session running that model may execute them; other sessions skip
+- Marker `[BLOCKED:P<N>:external]` — the block reason is "awaiting the target model" (a true external dependency per [priority.md](./priority.md)'s `external`/`selfable` classification: the item cannot proceed without that specific model session), so any session running that model may execute them; other sessions skip
 - A category tag (see below) so future triage passes can audit fit
 
 ## Suitability Categories
