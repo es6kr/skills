@@ -44,14 +44,48 @@ INPUT=$(cat)
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 case "$TOOL_NAME" in
-  Edit|Write) ;;
+  Edit|Write|write_to_file) ;;
   *) exit 0 ;;
 esac
 
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.TargetFile // .tool_input.target_file // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 
-NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty' 2>/dev/null)
+NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // .tool_input.CodeContent // empty' 2>/dev/null)
+
+# ============================================================================
+# Check 0: Block write_to_file / Write with Overwrite: true on existing files
+# ============================================================================
+check_write_file_overwrite() {
+  case "$TOOL_NAME" in
+    Write|write_to_file) ;;
+    *) return 0 ;;
+  esac
+
+  local overwrite
+  overwrite=$(echo "$INPUT" | jq -r '.tool_input.Overwrite // .tool_input.overwrite // false' 2>/dev/null)
+
+  if [[ -f "$FILE_PATH" && "$overwrite" == "true" ]]; then
+    case "$FILE_PATH" in
+      */task.md|*/scratch/*) return 0 ;;
+    esac
+
+    cat >&2 <<MSG
+DENIED: write_to_file with Overwrite: true on an existing file is strictly prohibited (HARD STOP).
+
+Target file: $FILE_PATH
+
+Why blocked:
+  - Editing an existing file with write_to_file (Overwrite: true) causes accidental content loss and truncates un-targeted sections.
+  - You MUST use replace_file_content or multi_replace_file_content for incremental edits on existing files.
+
+Required action:
+  - Switch to replace_file_content or multi_replace_file_content to edit only the target lines/sections.
+  - Preserve all existing file content and docstrings.
+MSG
+    exit 2
+  fi
+}
 
 # Lazy SKILL_ROOT resolution (only when a skill scope check runs)
 SKILL_ROOT=""
@@ -294,7 +328,7 @@ check_stub_file_substantive_edit() {
   #                    declared in the first 10 lines. Explicit author intent.
   #   AXIS B (loose):  body pointer phrase + size < 2KB + `## section count <= 1`.
   #                    True stubs are small pointer files with at most one ##
-  #                    section ("Location pointer" or equivalent). Topic files that
+  #                    section (a location-pointer marker, or equivalent). Topic files that
   #                    happen to contain a body phrase like "Use X instead"
   #                    typically carry 2+ ## sections (Method, Example, etc.)
   #                    — the section-count gate filters those out.
@@ -429,11 +463,136 @@ PYEOF
   exit 2
 }
 
+# ============================================================================
+# Check 6: skill .md Edit without a same-turn Skill("skill-kit", ...) call
+# ============================================================================
+# skill-usage.md HARD STOP: skill file creation/modification must go through
+# skill-kit (writer/upgrade/lint/...), not a direct Read-topic-then-inline-Edit.
+# 3 recurrences of the exact same pattern (Read the topic .md, silently apply
+# its guidance inline, never call Skill("skill-kit", ...)) — see
+# failed-attempts.md class skill-kit-invoke-bypass-via-direct-topic-read.
+check_skill_edit_without_skill_kit() {
+  [[ "$FILE_PATH" == *.md ]] || return 0
+  case "$FILE_PATH" in
+    */skills/*/*) ;;
+    *) return 0 ;;
+  esac
+
+  # Path-based exemption: case-history / data files are not skill procedural
+  # body (same exemption class as checks 1-3, 5 above).
+  case "$FILE_PATH" in
+    */data/failed-attempts*.md|*/data/failed-hooks*.md|*/data/archive/*.md|*/data/case-studies/*.md)
+      return 0
+      ;;
+  esac
+
+  resolve_skill_root
+  [[ -z "$SKILL_ROOT" ]] && return 0
+  [[ -f "$SKILL_ROOT/SKILL.md" ]] || return 0
+
+  local skill_name
+  skill_name="$(basename "$SKILL_ROOT")"
+  # Editing skill-kit's own files doesn't need to route through itself.
+  [[ "$skill_name" == "skill-kit" ]] && return 0
+
+  [[ -z "$NEW_CONTENT" ]] && return 0
+
+  local transcript
+  transcript=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+  [[ -z "$transcript" ]] && return 0
+  [[ -f "$transcript" ]] || return 0
+
+  local called
+  called=$(python3 - "$transcript" <<'PYEOF' 2>/dev/null
+import json, sys
+path = sys.argv[1]
+entries = []
+with open(path, encoding="utf-8", errors="ignore") as fh:
+    for line in fh:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except Exception:
+            continue
+
+# Find the start of the current turn: scan backward from the end for the most
+# recent genuine user prompt (role=user, string content — not a tool_result
+# array, which also carries role=user in this transcript format).
+#
+# Harness-injected stub messages ("Skill /<name> is already loaded above;
+# instructions unchanged.") also arrive as role=user string content whenever
+# a skill is re-invoked mid-session — indistinguishable from a real prompt by
+# role+type alone. Left unfiltered, this resets turn_start to AFTER the very
+# Skill("skill-kit", ...) call this check is looking for, permanently hiding
+# every re-invocation once skill-kit has loaded once in the session.
+STUB_MARKER = "is already loaded above; instructions unchanged."
+
+turn_start = 0
+for i in range(len(entries) - 1, -1, -1):
+    ent = entries[i]
+    msg = ent.get("message") or {}
+    content = msg.get("content")
+    if msg.get("role") == "user" and isinstance(content, str):
+        if STUB_MARKER in content:
+            continue
+        turn_start = i
+        break
+
+found = False
+for ent in entries[turn_start:]:
+    msg = ent.get("message") or {}
+    c = msg.get("content")
+    if not isinstance(c, list):
+        continue
+    for b in c:
+        if not isinstance(b, dict) or b.get("type") != "tool_use":
+            continue
+        if b.get("name") != "Skill":
+            continue
+        inp = b.get("input") or {}
+        if inp.get("skill") == "skill-kit":
+            found = True
+            break
+    if found:
+        break
+print("1" if found else "0")
+PYEOF
+)
+  called="${called:-0}"
+  [[ "$called" == "1" ]] && return 0
+
+  cat >&2 <<MSG
+DENIED: skill file Edit/Write without a same-turn Skill("skill-kit", ...) call.
+
+Target file:  $FILE_PATH
+Skill:        $skill_name
+
+Why blocked:
+  - Reading a topic .md and applying its guidance inline (without an actual
+    Skill("skill-kit", ...) tool call) has recurred 3 times — the topic's
+    guidance gets followed, but skill-kit's own validation (duplicate check,
+    Topics-table sync, frontmatter/language lint) never runs.
+  - skill-usage.md HARD STOP: skill file edits must route through the
+    skill-kit skill, not a direct topic-.md Read followed by an inline Edit.
+
+Required action:
+  1. Call Skill("skill-kit", "<writer|upgrade|lint|...>") first this turn.
+  2. Then retry this Edit/Write.
+
+Reference: failed-attempts.md class skill-kit-invoke-bypass-via-direct-topic-read.
+MSG
+  exit 2
+}
+
 # Execute checks in cost order (no-I/O → file I/O → transcript I/O)
+check_write_file_overwrite
 check_date_in_skill_rule
 check_skill_language_mismatch
 check_vendor_in_generic_skill
 check_stub_file_substantive_edit
 check_fa_edit_without_rag_search
+check_skill_edit_without_skill_kit
 
 exit 0
