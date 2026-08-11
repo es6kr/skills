@@ -74,7 +74,9 @@ Save session-learned project knowledge to persistent memory.
 
 **Detection**: see SKILL.md — only when both `.ralph/` directory exists **and** environment variable `RALPH_LOOP=1` is set.
 
-A-C: detect + record to `.ralph/improvements.md` only. No direct modifications/saves.
+A (documentation location) / B (infra doc check): detect + record to `.ralph/improvements.md` only — these are storage-location judgment calls that would normally prompt the user.
+
+**C (Memory Save) — split by sub-step, do not blanket-restrict (HARD STOP)**: the RAG receiver session-chunk import (cleanup/run.md 3-C.1) and structured discovery-chunk store (3-C.2) carry **no ask even in normal mode** (see cleanup/run.md's top-level "Ask-bypass axis vs. passive-persistence axis" carve-out) — they still run automatically in Ralph Mode, logging the result to `.ralph/improvements.md` instead of a chat report row. Only the Serena/Claude-Code-memory storage-location classification (Pre-check table above) stays recording-only, since picking a destination is itself a judgment call.
 
 ## Phase 2 Integration
 
