@@ -78,6 +78,22 @@ For tasks that touched files via `Edit` / `Write`, the completion report MUST sh
 - **20+ line change**: changed files + section structure (heading list) + key excerpt. Skeleton, not the whole body
 - **New file**: file path + first 10-20 line excerpt
 
+## External-resource completion — verifiable URL required (HARD STOP)
+
+When a task's deliverable is a non-git external resource (a form, a deployed page, a third-party SaaS record, an API-mutated document) rather than a commit or local file, the completion report MUST include a URL the user can open independently to verify the result. "I re-fetched it and confirmed" is not sufficient on its own — the user needs their own way to check, not just the assistant's word.
+
+**Priority order** — use the first one that applies:
+
+1. **The resource's own URL** (the form link, the deployed page URL, the record's direct link)
+2. **A Plane issue URL** tracking the work, if the resource itself has no shareable URL
+3. **Create a Plane intake issue on the spot** and include its URL, if neither #1 nor #2 exists — do not close out the completion report with no URL at all
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Report "reflected/updated/deployed — confirmed via re-fetch" with no link | Include the resource's own URL alongside the confirmation |
+| 2 | Treat self-verification (GET re-check, re-run, screenshot) as a substitute for a user-clickable link | Self-verification proves correctness; the URL gives the user their own means to check — both are needed, neither replaces the other |
+| 3 | Skip the URL because "there's no natural URL for this kind of resource" | Fall through the priority order — Plane issue, or create a Plane intake issue, before closing the report |
+
 ## PR comment for AI-assisted work — not needed on code PRs
 
 When the PR is itself a code-change PR, the commit messages and the commits are the work-tracking medium. Any rule / skill edits the AI made alongside should be recorded in `fix_plan` / `improvements.md`; a separate PR comment is noise.
@@ -97,4 +113,4 @@ When the PR is itself a code-change PR, the commit messages and the commits are 
 
 ## Reference
 
-See `~/.claude/skills/cleanup/data/failed-attempts.md` "completion report" and "file-change disclosure" entries for recurrence history.
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "completion report", "file-change disclosure", and "completion-report-missing-external-url" entries for recurrence history.
