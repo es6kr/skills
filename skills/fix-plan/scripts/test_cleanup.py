@@ -117,5 +117,35 @@ class TestEndToEndMove(unittest.TestCase):
         self.assertIn("recurrence check done", output)
 
 
+class TestAutoDetectTrackerRoot(unittest.TestCase):
+    """Issue #262: auto-detect must resolve .agents/fix_plan.md, not just
+    .ralph/fix_plan.md, when --file is not passed explicitly."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_agents_only_workspace_auto_detected(self):
+        agents_dir = os.path.join(self.tmpdir, ".agents")
+        os.makedirs(agents_dir)
+        fix_plan = os.path.join(agents_dir, "fix_plan.md")
+        with open(fix_plan, "w", encoding="utf-8") as f:
+            f.write("# Fix Plan\n\n## Progress\n\n## Completed\n\n## REPEAT\n")
+
+        import subprocess
+        # No --file: must auto-detect via cwd. No .ralph/ dir exists here —
+        # pre-fix behavior hardcoded .ralph/fix_plan.md and would exit 1
+        # with "Target fix plan file not found."
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "cleanup.py"), "--cutoff", "2020-01-01"],
+            capture_output=True, text=True, cwd=self.tmpdir,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(fix_plan, result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

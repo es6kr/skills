@@ -233,6 +233,8 @@ Keep responses concise:
 | Step 4: Implementation | Direct action | **PROHIBITED** - Use `[NEEDS_REVIEW]` tag |
 | Step 5: Validation | Validation | **Auto validation** (after changes are complete) |
 
+**Scope note (HARD STOP)**: this table governs the *creation* workflow only (new agent/skill/rule/hook). It does not extend to passive, no-ask persistence steps elsewhere in this skill's topics (`improve`/`persist` RAG session/discovery-chunk store) — those follow the narrower carve-out in `persist.md`'s own "Ralph Mode" section, not this table. Do not generalize "Ralph Mode = record-only, nothing runs" from this table alone.
+
 **improvements.md recording example**
 
 ```markdown

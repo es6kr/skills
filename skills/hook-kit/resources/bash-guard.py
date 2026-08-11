@@ -99,7 +99,10 @@ SIMPLE_BLOCKS = [
 GITPFX = r"\bgit(?:\s+-\S+(?:\s+[^-\s]\S*)?)*"
 GIT_BLOCKS = [
     # Git history destruction
-    (r"reset\s+--hard", "git reset --hard deletes uncommitted work"),
+    # NOTE: a narrow `reset\s+--hard` pattern used to live here, missing other
+    # destructive reset forms (arbitrary ref, large-N mixed history rewrite).
+    # Moved to check_git_reset() below, which blocks everything except a
+    # small-N --soft/--mixed HEAD~N undo (git.md: N<=2 needs no confirmation).
     # NOTE: newline excluded from the span — without it, "git branch --show-current"
     # on one line and "git commit -F" lines later false-matched as "branch -f"
     # (IGNORECASE makes -F hit -f\b). Same \n-exclusion applied to the rm/.tmp spans.
@@ -120,6 +123,27 @@ GIT_BLOCKS = [
     (r"commit\s+--allow-empty", "Empty commits risk being abused as CI/CD triggers"),
     (r"merge\s+--abort", "git merge --abort discards in-progress conflict resolution work"),
 ]
+
+
+def check_git_reset(scan: str) -> str | None:
+    """git reset guard, split out of GIT_BLOCKS: --hard is always destructive
+    (working tree loss) and stays hard-blocked. --soft/--mixed to HEAD~N is a
+    low-risk "undo the last commit(s), keep the changes staged" operation —
+    git.md only requires confirmation once N > 2, so small-N soft/mixed
+    resets are allowed. Bare reset (no --soft/--mixed) or any ref other than
+    HEAD~1/HEAD~2 falls back to the same blanket prohibition as before."""
+    for m in re.finditer(GITPFX + r"\s+reset\b([^|;&\n]*)", scan, IM):
+        tail = m.group(1)
+        if re.search(r"--hard\b", tail, I):
+            return "git reset --hard is ABSOLUTELY PROHIBITED for agents. Never execute under any circumstances."
+        mode = re.search(r"--(soft|mixed)\b", tail, I)
+        head = re.search(r"HEAD~(\d+)\b", tail, I)
+        if mode and head and int(head.group(1)) <= 2:
+            continue  # small-N soft/mixed reset — allowed, no confirmation needed per git.md
+        return ("git reset (hard/soft/mixed/ref) beyond a small --soft/--mixed HEAD~1 or "
+                "HEAD~2 is ABSOLUTELY PROHIBITED for agents. Never execute under any circumstances.")
+    return None
+
 
 # Background dispatch without a command-level time bound
 # (claudify/background-polling.md HARD STOP: the Bash tool `timeout` parameter does
@@ -516,6 +540,10 @@ def evaluate(
         if re.search(GITPFX + r"\s+" + sub, scan, IM):
             return hard(msg)
 
+    reset_reason = check_git_reset(scan)
+    if reset_reason:
+        return hard(reset_reason)
+
     pr_reason = check_pr_create_draft(command)
     if pr_reason:
         return hard(pr_reason)
@@ -633,10 +661,18 @@ def self_test() -> int:
         (True, False, "GIT -C /p RESET --HARD"),
         (True, False, 'git -C "/path with space" reset --hard'),
         (True, False, "foo && git -C /p reset --hard"),
+        # ── soft/mixed reset split (TaskList #15): --hard always blocks;
+        # bare reset, non-HEAD~N refs, and N>2 fall back to the same block ──
+        (True, False, "git reset"),
+        (True, False, "git reset --soft HEAD~3"),
+        (True, False, "git -C /p reset --soft main"),
+        (True, False, "git reset --soft --hard"),
         # ── FP cases: mentions / safe commands that MUST be allowed ──
         (False, False, "git status"),
         (False, False, "git -C /srv/app log --oneline -5"),
         (False, False, "git -C /p reset --soft HEAD~1"),
+        (False, False, "git reset --soft HEAD~2"),
+        (False, False, "git reset --mixed HEAD~1"),
         (False, False, "git clean -n"),
         (False, False, 'echo "git reset --hard undoes uncommitted work"'),
         (False, False, "grep 'git reset --hard' /tmp/notes.md"),

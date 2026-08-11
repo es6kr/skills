@@ -55,10 +55,31 @@ HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE}|merge/split|split/merge|merg
 HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:-AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+}"
 HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅}"
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
-HG_ASK_RETROSPECT_CLOSE="${HG_ASK_RETROSPECT_CLOSE:-close deferred|deferred[^.]{0,15}close|cannot close|not close|closeable|becomes close}"
+# bash's ${VAR:-default} parser brace-matches literal `{`/`}` inside the
+# default word even though they're not part of a nested ${...} — an
+# unescaped `{0,15}` here gets its closing `}` misread as ending the
+# expansion, corrupting the resulting pattern (verified: the runtime value
+# silently drops the `}` after `15` and gains a stray one at the end,
+# producing "grep: invalid repetition count(s)" wherever this var is used).
+# Fix: keep the default in a separate quoted constant with no bare `${:-}`
+# nesting, so no default-word brace-matching happens.
+_HG_ASK_RETROSPECT_CLOSE_DEFAULT="close deferred|deferred[^.]{0,15}close|cannot close|not close|closeable|becomes close"
+HG_ASK_RETROSPECT_CLOSE="${HG_ASK_RETROSPECT_CLOSE:-$_HG_ASK_RETROSPECT_CLOSE_DEFAULT}"
 HG_ASK_VERIFICATION_ATTESTATION="${HG_ASK_VERIFICATION_ATTESTATION:-gh pr (view|diff)|base=|pinned|counter only|verified|diff URL|issuecomment}"
 HG_ASK_PR_STRONG_KO="${HG_ASK_PR_STRONG_KO:-}"
 HG_ASK_PR_READY_KO="${HG_ASK_PR_READY_KO:-}"
+# Missing on this branch: check_stateful_data_safety() (below) references
+# these 4 vars under `set -uo pipefail` with no assignment anywhere in the
+# file, crashing every invocation with "unbound variable" regardless of what
+# is being checked. Restored from the branch that has them.
+HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:-longhorn|replica|PVC|persistentvolume|volume\.longhorn|storage|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume}"
+HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:-PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume}"
+HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:-no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)}"
+HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:-kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*verified|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified}"
+# check_push_without_details() below reads these Korean-locale overrides;
+# no default declaration existed on this branch either (same unbound-var class).
+HG_ASK_PUSH_KO="${HG_ASK_PUSH_KO:-}"
+HG_ASK_COMMIT_KO="${HG_ASK_COMMIT_KO:-}"
 
 INPUT=$(cat)
 
@@ -648,6 +669,79 @@ MSG
   exit 2
 }
 
+check_push_without_details() {
+  # Push-recommendation detail check — options proposing git push must specify target remote/branch AND commit info (SHA or subject)
+  # Locale-specific phrasing comes from data/hangul-patterns.regex (HG_ASK_PUSH_KO);
+  # the English-only fallback is sufficient when the data file is absent.
+  local push_pattern="git push|pushing|push to|Push"
+  if [[ -n "$HG_ASK_PUSH_KO" ]]; then
+    push_pattern="$push_pattern|$HG_ASK_PUSH_KO"
+  fi
+
+  if ! echo "$OPTIONS_BLOB" | grep -qiE "$push_pattern"; then
+    return 0
+  fi
+
+  # Skip if the ask is not actually proposing a git push execution (e.g. asking whether to push or skip, or post-push verification mentions)
+  if echo "$OPTIONS_BLOB" | grep -qiE "do not push|skip push|push skipped|no push"; then
+    return 0
+  fi
+
+  # Skip meta-discussion of this very gate (fixing/describing the push-detail
+  # requirement itself, not proposing an actual push)
+  if echo "$OPTIONS_BLOB" | grep -qiE "push[- ]?(gate|detail)|ask-guard.*push|push.*ask-guard|push.*(false[- ]?positive|\bFP\b)"; then
+    return 0
+  fi
+
+  local commit_pattern="commit|hash|sha|[0-9a-f]{7,40}"
+  if [[ -n "$HG_ASK_COMMIT_KO" ]]; then
+    commit_pattern="$commit_pattern|$HG_ASK_COMMIT_KO"
+  fi
+
+  # Per-option iteration: only block when an individual option that proposes push lacks details
+  local option_line
+  while IFS= read -r option_line; do
+    [[ -z "$option_line" ]] && continue
+    if echo "$option_line" | grep -qiE "$push_pattern"; then
+      # Ignore meta-discussion or skip mentions in this specific option line
+      if echo "$option_line" | grep -qiE "do not push|skip push|push skipped|no push|push[- ]?(gate|detail)|ask-guard.*push|push.*ask-guard|push.*(false[- ]?positive|\bFP\b)"; then
+        continue
+      fi
+
+      local has_remote=0
+      local has_commit_info=0
+
+      if echo "$option_line" | grep -qiE "origin/|remote|branch|local|main|master|target:" || echo "$ASK_TEXT" | grep -qiE "origin/|remote|branch|local|main|master|target:"; then
+        has_remote=1
+      fi
+
+      if echo "$option_line" | grep -qiE "$commit_pattern" || echo "$ASK_TEXT" | grep -qiE "$commit_pattern"; then
+        has_commit_info=1
+      fi
+
+      if [[ "$has_remote" -eq 0 || "$has_commit_info" -eq 0 ]]; then
+        cat >&2 <<'MSG'
+DENIED: AskUserQuestion option proposes Git Push without explicit remote/branch and commit details.
+
+Why blocked:
+  - Option proposes a Git Push action, BUT
+  - The question/option text lacks explicit target remote/branch details (e.g., origin/local, origin/main) OR commit details (SHA / commit subject).
+
+Per git.md and GEMINI.md "Git Push Recommendation Detail Rule (HARD STOP)":
+  - Whenever recommending or asking for Git Push execution, you MUST state the exact target remote, branch, and commit SHA/subject so the user can immediately evaluate the action.
+
+Required action:
+  - Run 'git remote -v' and 'git log -1' to inspect primary state.
+  - Include explicit target remote/branch and commit SHA/subject in your AskUserQuestion question or option description text.
+MSG
+        exit 2
+      fi
+    fi
+  done <<< "$OPTIONS_BLOB"
+
+  return 0
+}
+
 # Execute checks in cost order
 check_merge_without_review
 check_release_please_close
@@ -655,5 +749,6 @@ check_vendor_leak
 check_supervisor_loop_recommend
 check_stateful_data_safety
 check_pr_creation_without_draft
+check_push_without_details
 
 exit 0

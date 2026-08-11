@@ -753,6 +753,13 @@ Among all actionable items from Step 4 classification:
 
 **Environment detection is workspace (CWD) based** — Do not confuse the project-subdirectory `.ralph/` with the workspace `.ralph/`.
 
+**Workspace ≠ the reviewed PR's own repo (HARD STOP)**: the tracking medium is always the **session's own workspace** file — the workspace consolidate is currently running in, not a directory inside the repo that owns the PR under review. When the PR belongs to a different repo than the current session's workspace (a common case for cross-repo consolidate runs), do NOT look for `checklist.md`/`fix_plan.md` inside a checkout of that repo — check the session workspace's own root first, even if it requires a separate `cd`/path lookup outside the PR's repo tree.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | PR under review lives in repo A; look for `checklist.md`/`fix_plan.md` inside a local checkout of repo A, find none, and conclude "no tracking medium exists" | Check the session's own workspace root (e.g. `~/.agents/checklist.md` if that's where the session is running from) first — it applies regardless of which repo's PR is being reviewed |
+| 2 | Ask the user "GitHub Issue vs no tracking vs hold" as if no medium existed, when the session workspace already has a `checklist.md`/`fix_plan.md` | Register directly to the session workspace's existing medium — no ask needed once one exists |
+
 ### Registration procedure
 
 1. Read the medium file

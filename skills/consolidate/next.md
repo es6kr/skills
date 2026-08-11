@@ -56,14 +56,14 @@ Immediately after the Status line output, **ask the user for the PR handling dir
 AUTHOR=$(gh pr view <N> -R <owner>/<repo> --json author --jq '.author.login')
 
 # The comparison target is the API identity of the gh account being used for THIS repo
-# (per ~/.agents/rules/git.md account mapping: es6kr → DrumRobot, daegunsoftDev → daegunjhy).
+# (per ~/.agents/rules/git.md account mapping: es6kr → DrumRobot, an internal workspace org → its mapped account).
 # Do NOT use `gh auth status` "active" account — when multiple accounts are logged in,
 # the active one can differ from the account whose token is actually being used for the repo.
 # Do NOT use `git config user.email` — commit identity ≠ GitHub API identity.
 ACCOUNT_FOR_REPO=$(  # the gh user matching the repo owner per git.md mapping
   case "<owner>" in
     es6kr) echo DrumRobot ;;
-    daegunsoftDev|daegunjhy) echo daegunjhy ;;
+    <other-internal-org>) echo <mapped-account> ;;
     *) gh auth status 2>&1 | awk '/Logged in/{print $7; exit}' ;;
   esac
 )
@@ -125,6 +125,8 @@ When pushing a merge while not immediately applying actionable items (Critical, 
 | `{workspace}/checklist.md` exists (Ralph not in use) | checklist.md | `- [ ] [BLOCKED] {summary}` |
 | GitHub Issue collaboration workflow | Separate Issue | `gh issue create` — specify "deferred from PR #N" in title/body |
 | Handled by additional commit in the same PR | Separate commit | Do not use "subject to separate PR" — push to this PR |
+
+**`{workspace}` = the current consolidate session's own workspace, not the reviewed PR's repo (HARD STOP)**: when the PR under review lives in a different repo than the session's workspace, check the session workspace root for `checklist.md`/`fix_plan.md` — not a checkout of the PR's repo. See `post.md` Step 7.6 "Workspace ≠ the reviewed PR's own repo" for the Don't/Do detail.
 
 **Option description requirements**:
 
