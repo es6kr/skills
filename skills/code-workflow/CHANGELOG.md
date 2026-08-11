@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.2](https://github.com/es6kr/skills/compare/code-workflow-v0.6.1...code-workflow-v0.6.2) (2026-08-11)
+
+
+### Bug Fixes
+
+* **code-workflow:** drop leading-slash requirement in plan-undecided-guard path matcher ([d2ce69e](https://github.com/es6kr/skills/commit/d2ce69e55a1a2ea36bdc6069b2e2acbe11aef125))
+* **code-workflow:** drop unreachable .ralph arm in plan-undecided-guard path matcher ([c94ea53](https://github.com/es6kr/skills/commit/c94ea531bf2eeed79e6e918637fd7b2551e2ae8d))
+* **code-workflow:** scope plan-undecided-guard past fix_plan.md/checklist.md ([22222f4](https://github.com/es6kr/skills/commit/22222f4646e980b811b1253573c5cfe7ecadc590))
+* **code-workflow:** scope plan-undecided-guard past fix_plan.md/checklist.md ([ddcdb03](https://github.com/es6kr/skills/commit/ddcdb03a79852bc1a00e1178a70cec5d4c4359e4))
+
 ## [0.6.1](https://github.com/es6kr/skills/compare/code-workflow-v0.6.0...code-workflow-v0.6.1) (2026-08-05)
 
 

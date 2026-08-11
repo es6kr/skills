@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/es6kr/skills/compare/fix-plan-v0.6.0...fix-plan-v0.6.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **fix-plan:** resolve Plane issue state via separate states endpoint ([a027c74](https://github.com/es6kr/skills/commit/a027c744bf142fd1b6aec5275d372ba705e6c37d))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/fix-plan-v0.5.1...fix-plan-v0.6.0) (2026-08-09)
 
 
