@@ -134,6 +134,10 @@ Ralph cannot use AskUserQuestion, so every step performs **detection + recording
 
 **If `.ralph/` exists but it's an interactive user session, use normal mode** — AskUserQuestion is used normally. Do not judge based on `.ralph/` existence alone.
 
+**Explicit `--ralph` flag in an interactive session (no `RALPH_LOOP=1`) is a distinct case from a true autonomous loop (HARD STOP)**: a true `RALPH_LOOP=1` loop gets a self-healing safety net — a step skipped this iteration can be retried on the next. A user-typed `--ralph` flag in an interactive session has no such next iteration; a step skipped here is skipped for good unless someone notices. Do not apply the two identically — see the RAG-store carve-out below, which applies regardless of which path triggered Ralph Mode.
+
+**Ask-bypass axis vs. passive-persistence axis (HARD STOP — do not conflate)**: Ralph Mode exists because Ralph cannot call `AskUserQuestion` — it restricts only the steps that would otherwise need a user decision (rule/skill/hook edits, agent spawns, automation creation). It does **not** extend to steps that already run with **no ask in normal mode** — the RAG session-chunk store (3-C.1), the structured discovery-chunk store (3-C.2), and the missed-active-artifact store (3-C.3) are all documented above as "Automatic execution — no ask" even outside Ralph Mode. Skipping them under Ralph Mode is a category error: a step that needs no confirmation cannot be made "more autonomous-unsafe" by removing the confirmation channel. These three sub-steps **still run automatically in Ralph Mode** — only their *reporting* medium changes (append the result to `.ralph/improvements.md` instead of a chat-visible report row, since Ralph has no chat to report to). See each sub-step's own "Ralph mode" note below for the corrected behavior.
+
 **Ralph mode behavior rules**:
 
 | User session | Ralph mode |
@@ -142,6 +146,7 @@ Ralph cannot use AskUserQuestion, so every step performs **detection + recording
 | Direct modification (rules, memory, hook) | **Forbidden** — record only |
 | Skill/agent creation | **Forbidden** — record candidates only |
 | Delegate via Agent tool | **Forbidden** — record only |
+| RAG session-chunk / discovery-chunk / missed-artifact store (3-C.1/3-C.2/3-C.3) | **Still runs automatically** — these need no ask in normal mode either. Result logged to `.ralph/improvements.md` instead of a chat report row |
 
 **improvements.md recording format**:
 
@@ -570,9 +575,9 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 4. Files with 0 chunks = storage obligation. Call immediately + report quantitatively
 5. Omitting the report = this sub-step is incomplete
 
-**Ralph mode**: only record the artifact list + un-stored files to `.ralph/improvements.md`. No direct store.
+**Ralph mode**: still stores un-stored files (per the "Ask-bypass axis vs. passive-persistence axis" carve-out in the top-level "Ralph Mode" section — 3-C.3 needs no ask in normal mode either). Log the artifact list + store result to `.ralph/improvements.md` instead of a chat report row.
 
-**Ralph mode**: 3-A~3-C all perform detection+recording only (`.ralph/improvements.md`). No direct modification/storage. Skip RAG storage too (unsuited to autonomous execution).
+**Ralph mode**: 3-A/3-B (documentation-location recommendation, infra-doc edit check) perform detection+recording only (`.ralph/improvements.md`) — these would normally prompt the user for a location/edit decision. **3-C.1/3-C.2/3-C.3 (RAG session/discovery/artifact store) are exempt from this restriction and still run automatically** — they carry no ask in normal mode, so Ralph Mode's ask-bypass rationale does not apply to them (see top-level "Ask-bypass axis vs. passive-persistence axis"). Only direct modification of rules/skills/hooks/memory files stays recording-only.
 
 ---
 
