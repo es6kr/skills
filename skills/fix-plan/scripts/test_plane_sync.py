@@ -155,5 +155,30 @@ class TestSyncChecklistWithPlane(unittest.TestCase):
             self.assertFalse((Path(d) / "fix_plan.md.tmp").exists())
 
 
+class TestAutoDetectTrackerRoot(unittest.TestCase):
+    """Issue #262: the __main__ fallback (no --fix-plan passed) must resolve
+    .agents/fix_plan.md, not just .ralph/fix_plan.md."""
+
+    def test_agents_only_workspace_auto_detected(self):
+        with tempfile.TemporaryDirectory() as d:
+            agents_dir = Path(d) / ".agents"
+            agents_dir.mkdir()
+            fix_plan = agents_dir / "fix_plan.md"
+            fix_plan.write_text("# Fix Plan\n", encoding="utf-8")
+
+            import subprocess
+            # No --fix-plan: must auto-detect via cwd. No .ralph/ dir exists
+            # here — pre-fix behavior hardcoded .ralph/fix_plan.md, so the
+            # module would report "Target fix_plan file <cwd>/.ralph/fix_plan.md
+            # not found" instead of finding the real file under .agents/.
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT_DIR / "plane_sync.py")],
+                capture_output=True, text=True, cwd=d,
+            )
+            combined = result.stdout + result.stderr
+            self.assertNotIn(".ralph", combined)
+            self.assertNotIn("not found", combined)
+
+
 if __name__ == "__main__":
     unittest.main()
