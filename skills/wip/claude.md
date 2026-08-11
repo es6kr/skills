@@ -33,8 +33,11 @@ For the workflow procedure (cleanup → per-item direction ask → execute), see
 | **TodoWrite** | Sequential steps (3–7) | Order preserved, array-overwrite |
 | **fix_plan.md / checklist.md** | Need cross-session persistence | Survives compact / session end |
 | **WIP commit** | Preserve incomplete code | `WIP: <description>` tag, amend/squash later |
+| **Walkthrough file** | Narrative session record (not task tracking) | `walkthrough-<topic>-<sessid8>.md`, written/updated by `cleanup/run.md` Step 4.5 — Claude Code's counterpart to Antigravity's `walkthrough.md` (see [antigravity.md](./antigravity.md) "Storage") |
 
 **On `/wip`, execute at least one of the above.** Emitting only a text summary is forbidden.
+
+**Walkthrough file is a separate medium from task tracking**: Antigravity's `task.md` (progress checklist) and `walkthrough.md` (narrative account) are two distinct artifacts serving two distinct purposes — Claude Code's equivalents are `TaskList`/`TodoWrite` (progress) and the walkthrough file (narrative), respectively. Registering tasks does not substitute for the walkthrough file, and vice versa.
 
 ## Tool Selection
 
