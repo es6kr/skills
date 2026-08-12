@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3](https://github.com/es6kr/skills/compare/next-v0.7.2...next-v0.7.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* **next:** route autonomous-loop re-fire through the TaskList precedence gate ([1030498](https://github.com/es6kr/skills/commit/1030498a6d9c0fa5774a93b4b9284c2db3402918))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
 ## [0.7.2](https://github.com/es6kr/skills/compare/next-v0.7.1...next-v0.7.2) (2026-08-09)
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.4](https://github.com/es6kr/skills/compare/claudify-v0.5.3...claudify-v0.5.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* **claudify:** same Ralph Mode RAG-store carve-out for persist topic ([6c00653](https://github.com/es6kr/skills/commit/6c00653273190df654a093436fffdb76cbfeb20c))
+* **cleanup,claudify:** separate ask-bypass axis from RAG-store axis in Ralph Mode ([196da8f](https://github.com/es6kr/skills/commit/196da8fdb30de50bb11296ddf7cae153534bcb67))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
 ## [0.5.3](https://github.com/es6kr/skills/compare/claudify-v0.5.2...claudify-v0.5.3) (2026-08-09)
 
 
