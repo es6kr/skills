@@ -126,6 +126,18 @@ After cleanup, scan the remaining items (`pending` + `in_progress`). For any tas
 
 After Step 1, ask the direction for each remaining incomplete item (`pending` + `in_progress`).
 
+### Single unambiguous item — skip the ask (HARD STOP scope: exactly 1 item)
+
+If **exactly one** item remains after Step 1 (cleanup) and Step 1.5 (checklist state recovery), and **all** of the following hold, skip the `AskUserQuestion`/`ask.md` call entirely and go straight to Step 3:
+
+1. The item is **not** context-opaque (Step 1.5 resolved its state, or it never needed resolving — e.g. it was registered this session or its scope/direction is otherwise plainly evident from context)
+2. The item does **not** carry a BLOCKED / review-pending / host-delegated / external-wait label
+3. Nothing about the item signals it needs splitting or merging (single coherent deliverable)
+
+When these hold, state the inferred direction in one line ("Only one item remains: `<subject>` — proceeding.") and mark it `in_progress` immediately. This is not silent execution — naming the item and direction gives the user a visible point to redirect before work starts, without forcing a decision that has only one real answer.
+
+This fast path is scoped narrowly to the **count == 1** case. With 2+ remaining items, per-item ambiguity across items is common even when each one looks obvious in isolation (priority, dependency, or scope overlap between them) — Step 2's full ask still applies.
+
 ### Direction options
 
 | Label | Meaning |
@@ -147,6 +159,7 @@ After Step 1, ask the direction for each remaining incomplete item (`pending` + 
 | 4 | Mark the first item `in_progress` without the direction ask | Step 3 may only be entered after Step 2 is complete |
 | 5 | Offer only "Hold (keep as task)" for external-wait items (user manual action / merge instruction / reply pending) | Include **Defer to checklist** in the option set — external-wait items belong in the checklist medium per "Medium separation principle" below. Hold keeps them polluting the task list across sessions |
 | 6 | Reference a PR/issue by bare `#N` in the question text or an option's description | Every distinct PR/issue number needs its own clickable full URL (`https://github.com/<owner>/<repo>/pull/<N>`) somewhere in that same ask — this rule is not scoped to any one skill's option-composition path, it applies wherever a PR/issue surfaces in a decision UI. Enforced by `block-pr-url-gate.sh` (PreToolUse:AskUserQuestion) |
+| 7 | Ask direction for a single remaining item whose state is already known and whose direction is not actually in question | Apply the "Single unambiguous item — skip the ask" fast path above: state the inferred direction in one line and proceed to Step 3 directly |
 
 ### Per-environment ask method
 
@@ -178,7 +191,7 @@ Among the items decided as "Proceed" in Step 2, decide the start priority → ma
 
 ### Loop continuation (HARD STOP — do not stop with a report mid-batch)
 
-Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report. Delegating an item to a **background agent** (`run_in_background`) also returns control immediately — the dispatch itself is not a reason to stop.
+Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report. This applies even when `next` itself routed the flow into /wip earlier in the same chain — re-invocation is loop-safe: `next`'s gates re-evaluate the new completion state and terminate when no new candidates surface (skip/report or a single wrap-up ask), so the next↔wip cycle cannot spin, and "the duty was already discharged this chain" is not a valid skip reason. Delegating an item to a **background agent** (`run_in_background`) also returns control immediately — the dispatch itself is not a reason to stop.
 
 | # | Don't | Do |
 |---|-------|-----|
@@ -274,6 +287,7 @@ Step 1.5: Checklist state recovery (context-opaque tasks only)
   └─ Grep/Read fix_plan.md / checklist.md → feed recovered state into Step 2
   ↓
 Step 2: Per-item direction ask
+  ├─ exactly 1 item + unambiguous → skip ask, state direction, go to Step 3
   ├─ Claude: AskUserQuestion (questions array, 1 question per task, max 4)
   └─ Antigravity: ask.md (RequestFeedback: true)
   ↓
