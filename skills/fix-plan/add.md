@@ -66,6 +66,8 @@ fix_plan item body content = Action + Why + How (summary) + artefact reference +
 | Fix-option matrix / trade-offs / Test Plan / implementation procedure | **plan artefact** | `docs/generated/plan-<slug>.md` |
 | Related-context list (4 or more items) | **inside the research/plan artefact** | same as above |
 | Multi-step checklist (5 or more items) | **checklist artefact** | `docs/generated/checklist-<slug>.md` |
+| Progress / status updates for an item that references a plan artefact | **linked plan artefact — its `## Progress Checklist` section** (create the section if missing) | inside the referenced `plan-<slug>.md` |
+| Open action items (the referenced plan's remaining `[ ]` next-actions) | **fix_plan body — as `- [ ]` sub-checkboxes** | surface the immediate next-phase open items under the item; deeper phases stay pointer-only (keep the length budget). Distinct from "progress/status updates" above: what remains *to do* stays visible/trackable in the tracker, while status narrative goes to the plan |
 
 ### Don't / Do
 
@@ -76,6 +78,8 @@ fix_plan item body content = Action + Why + How (summary) + artefact reference +
 | 3 | Write "Decision record" / "User decision" as a paragraph in the body | One-line sub-bullet: `- **User decision (YYYY-MM-DD)**: Option D — short rationale` |
 | 4 | Allow a fix_plan body item to exceed 10 lines | Cap at 5-7 lines. Anything over → split into artefacts |
 | 5 | Include the A/B/C/D comparison table in fix_plan | Move to `plan-<slug>.md` "Trade-offs" section |
+| 6 | Relocate item detail into a NEW artefact without Reading the research/plan artefacts the item already references | Read each referenced artefact first — progress/status content routes into the plan's `## Progress Checklist` (create the section if missing); create a new artefact only for content with no owning research/plan doc |
+| 7 | Reduce an in-progress plan (one that has open `[ ]` Progress-Checklist items) to a prose-only pointer with zero checkboxes in the tracker item | Surface the immediate next-phase open items as `- [ ]` sub-checkboxes under the tracker item (within the length budget); keep deeper phases as a pointer to the plan's `## Progress Checklist`. A tracker item for in-progress work must stay actionable — the "slim pointer" rule governs status narrative, not the open action list |
 
 ### Self-check before saving an entry
 
@@ -83,6 +87,8 @@ fix_plan item body content = Action + Why + How (summary) + artefact reference +
 2. Does the entry contain diagnostics / reproduction / option matrix / related context? If yes, move to research/plan artefacts
 3. Is each artefact path expressed as a one-line sub-bullet?
 4. Are decision links one line each?
+5. Does the item already reference a research/plan artefact? Read it BEFORE relocating any content — progress/status updates belong in that plan's `## Progress Checklist` (create it if missing), not in a new standalone file
+6. Does the referenced plan have open `[ ]` Progress-Checklist items? If yes, did you surface the immediate next-actions as `- [ ]` sub-checkboxes in the tracker item, rather than leaving a prose-only pointer?
 
 ### Example — Bad (verbose)
 
