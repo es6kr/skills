@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.2](https://github.com/es6kr/skills/compare/fix-plan-v0.6.1...fix-plan-v0.6.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **fix-plan:** reclassify model-triage BLOCKED marker as external, not selfable ([#291](https://github.com/es6kr/skills/issues/291)) ([60e687c](https://github.com/es6kr/skills/commit/60e687c36a9e9b16493d8c48711bf14cf01d3441))
+* **fix-plan:** route cleanup.py and plane_sync.py through resolve_tracker_root ([#285](https://github.com/es6kr/skills/issues/285)) ([a42af9d](https://github.com/es6kr/skills/commit/a42af9d02cf2f56d9ae082ae7594976484bd7baa))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
 ## [0.6.1](https://github.com/es6kr/skills/compare/fix-plan-v0.6.0...fix-plan-v0.6.1) (2026-08-11)
 
 
