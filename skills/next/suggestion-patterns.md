@@ -506,6 +506,29 @@ Therefore: when a selection is about to be executed **and the percentage was par
 TaskList   # use pending/in_progress entries as the source
 ```
 
+### fix_plan.md candidate prioritization rules
+
+1. **Workspace-local prioritization**: Candidates from the local project's `fix_plan.md` are prioritized over generic options or templates.
+2. **Priority Sorting**: Candidates must be sorted strictly in the order of `P0` -> `P1` -> `P2` -> `[REPEAT]`.
+3. **Session Relevance**: Highlight and recommend tasks first that touch files or folders modified in the current session — session-irrelevant `fix_plan.md` items (even high-priority ones) must not be `Recommended` by default.
+4. **Cross-workspace target labeling (HARD STOP)**: `fix_plan.md` can legitimately index items whose actual work target is a different git org/repo than the current workspace's own (a cross-project dependency tracker entry). Being textually present in the local tracker does not make an item "this session's own work." Before surfacing such an item as an option, compare its target repo/org against the current session's workspace root — if they differ, the option description must name both sides explicitly (e.g. `(cross-workspace: <other-org>/<other-repo>)`), and it must not be `Recommended` unless the user's current work thread is actually about that target repo. See `ask-gates.md` Step 0.6 item 6a for the full procedure.
+
+### Session context synthesis in AskUserQuestion text (HARD STOP)
+
+When composing the question text for `AskUserQuestion` at the end of a session, do NOT use generic phrasings like "All modification requests are complete" or its Korean translation equivalent indicating general completion.
+Instead, you MUST dynamically synthesize the main technical themes, objectives, or features worked on in the current session (e.g. "backchannel logout finalization", "CI stability", "relocation of plans to llm-wiki/generated", "block-manual-delegation hook FP mitigation", "branch-policy contradiction fix").
+This helps the user clearly associate the recommended next steps with the active development context.
+
+**Strict Length Limit (HARD STOP)**: The synthesized context summary in the question text MUST be kept extremely concise.
+- **Maximum limit**: 1-2 high-level themes, under 15 words total.
+- **Forbidden**: Do NOT list 3+ distinct commits, subtasks, bug fixes, or minor achievements in a single question text. Keep details inside `walkthrough.md`, not in the choice prompt.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Use generic phrasings ("All tasks are done", "Everything is complete") | Summarize the key achievements of this session in the question text |
+| 2 | Enumerate every tiny commit or tool error (e.g., listing 5+ distinct bug fixes and updates in a long sentence) | Focus on the high-level technical goals under 15 words (e.g. "relocated plan files to llm-wiki/generated and resolved branch-policy contradiction") |
 ### Recommended priority — actionable follow-up over "End session" (HARD STOP)
 
 **"End session" must never be the default Recommended option.** It carries no actionable value beyond what the user already implies by stopping responding; suggesting it autonomously is an autonomous proposal of a work-progression decision (branching / session termination / skipping), which is forbidden. If the user wants to end the session, they will say so or simply stop — `next` does not need to nominate it.
