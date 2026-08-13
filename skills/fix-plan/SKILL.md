@@ -103,9 +103,9 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 
 | Profile | Steps executed | Skipped (reported as remainder) |
 |---------|----------------|--------------------------------|
-| `pm` | move → format → sync → priority → flowchart-sync (current full pipeline) | — |
-| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format — surfaced as a delegation remainder for a `pm` session |
-| `impl` | sync → priority, then surface `selfable` implementation candidates | move, format, model-triage |
+| `pm` | move → format → sync → priority → flowchart-sync (current full pipeline) → **Plan Drafts trigger-scan** (surface fired-trigger candidates from `## Plan Drafts`; no authoring — see [draft.md](./draft.md) "Role ownership") | — |
+| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan (**includes `impl`-promoted plans meeting Category I/III fit, registered for audit — not authored from scratch**) | move, format — surfaced as a delegation remainder for a `pm` session |
+| `impl` | sync → priority, then surface `selfable` implementation candidates → **execute Plan Draft promote** (default owner for all complexity tiers — see [draft.md](./draft.md) "Role ownership") | move, format, model-triage |
 | (unresolved) | full pipeline | — |
 
 - A skipped step is never silently dropped: the run report must list the skipped steps and their pending workload (e.g. "N completed `[x]` items awaiting move") so a later `pm` session picks them up.
