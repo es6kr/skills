@@ -1,5 +1,5 @@
 {
-  "description": "es6kr-skills root plugin hooks — migrated from ~/.claude/settings.json ~/.agents/skills/ registrations",
+  "description": "es6kr root plugin hooks — migrated from ~/.claude/settings.json ~/.agents/skills/ registrations",
   "hooks": {
     "PostToolUse": [
       {
