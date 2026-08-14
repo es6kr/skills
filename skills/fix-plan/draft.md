@@ -67,10 +67,10 @@ draft body file is the persistence medium.
 
 A plan-draft follows three stages.
 
-| Stage | Action | Owner |
-|-------|--------|-------|
+| Stage | Action | Owner (role) |
+|-------|--------|---------------|
 | 1. Write | Add a `- [BLOCKED:P*:selfable]` entry to `## Plan Drafts` (optionally a `plan-drafts/<slug>.md` body file) | This topic, when the user defers |
-| 2. Promote | When the resume trigger fires, re-verify the stub's premises against first sources, then hand the stub to the planning workflow (research → plan) and convert the entry into active work | This topic → `code-workflow` |
+| 2. Promote | When the resume trigger fires, re-verify the stub's premises against first sources, then hand the stub to the planning workflow (research → plan) and convert the entry into active work | `impl` (default) → `code-workflow`. Architecture-scale output (model-triage Category I/III fit) is registered for `deep` audit after promote — see "Role ownership" below |
 | 3. Archive | When a stub is superseded / abandoned, move any body file to `.ralph/.bak/` and remove the entry | This topic |
 
 ### 1. Write
@@ -88,6 +88,18 @@ When the resume trigger is met:
 2. Dispatch the stub to the planning workflow: `Skill("code-workflow", "steps")` (research → plan → user review) using the stub's Purpose + Expected deliverable — plus any premise corrections from step 1 — as the seed.
 3. After the real research/plan artifact exists, **remove the stub entry** from `## Plan Drafts` (its job is done — the artifact supersedes it).
 4. If a `plan-drafts/<slug>.md` body file existed, add valid YAML frontmatter (`title`, `status: superseded`, `created`, `share_eligibility: public|private`, `relates_to`, `archived: true`, `archived_at`, `archive_reason`) and move it to the unified `.ralph/` backup directory (`mkdir -p .ralph/.bak && mv plan-drafts/<slug>.md .ralph/.bak/draft-<slug>.md`). All `.ralph/` sub-document backups MUST be unified in `.ralph/.bak/` (never create sub-folder `.bak/` directories like `plan-drafts/.bak/` or `docs/generated/.bak/`).
+
+### Role ownership (promote execution)
+
+Which role profile (see `SKILL.md` "Role-based execution") executes Stage 2:
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `deep` authors architecture-scale drafts from scratch, `impl` limited to "lightweight" drafts only | `impl` executes Stage 2 by default for **all** complexity tiers — the same premise-reverify → `code-workflow` dispatch procedure |
+| 2 | `pm` executes any part of Stage 2 (premise re-verify, dispatch, authoring) | `pm` only surfaces drafts whose resume trigger has fired, during its default-pipeline scan of `## Plan Drafts` — it never authors |
+| 3 | `deep` waits idle for drafts to author, or drafts are pre-classified by scope before promote to route some to `deep` | After `impl` produces the plan artifact, if it fits [model-triage.md](./model-triage.md) Category I (greenfield architecture) or III (stale plan↔reality resync), register it into `## <Model> Target Tasks` via that topic's existing Discovery Procedure — `deep` audits/strengthens the artifact `impl` already produced, it does not draft from zero |
+
+This reuses model-triage's existing dedicated-section queue as the sole hand-off mechanism between `impl` and `deep` — no new state field or separate audit queue is introduced.
 
 ### 3. Archive (superseded / abandoned)
 
