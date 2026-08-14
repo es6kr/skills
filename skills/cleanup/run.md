@@ -285,7 +285,7 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 Analyze session mistakes, review hooks/skills, and detect patterns.
 
 **Automated Script Execution**:
-- Run `python ~/.gemini/config/skills/cleanup/scripts/fa-analyze.py` to automatically analyze `failed-attempts.md` rules, status tags, and detect recurring error classes.
+- Run `python scripts/fa-analyze.py` to automatically analyze `failed-attempts.md` rules, status tags, and detect recurring error classes.
 
 [claudify/improve.md](../claudify/improve.md) — planned conversion to a `Skill("claudify", "improve")` call.
 Currently the procedure below runs directly within cleanup.
