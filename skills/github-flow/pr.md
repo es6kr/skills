@@ -227,8 +227,9 @@ Runs at PR creation **and** after any body mutation (sanitize, review-apply, `gh
 
 ### Step 5: Sanitize Internal Paths
 
-Before posting, strip all internal paths per SKILL.md Core Rules:
+Before posting, strip all internal paths and planning jargon per SKILL.md Core Rules:
 - Internal workflow-generated doc paths (e.g., `.ralph/docs/`, `.omc/plans/`) → remove or inline the content
+- Internal planning jargon / temporary naming (e.g., `Option A`, `Option D`, `Phase 1`) → rewrite to clear, descriptive domain terms
 - Session IDs → remove
 - Other internal working directories (`~/.claude/`, `~/.ralph/`, `~/.omc/`, etc.) → remove
 
@@ -277,7 +278,7 @@ EOF
   --draft
 ```
 
-- **`--draft` is included BY DEFAULT (HARD STOP)** — the command above always creates a draft PR. Remove `--draft` **ONLY** when the user explicitly requested a ready PR (`--ready` or "non-draft"/"ready PR"). Autonomous ready-PR creation is forbidden. After CI passes on a draft, transition with `gh pr ready <N>` per the merge topic — but the initial creation stays draft.
+- **`--draft` is included BY DEFAULT (HARD STOP)** — the command above always creates a draft PR. Remove `--draft` **ONLY** when the user explicitly requested a ready PR (`--ready` or "non-draft"/"ready PR"). Autonomous ready-PR creation is forbidden.
 - `--skip-review` option → add `--label coderabbit:ignore` (in addition to classification label)
 - **At least 1 classification label required**: enhancement, bug, documentation, test, chore, etc.
 - **Milestone from Step 6** → add `--milestone "<title>"` flag
@@ -285,6 +286,15 @@ EOF
 Report the PR URL after creation.
 
 **Without gh CLI:** output the body in a code block for manual use.
+
+### Step 7.5: CI Watch → Ready Transition (MANDATORY HARD STOP — same turn, not a follow-up to defer)
+
+**Creating a draft PR is not the terminal action of this step — watching CI and transitioning to ready is part of the same task.** Do not end the turn on "draft PR created" and leave CI-watch as an implicit/future action; either drive it now or explicitly register it as a pending follow-up with its own check-back plan (per `claudify/background-polling.md`).
+
+1. Right after `gh pr create` returns the URL, run `gh pr checks <N> --watch` (blocks until CI resolves) — or, if other pending work exists this turn, poll `gh pr checks <N>` non-blocking per `claudify/background-polling.md`'s user-triggered-CI row instead of a long blocking watch
+2. CI green → `gh pr ready <N>` immediately, then report the transition
+3. CI red → report the failing check(s); do not auto-ready, do not silently drop it — surface to the user or continue investigating per the failure
+4. If CI is expected to take 5+ minutes and other work is drivable this turn, defer per `claudify/background-polling.md` (ScheduleWakeup / active poll) rather than blocking — but the deferred item must still resolve to a ready-transition or a reported failure, not silence
 
 ### Step 8: Attach Visual Evidence
 

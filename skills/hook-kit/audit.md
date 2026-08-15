@@ -95,6 +95,33 @@ done
 
 **Violation case**: `~/.claude/hooks/session-id-inject.sh` registered with mode 644, causing exit 126 on every SessionStart. ralph stream log accumulated `Permission denied`. install.md Step 3 performs `chmod +x`, but when files are copied externally or file mode is lost during dual-sync, audit must catch it.
 
+#### 3-A.1 Extend the check to every settings.json-referenced path, not just the fixed hooks directory
+
+A hook's script does not always live under `~/.claude/hooks/` — many are registered directly from a skill's `resources/` directory (`~/.claude/skills/<name>/resources/*.sh`, `~/.agents/skills/<name>/resources/*.sh`, or a marketplace worktree path). Step 1 already resolves and existence-checks every one of these paths. Step 3-A's chmod loop must scan the **same path set Step 1 produced**, not a separate hardcoded glob — otherwise a hook that lives outside `~/.claude/hooks/` can pass Step 1 (file exists) while still being non-executable, and nothing catches it.
+
+```bash
+# Reuse Step 1's extracted command list — do not re-glob a fixed directory
+for f in $(jq -r '.. | objects | select(.command) | .command' ~/.claude/settings.json 2>/dev/null \
+  | awk '{print $NF}' | sed "s|^~|$HOME|"); do
+  [ -f "$f" ] || continue   # existence already covered by Step 1 — skip non-matches here
+  if [ ! -x "$f" ]; then
+    echo "STALE-PERM: $f"
+  fi
+done
+```
+
+| Result | Action |
+|--------|--------|
+| `+x` present | OK |
+| `+x` missing, path under `~/.claude/hooks/` | Same as 3-A above |
+| `+x` missing, path under a skill's `resources/` (any skill directory, including marketplace worktrees) | **STALE-PERM** — auto-suggest `chmod +x <file>` (AskUserQuestion). Common cause: the file was copied during a skill split/rename and the copy did not preserve the executable bit |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat "path exists" (Step 1 pass) as proof the hook is live | Existence and executability are independent checks — a hook can pass Step 1 and still be dead |
+| 2 | Scope 3-A's chmod scan to `~/.claude/hooks/*.sh` only, reasoning "that's where hooks live" | Hooks can be registered from any skill's `resources/` directory. Scan the same path set Step 1 already resolved |
+| 3 | Skip the extended scan because a skill split/rename "just moves files, permissions carry over" | File copies (not `mv`) commonly reset the executable bit — verify, don't assume |
+
 ### 3-B. Orphan hook check (no resources source + not in settings)
 
 Validates the "every hook must have an owning skill" policy from `automation.md`. For each `~/.claude/hooks/*.sh`:

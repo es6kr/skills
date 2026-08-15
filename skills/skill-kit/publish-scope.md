@@ -48,6 +48,35 @@ A feature has **narrow scope** (unsuitable for publishing) if any of the followi
    - Otherwise, create a new local-only skill (`~/.claude/skills/<new-slug>/`, not registered in `published.json`, kept untracked)
 5. **User confirmation** — if the self-check result is ambiguous, ask via AskUserQuestion: "add to `{published-skill}` vs. separate into `{local-only-skill}` vs. create a new skill"
 
+## New-skill publication-readiness gate (HARD STOP)
+
+**Committing a NEW skill directory to a public catalog repo IS publication** — the gate applies at the first commit/PR, regardless of whether a registry (`published.json`, clawhub) entry exists yet. "Protecting an uncommitted backlog from loss" is a motive for committing, not a substitute for publication vetting: a public repo has no "committed but not yet published" state.
+
+Before a new skill directory enters a public catalog commit, all four axes must pass **per skill**:
+
+| # | Axis | Check |
+|---|------|-------|
+| 1 | **Slug / dedup decision** | The directory name is the publication slug. Confirm it is deliberately chosen AND deduped against (a) skills already in the catalog and (b) held/uncommitted sibling candidates with overlapping purpose — an unresolved near-duplicate pair (e.g. two discovery-helper skills) means the slug decision is still open |
+| 2 | **Publishable vs local-only classification** | Run the six narrow-scope criteria above on the whole skill, not just an addition. Local-instance skills — catalogs of a machine-local tool, discovery stubs for a local binary, personal multi-workspace layouts — are local-only and never enter the public catalog |
+| 3 | **Full-content sanitize sweep** | Grep the complete file contents with patterns that include **bare private org/user names**, not only `org/repo` path forms — path-form-only deny regexes pass prose mentions of the org name straight through |
+| 4 | **Explicit user ask before the publish-visible transition (HARD STOP)** | Axes 1-3 are mechanical self-verification, not final go-ahead. Local/reversible steps (local commit, draft PR, CI run) may proceed automatically, but the step that makes the addition publicly visible/reviewable (opening a non-draft PR, or a draft→ready transition) requires an explicit `AskUserQuestion` naming the new skill(s) — do not infer approval from "the 3 axes passed" |
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Bundle every "clearly my own" untracked skill into one wholesale catalog commit because a backlog issue says "commit the backlog" | Run the four-axis gate per skill; commit only the skills that pass all four, and report the held ones with the failing axis |
+| 2 | Rely on the repo's commit-hook deny regex as the sanitize step | The hook is a last-resort net with its own pattern gaps (path-form-only). Run an independent full-content sweep including bare org/user names before staging |
+| 3 | Treat CI/lint green as publication readiness | Lint proves formatting, not slug intent, dedup state, or scope fit. The four axes are separate from CI |
+| 4 | Treat axes 1-3 passing as sufficient to flip the PR to its publish-visible state without asking | Axis 4 is a separate approval gate, not a byproduct of the others — ask even when 1-3 are clean. A repo that enforces this mechanically (PreToolUse hook blocking the ready-transition when new skill paths are detected) is stronger than a rule-prose-only gate, which has been observed to get skipped under session momentum even immediately after passing axes 1-3 |
+
+### Self-check (before staging any new skill directory in a public catalog repo)
+
+1. Is this repo public? → If yes, this commit is a publication event; run the gate per skill
+2. For each skill: slug deliberately decided + no overlapping held/uncommitted sibling? scope classified publishable via the six criteria? full-content sweep (incl. bare org/user names) clean?
+3. Any axis unresolved → hold that skill out of the commit and surface the decision to the user
+4. Before the PR's publish-visible transition (non-draft create, or draft→ready): has the user explicitly approved publishing THIS skill, by name, in THIS session? → If no, ask first — do not treat "axes 1-3 passed" as approval
+
 ## Exceptions
 
 - The user has explicitly instructed "add to the published skill" (report the self-check result first, then defer to the user's decision)

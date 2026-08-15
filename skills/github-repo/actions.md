@@ -6,27 +6,32 @@ Generates and manages GitHub Actions workflows matching the project type.
 
 ### 1. Project Analysis
 
-Auto-detected items:
-- `package.json` → Node.js (pnpm/npm/yarn)
-- `pyproject.toml` / `setup.py` → Python
+Auto-detected items — `package.json`/`pyproject.toml` alone only confirm the *language*, not which package manager the templates below should target. Also check the lockfile/version-pin file to pick the right template variant:
+
+- `package.json` → Node.js. Disambiguate manager: `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm. Check `.node-version` (or `engines.node` in `package.json`) for the Node version to pin in `node-version-file`/`node-version`.
+- `pyproject.toml` / `setup.py` → Python. Disambiguate tool: `uv.lock` → uv (matches the "CI (Python + uv)" template below), otherwise plain pip/venv — the uv template does not apply, author a `pip install` step instead.
 - `go.mod` → Go
 - `Cargo.toml` → Rust
 - `Chart.yaml` → Helm
 - `Dockerfile` → Docker
-- `pnpm-workspace.yaml` → Monorepo
+- `pnpm-workspace.yaml` → Monorepo (confirms pnpm, not just Node.js)
 
 ### 2. Workflow Selection
 
 Select required workflows via AskUserQuestion (multiSelect: true):
 
-| Workflow | Description | Trigger |
-|----------|-------------|---------|
-| ci | Build + test + lint | push, PR |
-| release | Version tag → release creation | tag push |
-| docker | Docker image build + push | push to main |
-| deploy | Deploy (ArgoCD sync, etc.) | release |
-| helm | Helm chart packaging + GitHub Pages | push to main |
-| dependabot | Automated dependency updates | schedule |
+| Workflow | Description | Trigger | Canned template below |
+|----------|-------------|---------|------------------------|
+| ci (Node/pnpm) | Build + test + lint | push, PR | ✅ [CI (Node.js + pnpm)](#ci-nodejs--pnpm) |
+| ci (Python/uv) | Build + test + lint | push, PR | ✅ [CI (Python + uv)](#ci-python--uv) |
+| ci (Go/Rust) | Build + test + lint | push, PR | ❌ no template — author manually, following "Post-authoring Verification" below |
+| release | Version tag → release creation | tag push | ✅ [Release (npm)](#release-npm) — npm-specific; other ecosystems need manual authoring |
+| docker | Docker image build + push | push to main | ❌ no template — author manually, following "Post-authoring Verification" below |
+| deploy | Deploy (ArgoCD sync, etc.) | release | ❌ no template — deploy targets are project-specific; author manually |
+| helm | Helm chart packaging + GitHub Pages | push to main | ✅ [Helm Chart (GitHub Pages)](#helm-chart-github-pages) |
+| dependabot | Automated dependency updates | schedule | ✅ [Dependabot](#dependabot) |
+
+For any "❌" row selected, the workflow **still gets generated** — just hand-authored rather than templated. Follow "Post-authoring Verification" below regardless of template source.
 
 ### 3. Workflow Generation
 
@@ -48,9 +53,9 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.node-version'
           cache: 'pnpm'
@@ -75,8 +80,8 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run pytest
@@ -96,9 +101,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.node-version'
           cache: 'pnpm'
@@ -108,7 +113,7 @@ jobs:
       - run: pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
 ```
 
 ### Helm Chart (GitHub Pages)
@@ -127,10 +132,10 @@ jobs:
       contents: write
       pages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: |
           helm package charts/*
           helm repo index . --merge index.yaml
@@ -173,7 +178,7 @@ After writing a workflow YAML, verify **before committing**:
 
 1. **Dependency install step**: Confirm each job installs the tools it uses (pytest, bats, lint, etc.). `actions/setup-python` installs Python only — pytest, ruff, etc. need a separate `pip install`.
 2. **Local test run**: Run the commands the workflow will execute locally first to confirm they succeed.
-3. **Action version check**: Use the latest major version of each action (e.g., v4).
+3. **Action version check**: Check the actual latest major on the marketplace/repo (`gh api repos/<owner>/<action>/tags --jq '.[0].name'`) before generating — do not copy a version number from this doc's templates without re-verifying, since majors bump over time (e.g. `actions/checkout` moved v4→v7 between when these templates were first written and this check).
 
 ## Notes
 

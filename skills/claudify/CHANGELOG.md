@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.5.4](https://github.com/es6kr/skills/compare/claudify-v0.5.3...claudify-v0.5.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* **claudify:** same Ralph Mode RAG-store carve-out for persist topic ([6c00653](https://github.com/es6kr/skills/commit/6c00653273190df654a093436fffdb76cbfeb20c))
+* **cleanup,claudify:** separate ask-bypass axis from RAG-store axis in Ralph Mode ([196da8f](https://github.com/es6kr/skills/commit/196da8fdb30de50bb11296ddf7cae153534bcb67))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
+## [0.5.3](https://github.com/es6kr/skills/compare/claudify-v0.5.2...claudify-v0.5.3) (2026-08-09)
+
+
+### Bug Fixes
+
+* **claudify:** narrow topic-dispatch carve-out to declared topics only ([#260](https://github.com/es6kr/skills/issues/260)) ([ca87372](https://github.com/es6kr/skills/commit/ca87372594647e79ca8e623c4157429e3d9f0c87))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
+## [0.5.2](https://github.com/es6kr/skills/compare/claudify-v0.5.1...claudify-v0.5.2) (2026-08-05)
+
+
+### Bug Fixes
+
+* **claudify:** add assistant-triggered PR creation to notification matrix ([#205](https://github.com/es6kr/skills/issues/205)) ([50c5079](https://github.com/es6kr/skills/commit/50c5079a7095a6d44b5cc7ef1576955d043a3e1c))
+* **claudify:** check canonical skill dirs before recommending plugin bundle activation ([b302055](https://github.com/es6kr/skills/commit/b30205549727b6f6486abab693298f8657f17fcb))
+* **claudify:** extend idle-cache-ttl discipline to TaskOutput's own block/timeout ([#203](https://github.com/es6kr/skills/issues/203)) ([2112e0b](https://github.com/es6kr/skills/commit/2112e0b0ad17f22f709662da81761e65a9f9aa25))
+* **claudify:** stale-plugin-bundle check + self-improve reinforcements ([eebff5b](https://github.com/es6kr/skills/commit/eebff5b8d2b45d24d8b820bd814f4cf03f2a48e3))
+* **claudify:** strengthen self-check enumeration + TaskOutput ceiling + storage routing ([a8fb3c8](https://github.com/es6kr/skills/commit/a8fb3c8ddfdfb092260f1d2f51deecce4a495f20))
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/claudify-v0.5.0...claudify-v0.5.1) (2026-07-28)
 
 

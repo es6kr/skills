@@ -73,6 +73,8 @@ Step 0-0 and Step 0-1 below each describe themselves as running "first" — that
 
 **Exception — substantial discovery gets one lightweight tracking task (HARD STOP)**: the "no task registration" rule above assumes discovery resolves in a single quick call (e.g., one `TaskList` read). When candidate discovery itself grows beyond that — 3+ tool calls, or spanning 2+ distinct sources (`TaskList` + `fix_plan.md` + `gh pr`/`issue` search, etc.) — register **exactly one** lightweight tracking task for the whole discovery phase (e.g., "next: composing candidate options") before making the first discovery call, so the user retains visibility into in-flight work and can interrupt cleanly. Mark it completed the moment `AskUserQuestion` is composed. This does not reopen the meta-task-pollution problem: it is still one task for the entire phase, not one per source, and it is pruned immediately.
 
+**Self-candidacy exclusion (HARD STOP)**: capture this tracking task's own ID at registration time. Since candidate discovery treats pending/in-progress `TaskList` entries as candidates, this task — while pending/in-progress during its own discovery phase — would otherwise appear as a user-selectable follow-up option. Exclude the captured ID from candidate enumeration explicitly, then mark it completed once `AskUserQuestion` is composed.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Run `TaskList` + a `fix_plan.md` read + multiple `gh` searches across several tool calls with zero task tracking, leaving the user unable to see what discovery is in flight | Register one lightweight tracking task before the first discovery call when 3+ tool calls or 2+ sources are anticipated; mark it completed once options are composed |

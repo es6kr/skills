@@ -7,7 +7,17 @@ Unified workflow for acquiring a git worktree: inventory existing ones, identify
 - Need an isolated working directory for a branch (PR verification, plan testing, parallel work)
 - Before running `git worktree add` — always check for reusable worktrees first
 
-## Procedure
+### 0. Worktree Cap Gate (HARD STOP — Max 10 Worktrees)
+
+Before creating a new worktree, measure total active worktrees:
+```bash
+git worktree list | wc -l
+```
+If total count is **10 or more**:
+- **New worktree creation is BLOCKED.** Do NOT execute `git worktree add`.
+- You MUST either:
+  1. Prune/delete merged & inactive worktrees via `git worktree remove <path>`.
+  2. Repurpose/reuse an existing inactive/synced worktree via `git checkout -B <new-branch>`.
 
 ### 1. Inventory existing worktrees
 
@@ -50,6 +60,18 @@ A worktree that passed the gate is **inactive** (reuse candidate) if any of:
 | Not currently checked out by any session | No editor/terminal has `cwd` in that worktree |
 | Stale fix/refactor branch with no recent commits | `git log -1 --format=%ci <branch>` older than 7 days |
 
+### 2.5 Repurposable candidates (synced-to-origin, over-limit fallback)
+
+**Distinct from "inactive" above.** A worktree can have recent activity and an unmerged branch, yet still be safe to repurpose if its branch is **fully pushed to origin** — repointing it to a new branch loses nothing, since the existing work already lives on the remote.
+
+```bash
+# For each candidate <W>:
+git -C <W> log @{u}..HEAD --oneline   # unpushed commits ahead of the branch's upstream — empty = fully synced
+git -C <W> status --porcelain          # empty = no uncommitted local changes either
+```
+
+A worktree is **repurposable** when both checks are empty (fully pushed + clean). This is a weaker guarantee than "inactive" (the branch may still be under active review elsewhere), so it is used only as a **fallback** — when the worktree count is over the limit and no §2 inactive candidate exists.
+
 ### 3. Decision — reuse or create
 
 ```
@@ -57,7 +79,10 @@ inactive candidates found?
 ├─ YES → AskUserQuestion: which one to reuse?
 │        ├─ User selects one → Step 4A (rename/move)
 │        └─ User says "create new" → Step 4B (new)
-└─ NO  → Step 4B (new)
+└─ NO  → worktree count over the limit (see "Inactive Worktree Count Limit")?
+         ├─ YES → repurposable candidate found (§2.5)? → oldest one → Step 4A (rename/move)
+         │        └─ none found → report to user, ask before creating new
+         └─ NO  → Step 4B (new)
 ```
 
 **AskUserQuestion options must include both reuse and new-create** when inactive candidates exist.
@@ -68,9 +93,13 @@ Delegate to the appropriate sub-topic:
 
 | Situation | Topic |
 |-----------|-------|
-| Worktree is registered (`git worktree list` shows it) | [rename-worktree](./rename-worktree.md) — rename dir + metadata + switch branch |
+| Worktree is registered AND already lives under `<repo>/.worktrees/` | [rename-worktree](./rename-worktree.md) — rename dir + metadata + switch branch |
 | Worktree dir exists but not registered | [move-worktree](./move-worktree.md) Scenario A — register + switch branch |
-| Worktree in wrong location (`.worktrees/`) | [move-worktree](./move-worktree.md) Scenario B — relocate to `.claude/worktrees/` |
+| Worktree is registered but its parent directory is NOT `<repo>/.worktrees/` (legacy `.claude/worktrees/`, a sibling dir like `<repo>-wt/`, a bare `~/.worktrees/`, or any other non-canonical path) | [move-worktree](./move-worktree.md) Scenario B — relocate to `<repo>/.worktrees/` **first**, then proceed with the branch switch |
+
+**Path-canonicality applies regardless of which row is taken.** `rename-worktree.sh`'s `--wt-base` flag assumes `<old-name>` already lives directly under that base directory — it renames/re-branches in place, it does not relocate a worktree that lives entirely outside any `--wt-base` tree (e.g. `<repo>-wt/<name>` sitting next to `<repo>/`, or vibe-kanban's own worktree layout). Reusing such a worktree via `rename-worktree.sh` alone perpetuates its wrong location indefinitely — check the parent directory first, and route through Scenario B before renaming when it's not already `<repo>/.worktrees/`.
+
+**Automated pre-check**: `scripts/check-worktree-canonical.sh <repo> <worktree-name-or-path>` performs this parent-directory check mechanically — it exits `0` (canonical — safe to reuse in place), `1` (non-canonical — prints the Scenario B `git worktree move` command to run first), or `2` (not registered — orphan dir, Scenario A). It is detect-only (never mutates a worktree); run it before `rename-worktree.sh` to catch a wrong location without acting on it.
 
 After rename/move, verify:
 
@@ -143,6 +172,14 @@ For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-firs
 | 2 | Stash or checkout to shuffle *uncommitted* changes onto another branch | Commit first — the commit, not the working-tree diff, is what cherry-picks cleanly |
 | 3 | Derive the base purely from the commit's conventional-commit tag when the target file/directory is already known to diverge on a longer-lived staging branch | Check divergence first (e.g. `git diff origin/<default-base> origin/<staging-base> -- <path>`) — a non-empty diff means the staging branch overrides the tag-derived default |
 | 4 | Open the PR as ready-for-review by default | Draft is the default for a freshly promoted commit — convert to ready only after the author decides it's reviewable |
+| 5 | Resolve the base branch name correctly (step 2), then create/reuse a worktree whose branch ancestry doesn't actually trace to that base (e.g. `git worktree add` off `origin/main` while intending `--base <staging-branch>` at PR-creation time) | Before `git worktree add -b`, run `git log origin/<default-base>..origin/<staging-base> --oneline \| wc -l` (and the reverse) — if both are non-zero, the two branches have diverged and the worktree MUST be created off `origin/<staging-base>` directly, not off `origin/<default-base>` with the base only corrected later at `gh pr create --base`. A resolved base name that doesn't match the worktree's actual git ancestry produces a CONFLICTING PR, discovered only after push |
+
+### Self-check (immediately before `git worktree add` in a staging-branch-model repo)
+
+1. Did step 2 resolve a staging branch (not the plain default base)?
+2. If yes, run the mutual-divergence check (`git log origin/<default-base>..origin/<staging-base> --oneline | wc -l` + the reverse direction) **before** `git worktree add` — not after a conflict surfaces
+3. Is either count non-zero? → the worktree's start-point must be `origin/<staging-base>`, never `origin/<default-base>`
+4. Does the branch about to be passed to `git worktree add -b <branch> <start-point>` have `<start-point>` = the resolved staging branch? Mismatch here is the defect this row prevents, even when the *PR's* `--base` flag is correct
 
 ## Default Path Rules
 
@@ -162,10 +199,20 @@ For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-firs
 | 2 | Present only "create new" in AskUserQuestion | Include "reuse worktree X" option when inactive candidates exist |
 | 3 | Create worktree in `.worktrees/` | Use `.claude/worktrees/` |
 | 4 | Start coding without branch verification | `git branch --show-current` before any Write/Edit |
+| 5 | Chain `git checkout -b <new> <ref>` immediately followed by `git cherry-pick`/`git reset`/other git commands in a repo with a large pre-existing dirty working tree (e.g. `~/.agents`) | In-place checkout can fail silently ("local changes would be overwritten") while staying on the original branch, so the chained command runs on the wrong branch. Prefer `git branch <new> <ref>` (no working-tree switch) + `git worktree add <path> <new>` from the start when the repo is known to carry unrelated uncommitted content; if in-place checkout is used anyway, verify `git branch --show-current` before the next command (see failed-attempts.md "git-checkout-unverified-chain", 2 occurrences) |
 | 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
 | 6 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
 | 7 | Classify "merged + ahead=0 + dirty" as abandoned leftovers | Run the operation-state gate first — a merged branch can host an in-progress cherry-pick applying new work on top |
 | 8 | Check multiple state files with one `ls fileA fileB fileC 2>/dev/null \|\| echo "no in-progress op"` call | `ls` returns nonzero if **any** argument is missing, even while printing the paths of the ones that DO exist — a partial hit still fires the `\|\|` fallback and prints a false "no in-progress op" alongside the real hit. Check each file individually (see the operation-state gate command above), and always re-read the raw stdout before trusting a fallback message (see failed-attempts.md "ls multi-arg false negative") |
+| 9 | Reuse an inactive worktree via `rename-worktree.sh` (or a manual `git checkout -b` inside it) without checking its parent directory | Before reusing, confirm the worktree's parent directory is already `<repo>/.worktrees/` — if not, relocate via [move-worktree](./move-worktree.md) Scenario B first, then rename/switch branch |
+
+### Self-check (before reusing any inactive/repurposable candidate — §3/§4A)
+
+1. Is the candidate's path already `<repo>/.worktrees/<name>`? Check with `git worktree list` — the path column shows the full location.
+2. If not (a legacy `.claude/worktrees/`, a sibling `<repo>-wt/`, a bare `~/.worktrees/`, or anything else) → relocate via move-worktree.md Scenario B **before** renaming/switching branch — do not reuse in place and leave the wrong location to persist across future reuse cycles.
+3. Only after the path is confirmed canonical, proceed with rename-worktree.sh or the manual branch switch.
+
+Steps 1-2 can be run mechanically: `scripts/check-worktree-canonical.sh <repo> <candidate-name>` (exit 0 = canonical / 1 = non-canonical, prints the Scenario B move command / 2 = not registered).
 
 ## Inactive Worktree Count Limit (HARD STOP)
 
@@ -199,6 +246,25 @@ Reuse via rename is the default for inactive worktrees (Don't/Do rule #5). Howev
 2. If count > 5 after this just-completed worktree → choose A (remove)
 3. If count ≤ 5 → choose B (detach + branch -D) for reuse
 4. Always pull main worktree to `origin/main` regardless of A or B
+
+### Over-limit selection when no inactive candidate exists (HARD STOP)
+
+When the worktree count already exceeds the limit and §2's inactive-candidate check finds none (all branches are unmerged and have recent commits), do **not** default to creating a new worktree or working directly in the main worktree. Apply the repurposable-candidate fallback (§2.5): among worktrees whose branch is fully pushed to origin and synced, **select the oldest one** (by last-commit timestamp) and repurpose it via `/git-repo rename-worktree`.
+
+**Why oldest**: age is the tie-breaker once safety (fully pushed) is established — an older worktree is less likely to represent someone's imminent next action, and "fully pushed" guarantees no data loss regardless of age.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Conclude "no reuse candidate" once §2's inactive criteria all fail, and default to creating a new worktree or working in the main worktree | Before concluding no candidate exists, run the repurposable check (§2.5) across the worktrees over the limit |
+| 2 | Repurpose the newest pushed+synced worktree on the assumption it's "most likely genuinely done" | Select the **oldest** pushed+synced worktree — recency is not a completion signal, only sync status is |
+| 3 | Repurpose a worktree with unpushed commits or uncommitted changes just because it's old | Both checks (unpushed commits + uncommitted changes) must be empty — an old-but-dirty worktree is still someone's WIP |
+
+**Self-check (before proposing "no reuse candidate, create new" when over the limit)**:
+1. Did §2's inactive check return zero candidates?
+2. Is the current worktree count over the limit?
+3. If both yes, did you run the repurposable check (§2.5 — unpushed commits + uncommitted changes, both empty) across the existing worktrees?
+4. Among repurposable candidates, did you select by **oldest** timestamp, not newest or arbitrary?
+5. Only if the repurposable check also finds zero candidates → report this to the user and ask before creating new or working in the main worktree
 
 ### Origin
 
@@ -345,7 +411,7 @@ The verification timing is **before implementation starts** — not before commi
 ### Recommended pattern (using the `git -C` flag)
 
 ```bash
-WT=~/ghq/github.com/daegunsoftDev/deps-provisioning/.worktrees/fix-18-dev38-launch-url
+WT=~/ghq/github.com/<org>/<repo>/.worktrees/fix-18-dev38-launch-url
 git -C "$WT" branch --show-current
 git -C "$WT" log --oneline origin/develop..HEAD
 git -C "$WT" fetch origin develop

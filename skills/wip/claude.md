@@ -4,6 +4,27 @@ Tool usage for registering / updating / deleting tasks in the Claude Code enviro
 
 For the workflow procedure (cleanup → per-item direction ask → execute), see [resume.md](./resume.md).
 
+## Tool unavailability — verify before falling back (HARD STOP)
+
+**A `ToolSearch` miss or a system-reminder saying `TaskCreate`/`TaskList` is "disconnected" is NOT sufficient evidence to skip task tracking entirely.** `ToolSearch` only reports whether a tool's schema is currently loaded — it cannot distinguish "temporarily disconnected (will reconnect)" from "disabled in this context (won't reconnect this session)". Before falling through to a file-only medium (`fix_plan.md`/`checklist.md`), attempt an actual `TaskCreate` call once per session (and again after any subsequent disconnect signal) and branch on the real error:
+
+| Actual `TaskCreate` call result | Meaning | Action |
+|---|---|---|
+| Succeeds | Available now | Use it normally |
+| Error mentions disconnect / MCP unreachable | Recoverable — connectivity flickers | Retry at the start of the next `/wip` invocation this session; use the `claude-task` CLI fallback below in the meantime |
+| Error says "exists but is not enabled in this context" | Context/settings gap, not connectivity | **Report this to the user in plain text this turn** — do not silently normalize the workaround. Use the `claude-task` CLI fallback below for the rest of the session |
+
+**`claude-task` CLI fallback (when no Task tool is usable this turn)**: use the `claude-task` CLI (`todowrite` skill's `claude-task` topic) — `claude-task --env agent add -s "<subject>"` / `claude-task --env agent list` / `claude-task --env agent update <id> --status <status>`. It persists to a fixed directory (`~/.agents/tasks/default/`) that survives session/scratchpad-path changes — **do NOT use the session scratchpad directory** for this tracking; the scratchpad path changes across sessions/compacts and silently drops its contents with no recovery (case history: failed-attempts.md "scratchpad ephemeral task loss"). Run `claude-task --env agent list` first — a prior `/wip` or `/fix` call in the same session may have already registered unrelated in-flight items; add to the ledger rather than treating it as empty.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Conclude "Task API unavailable" from `ToolSearch` alone and skip straight to reading `fix_plan.md` with no task tracking at all | Attempt a real `TaskCreate` call first; only after seeing its actual error, decide the fallback medium |
+| 2 | Treat "exists but not enabled in this context" the same as a transient disconnect (silently retry every turn) | It's a settings-level gap — surface it to the user once, then use the `claude-task` CLI for the rest of the session without re-attempting every turn |
+| 3 | Write fix/wip tracking state to a file in the session scratchpad directory (`<scratchpad>/*.md`) | Use `claude-task --env agent add/list/update` — the scratchpad directory is session-scoped and can vanish across a session/compact boundary, silently losing all interim tracking |
+| 4 | Skip task tracking silently when the `claude-task` ledger already has entries from a prior `/fix`/`/wip` call | `claude-task --env agent list` first; add your new items alongside the existing ones, never treat the ledger as empty |
+
 ## Recording methods (at least one required)
 
 | Method | When | Characteristics |
@@ -12,8 +33,11 @@ For the workflow procedure (cleanup → per-item direction ask → execute), see
 | **TodoWrite** | Sequential steps (3–7) | Order preserved, array-overwrite |
 | **fix_plan.md / checklist.md** | Need cross-session persistence | Survives compact / session end |
 | **WIP commit** | Preserve incomplete code | `WIP: <description>` tag, amend/squash later |
+| **Walkthrough file** | Narrative session record (not task tracking) | `walkthrough-<topic>-<sessid8>.md`, written/updated by `cleanup/run.md` Step 4.5 — Claude Code's counterpart to Antigravity's `walkthrough.md` (see [antigravity.md](./antigravity.md) "Storage") |
 
 **On `/wip`, execute at least one of the above.** Emitting only a text summary is forbidden.
+
+**Walkthrough file is a separate medium from task tracking**: Antigravity's `task.md` (progress checklist) and `walkthrough.md` (narrative account) are two distinct artifacts serving two distinct purposes — Claude Code's equivalents are `TaskList`/`TodoWrite` (progress) and the walkthrough file (narrative), respectively. Registering tasks does not substitute for the walkthrough file, and vice versa.
 
 ## Tool Selection
 

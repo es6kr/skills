@@ -25,7 +25,38 @@ GUARD="$(cd "$(dirname "$0")/.." && pwd)/resources/ask-guard.sh"
 [[ -f "$GUARD" ]] || { echo "guard not found: $GUARD" >&2; exit 1; }
 
 TMPERR="$(mktemp)"
-trap 'rm -f "$TMPERR"' EXIT
+# gh stubs for the CI-gate-only base exemption cases (deterministic/offline):
+#   GH_STUB_DIR   — `pr checks` emits the "reviews are disabled for this base
+#                   branch" signal (exemption should fire)
+#   GH_STUB_NOSIG — `pr checks` emits a normal "Review completed" line (no exemption)
+# Both return empty for `pr view` so the bot-PR and solo-infra allowlists ahead of
+# the new block fail closed, isolating the CI-gate-only path under test.
+GH_STUB_DIR="$(mktemp -d)"
+GH_STUB_NOSIG="$(mktemp -d)"
+cat > "$GH_STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"repo view"*) echo "es6kr/skills" ;;
+  *"pr checks"*) printf 'CodeRabbit\tpass\t0\t\tReview skipped: reviews are disabled for this base branch\n' ;;
+  *) exit 0 ;;
+esac
+STUB
+cat > "$GH_STUB_NOSIG/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"repo view"*) echo "es6kr/skills" ;;
+  *"pr checks"*) printf 'CodeRabbit\tpass\t0\t\tReview completed\n' ;;
+  *) exit 0 ;;
+esac
+STUB
+# gh that always fails -> every allowlist lookup fails closed (deterministic block
+# for the TP cases). Replaces the earlier `PATH=/nonexistent:$PATH`, which did NOT
+# hide a real gh on PATH and left the TP cases dependent on live PR state (e.g. a
+# real PR whose base is CI-gate-only would now hit the new exemption).
+GH_STUB_FAIL="$(mktemp -d)"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$GH_STUB_FAIL/gh"
+chmod +x "$GH_STUB_DIR/gh" "$GH_STUB_NOSIG/gh" "$GH_STUB_FAIL/gh"
+trap 'rm -f "$TMPERR"; rm -rf "$GH_STUB_DIR" "$GH_STUB_NOSIG" "$GH_STUB_FAIL"' EXIT
 FAIL=0
 
 # Build an AskUserQuestion payload from "label::description" option pairs.
@@ -39,7 +70,7 @@ mk() {
   done
   printf '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"options":[%s]}]}}' "$opts"
 }
-run() { printf '%s' "$1" | PATH="/nonexistent:$PATH" bash "$GUARD" >/dev/null 2>"$TMPERR"; echo $?; }
+run() { printf '%s' "$1" | PATH="$GH_STUB_FAIL:$PATH" bash "$GUARD" >/dev/null 2>"$TMPERR"; echo $?; }
 check() { # name want_rc got_rc
   local name="$1" want="$2" got="$3"
   if [[ "$got" == "$want" ]]; then
@@ -120,6 +151,18 @@ check "tp3 plain merge proposal no attestation" 2 "$(run "$(mk \
 #     the new push-gate-meta exemption (fp10) must NOT let this slip through.
 check "tp4 active push no detail" 2 "$(run "$(mk \
   'Push it::just push the changes now, no further detail')")"
+# ---- CI-gate-only base exemption (new allowlist) ----
+# Must ALLOW when the referenced PR's base has reviews disabled; must still BLOCK
+# when the base is a normal (reviewed) branch. gh is stubbed per-case.
+run_stub() { printf '%s' "$2" | PATH="$1:$PATH" GH_REPO=es6kr/skills bash "$GUARD" >/dev/null 2>"$TMPERR"; echo $?; }
+
+# cg1: base reports "reviews are disabled" -> active merge option bypasses attestation.
+check "cg1 CI-gate-only base bypass" 0 "$(run_stub "$GH_STUB_DIR" "$(mk \
+  'Squash and merge PR #267::merge the CI-gate-only next-fix PR now')")"
+
+# cg2: base does NOT report the signal -> attestation still required (fail-closed block).
+check "cg2 reviewed base still blocks" 2 "$(run_stub "$GH_STUB_NOSIG" "$(mk \
+  'Squash and merge PR #267::merge the PR now')")"
 
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then echo "ALL PASS"; else echo "SOME FAILED"; fi

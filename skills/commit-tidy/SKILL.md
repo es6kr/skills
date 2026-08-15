@@ -4,6 +4,7 @@ metadata:
   version: "0.1.1"
 name: commit-tidy
 depends-on:
+  - cleanup
   - git-repo
 description: |
   Analyze staged/committed changes and recommend split, squash, or commit-message strategy.
@@ -41,6 +42,10 @@ Analyze staged/unstaged changes and recommend whether to split into multiple com
 - Reviewing changes that touch many files
 - Ensuring atomic, reviewable commits
 
+## Squash-scan scope (HARD STOP)
+
+**A user-named commit range is the minimum scope, never the maximum.** The moment any squash candidate is found — whether self-discovered or pointed at by the user — scan the *entire* unpushed range (`git log --name-only @{u}..HEAD`) grouped by file for the same repeated-single-file pattern before proposing a squash plan. See `staging-discipline.md` "Full-range squash-candidate scan" for the procedure. Presenting a squash plan for only the range the user mentioned, while an identical streak sits elsewhere in the same unpushed history, is a violation — the assistant surfaces the full picture, not just the part the user already knew about.
+
 ## Split Decision Criteria
 
 ### Split when
@@ -61,6 +66,11 @@ Analyze staged/unstaged changes and recommend whether to split into multiple com
 4. **Large diff size**
    - 500+ lines changed across unrelated areas
    - Multiple components modified independently
+
+## Reset & Rollback Commit Tidy Rule (HARD STOP)
+
+- **Mandatory Amend on Rollback**: When recovering initial configurations or adding files after a repository reset/rollback to the Initial Commit state, do not accumulate new commits; **always merge changes into the existing initialization commit via `git commit --amend`**.
+- **Clean Single Initial Commit**: Organize initial repository setups (`CLAUDE.md`, `index.md`, `log.md`, `pages/`) into a single clean, self-contained initial commit to maximize history readability.
 
 5. **Different reviewers needed**
    - Changes require different domain expertise
@@ -171,6 +181,8 @@ Look for natural split points:
 
 Provide specific recommendations. **Every recommended commit includes a body by default** (see `message-discipline.md` "Default commit message structure"). The body is free-form — it does not have to enumerate per-file changes.
 
+**Mandatory Interactive Ask Gate (HARD STOP)**: Autonomous commit execution or git push without user confirmation is STRICTLY FORBIDDEN. After presenting the split/squash recommendation, you MUST present the split options to the user via `AskUserQuestion` to obtain explicit approval before executing any `git commit` or `git push`. Even when `git pull --rebase` is required or executed, automatically running `git push` afterwards is strictly forbidden without a new `AskUserQuestion` confirmation.
+
 ```
 ## Analysis Results
 
@@ -235,6 +247,37 @@ Read each matched file. If a local mapping exists (e.g., "new topic = `feat:`, i
 | `feat(skill-X): add new-topic.md` (new topic file present) | same rule | `feat(skill-X): add new-topic topic` (unchanged) |
 
 See `message-discipline.md` → "Working-tree-specific commit-type override (HARD STOP)" for the full self-check.
+
+### Step 4.6: Prior-merge regression check (HARD STOP — before presenting the split as ready)
+
+**Before declaring a split "confirmed / ready to execute", check whether any staged file's skill was already the subject of a merged PR — especially a squash-merged one.** A squash-merge collapses individual commits (including "address review findings" fix commits) into one commit on the base branch. Staged changes that touch the same files can silently regress a bug that a findings-application commit already fixed, and a structural/pattern-scan diff will not reveal it.
+
+```bash
+# has this skill already got a merged PR? (repo-specific owner/repo)
+gh pr list -R <owner>/<repo> --state merged --search "<skill-name>" --json number,title,mergedAt,baseRefName
+
+# resolve the actual base (do not assume origin/main — staging repos use next-feat/next-fix)
+gh pr view <N> -R <owner>/<repo> --json baseRefName -q '.baseRefName'
+
+# if the PR had multiple commits before merge, list them — findings-application
+# commits are recognizable by "review findings" / "internal review" / "address feedback"
+gh api repos/<owner>/<repo>/pulls/<N>/commits --jq '.[] | {sha: .sha[0:7], message: .commit.message}'
+```
+
+Diff the staged content against the **actual resolved base ref** (not an assumed default) — and read the **full** diff, not a `head -N` or `grep`-filtered slice:
+
+```bash
+git diff origin/<actual-base> -- <file>
+```
+
+For any hunk that overlaps a findings-application commit's touched lines, and for any changed logic that is testable (regex assignment, conditional branch, script behavior), **execute the changed line(s)** to confirm behavior — a diff read is not a substitute for running the code.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Conclude "purely additive, no regression" from `grep -E '^\+##'` / `head -100` pattern-scan of a diff | Read the full diff line by line; treat any hunk overlapping a findings-application commit's region as requiring explicit re-verification |
+| 2 | Diff staged changes against `origin/main` when the actual PR base was a staging branch (`next-feat`/`next-fix`) | Resolve the actual merge base via `gh pr view --json baseRefName` first, then diff against that ref |
+| 3 | Declare "no regression" without executing/testing the changed logic | Run the actual code path (`bash -c`, a grep match test, a unit test) before asserting correctness |
+| 4 | Present a split as "confirmed / ready to execute" before this check has run on every touched skill | This check is part of split-readiness — gate Step 5 (and any user-facing "ready" claim) on it passing |
 
 ### Step 5: Execute split (if requested)
 

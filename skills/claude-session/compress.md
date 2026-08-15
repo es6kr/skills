@@ -6,43 +6,12 @@ Compresses sessions to reduce file size. Removes duplicate snapshots, truncates 
 
 ### 1. Check MCP Tool Availability
 
-First, check whether the `mcp__claude-sessions-mcp__compress_session` tool is directly available.
+Check whether the `mcp__claude-sessions-mcp__compress_session` tool is directly available (`ToolSearch("select:mcp__claude-sessions-mcp__compress_session")` or an equivalent tool-list check).
 
-- **Available**: Proceed to step 3
-- **Not available**: Proceed to step 2 for UTCP registration
+- **Available**: Proceed to step 2
+- **Not available**: Register `claude-sessions-mcp` in the project's MCP config (`.mcp.json` or `~/.claude/settings.json` `mcpServers`) per `mcp-config` skill conventions, then retry the availability check
 
-### 2. Register claude-sessions-mcp via UTCP (only when not directly registered)
-
-```bash
-/utcp add claude-sessions-mcp
-```
-
-The following configuration will be added to the project's `.utcp_config.json`:
-
-```json
-{
-  "name": "claude_sessions",
-  "call_template_type": "mcp",
-  "config": {
-    "mcpServers": {
-      "claude-sessions-mcp": {
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "claude-sessions-mcp"]
-      }
-    }
-  }
-}
-```
-
-Register with code-mode:
-
-```
-Call mcp__code-mode__register_manual tool:
-- template_name: "claude_sessions"
-```
-
-### 3. Remove Profanity (Optional)
+### 2. Remove Profanity (Optional)
 
 It is recommended to remove profanity from session files before compressing:
 
@@ -52,7 +21,7 @@ scripts/clean-profanity.py <session-file.jsonl>
 
 See [profanity-cleaner.md](./profanity-cleaner.md) for details.
 
-### 4. Determine Target Session
+### 3. Determine Target Session
 
 #### When session_id is provided
 Compress only that session.
@@ -70,7 +39,7 @@ Batch compress all sessions containing `"hookEvent":"Stop"` or `"type":"saved_ho
 
 3. **Run compression on each session**: Compress found sessions sequentially
 
-### 5. Backup (Required Before Compression)
+### 4. Backup (Required Before Compression)
 
 Back up the original session file before compressing:
 
@@ -86,9 +55,7 @@ cp ~/.claude/projects/<project_name>/<session_id>.jsonl ~/.claude/projects/.bak/
 - Backup files are saved by session_id in the `.bak/` folder, regardless of project
 - If a backup with the same session_id exists, it will be overwritten (only the latest backup is kept)
 
-### 6. Call compress_session
-
-**When directly registered via MCP:**
+### 5. Call compress_session
 
 ```text
 Call mcp__claude-sessions-mcp__compress_session tool:
@@ -96,17 +63,6 @@ Call mcp__claude-sessions-mcp__compress_session tool:
 - session_id: "<session UUID>"
 - keep_snapshots: "first_last"  // options: "first_last", "all", "none"
 - max_tool_output_length: 5000  // optional: 0 means unlimited
-```
-
-**When using UTCP/code-mode:**
-
-```text
-Call mcp__code-mode__call_tool_chain tool:
-- code: `claude_sessions.claude_sessions_compress_session({
-    project_name: "<project folder name>",
-    session_id: "<session UUID>",
-    keep_snapshots: "first_last"
-  })`
 ```
 
 ## Usage

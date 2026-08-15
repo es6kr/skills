@@ -27,9 +27,10 @@ If `--interactive` is off, proceed directly to medium decision + POST (determini
 
 ```markdown
 ## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
+<!-- consolidate:verified -->
 ```
 
-Plain `## AI Review Summary` is forbidden. The link form above is required.
+Plain `## AI Review Summary` is forbidden. The link form above is required. The `<!-- consolidate:verified -->` HTML comment on the second line is an invisible machine-readable provenance marker: it renders as nothing on GitHub but lets the `block-noncompliant-review-comment` guard (client hook + server Action) confirm the comment came through consolidate even if the `receiving-code-review` link text is ever reworded.
 
 **Caller retitle does NOT touch this Summary title (HARD STOP)**: a caller "rename the review → X" instruction scopes to the **Code Review comment** (Step 3.5.3 / `internal.md` "Caller-supplied custom title contract") — NEVER this Summary. The Summary heading stays `## AI Review Summary — [receiving-code-review](...)`. The two comments must not share the "Summary" token: the Code Review comment's heading must contain **no** "Summary" (e.g. `## Code Review — [requesting-code-review](...)`), this Summary comment owns "Summary" exclusively.
 
@@ -751,6 +752,13 @@ Among all actionable items from Step 4 classification:
 | Neither exists + no collaboration medium | AskUserQuestion | "Where to register?" options (new `.ralph/fix_plan.md` / new `checklist.md` / Issue / skip registration) |
 
 **Environment detection is workspace (CWD) based** — Do not confuse the project-subdirectory `.ralph/` with the workspace `.ralph/`.
+
+**Workspace ≠ the reviewed PR's own repo (HARD STOP)**: the tracking medium is always the **session's own workspace** file — the workspace consolidate is currently running in, not a directory inside the repo that owns the PR under review. When the PR belongs to a different repo than the current session's workspace (a common case for cross-repo consolidate runs), do NOT look for `checklist.md`/`fix_plan.md` inside a checkout of that repo — check the session workspace's own root first, even if it requires a separate `cd`/path lookup outside the PR's repo tree.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | PR under review lives in repo A; look for `checklist.md`/`fix_plan.md` inside a local checkout of repo A, find none, and conclude "no tracking medium exists" | Check the session's own workspace root (e.g. `~/.agents/checklist.md` if that's where the session is running from) first — it applies regardless of which repo's PR is being reviewed |
+| 2 | Ask the user "GitHub Issue vs no tracking vs hold" as if no medium existed, when the session workspace already has a `checklist.md`/`fix_plan.md` | Register directly to the session workspace's existing medium — no ask needed once one exists |
 
 ### Registration procedure
 

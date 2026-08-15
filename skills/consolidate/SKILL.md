@@ -1,12 +1,9 @@
 ---
 name: consolidate
-depends-on:
-  - git-repo
-  - github-flow
-  - superpowers
+depends-on: [git-repo, github-flow, hook-kit, superpowers]
 metadata:
   author: es6kr
-  version: "0.4.0" # x-release-please-version
+  version: "0.5.3" # x-release-please-version
 description: |
   Consolidate and respond to external feedback on PRs/issues. Topics —
   pr (workflow entrypoint + skip conditions),
@@ -55,6 +52,7 @@ Interactive mode auto-activated by caller args (intent: <intent class>) — draf
 | 2 | Activate interactive only for the matched step (e.g., only the Summary) | Once activated, applies to ALL POST steps in this consolidate run (Internal Review + Summary + any inline edits). One match → all-step gating |
 | 3 | Silent activation without chat acknowledgement | Emit the one-liner above so the user can confirm the intent was caught |
 | 4 | Map "important decision ask" only to scope-decision axes (Step 5 Axis B / Step 8 next-action) | Body content of Internal Review / Summary is an "important decision" too — every POSTed artifact is subject to review-before-post |
+| 5 | Directly running a local/CLI review tool (e.g., CodeRabbit CLI) and skipping the sequential topics of the `consolidate` skill (collect -> internal -> classify) | Even when running local CLI tools, always route through the `collect.md` and `internal.md` steps to ensure that the Internal Code Review comments and AI Review Summary are always posted as a pair |
 
 ### Interactive flow contract
 

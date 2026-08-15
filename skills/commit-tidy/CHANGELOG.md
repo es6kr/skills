@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.5.3](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.2...commit-tidy-v0.5.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **commit-tidy:** require explicit HEAD ref and hunk inspection in the shared-checkout sanity check ([7274f14](https://github.com/es6kr/skills/commit/7274f143863f27040b4379ea60ee6a4e8a2afbfd))
+* **commit-tidy:** require HEAD-diff sanity check before staging shared hardlinked skill files ([b77b597](https://github.com/es6kr/skills/commit/b77b5972350bec1d7f83ea4bcaa45214b9748b10))
+* **commit-tidy:** require HEAD-diff sanity check before staging shared hardlinked skill files ([174d27a](https://github.com/es6kr/skills/commit/174d27a2be3512148cd569381958d92908da467e))
+
+## [0.5.2](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.1...commit-tidy-v0.5.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit/Copilot review findings on PR [#270](https://github.com/es6kr/skills/issues/270) ([3b11a73](https://github.com/es6kr/skills/commit/3b11a730b5ad68803d35a8264eda540e48265d75))
+* declare undeclared skill-to-skill dependencies (7 skills) ([#271](https://github.com/es6kr/skills/issues/271)) ([36a9f9d](https://github.com/es6kr/skills/commit/36a9f9d7c1fac9bb1c4c96b325a067ab92ad0da7))
+* PR [#195](https://github.com/es6kr/skills/issues/195) review findings batch 2 (github-repo/skill-kit/commit-tidy/hook-kit) ([#264](https://github.com/es6kr/skills/issues/264)) ([d8d9df0](https://github.com/es6kr/skills/commit/d8d9df04bdf178fffa6822c44199a416668c6423))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
+## [0.5.1](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.0...commit-tidy-v0.5.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **commit-tidy:** add full-range squash scan + middle-range squash procedure ([#201](https://github.com/es6kr/skills/issues/201)) ([90e9ae8](https://github.com/es6kr/skills/commit/90e9ae86a3c1e483217b6d7f69b585809bfafd0f))
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/commit-tidy-v0.4.3...commit-tidy-v0.5.0) (2026-07-28)
 
 

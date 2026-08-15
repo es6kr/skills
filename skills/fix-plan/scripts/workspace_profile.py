@@ -44,7 +44,8 @@ DEFAULT_PROFILE = {
     "qdrant_memory_collection": "claude-memory",
     "qdrant_task_collection": "fix-plan",
     "llm_wiki_path": "",
-    "default_project": "default"
+    "default_project": "default",
+    "tracker_root": ".ralph"
 }
 
 
@@ -84,6 +85,41 @@ def detect_workspace(target_path: str = None) -> str:
     return "default"
 
 
+def resolve_tracker_root(target_path: str = None, workspace_name: str = None) -> str:
+    """Resolve the tracker root directory (the dir holding fix_plan.md) for a workspace.
+
+    Priority:
+      1. FIXPLAN_TRACKER_ROOT env var (per-invocation override, aids testing)
+      2. The workspace profile's explicit "tracker_root" (config.json profiles.<name>)
+      3. Filesystem auto-detect: ".agents/fix_plan.md" then ".ralph/fix_plan.md"
+      4. ".ralph" default (backward-compatible with Ralph workspaces)
+
+    Note: step 2 reads the RAW configured value, not the merged DEFAULT_PROFILE, so a
+    workspace that does not set "tracker_root" falls through to auto-detect rather than
+    being pinned to ".ralph".
+
+    workspace_name, when given, takes precedence over re-detecting from target_path —
+    callers that already resolved an explicit/forced workspace (e.g. get_profile's
+    --workspace override) must keep using that same workspace here.
+    """
+    env_root = os.environ.get("FIXPLAN_TRACKER_ROOT")
+    if env_root:
+        return env_root
+
+    profiles = load_user_config().get("profiles", {})
+    name = workspace_name or detect_workspace(target_path)
+    configured = profiles.get(name, {}).get("tracker_root")
+    if configured:
+        return configured
+
+    base = Path(target_path or os.getcwd()).resolve()
+    for candidate in (".agents", ".ralph"):
+        if (base / candidate / "fix_plan.md").exists():
+            return candidate
+
+    return ".ralph"
+
+
 def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
     """Get merged profile dictionary for given workspace."""
     user_config = load_user_config()
@@ -97,6 +133,10 @@ def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
     # API Token resolution from ENV
     token_env = profile["plane_token_env"]
     profile["plane_token"] = os.environ.get(token_env) or os.environ.get("PLANE_API_KEY", "")
+
+    # Resolve the tracker root dynamically (env > raw config > auto-detect > ".ralph"),
+    # overriding the static DEFAULT_PROFILE value so consumers get the real root.
+    profile["tracker_root"] = resolve_tracker_root(target_path, workspace_name=name)
 
     return profile
 
@@ -118,3 +158,4 @@ if __name__ == "__main__":
         print(f"  Qdrant URL: {profile['qdrant_url']}")
         print(f"  Wiki Collection: {profile['qdrant_wiki_collection']}")
         print(f"  LLM Wiki Path: {profile['llm_wiki_path']}")
+        print(f"  Tracker Root: {profile['tracker_root']}")

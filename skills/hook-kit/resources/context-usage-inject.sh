@@ -19,8 +19,9 @@
 #   1. $CC_CONTEXT_WINDOW env override (integer tokens), else
 #   2. model-id heuristic: fable/mythos/opus/sonnet-5 -> 1000000 (1M-context tiers),
 #      anything else -> 200000.
-# Cleanup-recommend tier: at >= $CC_CLEANUP_RECOMMEND_PCT (default 50) a second
-# directive line is injected obligating a /cleanup recommendation at the turn's
+# Cleanup-recommend tier: at >= $CC_CLEANUP_RECOMMEND_PCT (default is per-model —
+# 55 for fable/mythos, 50 for opus, 45 for everything else) a second directive
+# line is injected obligating a /cleanup recommendation at the turn's
 # wrap-up. Rationale: the 45% gate lives in next-skill docs and the deny-hook
 # (block-cleanup-option-below-context-gate.sh) can only judge asks it can
 # classify as wrap-ups — session-tail asks without end/stop wording escaped
@@ -37,6 +38,18 @@
 # invisible to marker-based detection. Mitigated below via a last-usage-age
 # check — not a fix for the underlying timing gap (which no amount of transcript
 # parsing can close), just a caveat so the reading isn't blindly trusted.
+#
+# First-post-compact suppression (context-usage-stale, 20th recurrence): the
+# isCompactSummary reset above prevents reusing a STALE pre-compact number, but
+# the very next reading after that reset can still be a genuinely FRESH, high
+# number — one turn of context reconstruction (re-reading skills/files to
+# resume working state) inflates usage without representing accumulating
+# budget pressure. Observed: a post-compact turn measured 62.7% (real, not
+# stale) and still triggered [CLEANUP-GATE], prompting a second cleanup
+# recommendation immediately after the session had just been compacted for
+# exactly that reason. Fix: suppress [CLEANUP-GATE] specifically on the first
+# assistant-usage reading seen since the last isCompactSummary reset,
+# regardless of its pct — treat it as effectively < 20% for gating purposes.
 
 INPUT=$(cat)
 
@@ -73,6 +86,8 @@ try:
         sys.exit(0)
 
     last_usage, last_model, last_ts = None, "", None
+    compact_seen = False
+    post_compact_usage_count = 0
     # encoding is explicit: Python's default is locale-dependent, so on a
     # non-UTF-8 Windows console codepage (e.g. cp949) any non-ASCII transcript
     # line raises UnicodeDecodeError and the outer handler silently exits —
@@ -95,6 +110,8 @@ try:
                     marker = None
                 if marker and marker.get("isCompactSummary") is True:
                     last_usage, last_model, last_ts = None, "", None
+                    compact_seen = True
+                    post_compact_usage_count = 0
                 continue
             if '"usage"' not in line:
                 continue
@@ -112,6 +129,8 @@ try:
                 last_usage = u
                 last_model = msg.get("model", "") or last_model
                 last_ts = e.get("timestamp")
+                if compact_seen:
+                    post_compact_usage_count += 1
 
     if not last_usage:
         # No post-compact assistant usage yet (right after /compact, before
@@ -148,12 +167,14 @@ try:
     # adds a caveat, never blocks anything.
     stale_min_env = os.environ.get("CC_CONTEXT_STALE_MIN", "")
     stale_min = int(stale_min_env) if stale_min_env.isdigit() else 15
+    is_stale = False
     if last_ts:
         try:
             from datetime import datetime, timezone
             last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
             gap_min = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60
             if gap_min >= stale_min:
+                is_stale = True
                 print(
                     f"[CONTEXT-STALE] This reading is based on an assistant message "
                     f"from ~{gap_min:.0f} min ago. A compaction may have happened "
@@ -184,7 +205,29 @@ try:
     if os.environ.get("CC_EMIT_THRESHOLD") == "1":
         print(f"CLEANUP-THRESHOLD: {rec_pct}")
 
-    if pct >= rec_pct:
+    # First-post-compact reading: this is the ONLY assistant-usage entry seen
+    # since the last isCompactSummary reset. Its pct is real (not stale) but
+    # inflated by one-time context-reconstruction cost rather than
+    # accumulating budget pressure — suppress the cleanup recommendation for
+    # this one reading regardless of pct (treat as if < 20%). The SECOND
+    # post-compact reading onward is trusted normally.
+    is_first_post_compact_reading = compact_seen and post_compact_usage_count == 1
+
+    if is_first_post_compact_reading:
+        print(
+            f"[POST-COMPACT] usage {pct:.1f}% is this session's first reading after a "
+            "/compact — treat effective usage as < 20% for cleanup-gate purposes. This "
+            "figure reflects one-time context-reconstruction cost (re-reading skills/"
+            "files to resume working state), not accumulating budget pressure. Do NOT "
+            "recommend /cleanup off this number; the gate resumes from the next reading."
+        )
+    elif is_stale:
+        # [CONTEXT-STALE] above already told the reader not to act on this figure —
+        # emitting [CLEANUP-GATE] here too would contradict that warning in the same
+        # breath. Suppress the gate for this stale reading; it resumes on the next
+        # (fresh) one, same as the first-post-compact suppression above.
+        pass
+    elif pct >= rec_pct:
         print(
             f"[CLEANUP-GATE] usage {pct:.1f}% >= {rec_pct}% — RECOMMEND /cleanup at this "
             "turn's wrap-up via AskUserQuestion: include a Recommended cleanup option in "

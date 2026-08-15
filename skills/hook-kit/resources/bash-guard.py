@@ -99,7 +99,10 @@ SIMPLE_BLOCKS = [
 GITPFX = r"\bgit(?:\s+-\S+(?:\s+[^-\s]\S*)?)*"
 GIT_BLOCKS = [
     # Git history destruction
-    (r"reset\s+--hard", "git reset --hard deletes uncommitted work"),
+    # NOTE: a narrow `reset\s+--hard` pattern used to live here, missing other
+    # destructive reset forms (arbitrary ref, large-N mixed history rewrite).
+    # Moved to check_git_reset() below, which blocks everything except a
+    # small-N --soft/--mixed HEAD~N undo (git.md: N<=2 needs no confirmation).
     # NOTE: newline excluded from the span — without it, "git branch --show-current"
     # on one line and "git commit -F" lines later false-matched as "branch -f"
     # (IGNORECASE makes -F hit -f\b). Same \n-exclusion applied to the rm/.tmp spans.
@@ -120,6 +123,27 @@ GIT_BLOCKS = [
     (r"commit\s+--allow-empty", "Empty commits risk being abused as CI/CD triggers"),
     (r"merge\s+--abort", "git merge --abort discards in-progress conflict resolution work"),
 ]
+
+
+def check_git_reset(scan: str) -> str | None:
+    """git reset guard, split out of GIT_BLOCKS: --hard is always destructive
+    (working tree loss) and stays hard-blocked. --soft/--mixed to HEAD~N is a
+    low-risk "undo the last commit(s), keep the changes staged" operation —
+    git.md only requires confirmation once N > 2, so small-N soft/mixed
+    resets are allowed. Bare reset (no --soft/--mixed) or any ref other than
+    HEAD~1/HEAD~2 falls back to the same blanket prohibition as before."""
+    for m in re.finditer(GITPFX + r"\s+reset\b([^|;&\n]*)", scan, IM):
+        tail = m.group(1)
+        if re.search(r"--hard\b", tail, I):
+            return "git reset --hard is ABSOLUTELY PROHIBITED for agents. Never execute under any circumstances."
+        mode = re.search(r"--(soft|mixed)\b", tail, I)
+        head = re.search(r"HEAD~(\d+)\b", tail, I)
+        if mode and head and int(head.group(1)) <= 2:
+            continue  # small-N soft/mixed reset — allowed, no confirmation needed per git.md
+        return ("git reset (hard/soft/mixed/ref) beyond a small --soft/--mixed HEAD~1 or "
+                "HEAD~2 is ABSOLUTELY PROHIBITED for agents. Never execute under any circumstances.")
+    return None
+
 
 # Background dispatch without a command-level time bound
 # (claudify/background-polling.md HARD STOP: the Bash tool `timeout` parameter does
@@ -387,6 +411,100 @@ def git_scan_text(command: str) -> str:
     return scan
 
 
+_PROD_BRANCHES = r"(?<![\w-])(?:production|master|release|prod|stable)"
+_PROD_BRANCH_PATTERNS = [
+    (r"git\s+push\s+.*:" + _PROD_BRANCHES + r"(?:$|\s)", "git push deleting protected branch"),
+    (r"git\s+push\s+.*" + _PROD_BRANCHES + r"(?:$|\s|:)", "git push targeting protected branch"),
+    (r"git\s+branch\s+(?:-[a-zA-Z]+\s+)*" + _PROD_BRANCHES + r"(?:$|\s)", "git branch create/force on protected branch"),
+    (r"git\s+(?:checkout|switch)\s+-[bBcC]\s+" + _PROD_BRANCHES + r"(?:$|\s)", "git branch create via checkout/switch on protected branch"),
+    (r"gh\s+api\s+.*branches/" + _PROD_BRANCHES, "gh api mutation on protected branch"),
+    (r"git\s+worktree\s+add\s+.*" + _PROD_BRANCHES + r"(?:$|\s)", "git worktree add on protected branch"),
+    (r"git\s+update-ref\s+refs/heads/" + _PROD_BRANCHES, "git update-ref on protected branch"),
+    (r"gh\s+workflow\s+run\s+.*(?:--ref|-r)\s+" + _PROD_BRANCHES + r"(?:$|\s)", "gh workflow run (workflow_dispatch) targeting protected branch"),
+]
+
+
+def check_prod_branch_ops(command: str) -> str | None:
+    """Block autonomous git/gh operations that create, push, delete, protect, or
+    workflow_dispatch against release-trigger branches (production/master/release/
+    prod/stable). `main` is deliberately excluded (already gated by the
+    push-confirmation rule). Bypass: prefix the command with
+    ALLOW_PROD_BRANCH_OPS=1 (per-command only — never session-wide).
+
+    Ported from the standalone block-prod-branch-autonomous-ops.sh hook into
+    bash-guard.py to avoid an extra PreToolUse:Bash process spawn per command."""
+    if os.environ.get("ALLOW_PROD_BRANCH_OPS") == "1":
+        return None
+    if re.search(r"ALLOW_PROD_BRANCH_OPS=1", command):
+        return None
+    scan = git_scan_text(command)
+    reason = None
+    for pat, r in _PROD_BRANCH_PATTERNS:
+        if re.search(pat, scan, IM):
+            reason = r
+            break
+    if reason is None and (
+        re.search(r"gh\s+api\s+.*actions/workflows/.*dispatches", scan, IM)
+        and re.search(r"(?:-f|-F|--field|--raw-field)\s+ref=" + _PROD_BRANCHES + r"(?:$|\s)", scan, IM)
+    ):
+        reason = "gh api workflow_dispatch targeting protected branch"
+    if reason is None:
+        return None
+    return (
+        f"{reason}\n\n"
+        "Branches matching /(production|master|release|prod|stable)/ are release triggers. "
+        "A single autonomous operation on them can trigger real user-facing publishes "
+        "(semantic-release, Marketplace stable, npm dist-tag latest, GitOps ArgoCD sync) "
+        "with no dry-run and no rollback.\n\n"
+        "To proceed with a genuinely user-approved operation, prefix the command with "
+        "ALLOW_PROD_BRANCH_OPS=1 (per-command only — never session-wide)."
+    )
+
+
+_GIT_GLOBAL_OPTS = r"(?:-C\s+\S+\s+|--no-pager\s+|-c\s+\S+=\S+\s+)*"
+_STAGING_BRANCH_TARGET = re.compile(
+    r"(?:git\s+" + _GIT_GLOBAL_OPTS + r"worktree\s+add|"
+    r"git\s+" + _GIT_GLOBAL_OPTS + r"switch\s+-[cC]|"
+    r"git\s+" + _GIT_GLOBAL_OPTS + r"checkout\s+-[bB]|"
+    r"gh\s+pr\s+create[^\n]*--base)\b[^\n]*\b(?:origin/)?(next-fix|next-feat)\b",
+    IM,
+)
+_STAGING_DIVERGENCE_EVIDENCE = re.compile(
+    r"git\s+(?:log|diff)\s+origin/main\.\.\.?origin/next-|baseRefName",
+    IM,
+)
+
+
+def check_staging_branch_without_divergence(command: str) -> str | None:
+    """Block creating/targeting a worktree, branch, or PR base on next-fix/next-feat
+    without evidence (in the same command) that the branch's actual staging-branch
+    home was checked first. next-fix and next-feat independently diverge from main and
+    from each other — assuming "this is a fix/* change so next-fix" (or the reverse)
+    without checking has caused repeated scope-contamination and wrong-base incidents
+    (failed-attempts.md class pr-base-divergence-check-reactive-not-preemptive, 3rd
+    occurrence triggered this check).
+
+    Evidence accepted (same command string): a divergence check
+    (`git log/diff origin/main..origin/next-*`) or a `baseRefName` lookup
+    (`gh pr view --json baseRefName`) confirming an existing PR's real base."""
+    if not _STAGING_BRANCH_TARGET.search(command):
+        return None
+    if _STAGING_DIVERGENCE_EVIDENCE.search(command):
+        return None
+    return (
+        "git worktree/branch/PR-base targets next-fix or next-feat without a "
+        "divergence check in the same command.\n\n"
+        "next-fix and next-feat independently diverge from main and from each other — "
+        "assuming one is the right base for a given branch (e.g. \"this is a fix/* "
+        "change so next-fix\") has repeatedly caused wrong-base branches (unrelated "
+        "commits pulled in, or a rebase mixing in another staging branch's history).\n\n"
+        "Run one of these first (in the same command), then retry:\n"
+        "  gh pr view <N> --json baseRefName   # if a PR already exists for this branch\n"
+        "  git log origin/main..origin/next-fix --oneline   # + reverse, to see actual divergence\n"
+        "  git log origin/main..origin/next-feat --oneline  # + reverse"
+    )
+
+
 def evaluate(
     command: str,
     run_bg: bool,
@@ -422,6 +540,10 @@ def evaluate(
         if re.search(GITPFX + r"\s+" + sub, scan, IM):
             return hard(msg)
 
+    reset_reason = check_git_reset(scan)
+    if reset_reason:
+        return hard(reset_reason)
+
     pr_reason = check_pr_create_draft(command)
     if pr_reason:
         return hard(pr_reason)
@@ -434,9 +556,17 @@ def evaluate(
     if pm2_reason:
         return hard(pm2_reason)
 
+    staging_branch_reason = check_staging_branch_without_divergence(command)
+    if staging_branch_reason:
+        return hard(staging_branch_reason)
+
     summary_reason = check_summary_without_internal_review(command)
     if summary_reason:
         return hard(summary_reason)
+
+    prod_branch_reason = check_prod_branch_ops(command)
+    if prod_branch_reason:
+        return hard(prod_branch_reason)
 
     if LOCAL_OVERLAY is not None:
         overlay_reason = LOCAL_OVERLAY.check(command, tool_name, transcript_path)
@@ -531,10 +661,18 @@ def self_test() -> int:
         (True, False, "GIT -C /p RESET --HARD"),
         (True, False, 'git -C "/path with space" reset --hard'),
         (True, False, "foo && git -C /p reset --hard"),
+        # ── soft/mixed reset split (TaskList #15): --hard always blocks;
+        # bare reset, non-HEAD~N refs, and N>2 fall back to the same block ──
+        (True, False, "git reset"),
+        (True, False, "git reset --soft HEAD~3"),
+        (True, False, "git -C /p reset --soft main"),
+        (True, False, "git reset --soft --hard"),
         # ── FP cases: mentions / safe commands that MUST be allowed ──
         (False, False, "git status"),
         (False, False, "git -C /srv/app log --oneline -5"),
         (False, False, "git -C /p reset --soft HEAD~1"),
+        (False, False, "git reset --soft HEAD~2"),
+        (False, False, "git reset --mixed HEAD~1"),
         (False, False, "git clean -n"),
         (False, False, 'echo "git reset --hard undoes uncommitted work"'),
         (False, False, "grep 'git reset --hard' /tmp/notes.md"),
@@ -598,6 +736,16 @@ def self_test() -> int:
         (False, False, "gh pr comment 123 --body 'plain review comment'"),
         (False, False, "gh pr view 123"),
         (False, False, 'echo "posting AI Review Summary later"'),
+        # ── staging-branch divergence guard (pr-base-divergence-check-reactive-not-preemptive,
+        # failed-attempts.md — 3rd occurrence) ──
+        (True, False, "git switch -C fix/x origin/next-fix"),
+        (True, False, "git checkout -b fix/y origin/next-feat"),
+        (True, False, "git worktree add ../wt origin/next-fix"),
+        (True, False, "gh pr create --base next-fix --draft --title x --body y"),
+        (False, False, "git log origin/main..origin/next-fix --oneline; git switch -C fix/x origin/next-fix"),
+        (False, False, "gh pr view 238 --json baseRefName; git switch -C fix/x origin/next-feat"),
+        (False, False, "git status --short"),
+        (False, False, "git switch -c fix/unrelated-thing"),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:

@@ -43,12 +43,17 @@ TOTAL_LINES=$(wc -l < "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)
 START=$(( TOTAL_LINES > WINDOW ? TOTAL_LINES - WINDOW : 1 ))
 
 # Last genuine user-typed slash-command line: excludes tool_result user-lines
-# (quoting another session's invocation, e.g. RAG search hits) and assistant
-# lines (their inner quotes are JSON-escaped and never match this pattern).
+# (quoting another session's invocation, e.g. RAG search hits), assistant
+# lines (their inner quotes are JSON-escaped and never match this pattern),
+# and compact-summary lines (`"isCompactSummary":true` — a summary's own
+# narrative quotes prior turns verbatim, including a `<command-name>/<slug>`
+# that was already invoked+resolved pre-compact; without this exclusion the
+# stale quoted text reads identically to a live re-invocation).
 CMD_MATCH=$(tail -n +"$START" "$TRANSCRIPT_PATH" 2>/dev/null \
   | grep -n '<command-name>/' \
   | grep '"type":"user"' \
   | grep -v 'tool_result' \
+  | grep -v '"isCompactSummary":true' \
   | tail -1)
 [[ -z "$CMD_MATCH" ]] && exit 0
 
@@ -82,4 +87,4 @@ jq -n --arg slug "$SLUG" '
     decision: "block",
     reason: "Detected `/\($slug)` typed by the user, but no `Skill(\"\($slug)\", ...)` tool_use call was found afterward in this transcript. A slash-command inject (the SKILL.md content shown after `/\($slug)`) is NOT itself a Skill invocation — it only surfaces the skill'\''s instructions; the procedure starts only once the assistant actually calls the Skill tool. If `/\($slug)`'\''s procedure was already followed manually this turn, call `Skill(\"\($slug)\")` now anyway to record the formal invocation before proceeding."
   }'
-exit 2
+exit 0

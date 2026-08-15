@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/es6kr/skills/compare/tdd-v0.3.1...tdd-v0.3.2) (2026-08-05)
+
+
+### Bug Fixes
+
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/tdd-v0.3.0...tdd-v0.3.1) (2026-06-19)
 
 

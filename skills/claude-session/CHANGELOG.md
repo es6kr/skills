@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/claude-session-v0.7.0...claude-session-v0.7.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+
+## [0.7.0](https://github.com/es6kr/skills/compare/claude-session-v0.6.0...claude-session-v0.7.0) (2026-08-03)
+
+
+### Features
+
+* **claude-session:** inject current model id in session-id-inject hook ([#175](https://github.com/es6kr/skills/issues/175)) ([1fc3a85](https://github.com/es6kr/skills/commit/1fc3a85dc0fd86a39cfd369f0a85619f5c43ecba))
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/claude-session-v0.5.1...claude-session-v0.6.0) (2026-07-23)
 
 

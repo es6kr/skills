@@ -8,6 +8,7 @@ import re
 import codecs
 import argparse
 from datetime import datetime
+from workspace_profile import resolve_tracker_root
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Clean up completed items and archive older entries in fix plans.")
@@ -196,7 +197,7 @@ def main():
         # Search common paths
         cwd = os.getcwd()
         candidates = [
-            os.path.join(cwd, ".ralph", "fix_plan.md"),
+            os.path.join(cwd, resolve_tracker_root(cwd), "fix_plan.md"),
             os.path.join(cwd, "fix_plan.md"),
             os.path.join(cwd, "checklist.md")
         ]

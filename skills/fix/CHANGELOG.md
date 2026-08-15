@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.11](https://github.com/es6kr/skills/compare/fix-v0.3.10...fix-v0.3.11) (2026-08-09)
+
+
+### Bug Fixes
+
+* declare undeclared skill-to-skill dependencies (7 skills) ([#271](https://github.com/es6kr/skills/issues/271)) ([36a9f9d](https://github.com/es6kr/skills/commit/36a9f9d7c1fac9bb1c4c96b325a067ab92ad0da7))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
+## [0.3.10](https://github.com/es6kr/skills/compare/fix-v0.3.9...fix-v0.3.10) (2026-08-05)
+
+
+### Bug Fixes
+
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
 ## [0.3.9](https://github.com/es6kr/skills/compare/fix-v0.3.8...fix-v0.3.9) (2026-07-28)
 
 

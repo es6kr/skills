@@ -101,3 +101,67 @@ git status (change list)
 ### Failure case
 
 See `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry for "worktree split option missing in commit-method ask" (Makefile environment targets case, AskUserQuestion presented commit options without a worktree-split option and without pre-commit `git status` check).
+
+---
+
+## Full-range squash-candidate scan (HARD STOP — triggered by any squash finding)
+
+**The moment a squash candidate is found anywhere in the unpushed history, that finding is a signal to scan the ENTIRE unpushed range for the same pattern — not just the range the user happened to mention.** A user pointing at one specific commit range (by hash or description) defines the *minimum* scope, never the *maximum*. Stopping analysis at the user-named range misses adjacent streaks of the identical pattern.
+
+### Procedure
+
+1. Once ANY squashable streak is identified (2+ consecutive commits touching the same single file, or an equivalent repetition pattern), run a full-range scan before reporting or proposing anything:
+   ```bash
+   git log --name-only --oneline @{u}..HEAD   # or origin/<branch>..HEAD if no upstream is set
+   ```
+2. Group the output by file: for each file, list the commits that touch only that file in a contiguous run.
+3. Report **every** contiguous single-file streak found (not just the one the user named) as a squash candidate — even ones the user never mentioned.
+4. Only after the full-range scan is complete does an AskUserQuestion / squash-plan proposal count as ready.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | User names a specific commit-hash range → analyze only that range and stop | Treat the named range as a *trigger*, not a *boundary* — scan the full unpushed range for the same pattern |
+| 2 | Verify a claimed squash candidate with `git log --name-only <user-named-range>` only | Also run `git log --name-only @{u}..HEAD` (whole range) grouped by file, independent of what the user named |
+| 3 | Present a squash plan for one range while other identical streaks sit elsewhere in the same unpushed history | Enumerate all streaks in the same response — the user decides which to include, not the assistant by omission |
+| 4 | Treat "the user will tell me if there's more" as sufficient | The assistant's job is to surface the full picture; a partial squash plan the user must supplement by re-asking is the exact failure this rule prevents |
+
+### Self-check (before presenting any squash plan)
+
+1. Did I run `git log --name-only @{u}..HEAD` (or the equivalent full-unpushed-range command) — not just the range the user named?
+2. Does the output show more than one contiguous single-file streak?
+3. If yes, does my report/plan include ALL of them, not just the one initially pointed at?
+
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "squash-scan-scope-narrowed-to-user-mention" for case history.
+
+---
+
+## Shared hardlinked-checkout HEAD-diff sanity check (HARD STOP — concurrent-session drift)
+
+**Before staging/committing a file that lives in a checkout shared across concurrent sessions (e.g. a hardlinked skills repo checkout under `~/.agents`), run `git diff HEAD --stat -- <file>` against HEAD and inspect the actual diff hunks (`git diff HEAD -- <file>`), not just the reported insertion/deletion counts.** A concurrent session's commit can advance HEAD past this session's Read-time baseline — the on-disk file may already carry someone else's change by the time this session stages it, and a plain `git add` bundles that unrelated change into the commit silently. Without an explicit `HEAD` ref, `git diff` compares the working tree to the **index**, not HEAD — if the index already carries staged content, the check under-reports or shows 0. Insertion/deletion counts alone are also insufficient: two unrelated edits can produce identical `--stat` totals, so a concurrent overwrite with the same line-delta can silently pass a count-only check.
+
+### Procedure
+
+1. Right before `git add <file>` (not right after Edit — right before staging), run `git diff HEAD --stat -- <file>` comparing the working tree to HEAD.
+2. Inspect `git diff HEAD -- <file>` and verify that every hunk belongs to this session's edit — use the `--stat` totals only as a preliminary signal, not the acceptance criterion.
+3. Every hunk matches the intended edit → proceed to stage.
+4. Any hunk is unfamiliar or doesn't match the intended edit (extra hunks, unfamiliar lines, sections not touched this session) → **halt, do not stage**, even if the `--stat` totals look right. A concurrent session's commit already landed on this file.
+5. Re-`Read` the file for its current on-disk state, reconcile the intended change against it (re-apply the edit on top of the new baseline if it still applies cleanly), then re-check `git diff HEAD -- <file>` before staging again.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Stage a shared-checkout file immediately after Edit without a fresh `git diff HEAD --stat -- <file>` check | Run `git diff HEAD --stat -- <file>` right before `git add`, not right after Edit — HEAD can move in between |
+| 2 | Assume the Read-time content is still current because no tool reported a conflict | Hardlinked/shared checkouts have no built-in conflict signal — the sanity check is the only defense |
+| 3 | Treat matching insertion/deletion totals as proof the diff contains only this session's edit | Two different edits can have identical `--stat` totals — inspect `git diff HEAD -- <file>` hunks and reconcile before staging, don't rationalize a size match away |
+| 4 | Limit this check to skill files specifically | Applies to any shared-checkout path where concurrent sessions commit independently (skills, rules, shared docs under a hardlinked repo) |
+
+### Self-check (every time, right before `git add` on a shared-checkout file)
+
+1. `git diff HEAD -- <file>` — does every hunk belong to this session's own edit? (`--stat` totals are a preliminary signal only, not the acceptance criterion)
+2. Any unfamiliar hunk → halt, re-Read, reconcile, re-check before retrying `git add`
+3. Only stage once every hunk matches this session's edit exactly
+
+See `~/.claude/skills/cleanup/data/failed-attempts.md` "concurrent-session-overwrites-hardlinked-shared-config" for case history (related failure mode: a prior Edit lost, not just an unrelated edit bundled into a commit).

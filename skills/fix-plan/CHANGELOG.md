@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.6.2](https://github.com/es6kr/skills/compare/fix-plan-v0.6.1...fix-plan-v0.6.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **fix-plan:** reclassify model-triage BLOCKED marker as external, not selfable ([#291](https://github.com/es6kr/skills/issues/291)) ([60e687c](https://github.com/es6kr/skills/commit/60e687c36a9e9b16493d8c48711bf14cf01d3441))
+* **fix-plan:** route cleanup.py and plane_sync.py through resolve_tracker_root ([#285](https://github.com/es6kr/skills/issues/285)) ([a42af9d](https://github.com/es6kr/skills/commit/a42af9d02cf2f56d9ae082ae7594976484bd7baa))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
+## [0.6.1](https://github.com/es6kr/skills/compare/fix-plan-v0.6.0...fix-plan-v0.6.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **fix-plan:** resolve Plane issue state via separate states endpoint ([a027c74](https://github.com/es6kr/skills/commit/a027c744bf142fd1b6aec5275d372ba705e6c37d))
+
+## [0.6.0](https://github.com/es6kr/skills/compare/fix-plan-v0.5.1...fix-plan-v0.6.0) (2026-08-09)
+
+
+### Features
+
+* **fix-plan:** implement plane_sync.py as a real Plane sync engine ([a901895](https://github.com/es6kr/skills/commit/a90189595e3d3487509c4fd0b4889630e438bc39))
+* **fix-plan:** implement plane_sync.py as a real Plane sync engine ([4607f13](https://github.com/es6kr/skills/commit/4607f13c15e3572e904dd56b56b4ce36ed462d26))
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit/Copilot review findings on PR [#270](https://github.com/es6kr/skills/issues/270) ([3b11a73](https://github.com/es6kr/skills/commit/3b11a730b5ad68803d35a8264eda540e48265d75))
+* **fix-plan:** externalize detect_bloated_tasks.py locale patterns to git-ignored data/ ([#258](https://github.com/es6kr/skills/issues/258)) ([0616217](https://github.com/es6kr/skills/commit/0616217a779aac7471e841626e22ba058d16d28f))
+* **fix-plan:** guard plane_sync.py write against concurrent tracker edits ([0d34339](https://github.com/es6kr/skills/commit/0d343399d6a7c9f97114c5e85254e65ed93e9d67))
+* **fix-plan:** workspace-aware tracker root + broaden stale_check detection ([#255](https://github.com/es6kr/skills/issues/255)) ([b6d041a](https://github.com/es6kr/skills/commit/b6d041a2babb5ed8d9c29979eef96fa4a4fa92ab))
+* promote accumulated next-fix fixes to main ([95656e9](https://github.com/es6kr/skills/commit/95656e9b551ee0bb77904a0a571d49c53bc01cc9))
+
+## [0.5.1](https://github.com/es6kr/skills/compare/fix-plan-v0.5.0...fix-plan-v0.5.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* promote next-fix staging (38 fixes across 16 skills) ([94f8c33](https://github.com/es6kr/skills/commit/94f8c33800ce411ae63e22c5259cdae8435508a4))
+
+## [0.5.0](https://github.com/es6kr/skills/compare/fix-plan-v0.4.0...fix-plan-v0.5.0) (2026-08-03)
+
+
+### Features
+
+* promote next-feat to main ([4fbe313](https://github.com/es6kr/skills/commit/4fbe31332c58bf24327d819cc9204ebda2d4afa8))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/fix-plan-v0.3.3...fix-plan-v0.4.0) (2026-07-28)
 
 

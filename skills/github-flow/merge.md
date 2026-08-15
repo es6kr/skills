@@ -302,9 +302,9 @@ When marking an unchecked Test Plan item as `[x] (post-merge verification — tr
 - The "merge with unchecked items after user consent" path is closed. Even if the user says "go ahead", do not run `gh pr merge` while any `- [ ]` remains
 - "Record and proceed" = "record this fact" + "proceed to the next step (verification / deploy)", NOT "approval to merge unchecked"
 
-#### HARD STOP — Self-check for the merge-option AskUserQuestion (five conditions)
+#### HARD STOP — Self-check for the merge-option AskUserQuestion (six conditions)
 
-Before recommending merge (AskUserQuestion option includes "proceed merge" / "squash merge"), **self-check all five conditions**:
+Before recommending merge (AskUserQuestion option includes "proceed merge" / "squash merge"), **self-check all six conditions**:
 
 | # | Condition | How to verify | If not satisfied |
 |---|-----------|---------------|------------------|
@@ -313,12 +313,21 @@ Before recommending merge (AskUserQuestion option includes "proceed merge" / "sq
 | 3 | AI Review Summary comment posted | `gh pr view <N> --json comments` → confirm a user-authored "AI Review Summary" body | consolidate invocation required |
 | 4 | Mergeable | `gh pr view <N> --json mergeable` → MERGEABLE | Resolve conflicts first |
 | 5 | Cross-repo infrastructure dependency | Inspect PR body / code for cross-repo env-var or infrastructure changes | Block merge until the dependent repo's change is merged + deployed |
+| 6 | Merge method matches repo policy | Run the "Merge-method policy pre-check" above (`viewerDefaultMergeMethod` / `.release-please-manifest.json` / `.changeset/`) | If the repo signals merge-commit policy, the option must use `--merge`, never `--squash` — do not default to squash just because it satisfies conditions 1-5 |
 
 **Condition 5 in detail — cross-repo dependency (HARD STOP)**:
 - The code references a new env var (`process.env.X`, `lookup('env', 'X')`) that is supplied by an infra repo's inventory / template
 - **The infra-repo PR must be merged + deployed first** before the app code can merge
 - Order: infra variable-addition PR merged → infra deploy → app code PR merged → app deploy
 - **Forbidden**: merging the app code first and deferring the infra as a "follow-up PR" — at deploy time the missing env var breaks the feature
+
+**Exception — base branch's ROLE is a CI gate, not a review gate**: what matters is *why* the base branch exists, not its literal name. Some long-lived branches (e.g. `next-feat`/`next-fix` in a two-tier staging model) exist purely to accumulate CI-passing commits ahead of a later, separately-reviewed promotion PR (staging → main) — for that role, condition 3 (AI Review Summary) does not apply to PRs merging INTO it. Don't pattern-match on branch name; verify the role: `gh pr checks <N>` reporting `Review skipped: reviews are disabled for this base branch` is the actual signal that this base is a CI-gate-only branch, regardless of what it's called. Do not wait for a walkthrough that will never arrive, and do not run `/consolidate pr` for it. Conditions 1 (CI), 2 (Test Plan), 4 (Mergeable) still apply in full; the real review gate for that commit happens later, at the promotion PR into the branch that IS reviewed.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume the exception applies because the base branch is literally named `next-feat`/`next-fix` | Verify the branch's actual role via `gh pr checks <N>` — the CodeRabbit-disabled signal, not the name, is what confirms this is a CI-gate-only base |
+| 2 | Treat a CI-gate-only base's missing AI Review Summary as "waiting for CodeRabbit" and leave it pending indefinitely | `Review skipped: reviews are disabled for this base branch` means condition 3 is structurally exempt for this base's role, not unmet |
+| 3 | Run `/consolidate pr` on a PR into a CI-gate-only base because a review artifact "should" exist | Skip consolidate for this base — CI green + Test Plan + Mergeable is the full gate; review happens at the later promotion PR |
 
 **If even one condition is unsatisfied, ALL of the following are forbidden**:
 - Including "proceed merge" / "squash merge" / "merge recommended" in AskUserQuestion options
@@ -417,17 +426,21 @@ The following expressions mean "inspect / review / check" — NOT permission to 
 | "run it through to the end" + workflow names merge | Approval | ✅ |
 
 **Correct flow** (non-approval pattern + conditions satisfied):
-1. Report the five-condition self-check result as text ("CI ✅, AI Review ✅, Test Plan ✅, Mergeable ✅")
+1. Report the six-condition self-check result as text ("CI ✅, AI Review ✅, Test Plan ✅, Mergeable ✅, Cross-repo dependency ✅, Merge-method policy ✅")
 2. Use AskUserQuestion to **confirm merge intent separately** — "All conditions satisfied. Proceed with merge?" (options: "merge now" / "defer" / "additional review")
 3. Run `gh pr merge --squash` only when the user picks "merge now"
 
 **Auto-merge procedure**:
-1. Self-check the five conditions (CI / Test Plan / AI Review Summary / Mergeable)
+1. Self-check the six conditions (CI / Test Plan / AI Review Summary / Mergeable / Cross-repo dependency / Merge-method policy)
 2. If all satisfied → skip AskUserQuestion, run `gh pr merge --squash`
 3. If any unsatisfied → AskUserQuestion explaining the blocker + suggesting how to clear it (independent of pre-approval)
 
+**Exception — AI Review Summary structurally exempt (CI-gate-only staging base) (HARD STOP)**: "skip AskUserQuestion" in step 2 assumes the AI Review Summary already gave the user visibility into the actual diff before this point. When condition 3 is exempt because the base is CI-gate-only (staging branch, e.g. `next-fix`/`next-feat` — see the CI-gate-only exception above), that visibility never happened, and an explicit merge command + the remaining 5 conditions is not the same thing as the user having seen the content. In this case, do NOT skip AskUserQuestion — present a final content-review ask (the PR URL + a one-line summary of the change) before running `gh pr merge`, even though the user already gave an explicit merge instruction. This is not re-confirming *intent to merge* (already given) — it's the only remaining chance for the user to catch something they'd reject (e.g. a wrongly-scoped skill topic) before an irreversible squash.
+
+**Self-check (before skipping AskUserQuestion in the auto-merge procedure)**: is AI Review Summary satisfied because it was actually posted, or because it's structurally exempt (staging base)? If exempt → this exception applies, ask before merging regardless of pre-approval wording.
+
 **Forbidden patterns**:
-- "Wait for the predecessor PR to merge" answer → after the PR is created + five conditions satisfied → asking "shall I merge?" again (redundant)
+- "Wait for the predecessor PR to merge" answer → after the PR is created + six conditions satisfied → asking "shall I merge?" again (redundant)
 - Mis-interpreting a pre-approval answer as "inspect intent" instead of "merge intent"
 
 ### 4. Mergeable status
@@ -445,9 +458,48 @@ gh pr view <PR_NUMBER> --json mergeable
 | Solo-maintained infra repo | Allowed (solo) | Replaced by AI Review APPROVE |
 
 - For an org-protected app repository where self-approve is not allowed, the formal-review condition is skipped.
-- If all five conditions above pass, the PR can be merged.
+- If all six conditions above pass, the PR can be merged.
 
 ## Merge Execution
+
+### Merge-method policy pre-check (HARD STOP — before proposing a merge method)
+
+Squash is the default recommendation below, but some repos treat **merge-commit as policy, not squash** — most notably **release-please / changesets** repos. release-please parses the individual Conventional Commits landed on the default branch, and changesets relies on the per-commit changeset files; squashing collapses that history and breaks the release tooling. Before offering a merge method (or building an AskUserQuestion merge option), confirm the repo's allowed/default method:
+
+```bash
+gh api graphql -f query='{repository(owner:"<owner>",name:"<repo>"){viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed}}'
+# viewerDefaultMergeMethod = the configured default; mergeCommitAllowed/squashMergeAllowed = the reliable allowed-method booleans (fallback when the default field is unavailable).
+```
+
+Signal that merge-commit is the policy: a release-please manifest/config in the repo root (`.release-please-manifest.json`, `release-please-config.json`) or a `.changeset/` directory. When present, propose `--merge` (below), not `--squash`.
+
+**This pre-check is condition 6 of the "Self-check for the merge-option AskUserQuestion" gate below, not a separate optional step.** Composing a squash-merge option after satisfying only CI/Test Plan/AI Review Summary/Mergeable (conditions 1-4) without re-running this check is a HARD STOP violation — a release-please/changesets repo with a multi-commit PR against an accumulation branch needs `--merge` even when the other four conditions all look green.
+
+### Commit-count / distinctness gate (HARD STOP — before defaulting to squash)
+
+**"Squash Merge (recommended)" below is the default only for PRs whose commits are not independently meaningful.** A PR with 3+ commits spanning genuinely distinct concerns (e.g. separate hook registrations, separate bug fixes bundled together, separate feature slices) loses that per-concern traceability when squashed — the option description must disclose this trade-off, not silently default to squash.
+
+**Concrete operational cost, not just traceability**: in a workspace running multiple concurrent worktree branches against the same target branch (a common pattern here), squashing collapses commits that other in-flight branches may already share as ancestors — those branches then hit avoidable conflicts the next time they rebase onto the target, because the target's history no longer contains the individual commit objects they diverged from. `--merge` (preserving the original commits) avoids this. This is a second, independent reason (beyond traceability) to route distinct-concern multi-commit PRs to `--merge`.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api --paginate repos/{owner}/{repo}/pulls/<N>/commits \| jq -s 'add \| length'` before composing the option — the bare (non-paginated) form silently caps at the API's default page size (30), undercounting larger PRs; `--paginate` alone still applies `--jq` per page rather than aggregating, so slurp+combine with an external `jq -s`. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
+| 2 | Treat "3+ commits" as automatically requiring `--merge` | Commit count alone is not the trigger — count *distinct concerns* among the commits (different files/subsystems touched, different one-line summaries). 5 commits from one incremental refactor still squash cleanly; 3 commits fixing 3 unrelated bugs do not |
+| 3 | Present only "Squash merge (Recommended)" as an option when commit count ≥ 3 and concerns are distinct | Present both `Squash merge` and `Merge commit (preserve history)` as co-equal options **only when repository policy permits both** — let the user weigh the trade-off, do not silently pick one |
+| 4 | Bury the commit list in a follow-up message after the user asks for it | Include the commit SHA + one-line summary list directly in the option description (or the question text) the first time a multi-commit PR's merge is proposed |
+| 5 | State only a commit **count** ("1 commit", "3 commits") without listing the actual commit(s) — even for a single-commit PR | Always show the commit SHA + one-line summary for every commit being merged, regardless of count. A bare count is an unverifiable assertion; the list lets the user check it themselves instead of having to ask |
+
+**Policy-required exception (release-please / changesets repos)**: when the merge-method policy pre-check above (condition 6) signals that individual commits must be preserved, `Squash merge` is not a valid co-equal option for that PR — squashing collapses the Conventional Commit history release-please/changesets parses per-commit, breaking their version-bump detection. Present `Merge commit (preserve history)` as the only method, still disclosing the commit count and per-commit summaries so the user can verify the list, but do not offer squash as a choice to weigh.
+
+**Why disclosure isn't just a 3+-commit rule**: the count-only pattern above reads as scoped to the distinctness trigger (3+ commits), but the underlying reason — don't make the user trust an assertion they can't independently verify — applies to every merge ask, including 1-commit ones. A miscounted or mischaracterized single commit is just as much a trust problem as an undisclosed multi-commit bundle.
+
+**Self-check (before composing ANY merge-recommendation option, in addition to the six-condition gate)**:
+1. Run the commit-count query above. Is it ≥ 3?
+2. If yes, do the commits span distinct concerns (different subsystems/files/one-line summaries)? — if unclear, list them and let the user judge, don't decide unilaterally
+3. Does the option set include the actual commit SHA + one-line summary list (not just a count), and — when count ≥ 3 with distinct concerns — both squash and merge-commit as co-equal options?
+4. If any answer above was skipped, the AskUserQuestion is incomplete — add it before presenting
+
+**Stale-knowledge trap in multi-PR sessions (HARD STOP)**: this gate — like the rest of "Merge Execution" — can change between when you first Read this file and the Nth merge decision later in the same long session (e.g. a just-merged PR updated this very file). Recalling "CI + Test Plan + Mergeable were the conditions" from an early-session Read and never re-checking the *current* six conditions per PR is exactly how a real gate (commit count queried, but its consequence unknown/forgotten) gets silently skipped. Before each individual merge-recommendation ask in a session touching 2+ PRs, treat your in-context knowledge of this file as a snapshot, not a live source — run the commit-count query fresh and apply its current consequence, don't just reuse conclusions from earlier in the session.
 
 ### Squash Merge (recommended)
 
@@ -489,30 +541,35 @@ gh pr merge <PR_NUMBER> --merge
   - **Cross-repo issues apply equally**: if the PR references another repository's issue, update that repository's issue body too (e.g. when an app-repo PR includes work tracked in the infra repo, update both issue bodies)
   - Consequence of skipping: the epic body stays stale; on the next planning pass, "already implemented items" appear unfinished and cause duplicate work / confusion
 - **Deploy follow-up**: after merge, confirm with the user whether to run the related deploy workflow (infra automation, ArgoCD sync, etc.).
-- **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the five conditions to the user is a procedural violation.
+- **`gh pr merge` direct invocation is absolutely forbidden** — merging must always go through this skill (`/github-flow merge`). Trying to merge without surfacing the six conditions to the user is a procedural violation.
 - **Post-hoc review for PRs merged without review** — run `/consolidate pr` for a post-hoc review, and if actionable items appear, ask via AskUserQuestion whether to register them in a follow-up PR or an existing issue.
 
 ## Recording evidence of merge-condition satisfaction (CRITICAL)
 
-**When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all five conditions.**
+**When you add the PR entry to the "Completed" or "Merged / Closed" section of fix_plan.md right after merging, also record the evidence for all six conditions.**
 
-A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Format:
+**Format authority**: `fix_plan.md`'s schema (section layout, marker syntax) is owned by `fix-plan/format.md` — that file's `## Completed` convention (flat `-` line, no checkbox, no `###` headers) governs here too. This section only adds *what evidence to include*, not a competing structure.
+
+A bare `✅` leaves no basis to verify "the conditions were really satisfied" after the fact. Record evidence for all six conditions from the self-check table above (CI / Test Plan / AI Review Summary / Mergeable / Cross-repo dependency / Merge method). Format:
 
 ```markdown
-### PR #N (branch-name) — ✅ MERGED YYYY-MM-DD
-- CI: 4/4 SUCCESS (test ubuntu, test windows, e2e, CodeRabbit)
-- AI Review: CodeRabbit ✅ addressed (3 actionable), Copilot ✅ addressed (1 comment)
-- Test Plan: 5/5 checked
-- Formal Review: APPROVED by @user (or "not required by repo policy")
+- PR #N (branch-name) — ✅ MERGED YYYY-MM-DD
+  - CI: 4/4 SUCCESS (test ubuntu, test windows, e2e, CodeRabbit)
+  - Test Plan: 5/5 checked
+  - AI Review: CodeRabbit ✅ addressed (3 actionable), Copilot ✅ addressed (1 comment) (or "exempt — CI-gate-only base")
+  - Mergeable: MERGEABLE
+  - Cross-repo dependency: none (or "infra PR #M merged + deployed first")
+  - Merge method: squash (or "merge — release-please-preserving repo policy")
+  - Formal Review: APPROVED by @user (or "not required by repo policy")
 ```
 
-**Forbidden pattern**: `### PR #N — ✅ MERGED YYYY-MM-DD` alone (no condition evidence)
+**Forbidden pattern**: `- PR #N — ✅ MERGED YYYY-MM-DD` alone (no condition evidence). Also forbidden: a `### PR #N ...` heading — `fix-plan/format.md`'s "Forbidden actions" bans `###` section headers in `fix_plan.md` entirely (they fragment the file into islands that break batch-processing tooling).
 
 **For post-hoc verifiability**: a post-hoc supervision flow (e.g., a Ralph wrapper's improve 5-A2 step, or the workflow.md supervision checklist Step 7) reads this information for verification. Without evidence, `✅`-only entries are classified as "merged without checking conditions" suspects during supervision.
 
 ## Merge-recommendation AskUserQuestion format (CRITICAL — HARD STOP)
 
-**When recommending PR merge via AskUserQuestion, every option's description must include evidence for the five conditions.**
+**When recommending PR merge via AskUserQuestion, every option's description must include evidence for the six conditions.**
 
 ```typescript
 {
@@ -528,7 +585,7 @@ A bare `✅` leaves no basis to verify "the conditions were really satisfied" af
 
 **Verification procedure (HARD STOP)**:
 
-Right before authoring the merge-recommendation AskUserQuestion, verify all five conditions:
+Right before authoring the merge-recommendation AskUserQuestion, verify all six conditions:
 
 ```bash
 # 1. CI status

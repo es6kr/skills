@@ -29,7 +29,7 @@ Guide users to convert functionality into the appropriate Claude Code automation
 | `persist` | [persist.md](./persist.md) | Knowledge persistence: documentation + memory save |
 | `background-polling` | [background-polling.md](./background-polling.md) | ScheduleWakeup/timeout polling discipline for 5min+ background dispatches |
 
-For any topic arg other than `create` / `agentify` / (none), **Read that topic file and follow it** — the Decision Matrix and creation Workflow below apply only to the `create`/`agentify`/(none) creation path.
+For `improve` / `persist` / `background-polling`, **Read that topic file and follow it** — the Decision Matrix and creation Workflow below apply only to the `create`/`agentify`/(none) creation path. For any other/unrecognized topic arg, fall back to the `create`/`agentify`/(none) creation workflow below rather than assuming a matching topic file exists.
 
 ## Decision Matrix
 
@@ -232,6 +232,8 @@ Keep responses concise:
 | Step 3: Type recommendation | Recommend only | improvements.md recording |
 | Step 4: Implementation | Direct action | **PROHIBITED** - Use `[NEEDS_REVIEW]` tag |
 | Step 5: Validation | Validation | **Auto validation** (after changes are complete) |
+
+**Scope note (HARD STOP)**: this table governs the *creation* workflow only (new agent/skill/rule/hook). It does not extend to passive, no-ask persistence steps elsewhere in this skill's topics (`improve`/`persist` RAG session/discovery-chunk store) — those follow the narrower carve-out in `persist.md`'s own "Ralph Mode" section, not this table. Do not generalize "Ralph Mode = record-only, nothing runs" from this table alone.
 
 **improvements.md recording example**
 
