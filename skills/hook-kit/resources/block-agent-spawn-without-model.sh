@@ -93,12 +93,18 @@ fi
 
 # --- Gate A: model (auto-inject sonnet, do not block) -----------------------
 if [[ -z "$MODEL" && "$SUBAGENT" != "fork" ]] && ! printf '%s' "$PROMPT" | grep -qF '[model-inherit-ok]'; then
-  jq -n '{
+  # updatedInput REPLACES the tool input wholesale — it is not merged by the
+  # harness. Emitting a bare `{ model: "sonnet" }` therefore drops description /
+  # prompt / subagent_type and the spawn dies on schema validation
+  # ("The required parameter `description` is missing"), which is a hard failure
+  # for every model-less spawn rather than the intended cheap default.
+  # So echo the caller's own tool_input back with only `model` added.
+  printf '%s' "$INPUT" | jq '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "allow",
       permissionDecisionReason: "No model specified — injected default \"sonnet\" instead of inheriting the parent (expensive) tier. Add [model-inherit-ok] to the prompt or set model explicitly to opt out.",
-      updatedInput: { model: "sonnet" }
+      updatedInput: (.tool_input + { model: "sonnet" })
     }
   }'
   exit 0
