@@ -307,8 +307,8 @@ check_vendor_in_generic_skill() {
     echo "    contract; receiver skill picks its own MCP/HTTP backend"
     echo ""
     echo "Reference:"
-    echo "  ~/.agents/rules/skill-usage.md"
-    echo "    section: 'Vendor-specific references forbidden in shared skills'"
+    echo "  skills/skill-kit/portability.md (this repo)"
+    echo "    section: 'Rule B — No vendor-specific hardcoding in generic (shared) skills'"
   } >&2
   exit 2
 }
@@ -458,7 +458,7 @@ PYEOF
     echo "  2. If you have verified via grep that the pattern is genuinely new,"
     echo "     include 'fix-rag-search-skipped' in the new section body."
     echo ""
-    echo "Reference: ~/.claude/skills/fix/SKILL.md Step 1 'Recurrence pre-check'"
+    echo "Reference: skills/fix/SKILL.md (this repo) Step 1 'Recurrence pre-check'"
   } >&2
   exit 2
 }
