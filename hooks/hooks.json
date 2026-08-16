@@ -67,10 +67,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/fix-step-guard.sh"
-          },
-          {
-            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/fix-step-guard.sh\"",
             "timeout": 5
           }
@@ -136,11 +132,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
-          },
-          {
-            "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/bash-guard.py\"",
-            "timeout": 10
           }
         ]
       },
@@ -150,14 +141,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/edit-guard.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-case-history-in-feedback-memory.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/e2e-expect-guard.sh"
           },
           {
             "type": "command",
@@ -191,10 +174,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/edit-guard.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-case-history-in-feedback-memory.sh"
           },
           {
             "type": "command",
@@ -235,17 +214,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-option-below-context-gate.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-axis-merged-ask.sh\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-tasklist-id-in-conversation.sh\"",
             "timeout": 5
           },
           {
@@ -321,10 +290,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-ask-bypass-keywords.sh"
-          },
-          {
-            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-session-rag.sh"
           },
           {
@@ -375,10 +340,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/fix/resources/fix-and-ambiguity-guard.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/idle-wait-reactive-guard.sh"
           },
           {
             "type": "command",
