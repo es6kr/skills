@@ -27,7 +27,7 @@ fi
 # When the locale data is missing, set the Hangul range to a pattern that
 # never matches (so the language-mismatch check no-ops gracefully).
 HG_EDIT_HANGUL_RANGE="${HG_EDIT_HANGUL_RANGE:-[!-~]_NEVER_MATCH}"
-HG_EDIT_STUB_MARKERS="${HG_EDIT_STUB_MARKERS:+${HG_EDIT_STUB_MARKERS}|}location pointer|Use .* instead|^type: *stub$|^stub: *true$|^pointer: *true$"
+HG_EDIT_STUB_MARKERS="${HG_EDIT_STUB_MARKERS:-location pointer|Use .* instead|^type: *stub$|^stub: *true$|^pointer: *true$}"
 
 # Internal-host detection tokens are externalized the same way so the public
 # repo never embeds real internal hostnames. The git-ignored data file supplies
@@ -531,7 +531,7 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
 # new one silently reopened the same bug. These reload entries instead carry
 # a structural marker regardless of wording: isMeta=true, plus a
 # sourceToolUseID pointing back at the originating Skill tool_use — verified
-# directly against a live session transcript (genuine user prompts never
+# directly against this session's own transcript (genuine user prompts never
 # carry isMeta). Skip on that field instead of matching text, so no future
 # reload-wording variant can reopen this bug.
 turn_start = 0

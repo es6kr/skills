@@ -144,9 +144,12 @@ fi
 # (many tool calls, no intervening user prompt) it freezes at an early-turn
 # value; both the over- and under-offer checks then misfire (the exact 2nd
 # recurrence this guard was defeated by). Recompute the live figure on demand
-# from the transcript's last assistant-message usage field via the sibling
-# context-usage-inject.sh (the same source the injection hook uses).
-CTX_INJECT="$(dirname "$0")/context-usage-inject.sh"
+# from the transcript's last assistant-message usage field via
+# context-usage-inject.sh (the same source the injection hook uses). Moved to
+# the context-measure skill (2026-08-10, split out of hook-kit) — no longer a
+# same-directory sibling, hence the explicit cross-skill path below instead of
+# "$(dirname "$0")/context-usage-inject.sh".
+CTX_INJECT="$HOME/.claude/skills/context-measure/resources/context-usage-inject.sh"
 LATEST_PCT=""
 if [[ -f "$CTX_INJECT" ]]; then
   # One invocation yields both figures. CC_EMIT_THRESHOLD makes the script
@@ -272,6 +275,43 @@ if [[ ( "$HAS_ENDSTOP" == "1" || "$HAS_NEXTACTION" == "1" ) && "$HAS_CLEANUP" ==
     echo ""
     echo "Reference: next skill suggestion-patterns.md 'Context-usage gate' positive trigger;"
     echo "  failed-attempts.md (grep \"context-usage\")"
+  } >&2
+  exit 2
+fi
+
+# GENERIC-CITATION (5th check, new -- closes the gap where an end/stop-framed
+# ask never offers a cleanup-labeled option at all (below threshold, or the
+# composer chose a plain "continue vs stop" framing instead) and therefore
+# skips every check above untouched -- all of them require a cleanup option
+# to be present or the reading to already be at/above threshold before they
+# even look at citation. The point of citing % is to let the user judge for
+# themselves regardless of which side of the cleanup threshold the ask lands
+# on, so this check fires whenever the ask carries end/stop framing
+# (HAS_ENDSTOP==1) and NO number appears anywhere in the ask (question text
+# or any option text), independent of HAS_CLEANUP/BELOW.
+ALL_ASK_TEXT=$(echo "$INPUT" | jq -r '
+  .tool_input.questions[]? |
+  (.question // ""), (.options[]? | (.label // "") + " " + (.description // ""))
+' 2>/dev/null)
+
+if [[ "$HAS_ENDSTOP" == "1" ]] && ! echo "$ALL_ASK_TEXT" | grep -qE '[0-9]+(\.[0-9]+)?[[:space:]]*%'; then
+  {
+    echo "DENIED: end/stop-session ask cites no live context-usage percentage anywhere."
+    echo ""
+    echo "Live context usage: ${LATEST_PCT}% (threshold ${THRESHOLD}% -- informational here, not the gate)."
+    echo ""
+    echo "Why blocked:"
+    echo "  - A plain 'continue vs stop' ask with end/stop framing but no cleanup-labeled"
+    echo "    option falls outside the OVER/MISSING-CITATION/UNDER-offer checks above,"
+    echo "    which all require a cleanup option or an at/above-threshold reading first"
+    echo "  - The user needs the number to judge for themselves whether to keep going,"
+    echo "    independent of whether this ask crosses the cleanup-recommendation threshold"
+    echo ""
+    echo "Required action:"
+    echo "  Cite the live figure in the question text or an option, e.g."
+    echo "  \"... (context usage: ~${LATEST_PCT}%) ...\""
+    echo ""
+    echo "Reference: failed-attempts.md class context-usage-stale (19th occurrence)"
   } >&2
   exit 2
 fi

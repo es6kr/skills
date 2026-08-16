@@ -11,13 +11,18 @@
 # after — no Stop-based guard can close that window. UserPromptSubmit fires on
 # the NEXT real user prompt and CAN look back at the turn that just ended.
 #
-# Detection reuses the exact 3-condition contract from
-# block-idle-wait-without-short-cycle.sh, applied to the PRIOR turn (the one
-# that just silently ended, right before this new prompt was submitted):
+# Detection reuses the same contract as block-idle-wait-without-short-cycle.sh,
+# applied to the PRIOR turn (the one that just silently ended, right before
+# this new prompt was submitted):
 #   1. Background dispatch marker present in the prior turn's raw transcript
-#      text (same literal strings the Stop hook matches).
+#      text (same literal strings the Stop hook matches — including "Command
+#      was manually backgrounded by user with ID:", emitted when the user
+#      actually runs a "!"-handoff command in their own terminal), OR the
+#      prior turn's final assistant text contains a "! <command>" user-handoff
+#      line (idle-cache-ttl class, shape: user-!-handoff).
 #   2. Prior turn's LAST assistant text block matches the waiting-phrase
-#      pattern (same locale-data-driven pattern the Stop hook uses).
+#      pattern (same locale-data-driven pattern the Stop hook uses) — waived
+#      when marker 1 was the "!"-handoff line itself.
 #   3. No "[idle-ok]" annotation in that text.
 #
 # Output: additionalContext reminder only — UserPromptSubmit cannot block a
@@ -63,12 +68,8 @@ PRIOR_TURN_RAW=$(jq -R 'fromjson? // empty' "$TRANSCRIPT" 2>/dev/null | jq -rs '
 ' 2>/dev/null || echo "")
 [[ -z "$PRIOR_TURN_RAW" ]] && exit 0
 
-# Condition 1: background dispatch marker anywhere in the prior turn's raw text.
-if ! printf '%s' "$PRIOR_TURN_RAW" | grep -qE 'Command running in background with ID:|Async agent launched successfully|The agent is (now running|working in the background)'; then
-  exit 0
-fi
-
-# Last assistant text block within that same range.
+# Last assistant text block within that same range (computed before the
+# marker gate below because the "!"-handoff marker reads this same text).
 LAST_TEXT=$(printf '%s' "$PRIOR_TURN_RAW" | jq -rs '
   [ .[] | select(type=="object" and .type=="assistant")
     | (.message.content
@@ -77,6 +78,20 @@ LAST_TEXT=$(printf '%s' "$PRIOR_TURN_RAW" | jq -rs '
     | select(length > 0)
   ] | last // "" | .[-300:]
 ' 2>/dev/null || echo "")
+
+# Condition 1c: user-interactive "!" command handoff marker — same shape gap
+# as block-idle-wait-without-short-cycle.sh (see that file's header comment).
+BANG_HANDOFF=0
+if [[ -n "$LAST_TEXT" ]] && printf '%s' "$LAST_TEXT" | grep -qE '^! [^ ]'; then
+  BANG_HANDOFF=1
+fi
+
+# Condition 1: background dispatch marker anywhere in the prior turn's raw text.
+if ! printf '%s' "$PRIOR_TURN_RAW" | grep -qE 'Command running in background with ID:|Command was manually backgrounded by user with ID:|Async agent launched successfully|The agent is (now running|working in the background)' \
+   && [[ "$BANG_HANDOFF" -eq 0 ]]; then
+  exit 0
+fi
+
 [[ -z "$LAST_TEXT" ]] && exit 0
 
 # Condition 3: explicit idle-ok annotation exempts.
@@ -84,8 +99,9 @@ if printf '%s' "$LAST_TEXT" | grep -qF '[idle-ok]'; then
   exit 0
 fi
 
-# Condition 2: waiting-posture close?
-if ! printf '%s' "$LAST_TEXT" | grep -qiE "$WAIT_PHRASES"; then
+# Condition 2: waiting-posture close? Waived for the "!"-handoff marker
+# (inherently a wait posture by construction).
+if [[ "$BANG_HANDOFF" -eq 0 ]] && ! printf '%s' "$LAST_TEXT" | grep -qiE "$WAIT_PHRASES"; then
   exit 0
 fi
 
