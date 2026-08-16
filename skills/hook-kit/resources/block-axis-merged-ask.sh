@@ -23,9 +23,9 @@ if [[ -f "$HG_DATA_FILE" ]]; then
   . "$HG_DATA_FILE"
 fi
 HG_AXIS_TALLY_KO_SUFFIX="${HG_AXIS_TALLY_KO_SUFFIX:-}"
-HG_AXIS_COUNT_TOKEN="${HG_AXIS_COUNT_TOKEN:-([2-9]|[1-9][0-9])[[:space:]]+(findings|issues|points|items)}"
-HG_AXIS_DISPO_VERB="${HG_AXIS_DISPO_VERB:-dispose|include|post the}"
-HG_AXIS_SCOPE_WORD="${HG_AXIS_SCOPE_WORD:-\\ball\\b|\\bexcept\\b|\\bexcluding\\b|\\bwithout\\b|\\bonly\\b|\\bpartial(ly)?\\b}"
+HG_AXIS_COUNT_TOKEN="${HG_AXIS_COUNT_TOKEN:+${HG_AXIS_COUNT_TOKEN}|}([2-9]|[1-9][0-9])[[:space:]]+(findings|issues|points|items)"
+HG_AXIS_DISPO_VERB="${HG_AXIS_DISPO_VERB:+${HG_AXIS_DISPO_VERB}|}dispose|include|post the"
+HG_AXIS_SCOPE_WORD="${HG_AXIS_SCOPE_WORD:+${HG_AXIS_SCOPE_WORD}|}\\ball\\b|\\bexcept\\b|\\bexcluding\\b|\\bwithout\\b|\\bonly\\b|\\bpartial(ly)?\\b"
 
 INPUT=$(cat)
 
