@@ -48,6 +48,30 @@ Manage hooks and script files in `~/.claude/settings.json`. Includes resource (s
 /hook remove   # remove hook
 ```
 
+## Helper Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/check-ask-payload.sh` | Dry-run a draft `AskUserQuestion` payload against every registered `PreToolUse:AskUserQuestion` guard in one call, before making the real tool call |
+
+```bash
+bash scripts/check-ask-payload.sh --list          # guards that would run
+bash scripts/check-ask-payload.sh draft.json      # or feed the JSON on stdin
+```
+
+A denied ask costs a full round trip — the call is rejected, the payload is
+rewritten, and the user waits through both. The guards are plain scripts
+reading the payload on stdin, so a draft can be checked first; doing it by hand
+means one command per guard, and the guard list spans `settings.json` plus every
+installed plugin's `hooks.json` (both the marketplace-root and per-plugin
+layouts), which is why partial checks are the norm.
+
+It also separates **ghost** from **denied**: a guard registered at a path that
+no longer exists exits 127, which is indistinguishable from "no objection" at
+the harness level. The first real run of this script surfaced exactly that — a
+context-gate guard whose script had been relocated while its registration was
+left behind, silently enforcing nothing.
+
 ## Dual-Sync Structure
 
 ```
