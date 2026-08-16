@@ -87,6 +87,24 @@ The PRIVATE+Free row explains why cloud output may be walkthrough-only — but t
 
 1. **Call `Skill("superpowers:requesting-code-review")` (MANDATORY)** — this skill loads the review framework and includes code-reviewer agent dispatch. When the skill returns the review result, proceed to the "Check existing review comment" and "Post/update review comment" sub-steps below (still within Step 3.5).
 2. **In-session agent path unavailable → dispatch to a clawo session (do NOT abandon the review)**: if the `code-reviewer` agent path does not run in this session (Agent tool unregistered, the dispatch stalls, or repeated attempts fail), do not drop the Internal Review — dispatch the entire consolidate to a fresh **clawo session** (the `clawo` skill `launch` topic: `session-start` in the repo cwd + `session-send "consolidate <PR-URL>"`), which runs consolidate autonomously with the project's `.claude/` rules. Pre-bake the verdict/medium gates in the dispatch message (autonomous sessions cannot `AskUserQuestion` — see `clawo/launch.md` Step 5a). Abandoning the review because the in-session agent stalled — and pivoting to unrelated work — is the exact drift this fallback prevents.
+3. **Dispatch succeeded but the agent reported nothing → escalate on a bound (HARD STOP)**: the failure mode that stalls this step most quietly is not an unavailable agent — it is a *successful* dispatch whose agent ends idle with no result. There is no error to catch, so a caller waiting on the report simply stops and the consolidate never reaches Step 4, with no trace of why. Treat all of these as the same condition: the dispatch returns an agent id but no completion notification arrives; the agent reaches a terminal state with an empty final message; the agent's transcript exists but carries no review body.
+
+   Escalation ladder — take the next rung as soon as the current one yields no review body, and never let the sequence exit without a posted comment:
+
+   | Rung | Action | Leaves this rung when |
+   |------|--------|-----------------------|
+   | 1 | Re-dispatch **once**, restating the worktree path and the `gh pr diff <N>` command in the prompt | A review body is returned |
+   | 2 | Dispatch the whole consolidate to a fresh clawo session (item 2 above) | A review body is returned |
+   | 3 | Self-analyse inline and post under the same title template, per Don't `#4` below | Always — this rung cannot fail |
+
+   Whichever rung produces the body, **name the engine that produced it in the body's opening line** (e.g. "the superpowers code-reviewer dispatch went idle twice without reporting, so per Don't `#4` this is a self-analysed review"). A reader must be able to tell a subagent review from a self-analysed one; presenting rung 3 output as rung 1 output misrepresents the review's independence — the second perspective is the whole reason Step 3.5 exists.
+
+   | # | Don't | Do |
+   |---|-------|-----|
+   | 1 | Keep waiting on a dispatched agent that has already gone idle, or re-dispatch repeatedly hoping for a different outcome | One re-dispatch, then move down the ladder. Repeated identical dispatches are the stall, not a recovery from it |
+   | 2 | Read "the agent returned nothing" as "there was nothing to report" | An empty result is a failed dispatch, not a clean review. A clean review still has a body — "no actionable findings" plus what was verified and how |
+   | 3 | Pivot to other work while the review is "waiting on the agent" | Rung 3 always terminates. There is no state in which this step legitimately stays open |
+   | 4 | Post rung 3 output without disclosing the substitution | State the engine and the reason in the body's opening line, and record it in the Summary's reviewer matrix |
 
 **Prevention tooling never substitutes for the POST (HARD STOP)**: if a non-compliant / garbage review comment is discovered on the PR, correcting the *process* (building a guard hook, adding a lint, filing a prevention task) does NOT complete this consolidate. The compliant `## AI Review Summary — [receiving-code-review](...)` must still be posted for this PR. A prevention effort spawned from a consolidate gap is additive work, never a substitute for the object deliverable — do not treat the consolidate as done until the Summary is on the PR.
 
