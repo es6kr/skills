@@ -469,8 +469,15 @@ _STAGING_BRANCH_TARGET = re.compile(
     r"gh\s+pr\s+create[^\n]*--base)\b[^\n]*\b(?:origin/)?(next-fix|next-feat)\b",
     IM,
 )
+# Must tolerate the same global opts the TARGET regex above allows. Without
+# _GIT_GLOBAL_OPTS here, `git -C <path> log origin/main..origin/next-feat` — the
+# form the worktree rules actually require, since operating on another checkout
+# needs -C — could never register as evidence, so the check was unsatisfiable for
+# exactly the callers it was written for. Also accept the space-separated diff
+# form (`git diff origin/main origin/next-feat`), which is the natural spelling
+# for diff and equally valid evidence.
 _STAGING_DIVERGENCE_EVIDENCE = re.compile(
-    r"git\s+(?:log|diff)\s+origin/main\.\.\.?origin/next-|baseRefName",
+    r"git\s+" + _GIT_GLOBAL_OPTS + r"(?:log|diff)\s+origin/main(?:\.\.\.?|\s+)origin/next-|baseRefName",
     IM,
 )
 
