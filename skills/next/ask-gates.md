@@ -370,11 +370,13 @@ Get the number the same way the cleanup-gate section does: the latest injected `
 |---|-------|-----|
 | 1 | Compose a next-action ask with zero cleanup candidates and omit the context percentage because "no cleanup option is being offered, so the citation rule doesn't apply" | Cite the live percentage in the question text regardless — it is baseline situational awareness for the user, independent of whether cleanup is being recommended |
 | 2 | Assume `block-cleanup-option-below-context-gate.sh` will catch a missing percentage | That hook only fires when a cleanup/wrap-up option is present in the payload. A plain "what next" ask with no such option is invisible to it — this is a skill-level obligation, not a hook-enforced one |
+| 3 | Treat a percentage that was correct at ask-composition time as still valid once the user answers, and execute the selection without re-measuring | The gate has no validity duration. Automatic context compression can fire **while the ask is open** and leaves no `isCompactSummary` / `compact_boundary` marker, so the staleness is undetectable after the fact — re-measure before executing any selection the percentage justified. Full rule: suggestion-patterns.md "Round-trip invalidation" |
 
 ### Self-check (every time before calling `AskUserQuestion` from this skill)
 
 1. Does the question text include the live percentage (`NN%` or `NN.N%`)? → If no, add it before calling
 2. Is the reading fresh (post-compact, not from a stale earlier turn in a long tool-call chain)? → If stale, get a live reading first (suggestion-patterns.md "Live-check fallback")
+3. **On receiving the answer**: was the percentage part of the chosen option's justification? → If yes, re-measure before executing. A reading that has since fallen below the threshold invalidates the user's consent, not just the rationale — report the new figure and re-offer instead of proceeding
 
 ---
 
