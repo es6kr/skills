@@ -30,7 +30,7 @@ if [[ -f "$HG_DATA_FILE" ]]; then
   . "$HG_DATA_FILE"
 fi
 HG_ASK_ACTIVE_MERGE_KO="${HG_ASK_ACTIVE_MERGE_KO:-}"
-HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this}"
+HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:+${HG_ASK_ACTIVE_MERGE_EN}|}Squash and merge|squash and merge|squash merge|Squash merge|merge it|proceed with merge|do merge|Merge this"
 # Known limitation: bare \bmerge\b over-matches git branch-merge / conflict-resolution
 # asks (e.g. "merge origin/main into next-fix"), non-PR "merge" nouns (e.g. "plan
 # merge", "doc merge", "consolidation"), task-clustering "merge/split", PR-state
@@ -41,8 +41,20 @@ HG_ASK_ACTIVE_MERGE_EN="${HG_ASK_ACTIVE_MERGE_EN:-Squash and merge|squash and me
 # "merge-keyword", "await-merge", "ask-guard") — phrase such asks with those tokens
 # to pass. Strong merge intent ("Squash and merge", "merge it") still hits
 # HG_ASK_ACTIVE_MERGE_EN and is gated regardless of these exclusions.
-HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:-\bmerge\b|\bMerge\b|\bMERGE\b|\bSquash\b|\bsquash\b}"
-HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/|plan merge|doc merge|docs? merge|consolidat[a-z]*|merges? into|merge target|merge base|base branch|merge option|merge ask|merge gating|merge check|[a-z-]*-merge-[a-z-]*\.sh|block-merge-without-review}"
+# Convention for the HG_* pattern vars below: `:+…|` (additive), not `:-` (override).
+# The locale data file is sourced first, so `:-` made ITS value replace everything
+# here — the committed patterns became dead code on any machine that happens to have
+# the untracked file, and which set wins depended on that file's existence rather than
+# on intent. Union keeps the committed baseline authoritative and lets the git-ignored
+# file only ADD locale variants.
+#
+# NOT applied to vars whose inline default is EMPTY (the locale-only ones, e.g. the
+# *_KO pairs): `${VAR:+$VAR|}` with an empty default yields a trailing `|`, and an ERE
+# ending in `|` matches the empty string — i.e. the guard would match everything and
+# silently open. Those vars have no override problem to fix in the first place, so they
+# keep `:-`. Same for file-path vars and the `_NEVER_MATCH` sentinels (deliberate no-ops).
+HG_ASK_MERGE_KEYWORDS="${HG_ASK_MERGE_KEYWORDS:+${HG_ASK_MERGE_KEYWORDS}|}\bmerge\b|\bMerge\b|\bMERGE\b|\bSquash\b|\bsquash\b"
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:+${HG_ASK_RETROSPECT_MERGE}|}merged|MERGED|after merge|post-merge|squash type|squash subject|squash commit|merge time|validation|verification|merge --abort|merge abort|conflict resolution|resolve conflict|resolving conflict|review ?anchor|merge origin/|plan merge|doc merge|docs? merge|consolidat[a-z]*|merges? into|merge target|merge base|base branch|merge option|merge ask|merge gating|merge check|[a-z-]*-merge-[a-z-]*\.sh|block-merge-without-review"
 # Append-guarantee (recurrence fix): the locale data file (data/hangul-patterns.regex)
 # fully REDEFINES HG_ASK_RETROSPECT_MERGE (Korean + a snapshot of the English set).
 # A stale locale snapshot silently drops English exclusions added to the :- default
@@ -52,9 +64,9 @@ HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:-merged|MERGED|after merge|po
 # make an ask PASS. NEW English non-PR-merge senses belong on THIS append line, not
 # the :- default, so they survive a locale override.
 HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE}|merge/split|split/merge|merge[- ]?keyword|merge[- ]?fp|merge[- ]?false[- ]?positive|await[- ]?merge|awaiting[- ]?merge|class[- ]?merge|merge[- ]?class|ask-guard"
-HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:-AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+}"
-HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:-Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅}"
-HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
+HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:+${HG_ASK_SUMMARY_ATTESTATION}|}AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+"
+HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:+${HG_ASK_TESTPLAN_ATTESTATION}|}Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅"
+HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:+${HG_ASK_CLOSE_KEYWORDS}|}close"
 # bash's ${VAR:-default} parser brace-matches literal `{`/`}` inside the
 # default word even though they're not part of a nested ${...} — an
 # unescaped `{0,15}` here gets its closing `}` misread as ending the
@@ -65,15 +77,15 @@ HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:-close}"
 # nesting, so no default-word brace-matching happens.
 _HG_ASK_RETROSPECT_CLOSE_DEFAULT="close deferred|deferred[^.]{0,15}close|cannot close|not close|closeable|becomes close"
 HG_ASK_RETROSPECT_CLOSE="${HG_ASK_RETROSPECT_CLOSE:-$_HG_ASK_RETROSPECT_CLOSE_DEFAULT}"
-HG_ASK_VERIFICATION_ATTESTATION="${HG_ASK_VERIFICATION_ATTESTATION:-gh pr (view|diff)|base=|pinned|counter only|verified|diff URL|issuecomment}"
+HG_ASK_VERIFICATION_ATTESTATION="${HG_ASK_VERIFICATION_ATTESTATION:+${HG_ASK_VERIFICATION_ATTESTATION}|}gh pr (view|diff)|base=|pinned|counter only|verified|diff URL|issuecomment"
 HG_ASK_PUSH_KO="${HG_ASK_PUSH_KO:-}"
 HG_ASK_COMMIT_KO="${HG_ASK_COMMIT_KO:-}"
 HG_ASK_PR_STRONG_KO="${HG_ASK_PR_STRONG_KO:-}"
 HG_ASK_PR_READY_KO="${HG_ASK_PR_READY_KO:-}"
-HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:-longhorn|replica|PVC|persistentvolume|volume\.longhorn|storage|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume}"
-HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:-PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume}"
-HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:-no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)}"
-HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:-kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*(verified)|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified}"
+HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:+${HG_ASK_STATEFUL_RESOURCE}|}longhorn|replica|PVC|persistentvolume|volume\.longhorn|storage|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume"
+HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:+${HG_ASK_DESTRUCTIVE_VOLUME_OP}|}PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume"
+HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:+${HG_ASK_DATA_SAFETY_CLAIM}|}no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)"
+HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:+${HG_ASK_STATE_ATTESTATION}|}kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*(verified)|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified"
 
 INPUT=$(cat)
 

@@ -33,16 +33,16 @@ fi
 # more likely to be headed "cleanup complete" / "cleanup pass 2 complete" than
 # to repeat the literal invocation "/cleanup run", and those natural headings
 # previously matched nothing here, so the guard never even entered its checks.
-HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:-(^|[[:space:]])/cleanup|cleanup run|cleanup wrap-up|cleanup complete|cleanup pass|cleanup finished|Session Ended|Session Cleanup|session-end report}"
-HG_SESSION_ID_MARKERS="${HG_SESSION_ID_MARKERS:-Session ID:|session[[:space:]]+id:}"
+HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:+${HG_CLEANUP_MARKERS}|}(^|[[:space:]])/cleanup|cleanup run|cleanup wrap-up|cleanup complete|cleanup pass|cleanup finished|Session Ended|Session Cleanup|session-end report"
+HG_SESSION_ID_MARKERS="${HG_SESSION_ID_MARKERS:+${HG_SESSION_ID_MARKERS}|}Session ID:|session[[:space:]]+id:"
 # Words that, together with a markdown table, mark a response as the completion
 # report itself rather than a mid-cleanup progress message. Used only to decide
 # whether an ABSENT Session ID line is already due (see the omission branch).
-HG_COMPLETION_WORDS="${HG_COMPLETION_WORDS:-complete|completed|finished|Session Ended|wrap-up}"
+HG_COMPLETION_WORDS="${HG_COMPLETION_WORDS:+${HG_COMPLETION_WORDS}|}complete|completed|finished|Session Ended|wrap-up"
 # Row labels unique to run.md's Step 5 mandatory-rows table. Requiring one of
 # these keeps the omission branch off unrelated "<something> cleanup finished"
 # reports that merely happen to contain a table (e.g. a file-cleanup summary).
-HG_CLEANUP_STEP_ROWS="${HG_CLEANUP_STEP_ROWS:-Self-Improve|Knowledge Persist|RAG Store|wip task|TaskList|Task prune|Weekly Report}"
+HG_CLEANUP_STEP_ROWS="${HG_CLEANUP_STEP_ROWS:+${HG_CLEANUP_STEP_ROWS}|}Self-Improve|Knowledge Persist|RAG Store|wip task|TaskList|Task prune|Weekly Report"
 
 INPUT=$(cat)
 
