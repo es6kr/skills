@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), sync-automation (Stop-hook overdue-sync nudge), verify (commit-hash/file-path staleness check against local git state), issue-drafts (write → publish → archive → delete), model-triage (high-capability model fit categories + dedicated `<Model> Target Tasks` section), completion-criteria (DoD per output type + marker transition + residual-scope split).
-  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl, context self-detection fallback — see "Role-based execution").
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "sync automation", "sync nudge", "issue draft cleanup", "plan draft", "defer plan", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "definition of done", "why still blocked", "role profile", "role-based execution", "--role", "verify tracker reference", "stale commit hash".
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format (markers/sections), priority (P0-P3 BLOCKED + external/selfable), add (Action/Why/How), draft (deferred plan stub → promote), move ([x] → Completed + subtree), sync (gh pr/issue polling → auto-check), sync-automation (overdue nudge), verify (commit/path staleness), issue-drafts (write→publish→archive), model-triage (model-fit section), completion-criteria (DoD + marker transition), claim (multi-session lease — CLAIMED tag prevents duplicate work across sessions).
+  Default (no args): move → format → sync → priority → flowchart-sync, scoped by --role=pm|deep|impl.
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "plan draft", "model triage", "completion criteria", "--role", "verify tracker reference", "claim item", "in-progress lease", "mark in progress", "concurrent session", "prevent duplicate work".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -29,6 +29,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | add | New item authoring schema (Action / Why / How), length budget, deliverable separation (research / plan / checklist split) | [add.md](./add.md) |
+| claim | Multi-session in-progress lease: `[CLAIMED:<sid>:<ts>]` suffix tag on `[ ]` / `[BLOCKED:*:selfable]` items, claim→refresh→release lifecycle, stale-TTL takeover — prevents two sessions duplicating the same item | [claim.md](./claim.md) |
 | completion-criteria | Definition of done per item output type (`Why` = scope narrative vs `How to apply` = deliverable), marker transition rules, residual-scope split | [completion-criteria.md](./completion-criteria.md) |
 | draft | Record a deferred plan **stub** (purpose + defer reason + resume trigger + expected deliverable) in `## Plan Drafts` when full planning is postponed; promote to `code-workflow` research→plan when the trigger fires. Invoked `/fix-plan draft` | [draft.md](./draft.md) |
 | flowchart | Priority flowchart (Mermaid `graph TD` dependency graph) authoring, clean syntax rules (no inline `%%`), plan document node mapping (`llm-wiki/outputs/`, `.ralph/plan-drafts/`) without `file://` URLs, and the `pm`-role default-pipeline sync procedure (drift check against priority-triage output) | [flowchart.md](./flowchart.md) |
@@ -50,6 +51,7 @@ fix-plan (schema + lifecycle)
   ├─→ priority (new convention — BLOCKED P0-P3 + reason)
   │     └─→ depends on sync (Step 0: refresh external state before classifying)
   ├─→ add (authoring act-now items)
+  ├─→ claim (multi-session lease) — annotates format's markers; move drops the tag on completion; priority triage excludes fresh-claimed items
   ├─→ model-triage (cross-section discovery → dedicated section; items authored via add's schema)
   ├─→ draft (deferred plan stub → `## Plan Drafts`)
   │     └─→ code-workflow/steps dispatch on promote (research → plan)
@@ -73,6 +75,7 @@ fix-plan (schema + lifecycle)
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `claim-ttl` | `4` (hours) | Stale-claim TTL for the `claim` topic — a `[CLAIMED:<sid>:<ts>]` lease older than this (or whose session has ended) is takeable by another session. Set via `--claim-ttl=<hours>`. See [claim.md](./claim.md) |
 | `archive-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for **default invocation** (no args). When set, the caller routes the source's `## Completed` section to this receiver for external archiving (weekly report, postmortem log, RAG store, etc.). Receiver harvests + appends to its own report + removes harvested lines from source. Set via `--archive=<skill>:<topic>` CLI flag. See "Default invocation" below |
 | `completed-archive-period` | `monthly` | Period for the **receiver-independent local archive** of the `## Completed` section — `monthly` (`YYYY-MM`) or `weekly` (ISO `YYYY-Www`). On the period boundary, older Completed entries move to `<tracker-dir>/.bak/<tracker-stem>-completed-<period>.md` and are removed from the tracker, keeping the live file small. Set via `--completed-archive-period=weekly\|monthly`. See [move.md](./move.md) "Completed-section size management" |
 | `rag-receiver` | (unset) | Optional `<skill>:<topic>` dispatch for `move` topic semantic indexing — set via the `--rag=<skill>:<topic>` CLI flag on the `move` topic (see [move.md](./move.md)). No env var or config file is consumed by this skill; the caller routes |
@@ -220,6 +223,17 @@ See [priority.md](./priority.md) for full convention.
 ```
 
 See [add.md](./add.md) for length budget + deliverable separation.
+
+### Claim an item in progress (multi-session)
+
+Re-read the tracker, then stamp a lease tag before starting work so a concurrent session does not duplicate it:
+
+```markdown
+- [ ] [CLAIMED:<sid>:<YYYY-MM-DDTHH:mm>] {Action}
+- [BLOCKED:P1:selfable] [CLAIMED:<sid>:<ts>] {Action}
+```
+
+`[CLAIMED]` is a lease annotation (not a checkbox state). Completion (`[x]` → Completed) drops it; a claim older than the TTL (default 4h) or from an ended session is takeable. See [claim.md](./claim.md).
 
 ### Record a deferred plan draft
 
