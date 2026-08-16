@@ -20,11 +20,28 @@ PLANE_BACKLOG_SCRIPTS = REPO_ROOT / "skills" / "plane-backlog" / "scripts"
 FIX_PLAN_SCRIPTS = REPO_ROOT / "skills" / "fix-plan" / "scripts"
 
 # Scripts that must never carry a concrete workspace identifier as a fallback.
-CREATE_SCRIPTS = [
+#
+# Both skill directories are listed because the docs reference the create
+# scripts under either root, and a copy may exist in one, the other, or both.
+# Only the paths that actually resolve are asserted on — a missing candidate is
+# a documentation drift to fix in the docs, not a reason to fail this guard with
+# a FileNotFoundError that says nothing about workspace identifiers.
+_CREATE_SCRIPT_CANDIDATES = [
     PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py",
     PLANE_BACKLOG_SCRIPTS / "plane_create_comment.py",
     FIX_PLAN_SCRIPTS / "plane_create_issue.py",
+    FIX_PLAN_SCRIPTS / "plane_create_comment.py",
 ]
+
+CREATE_SCRIPTS = [p for p in _CREATE_SCRIPT_CANDIDATES if p.is_file()]
+
+# Guard the guard: if a rename empties the list, every test below would pass
+# vacuously and the workspace-identifier check would silently stop running.
+assert CREATE_SCRIPTS, (
+    "no create script resolved under "
+    f"{PLANE_BACKLOG_SCRIPTS} or {FIX_PLAN_SCRIPTS} — "
+    "the scripts moved and this test's candidate list needs updating"
+)
 
 UUID_LITERAL = re.compile(
     r"['\"][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['\"]"
