@@ -127,7 +127,7 @@ def parse_bullet_tokens(tokens):
             "content": item_tiptap_content
         })
         html_items.append(f"<li>{html_item_str}</li>")
-        
+
     tiptap_bullet_list = {
         "type": "bulletList",
         "content": list_content
@@ -299,10 +299,10 @@ def create_via_k3s_fallback(profile: dict, title: str, description: str = "", pr
     py_script = f"""import json, re
 from plane.db.models import Issue, IntakeIssue, Workspace, Project, User
 
-ws = Workspace.objects.filter(slug='{workspace_slug}').first()
-prj = Project.objects.filter(id='{prj_id}').first()
+ws = Workspace.objects.filter(slug={json.dumps(workspace_slug)}).first()
+prj = Project.objects.filter(id={json.dumps(prj_id)}).first()
 if prj is None:
-    print(json.dumps({{"success": False, "reason": "project {prj_id} not found"}}))
+    print(json.dumps({{"success": False, "reason": {json.dumps(f"project {prj_id} not found")}}}))
     raise SystemExit(0)
 u = User.objects.filter(is_superuser=True).first() or User.objects.first()
 
@@ -380,7 +380,7 @@ def parse_bullet_tokens(tokens):
     html_items = []
     for item_text, sub_tokens in items:
         inline_nodes = parse_inline_tiptap(item_text)
-        item_tiptap_content = [{"type": "paragraph", "content": inline_nodes}]
+        item_tiptap_content = [{{"type": "paragraph", "content": inline_nodes}}]
         html_item_str = inline_to_html(item_text)
         
         if sub_tokens:
@@ -389,17 +389,17 @@ def parse_bullet_tokens(tokens):
                 item_tiptap_content.append(sub_tiptap)
                 html_item_str += sub_html
                 
-        list_content.append({
+        list_content.append({{
             "type": "listItem",
             "content": item_tiptap_content
-        })
-        html_items.append(f"<li>{html_item_str}</li>")
-        
-    tiptap_bullet_list = {
+        }})
+        html_items.append(f"<li>{{html_item_str}}</li>")
+
+    tiptap_bullet_list = {{
         "type": "bulletList",
         "content": list_content
-    }
-    html_bullet_list = f"<ul>{''.join(html_items)}</ul>"
+    }}
+    html_bullet_list = f"<ul>{{''.join(html_items)}}</ul>"
     return tiptap_bullet_list, html_bullet_list
 
 def markdown_to_tiptap_and_html(md_text: str):

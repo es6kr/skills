@@ -7,6 +7,8 @@ resolution. The practical effect was that per-workspace isolation never engaged
 and a run could target a different workspace's Plane project.
 """
 
+import ast
+import base64
 import json
 import os
 import re
@@ -165,4 +167,71 @@ def test_no_hardcoded_workspace_identifier_fallback(script):
     assert not PLANE_HOST_LITERAL.search(source), (
         f"{script.name} embeds a concrete Plane host; a profile miss would "
         "silently target that deployment"
+    )
+
+
+def test_k3s_fallback_script_survives_quote_in_workspace_slug(monkeypatch):
+    """workspace_slug/project_id must not break out of the generated py_script.
+
+    `create_via_k3s_fallback` builds a Django-shell Python script as an
+    f-string and interpolates the profile's workspace_slug and the resolved
+    project id directly into it. Prior to the json.dumps fix, both were
+    embedded as raw text inside single-quoted Python literals
+    (`filter(slug='{workspace_slug}')`), so a value containing a single quote
+    generated syntactically invalid — or attacker-controlled — Python source
+    that plane-api would then execute via `manage.py shell`.
+
+    Loaded by explicit file path (not via scripts_on_path/sys.path) because
+    both the plane-backlog and fix-plan copies share the module name
+    "plane_create_issue" — only the plane-backlog copy carries this fix.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "plane_create_issue_under_test",
+        PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py",
+    )
+    plane_create_issue = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(plane_create_issue)
+
+    captured_cmd = {}
+
+    class _FakeCompletedProcess:
+        stdout = 'RESULT_JSON:{"success": true, "id": "1", "sequence_id": 1, "title": "t", "url": "u", "intake": true}\n'
+        stderr = ""
+
+    def _fake_run(cmd, capture_output, text, check):
+        captured_cmd["cmd"] = cmd
+        return _FakeCompletedProcess()
+
+    monkeypatch.setattr(plane_create_issue.subprocess, "run", _fake_run)
+
+    malicious_slug = "acme'; Workspace.objects.all().delete(); x='"
+    profile = {
+        "workspace_slug": malicious_slug,
+        "plane_host": "https://plane.acme.invalid",
+    }
+
+    plane_create_issue.create_via_k3s_fallback(
+        profile, title="regression test", project_id="proj-1"
+    )
+
+    assert captured_cmd, "subprocess.run was never called — fallback path did not run"
+    shell_cmd = captured_cmd["cmd"][-1]
+    b64_marker = "base64.b64decode('"
+    start = shell_cmd.index(b64_marker) + len(b64_marker)
+    end = shell_cmd.index("'", start)
+    py_script = base64.b64decode(shell_cmd[start:end]).decode("utf-8")
+
+    ast.parse(py_script)  # raises SyntaxError if the slug broke out of the literal
+
+    filter_line = next(
+        line for line in py_script.splitlines() if "Workspace.objects.filter" in line
+    )
+    assert filter_line.strip() == (
+        f"ws = Workspace.objects.filter(slug={json.dumps(malicious_slug)}).first()"
+    ), (
+        "the slug must be embedded via json.dumps, not raw-interpolated into a "
+        "single-quoted literal — otherwise its own quote characters break out "
+        "of the string and the trailing text runs as Python statements"
     )
