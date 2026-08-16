@@ -23,13 +23,33 @@ import base64
 import re
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, SCRIPT_DIR)
 
-try:
-    from workspace_profile import get_profile_for_cwd
-except ImportError:
-    def get_profile_for_cwd(cwd=None):
-        return {}
+
+def _shared_script_dirs():
+    """Directories holding the shared plane-backlog / fix-plan script modules.
+
+    The two skills ship together but live in separate directories, so neither
+    can reach the other by adding only its own directory to ``sys.path``.
+    """
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    candidates = [SCRIPT_DIR]
+    for skill in ("plane-backlog", "fix-plan"):
+        if plugin_root:
+            candidates.append(os.path.join(plugin_root, "skills", skill, "scripts"))
+        candidates.append(
+            os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir, os.pardir, skill, "scripts"))
+        )
+    return [d for d in candidates if d and os.path.isdir(d)]
+
+
+for _shared_dir in _shared_script_dirs():
+    if _shared_dir not in sys.path:
+        sys.path.insert(0, _shared_dir)
+
+# Single source of truth for profile resolution. Importing it eagerly is
+# deliberate: a missing resolver must fail loudly rather than silently degrade
+# into a run that targets whichever workspace the environment happens to name.
+from plane_client import resolve_profile  # noqa: E402
 
 
 def parse_inline_tiptap(text: str) -> list:
@@ -183,14 +203,30 @@ def markdown_to_tiptap_and_html(md_text: str):
 
 
 def create_via_rest_api(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True) -> dict:
-    plane_host = profile.get("plane_host", "").rstrip("/")
-    token_env = profile.get("plane_token_env", "PLANE_API_KEY")
-    token = profile.get("plane_token") or os.environ.get(token_env) or os.environ.get("PLANE_API_KEY") or os.environ.get("DGS_PLANE_API_KEY")
-    workspace_slug = profile.get("workspace_name", "es6kr")
+    plane_host = (profile.get("plane_host") or "").rstrip("/")
+    token = profile.get("token")
+    workspace_slug = profile.get("workspace_slug")
     prj_id = project_id or profile.get("default_project")
 
-    if not plane_host or not token or not prj_id:
-        return {"success": False, "reason": "Missing plane_host, plane_token, or project_id"}
+    missing = [
+        name
+        for name, value in (
+            ("plane_host", plane_host),
+            ("token", token),
+            ("workspace_slug", workspace_slug),
+            ("project_id", prj_id),
+        )
+        if not value
+    ]
+    if missing:
+        return {
+            "success": False,
+            "reason": (
+                f"Unresolved workspace profile fields: {', '.join(missing)}. "
+                "Refusing to guess a target — configure the workspace profile "
+                "or set the corresponding environment variables."
+            ),
+        }
 
     url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/issues/"
     headers = {
@@ -238,15 +274,36 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
 
 
 def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True) -> dict:
-    workspace_slug = profile.get("workspace_name", "es6kr")
-    prj_id = project_id or profile.get("default_project") or "4b4d8bfc-5e5d-495b-bd4c-301fe89e5bb0"
-    plane_host = profile.get("plane_host", "https://plane.es6.kr").rstrip("/")
+    workspace_slug = profile.get("workspace_slug")
+    prj_id = project_id or profile.get("default_project")
+    plane_host = (profile.get("plane_host") or "").rstrip("/")
+
+    missing = [
+        name
+        for name, value in (
+            ("workspace_slug", workspace_slug),
+            ("project_id", prj_id),
+            ("plane_host", plane_host),
+        )
+        if not value
+    ]
+    if missing:
+        return {
+            "success": False,
+            "reason": (
+                f"Unresolved workspace profile fields: {', '.join(missing)}. "
+                "Refusing to fall back to an arbitrary workspace or project."
+            ),
+        }
 
     py_script = f"""import json, re
 from plane.db.models import Issue, IntakeIssue, Workspace, Project, User
 
 ws = Workspace.objects.filter(slug='{workspace_slug}').first()
-prj = Project.objects.filter(id='{prj_id}').first() or Project.objects.first()
+prj = Project.objects.filter(id='{prj_id}').first()
+if prj is None:
+    print(json.dumps({{"success": False, "reason": "project {prj_id} not found"}}))
+    raise SystemExit(0)
 u = User.objects.filter(is_superuser=True).first() or User.objects.first()
 
 # Idempotency check: look for existing issue with exact same title in project
@@ -460,7 +517,7 @@ print("RESULT_JSON:" + json.dumps(res))
 
 
 def create_plane_issue(title: str, description: str = "", project_id: str = None, is_intake: bool = True, cwd: str = None) -> dict:
-    profile = get_profile_for_cwd(cwd or os.getcwd())
+    profile = resolve_profile(cwd or os.getcwd())
     res = create_via_rest_api(profile, title, description, project_id, is_intake)
     if res.get("success"):
         return res

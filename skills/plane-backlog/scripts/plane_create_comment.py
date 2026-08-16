@@ -27,20 +27,31 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, SCRIPT_DIR)
-# workspace_profile ships with the fix-plan scripts; add common locations to the path
-for cand in (
-    os.path.join(os.path.expanduser("~"), ".agents", "skills", "fix-plan", "scripts"),
-    os.path.join(os.path.expanduser("~"), ".gemini", "config", "skills", "fix-plan", "scripts"),
-    SCRIPT_DIR,
-):
-    if os.path.isdir(cand):
-        sys.path.insert(0, cand)
-try:
-    from workspace_profile import get_profile_for_cwd
-except Exception:
-    def get_profile_for_cwd(cwd=None):
-        return {}
+
+
+def _shared_script_dirs():
+    """Directories holding the shared plane-backlog / fix-plan script modules.
+
+    Resolved relative to this file and ``CLAUDE_PLUGIN_ROOT`` so the lookup does
+    not depend on any particular install layout under the user's home.
+    """
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    candidates = [SCRIPT_DIR]
+    for skill in ("plane-backlog", "fix-plan"):
+        if plugin_root:
+            candidates.append(os.path.join(plugin_root, "skills", skill, "scripts"))
+        candidates.append(
+            os.path.abspath(os.path.join(SCRIPT_DIR, os.pardir, os.pardir, skill, "scripts"))
+        )
+    return [d for d in candidates if d and os.path.isdir(d)]
+
+
+for _shared_dir in _shared_script_dirs():
+    if _shared_dir not in sys.path:
+        sys.path.insert(0, _shared_dir)
+
+# Single source of truth for profile resolution — see plane_client.resolve_profile.
+from plane_client import resolve_profile  # noqa: E402
 
 UA = "Mozilla/5.0 (plane-backlog)"
 
@@ -109,14 +120,23 @@ def resolve_project(host, ws, token, want):
 
 
 def create_comment(issue_id, comment_md, project=None, cwd=None):
-    profile = get_profile_for_cwd(cwd or os.getcwd())
+    profile = resolve_profile(cwd or os.getcwd())
     host = (profile.get("plane_host") or "").rstrip("/")
-    ws = profile.get("workspace_name", "es6kr")
-    token_env = profile.get("plane_token_env", "PLANE_API_KEY")
-    token = (profile.get("plane_token") or os.environ.get(token_env)
-             or os.environ.get("PLANE_API_KEY"))
-    if not host or not token:
-        return {"success": False, "reason": "Missing plane_host or token (set the workspace token env var)"}
+    ws = profile.get("workspace_slug")
+    token = profile.get("token")
+    missing = [
+        name
+        for name, value in (("plane_host", host), ("token", token), ("workspace_slug", ws))
+        if not value
+    ]
+    if missing:
+        return {
+            "success": False,
+            "reason": (
+                f"Unresolved workspace profile fields: {', '.join(missing)}. "
+                "Refusing to guess a target workspace."
+            ),
+        }
     prj = resolve_project(host, ws, token, project or profile.get("default_project"))
     if not prj:
         return {"success": False, "reason": "Could not resolve project UUID — pass --project <uuid>"}

@@ -39,19 +39,45 @@ MAX_ATTEMPTS = 4
 PAGE_SIZE = 100
 
 
+def _workspace_profile_dirs():
+    """Directories that may hold ``workspace_profile.py``, most specific first.
+
+    The module ships with the ``fix-plan`` skill, so a script living under
+    ``plane-backlog/scripts`` cannot reach it by adding only its own directory.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
+    candidates = [
+        here,
+        os.path.join(plugin_root, "skills", "fix-plan", "scripts") if plugin_root else "",
+        os.path.abspath(os.path.join(here, os.pardir, os.pardir, "fix-plan", "scripts")),
+    ]
+    return [d for d in candidates if d and os.path.isdir(d)]
+
+
 def resolve_profile(cwd=None):
     """Return the workspace profile dict (plane_host / token / slug / project).
 
-    Delegates to the sibling ``workspace_profile`` module when it is importable
-    so multi-workspace isolation keeps working; otherwise falls back to
-    environment variables.
+    Delegates to the ``workspace_profile`` module so multi-workspace isolation
+    keeps working. A failure to reach it is reported on stderr rather than
+    silently degrading to environment variables — a configuration error and
+    "no profile configured" are not the same thing, and conflating them lets a
+    run target the wrong workspace without any signal.
     """
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    for candidate in _workspace_profile_dirs():
+        if candidate not in sys.path:
+            sys.path.insert(0, candidate)
     try:
-        from workspace_profile import get_profile_for_cwd  # type: ignore
+        from workspace_profile import get_profile  # type: ignore
 
-        profile = get_profile_for_cwd(cwd) or {}
-    except Exception:
+        profile = get_profile(target_path=cwd) or {}
+    except ImportError as exc:
+        print(
+            f"WARN: workspace_profile unavailable ({exc}); "
+            "resolving from environment variables only — per-workspace "
+            "isolation is INACTIVE for this run",
+            file=sys.stderr,
+        )
         profile = {}
 
     token_env = profile.get("plane_token_env", "PLANE_API_KEY")
