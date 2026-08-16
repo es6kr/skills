@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq get + auto SourceGit register), conflict-dry-run (isolated worktree merge/cherry-pick test), credential-helper (per-org HTTPS token pin for multi-account), fix-worktree (bare repo recovery), isolate-hunk (stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing — hash-object + update-index), merge-duplicate (same-origin merge), to-ghq (bare+worktree → ghq, formerly migrate), to-bare (regular repo → bare + worktree, lock-aware), worktree-register (shared metadata register/relink), patrol (batch inspect), move-worktree (register / reclaim merged PR), rename-worktree (rename dir + metadata), sourcegit (preference.json), ssh-key (multi-account SSH map), worktree (inventory + reuse + create). Use when: "ghq get", "sourcegit", "ghq migrate", "repo patrol", "duplicate repo", "worktree fix", "rename worktree", "reuse worktree", "move worktree", "to bare", "convert to bare", "multi-account clone", "core.sshCommand", "Repository not found", "credential helper", "wrong account", "worktree create", "merge conflict test", "cherry-pick dry run", "isolate hunk", "stage isolated content", "concurrent uncommitted edit", "separate my edit from other changes" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), fix-worktree (bare repo recovery), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, rebase-audit (accidental-revert detection during an active rebase), to-ghq (formerly migrate), to-bare, worktree-register (metadata register/relink), patrol (batch inspect), move-worktree (register/reclaim merged PR), rename-worktree, sourcegit, ssh-key (multi-account SSH map), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely). Use when: "reuse worktree", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -36,12 +36,14 @@ Git repository management and SourceGit GUI client integration.
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
 | move-worktree | move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
 | patrol | batch inspection of ghq repositories (status, stash, unpushed + commit-splitter integration) | [patrol.md](./patrol.md) |
+| rebase-audit | audit an active interactive rebase's staged files for accidental reverts (HEAD-vs-index diff + revert-pattern heuristic + AskUserQuestion multiSelect) without touching the rebase itself | [rebase-audit.md](./rebase-audit.md) |
 | rename-worktree | rename worktree directory and metadata (cross-platform, Windows safe) | [rename-worktree.md](./rename-worktree.md) |
 | sourcegit | SourceGit preference.json management (add repos, workspaces, folder rename) | [sourcegit.md](./sourcegit.md) |
 | ssh-key | per-repo SSH key mapping for multi-account GitHub (core.sshCommand + IdentityAgent) | [ssh-key.md](./ssh-key.md) |
 | to-bare | convert a regular repo → bare + worktree at a custom location, preserving uncommitted changes (inverse of to-ghq; helper: `scripts/repo-to-bare-worktree.sh`) | [to-bare.md](./to-bare.md) |
 | to-ghq | migrate bare+worktree → regular `.git` at the ghq path (formerly `migrate`) | [to-ghq.md](./to-ghq.md) |
 | worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.claude/worktrees/` | [worktree.md](./worktree.md) |
+| worktree-drift-sync | re-verify each worktree's git state immediately before/after applying an identical fix across a repo's multiple worktrees under external concurrent editing | [worktree-drift-sync.md](./worktree-drift-sync.md) |
 | worktree-register | shared: register a populated directory as a worktree via metadata only (used by fix-worktree + to-bare) | [worktree-register.md](./worktree-register.md) |
 
 ## Topic Dependencies
@@ -58,6 +60,8 @@ worktree-register (shared metadata register/relink mechanism)
 to-bare  ←inverse→  to-ghq (formerly `migrate`)
 
 ssh-key (SSH multi-account)  ──counterpart──  credential-helper (HTTPS multi-account)
+
+rebase-audit (active-rebase revert detection)  ──restoration mechanism shared with──  isolate-hunk (targeted hunk staging)
 ```
 
 ## Worktree decision tree (HARD STOP — every time a worktree is needed)

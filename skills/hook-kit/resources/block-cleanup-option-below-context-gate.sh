@@ -39,7 +39,11 @@ HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
 if [[ -f "$HG_DATA_FILE" ]]; then
   . "$HG_DATA_FILE"
 fi
-WRAPUP_PATTERN_EN='wrap[- ]?up|/cleanup|session cleanup|retrospect'
+# Negative lookbehind on "/cleanup" excludes a bare substring match inside
+# unrelated slash-delimited text (e.g. "resume/shutdown/cleanup/agent-messages")
+# — only a standalone "/cleanup" token (not preceded by alnum or another slash)
+# counts as the slash-command reference.
+WRAPUP_PATTERN_EN='wrap[- ]?up|(?<![a-zA-Z0-9/])/cleanup|session cleanup|retrospect'
 if [[ -n "${HG_CONTEXT_GATE_WRAPUP_KO:-}" ]]; then
   WRAPUP_PATTERN="${WRAPUP_PATTERN_EN}|${HG_CONTEXT_GATE_WRAPUP_KO}"
 else
@@ -200,6 +204,44 @@ if [[ "$HAS_CLEANUP" == "1" && "$BELOW" == "1" ]]; then
     echo "  failed-attempts.md (grep \"context-usage\")"
   } >&2
   exit 2
+fi
+
+# MISSING-CITATION (3rd check, restored — class context-usage-stale, was documented as
+# added at the 13th occurrence but the deployed file never carried it; re-added after a
+# 17th-occurrence catch confirmed the gap): a legitimate cleanup offer (HAS_CLEANUP==1,
+# not already denied above as OVER-offer, i.e. BELOW==0) whose option text substitutes
+# qualitative language ("session grew large") for the actual live percentage. A number
+# must appear in the SAME option's label+description — citing a number anywhere else in
+# the ask (e.g. the question text) does not satisfy this.
+CLEANUP_OPT_TEXT=$(echo "$INPUT" | jq --arg pattern "$WRAPUP_PATTERN" -r '
+  [
+    .tool_input.questions[]? | .options[]? |
+    select((.label // "") + " " + (.description // "") | test($pattern; "i")) |
+    (.label // "") + " " + (.description // "")
+  ] | join(" ")
+' 2>/dev/null)
+
+if [[ "$HAS_CLEANUP" == "1" && "$BELOW" == "0" ]]; then
+  if ! echo "$CLEANUP_OPT_TEXT" | grep -qE '[0-9]+(\.[0-9]+)?[[:space:]]*%'; then
+    {
+      echo "DENIED: cleanup/wrap-up option omits the live numeric context-usage percentage."
+      echo ""
+      echo "Live context usage: ${LATEST_PCT}% (>= ${THRESHOLD}% threshold — the offer itself is legitimate)."
+      echo ""
+      echo "Why blocked:"
+      echo "  - The offered option's label+description contains no [0-9]+% figure — qualitative"
+      echo "    phrasing ('session grew large', 'context is high') is not a substitute for the"
+      echo "    cited number the user needs to judge the recommendation"
+      echo ""
+      echo "Required action:"
+      echo "  Restate the option description to cite the live figure, e.g."
+      echo "  \"Context usage: ~${LATEST_PCT}% — session cleanup and retrospective\""
+      echo ""
+      echo "Reference: next skill suggestion-patterns.md 'Context-usage gate' Don't/Do #5;"
+      echo "  failed-attempts.md class context-usage-stale (13th occurrence)"
+    } >&2
+    exit 2
+  fi
 fi
 
 # UNDER-offer (positive-trigger enforcement): the ask IS wrap-up-scoped

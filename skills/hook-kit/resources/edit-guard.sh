@@ -27,7 +27,7 @@ fi
 # When the locale data is missing, set the Hangul range to a pattern that
 # never matches (so the language-mismatch check no-ops gracefully).
 HG_EDIT_HANGUL_RANGE="${HG_EDIT_HANGUL_RANGE:-[!-~]_NEVER_MATCH}"
-HG_EDIT_STUB_MARKERS="${HG_EDIT_STUB_MARKERS:-location pointer|Use .* instead|^type: *stub$|^stub: *true$|^pointer: *true$}"
+HG_EDIT_STUB_MARKERS="${HG_EDIT_STUB_MARKERS:+${HG_EDIT_STUB_MARKERS}|}location pointer|Use .* instead|^type: *stub$|^stub: *true$|^pointer: *true$"
 
 # Internal-host detection tokens are externalized the same way so the public
 # repo never embeds real internal hostnames. The git-ignored data file supplies
@@ -521,21 +521,26 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
 # recent genuine user prompt (role=user, string content — not a tool_result
 # array, which also carries role=user in this transcript format).
 #
-# Harness-injected stub messages ("Skill /<name> is already loaded above;
-# instructions unchanged.") also arrive as role=user string content whenever
-# a skill is re-invoked mid-session — indistinguishable from a real prompt by
-# role+type alone. Left unfiltered, this resets turn_start to AFTER the very
-# Skill("skill-kit", ...) call this check is looking for, permanently hiding
-# every re-invocation once skill-kit has loaded once in the session.
-STUB_MARKER = "is already loaded above; instructions unchanged."
-
+# Harness-injected skill-reload messages ("Skill /<name> is already loaded
+# above; instructions unchanged.", "(Re-invocation of /<name> — ... truncated
+# by compaction ...)", and potentially other future wordings) also arrive as
+# role=user string content whenever a skill is re-invoked mid-session —
+# indistinguishable from a real prompt by role+type alone. A prior version of
+# this check matched specific reload-message substrings (STUB_MARKER); that
+# approach recurred because the harness uses more than one wording and each
+# new one silently reopened the same bug. These reload entries instead carry
+# a structural marker regardless of wording: isMeta=true, plus a
+# sourceToolUseID pointing back at the originating Skill tool_use — verified
+# directly against a live session transcript (genuine user prompts never
+# carry isMeta). Skip on that field instead of matching text, so no future
+# reload-wording variant can reopen this bug.
 turn_start = 0
 for i in range(len(entries) - 1, -1, -1):
     ent = entries[i]
     msg = ent.get("message") or {}
     content = msg.get("content")
     if msg.get("role") == "user" and isinstance(content, str):
-        if STUB_MARKER in content:
+        if ent.get("isMeta") is True:
             continue
         turn_start = i
         break
@@ -552,7 +557,14 @@ for ent in entries[turn_start:]:
         if b.get("name") != "Skill":
             continue
         inp = b.get("input") or {}
-        if inp.get("skill") == "skill-kit":
+        # Accept the plugin-qualified form too. Marketplace-installed skills are
+        # invoked as "<plugin>:skill-kit" (e.g. "es6kr:skill-kit"), which an exact
+        # match never sees — so a correct invocation looked like no invocation and
+        # the guard blocked legitimate edits until the caller happened to retry
+        # with the bare name. Same failure shape as the reload-wording bug above:
+        # matching one spelling of a value that has several valid spellings.
+        skill_arg = inp.get("skill") or ""
+        if skill_arg == "skill-kit" or skill_arg.endswith(":skill-kit"):
             found = True
             break
     if found:
