@@ -28,7 +28,7 @@ Scan conversation for mistake signals and record to feedback memory + failed-att
 2. Draft feedback memory entry (rule + Why + How to apply)
 3. Collect for Phase 2 AskUserQuestion
 
-**FA Prune**: After recording, if failed-attempts.md has 5+ sections, run [fa-prune.md](../cleanup/fa-prune.md) automatically.
+**FA Prune**: After recording, run [fa-prune.md](../cleanup/fa-prune.md) automatically when any axis in its "Execution trigger (class-based)" table fires. That table is the single source for the trigger — do not restate a section-count threshold here; the flat counts it replaced are deprecated.
 
 **Skip condition**: No mistakes/corrections in conversation.
 

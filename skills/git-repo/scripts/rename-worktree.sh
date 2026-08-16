@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # rename-worktree.sh — git worktree rename (directory + metadata + branch)
-# Usage: rename-worktree.sh <repo> <old-name> <new-name> [--branch <branch>] [--wt-base <dir>]
+# Usage: rename-worktree.sh <repo> <old-name> <new-name> [--branch <branch>] [--base <ref>] [--wt-base <dir>]
 #
 # <old-name>:  directory name under the worktree base
 # <new-name>:  new directory name
 # --branch:    branch to switch to (default: keep current branch)
+# --base:      base ref for a NEWLY created branch (e.g. origin/main). Ignored when
+#              --branch names a branch that already exists locally or on origin.
+#              Without it a new branch starts at the worktree's current HEAD — which,
+#              in this script's primary use case (reclaiming an inactive worktree),
+#              is the stale tip of the work that worktree used to hold.
 # --wt-base:   worktree base dir relative to <repo> (default: .claude/worktrees).
 #              Use e.g. --wt-base .worktrees for repos that keep worktrees at <repo>/.worktrees/
 
@@ -14,12 +19,14 @@ REPO="${1:?Usage: rename-worktree.sh <repo> <old-name> <new-name> [--branch <bra
 OLD="${2:?missing old-name}"
 NEW="${3:?missing new-name}"
 BRANCH=""
+BASE=""
 WT_BASE_REL=".claude/worktrees"
 
 shift 3
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --branch) BRANCH="$2"; shift 2 ;;
+    --base) BASE="$2"; shift 2 ;;
     --wt-base) WT_BASE_REL="${2#/}"; WT_BASE_REL="${WT_BASE_REL%/}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -115,7 +122,24 @@ if [[ -n "$BRANCH" ]]; then
     git checkout "$BRANCH"
   elif git show-ref --verify --quiet "refs/remotes/origin/$BRANCH" 2>/dev/null; then
     git checkout -b "$BRANCH" "origin/$BRANCH"
+  elif [[ -n "$BASE" ]]; then
+    git rev-parse --verify --quiet "$BASE" >/dev/null \
+      || { echo "ERROR: --base '$BASE' does not resolve (fetch it first?)" >&2; exit 1; }
+    git checkout -b "$BRANCH" "$BASE"
   else
+    # No base given: start at the worktree's current HEAD. When this worktree is
+    # being reclaimed from finished work, that HEAD is the stale tip of the old
+    # branch, so the new branch silently inherits commits the caller did not want.
+    # Cannot pick a default safely — the repo's integration branch is not always
+    # main (staging-branch models exist) — so report what is being used instead.
+    _head="$(git rev-parse --short HEAD)"
+    _subject="$(git log -1 --format=%s)"
+    echo "WARNING: new branch '$BRANCH' starts at HEAD ($_head: $_subject)." >&2
+    if _up="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+      _behind="$(git rev-list --count "HEAD..$_up" 2>/dev/null || echo '?')"
+      echo "         HEAD is $_behind commit(s) behind $_up." >&2
+    fi
+    echo "         Pass --base <ref> (e.g. --base origin/main) to start elsewhere." >&2
     git checkout -b "$BRANCH" HEAD
   fi
 fi

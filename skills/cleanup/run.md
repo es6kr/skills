@@ -296,7 +296,7 @@ Analyze the session's episodic data (mistakes, hook/skill behavior, repeated pat
 
 Analyze mistakes made during the session and record them to feedback memory + failed-attempts.md.
 
-**Procedure**: see [retrospect.md](./retrospect.md) — in Step 6 (FA Prune), if the section count > 20, calling `Skill("cleanup", "fa-prune")` is **mandatory** (a text-only note is ❌).
+**Procedure**: see [retrospect.md](./retrospect.md) — in Step 6 (FA Prune), when any axis in [fa-prune.md](./fa-prune.md) "Execution trigger (class-based)" fires, calling `Skill("cleanup", "fa-prune")` is **mandatory** (a text-only note is ❌). Do not restate a numeric threshold here: the flat section-count triggers are deprecated in favour of the class-count / hook-debt / stale-line axes, and a copy of the old number silently diverges from the source the moment it is tuned.
 
 **Skip condition**: skip if there were no mistakes/corrections in the conversation
 
