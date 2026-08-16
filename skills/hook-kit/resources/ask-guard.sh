@@ -63,7 +63,12 @@ HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE:+${HG_ASK_RETROSPECT_MERGE}|}
 # locale file can re-open them. Append-only is safe: retrospect exclusions only ever
 # make an ask PASS. NEW English non-PR-merge senses belong on THIS append line, not
 # the :- default, so they survive a locale override.
-HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE}|merge/split|split/merge|merge[- ]?keyword|merge[- ]?fp|merge[- ]?false[- ]?positive|await[- ]?merge|awaiting[- ]?merge|class[- ]?merge|merge[- ]?class|ask-guard"
+# "[Mm]erge[ -][Rr]isk" is a review-tool verdict label (CodeRabbit prints
+# "Merge Risk: Critical" on its PR walkthrough), not a proposal to merge. Quoting a
+# PR's review status in an option description is the most ordinary thing an ask can
+# do, and it tripped this gate twice in one session — the second time on the very ask
+# that was reporting the first as a defect.
+HG_ASK_RETROSPECT_MERGE="${HG_ASK_RETROSPECT_MERGE}|merge/split|split/merge|merge[- ]?keyword|merge[- ]?fp|merge[- ]?false[- ]?positive|await[- ]?merge|awaiting[- ]?merge|class[- ]?merge|merge[- ]?class|ask-guard|[Mm]erge[ -][Rr]isk"
 HG_ASK_SUMMARY_ATTESTATION="${HG_ASK_SUMMARY_ATTESTATION:+${HG_ASK_SUMMARY_ATTESTATION}|}AI Review Summary.*(completed|posted|✅)|github\.com/.+/pull/[0-9]+#issuecomment-[0-9]+"
 HG_ASK_TESTPLAN_ATTESTATION="${HG_ASK_TESTPLAN_ATTESTATION:+${HG_ASK_TESTPLAN_ATTESTATION}|}Test Plan.*(all).*\[x\]|Test Plan [0-9]+/[0-9]+ ✅|Test Plan.*✅"
 HG_ASK_CLOSE_KEYWORDS="${HG_ASK_CLOSE_KEYWORDS:+${HG_ASK_CLOSE_KEYWORDS}|}close"

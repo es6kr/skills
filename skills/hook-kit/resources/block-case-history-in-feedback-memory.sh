@@ -24,7 +24,7 @@ if [[ -f "$HG_DATA_FILE" ]]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
 fi
-HG_FEEDBACK_CASE_KEYWORDS="${HG_FEEDBACK_CASE_KEYWORDS:+${HG_FEEDBACK_CASE_KEYWORDS}|}recurrence|violation case|Nth (time|occurrence)|incident quote"
+HG_FEEDBACK_CASE_KEYWORDS="${HG_FEEDBACK_CASE_KEYWORDS:-recurrence|violation case|Nth (time|occurrence)|incident quote}"
 
 INPUT=$(cat)
 
