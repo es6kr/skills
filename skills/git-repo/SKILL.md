@@ -80,7 +80,23 @@ rebase-audit (active-rebase revert detection)  ──restoration mechanism share
    Any hit = a cherry-pick/merge/rebase/bisect is **mid-flight** (likely the user's active operation) → the worktree is **NOT an inactive candidate**, its dirty files are the operation's payload (never offer discard / `git add` resolution / stash), and reuse is forbidden — report to the user instead. Merge-status heuristics (branch merged + ahead=0) do NOT override this gate. (see failed-attempts.md "cherry-pick in progress misclassified as abandoned")
 3. Identify inactive candidates (only among worktrees that passed the gate):
    - **Merged-PR worktrees** (commit hash equals the base branch's merge commit)
+   - **Squash-merged-PR worktrees** — see the caveat below; the hash test above does **not** find these
    - **Stale fix/refactor branch worktrees** (confirm with the user)
+
+   **Hash-equality misses every squash merge (HARD STOP)**: a squash merge creates a new single commit on the base with no parent link to the branch, so a worktree whose PR was squashed keeps a HEAD that matches nothing on the base. The test in the first bullet reports it as *not* merged, and its N original commits still read as unmerged work — which both hides a reclaimable worktree and, worse, makes a genuinely stale branch look active. Ask GitHub for the PR state instead of inferring it from hashes:
+
+   ```bash
+   B=$(git -C <worktree> branch --show-current)
+   gh pr list --head "$B" --state all --json number,state,mergedAt --jq '.[0]'
+   ```
+
+   | PR state for the worktree's branch | Classification |
+   |------------------------------------|----------------|
+   | `MERGED` (regardless of merge method) | Inactive candidate — reclaimable |
+   | `OPEN` | Active — not a candidate |
+   | `CLOSED` unmerged, or no PR | Stale candidate — confirm with the user before reuse |
+
+   For a `MERGED` squashed branch, reuse means re-pointing the worktree at a fresh branch off the updated base (`rename-worktree`) — do **not** rebase or merge the old branch forward, since its commits duplicate content the base already carries in squashed form.
 4. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
 5. If no inactive worktree exists or the user opts for new → `git worktree add`
 
