@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/next-v0.7.3...next-v0.8.0) (2026-08-16)
+
+
+### Features
+
+* merge next-feat into main ([#313](https://github.com/es6kr/skills/issues/313)) ([2d9308a](https://github.com/es6kr/skills/commit/2d9308ab3e7e0086a88a7f64d3ed4d5c4d36e017))
+
+
+### Bug Fixes
+
+* **next:** require a post-compact re-measure before the context-usage gate fires ([288a4bd](https://github.com/es6kr/skills/commit/288a4bd0228304e44031d44e3c3baf2a7dba89eb))
+* **next:** require a post-compact re-measure before the context-usage gate fires ([7ca17b7](https://github.com/es6kr/skills/commit/7ca17b71dc735c1579af6cd62e1206eeda3a6081))
+
 ## [0.7.3](https://github.com/es6kr/skills/compare/next-v0.7.2...next-v0.7.3) (2026-08-12)
 
 
