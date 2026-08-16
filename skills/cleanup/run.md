@@ -64,6 +64,7 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | **3-C.4 workspace fix_plan-history sync (mode C)** | **Automatic execution — no ask** | — | If this session added `## Completed` entries to `fix_plan.md` AND the current workspace exposes a fix_plan→RAG sync script (per `rag-store.md` "fix_plan.md Completed Item RAG Sync + Delete Obligation"), run it. Session import (3-C.1) and structured chunks (3-C.2) are conversation-shaped; this sync is deliverable-shaped (task/decision history) — neither of the other two modes substitutes for it |
 | Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) | When this session has artifacts |
 | Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) | **Always** — state preservation for next-session resume at cleanup end |
+| **Step 5 report (HARD STOP — re-read before writing)** | **Before composing the completion report, scroll back to "Step 5 Completion Report Table Mandatory Rows" and copy its row list literally.** That section sits *above* the Step 1-5 procedure bodies, so executing the steps in order never passes through it again — the report then gets assembled from memory, which is exactly how mandatory rows (Session identity, the separate 3-C.1 / 3-C.2 / 3-C.4 rows) are silently dropped | — | **Always** — applies to the cleanup wrap-up table AND any separate session-end report |
 | Step 5.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4.5+5 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
 
 **Don't / Do**:
@@ -483,6 +484,18 @@ This step is mandatory before entering RAG store. **Do not conclude "unreachable
 | 1 | RAG receiver MCP tool available (in the system reminder's "available tools" list or matched via `ToolSearch` — the receiver's store/find tool name) | MCP is already connected to the receiver — primary availability signal | Run [rag-store.md](./rag-store.md) "Purpose-fit priority for 3-C.1" detection procedure FIRST — a purpose-built session-importer script (medium 2) outranks this generic MCP tool for whole-session import, even though the MCP tool is available. Only call the MCP store tool directly for 3-C.1 if no purpose-built importer is found |
 | 2 | The endpoint readyz probe explicitly documented by the receiver skill (use only the endpoint from the receiver's `<skill>:<topic>.md` doc) | Direct HTTP probe — secondary availability signal | MCP not connected, but the endpoint is alive. Enter via the script path |
 | **FAILED** | (1) MCP unavailable AND (2) endpoint probe timeout/HTTP 5xx | Both must fail to be unreachable | **Entire cleanup status = FAILED. Do not declare "✅ Complete"** — apply the "RAG store failure = cleanup failure" procedure below |
+
+##### After a successful import: advance the receiver's gap baseline (HARD STOP)
+
+The session import performed here is the **same operation** that a receiver's mid-session gap hook triggers on its own. Such a hook typically decides whether to fire by comparing the transcript's current line count against a per-session checkpoint file that, by default, **only the hook itself writes**. If cleanup imports without advancing that checkpoint, the baseline stays stale — right after this cleanup the hook still measures against the old point, fires again, and demands a duplicate import of the very turns 3-C.1 just stored.
+
+So on a successful 3-C.1 import, advance the receiver's baseline **in the same step**. The receiver skill documents the exact path and command (for the es6kr receiver, see its `qdrant-import` topic, "The checkpoint is a shared baseline"). Skip only when the receiver exposes no such checkpoint.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | End 3-C.1 at "import succeeded" and leave the checkpoint untouched | Advance the receiver's baseline in the same step — the import is not finished until the state tracking it agrees |
+| 2 | Treat the checkpoint as the hook's private state | It records "where a session import last happened", whichever entry point performed it |
+| 3 | Let the hook fire right after cleanup and satisfy it with another import | That import is a no-op re-run over turns already stored; the fix is the stale baseline, not another import |
 
 ##### RAG store failure = cleanup failure (HARD STOP)
 
