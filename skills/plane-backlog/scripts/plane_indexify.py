@@ -52,9 +52,19 @@ DEFAULT_BOILERPLATE_RE = (
     r"\s*[(（]?\s*fix[_ ]plan\s+phase\s*3\s+index\w*\s+\w+\s*"
     r"[,，]?\s*\d{4}\s*[-.]?\s*\d{2}\s*[-.]?\s*\d{2}\s*[)）]?\s*$"
 )
-BOILERPLATE_RE = re.compile(
-    os.environ.get("PLANE_BOILERPLATE_RE", DEFAULT_BOILERPLATE_RE), re.IGNORECASE
-)
+def _compile_boilerplate_re():
+    custom_pattern = os.environ.get("PLANE_BOILERPLATE_RE")
+    if custom_pattern:
+        try:
+            return re.compile(custom_pattern, re.IGNORECASE)
+        except re.error as e:
+            sys.stderr.write(
+                f"WARN: Malformed PLANE_BOILERPLATE_RE regex '{custom_pattern}': {e}. "
+                "Falling back to default pattern.\n"
+            )
+    return re.compile(DEFAULT_BOILERPLATE_RE, re.IGNORECASE)
+
+BOILERPLATE_RE = _compile_boilerplate_re()
 ITEM_RE = re.compile(r"^(?P<indent>\s*)- \[(?P<marker>[^\]]*)\]\s+(?P<title>.+?)\s*$")
 ALREADY_INDEXED_RE = re.compile(r"^\s*- \[[^\]]*\]\s+\[[A-Z][A-Z0-9]*-\d+\]")
 

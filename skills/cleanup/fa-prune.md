@@ -90,10 +90,18 @@ Demoted sections move to archive + RAG store, so recurrence detection (Section 7
 
 **Auto-classification script**: `scripts/fa-classify.py` implements the entire classification above (recurrence/hook/resolution detection + COLD verdict) — a successor to fa-analyze.py, including the resolution exception.
 
+Resolve the `cleanup` scripts directory:
 ```bash
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py                     # strict summary + COLD candidates (R = resolved-exception, S = stale-recurrence) and hook/FALSE-NEG diagnostics
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed           # relaxed mode (S = stale-recurrence demotion) — default operating policy and hook/FALSE-NEG diagnostics
-uv run python ~/.claude/skills/cleanup/scripts/fa-classify.py --relaxed --cut /tmp/fa-cold  # separate COLD body files + index.json (Section 8 RAG store input)
+for d in "${CLEANUP_SCRIPTS:-}" \
+         "${CLAUDE_PLUGIN_ROOT:-}/skills/cleanup/scripts" \
+         "$HOME/.claude/plugins/marketplaces/es6kr-skills/skills/cleanup/scripts" \
+         "${AGENT_SKILLS_HOME:-$HOME/.agents}/skills/cleanup/scripts"; do
+  [ -n "$d" ] && [ -d "$d" ] && CLEANUP_SCRIPTS="$d" && break
+done
+
+uv run python "$CLEANUP_SCRIPTS/fa-classify.py"                     # strict summary + COLD candidates (R = resolved-exception, S = stale-recurrence) and hook/FALSE-NEG diagnostics
+uv run python "$CLEANUP_SCRIPTS/fa-classify.py" --relaxed           # relaxed mode (S = stale-recurrence demotion) — default operating policy and hook/FALSE-NEG diagnostics
+uv run python "$CLEANUP_SCRIPTS/fa-classify.py" --relaxed --cut /tmp/fa-cold  # separate COLD body files + index.json (Section 8 RAG store input)
 ```
 
 **Script-first (HARD STOP)**: when a deterministic classifier is named in the procedure (`fa-classify.py` here), **run it before** recording your own HOT/COLD verdict. If your LLM judgment disagrees with the script's output, re-verify against the script's result — its recurrence/hook/resolution detection is the authority. Reclassifying a section on LLM judgment alone, without running the script for comparison, is forbidden. Caveat: the classifier's legacy heuristics predate the class format — until its meta-line parser lands, treat its output on class-format sections as advisory and prefer the meta fields (`count`/`last`/`status`) as the authority for those sections.

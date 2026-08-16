@@ -64,7 +64,7 @@ python3 "$FIX_PLAN_SCRIPTS/plane_create_issue.py" --title "<title>" --descriptio
 
 ### 6. Plane Issue Comment Creation
 ```bash
-python3 "<plane-backlog>/scripts/plane_create_comment.py" --issue "<issue_uuid>" --comment "<text>" --json
+python3 "$FIX_PLAN_SCRIPTS/plane_create_comment.py" --issue "<issue_uuid>" --comment "<text>" --json
 ```
 
 ## Topics
