@@ -87,3 +87,15 @@ Every issue body and PR body must include a verification/test plan section. This
 | Discussion items / open questions | Issue comment | Threaded, time-stamped, doesn't clutter body |
 | Progress updates | Issue comment | Chronological record |
 | Review feedback summary | Issue comment | Preserves review history |
+
+### 4. Check for existing open PRs before starting repo-wide fix work (HARD STOP)
+
+Before starting work on a repo-wide or config-level problem (broken CI config, a stale/misconfigured file affecting many components, a systemic lint failure, etc.), run `gh pr list -R <owner>/<repo> --state open` and skim titles for the same problem. Someone (including a past session under your own account) may have already fixed it in an unmerged PR.
+
+**Why**: independently re-deriving a fix that already exists in an open PR wastes the work, and — worse — if both land, the later one can silently supersede or conflict with the earlier one without either author knowing. Case: a claude-plugins CI-fix session spent significant work rebuilding `release-please-config.json`'s `packages` list from scratch, unaware that PR #17 (same author, ~7 hours earlier) had already implemented the identical fix; PR #17 had to be closed as superseded once the duplication was discovered mid-review.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Jump straight into fixing a CI/config-level problem because it's clearly broken | `gh pr list --state open` first — skim titles for the same file/problem area |
+| 2 | Assume "I'd have noticed if this were already being worked on" | Open PRs from earlier in the same day (even your own past sessions) are easy to miss without an explicit check |
+| 3 | Only check open PRs when multiple sessions are known to be active | Run the check unconditionally before repo-wide fix work — it's a single `gh pr list` call |
