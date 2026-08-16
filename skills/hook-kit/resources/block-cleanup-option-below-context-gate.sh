@@ -145,11 +145,28 @@ fi
 # value; both the over- and under-offer checks then misfire (the exact 2nd
 # recurrence this guard was defeated by). Recompute the live figure on demand
 # from the transcript's last assistant-message usage field via
-# context-usage-inject.sh (the same source the injection hook uses). Moved to
-# the context-measure skill (2026-08-10, split out of hook-kit) — no longer a
-# same-directory sibling, hence the explicit cross-skill path below instead of
-# "$(dirname "$0")/context-usage-inject.sh".
-CTX_INJECT="$HOME/.claude/skills/context-measure/resources/context-usage-inject.sh"
+# context-usage-inject.sh (the same source the injection hook uses).
+#
+# The script lives in different places depending on which marketplace this copy
+# was installed from, so probe a chain instead of hardcoding one path — a single
+# hardcoded path silently degrades this guard to "no signal" wherever it does not
+# resolve, and the failure is invisible: LATEST_PCT stays empty and the guard
+# falls back to the STALE injected figure, which is exactly the bug this LIVE
+# reading exists to avoid. Observed 2026-08-16: two installed copies of this
+# guard returned 62.8% and 24.0% for the same ask, purely because one resolved
+# its path and the other did not.
+#   1. same-directory sibling      — hook-kit ships its own copy (es6kr-skills)
+#   2. sibling context-measure skill — after the 2026-08-10 split-out
+#   3. ${CLAUDE_PLUGIN_ROOT}       — plugin-relative, set when run as a plugin hook
+#   4. $HOME/.claude/skills/...    — legacy absolute path, kept for back-compat
+CTX_INJECT=""
+for _cand in \
+  "$(dirname "$0")/context-usage-inject.sh" \
+  "$(dirname "$0")/../../context-measure/resources/context-usage-inject.sh" \
+  "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/context-measure/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/context-measure/resources/context-usage-inject.sh"; do
+  if [[ -f "$_cand" ]]; then CTX_INJECT="$_cand"; break; fi
+done
 LATEST_PCT=""
 if [[ -f "$CTX_INJECT" ]]; then
   # One invocation yields both figures. CC_EMIT_THRESHOLD makes the script
