@@ -484,6 +484,18 @@ This step is mandatory before entering RAG store. **Do not conclude "unreachable
 | 2 | The endpoint readyz probe explicitly documented by the receiver skill (use only the endpoint from the receiver's `<skill>:<topic>.md` doc) | Direct HTTP probe — secondary availability signal | MCP not connected, but the endpoint is alive. Enter via the script path |
 | **FAILED** | (1) MCP unavailable AND (2) endpoint probe timeout/HTTP 5xx | Both must fail to be unreachable | **Entire cleanup status = FAILED. Do not declare "✅ Complete"** — apply the "RAG store failure = cleanup failure" procedure below |
 
+##### After a successful import: advance the receiver's gap baseline (HARD STOP)
+
+The session import performed here is the **same operation** that a receiver's mid-session gap hook triggers on its own. Such a hook typically decides whether to fire by comparing the transcript's current line count against a per-session checkpoint file that, by default, **only the hook itself writes**. If cleanup imports without advancing that checkpoint, the baseline stays stale — right after this cleanup the hook still measures against the old point, fires again, and demands a duplicate import of the very turns 3-C.1 just stored.
+
+So on a successful 3-C.1 import, advance the receiver's baseline **in the same step**. The receiver skill documents the exact path and command (for the es6kr receiver, see its `qdrant-import` topic, "The checkpoint is a shared baseline"). Skip only when the receiver exposes no such checkpoint.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | End 3-C.1 at "import succeeded" and leave the checkpoint untouched | Advance the receiver's baseline in the same step — the import is not finished until the state tracking it agrees |
+| 2 | Treat the checkpoint as the hook's private state | It records "where a session import last happened", whichever entry point performed it |
+| 3 | Let the hook fire right after cleanup and satisfy it with another import | That import is a no-op re-run over turns already stored; the fix is the stale baseline, not another import |
+
 ##### RAG store failure = cleanup failure (HARD STOP)
 
 **3-C.1 RAG store is a mandatory cleanup step — on failure/unavailability, report the entire cleanup as FAILED.** RAG store is the core medium for "session-end state preservation" (this skill's philosophy #2), and if the session ends in a missed state, the opportunity to store the session chunk is effectively lost ("retry next session" is a weak trigger, so actual retries rarely happen).
