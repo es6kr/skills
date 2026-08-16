@@ -23,7 +23,7 @@
 
 if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
 
-HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
 if [ -f "$HG_DATA_FILE" ]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"

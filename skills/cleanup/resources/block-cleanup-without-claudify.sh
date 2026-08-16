@@ -59,7 +59,7 @@ GATEB_WINDOW=2500
 # Load locale-specific regex patterns from data/. The file is git-ignored so
 # the public repo never sees Korean characters. When absent, cleanup detection
 # falls back to English-only markers.
-HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
 if [ -f "$HG_DATA_FILE" ]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
