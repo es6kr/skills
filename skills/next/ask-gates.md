@@ -213,24 +213,36 @@ This is narrower than the general "avoid guess options" guidance below — it sp
 
 ## Step 0.66: Unchanged-candidate-set re-fire within the same chain (HARD STOP)
 
-**When `next` fires again within the same `stop_hook_active` continuation chain and the candidate/decision set is identical to the immediately-prior `next`-ask in that same chain (no new item, no state change, no new answer received), do not compose a fresh full `AskUserQuestion`.** This is distinct from Step 0.65 (zero-candidate repeated firing) — here candidates DO exist, but they are the same ones already surfaced and either answered or explicitly deferred moments earlier in the same chain. Re-presenting them as a new ask reads as not having listened to the prior answer.
+**Silent skip (status report, no `AskUserQuestion`) requires BOTH conditions below — "candidate set unchanged" ALONE is never sufficient.** The only case where skipping the ask is permitted is immediately after a `/cleanup` run in this same turn/chain — because `/cleanup` Step 5 (wip delegation) has already composed and resolved its own wrap-up ask, so a `next` re-fire right after it would be a redundant re-ask of a decision the user just made. Every other "candidate set looks unchanged" situation still requires an ask (at minimum the single-item confirmation form below) — an unchanged backlog does not, by itself, mean nothing needs asking.
 
-**Same-set test**: compare the current candidate list (post Step 0.5/0.6 discovery) against the immediately-prior `next`-ask's candidate list in this chain. Identical if every item matches by subject/target (ignoring cosmetic wording) AND none has a new state (no new TaskList entry, no fix_plan change, no user reply that altered scope).
+**Preconditions (BOTH required for the silent-skip path)**:
+1. **Cleanup precondition (HARD STOP — check this FIRST)**: was the immediately-preceding action in this turn/chain an actual `/cleanup` (or equivalent session-wrap-up skill) execution — not merely "no urgent items" or "the transcript looks quiet"? If the preceding action was anything else (an import, a push, a code edit, a prior `next` ask with no cleanup in between), this precondition FAILS and the silent-skip path is not available, regardless of the same-set test result.
+2. **Same-set test**: compare the current candidate list (post Step 0.5/0.6 discovery) against the immediately-prior `next`-ask's candidate list in this chain. Identical if every item matches by subject/target (ignoring cosmetic wording) AND none has a new state (no new TaskList entry, no fix_plan change, no user reply that altered scope).
+
+This is distinct from Step 0.65 (zero-candidate repeated firing) — here candidates DO exist, but they are the same ones already surfaced and either answered or explicitly deferred moments earlier in the same chain.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Compose a new full `AskUserQuestion` with the same options as the previous ask in this chain, just reworded | End the turn with a short status report ("carried over: X, Y, Z — no new candidates this fire") and no ask |
-| 2 | Keep re-asking until the user manually breaks out (rejects the tool call, issues an unrelated command) | Recognize the unchanged-set condition before the ask, not after the user has to reject it |
-| 3 | Treat "the hook fired again" as proof a fresh ask is owed regardless of content | The hook firing is a *reminder to check*, not a mandate to always ask — check the same-set test first |
-| 4 | Silently drop the carryover items on grounds of "already asked" | Still report their carryover status in plain text (per Step 0.3's skip-still-reports discipline) — silence is the ask-gates violation this table exists to prevent elsewhere |
+| 1 | Skip the ask solely because the candidate/decision set looks unchanged | Check the cleanup precondition FIRST. Unchanged set + no preceding `/cleanup` = still ask (minimal form) |
+| 2 | Compose a new full `AskUserQuestion` with the same options as the previous ask in this chain, just reworded | If both preconditions hold: end the turn with a short status report ("carried over: X, Y, Z — no new candidates this fire") and no ask |
+| 3 | Keep re-asking until the user manually breaks out (rejects the tool call, issues an unrelated command) | Recognize the unchanged-set condition before the ask, not after the user has to reject it |
+| 4 | Treat "the hook fired again" as proof a fresh ask is owed regardless of content | The hook firing is a *reminder to check*, not a mandate to always ask — check both preconditions first |
+| 5 | Silently drop the carryover items on grounds of "already asked" | Still report their carryover status in plain text (per Step 0.3's skip-still-reports discipline) — silence is the ask-gates violation this table exists to prevent elsewhere |
+| 6 | Treat an intervening non-cleanup action (RAG import, a push, a PR conversion) between the prior ask and this fire as "nothing changed, so cleanup precondition is close enough" | Only a literal `/cleanup` run satisfies the cleanup precondition. Any other intervening action means this step's silent-skip path does not apply — ask |
 
-**Exception**: if the one item that is still genuinely open differs from the rest (e.g., 3 items already deferred, 1 item newly blocking), a minimal single-item confirmation for that one item is allowed — do not fold it back into a full 4-option re-ask of the whole set.
+**Exception**: if the one item that is still genuinely open differs from the rest (e.g., 3 items already deferred, 1 item newly blocking), a minimal single-item confirmation for that one item is allowed — do not fold it back into a full 4-option re-ask of the whole set. This minimal-confirmation form is available even when the cleanup precondition fails (it is not a "full ask", so it isn't gated the same way) — use it instead of a silent status report whenever precondition 1 fails.
 
 ### Self-check
 
-1. Is this `next` firing within the same `stop_hook_active` continuation chain as an earlier `next`-ask this turn/chain? → If no, this step does not apply
-2. Does the candidate/decision set match the immediately-prior ask's set exactly (same-set test above)? → If yes, skip the full ask; end with a status report or a single-item confirmation for the one genuinely-new item
-3. Am I about to re-ask the same set a 2nd+ time in this chain hoping for a different answer? → Forbidden. Report and stop, or escalate to Step 0.65's direct free-text ask only if the set is now genuinely empty
+1. **Did a `/cleanup` (or equivalent session-wrap-up skill) actually execute as the immediately-preceding action in this turn/chain?** → If no, the silent-skip path is unavailable — go to item 4 below (compose at least a minimal ask), regardless of how the same-set test comes out.
+2. Is this `next` firing within the same `stop_hook_active` continuation chain as an earlier `next`-ask this turn/chain? → If no, this step does not apply
+3. Does the candidate/decision set match the immediately-prior ask's set exactly (same-set test above)? → Only relevant if item 1 passed. Both pass → skip the full ask; end with a status report
+4. Item 1 failed (no preceding cleanup) OR the set is only partially unchanged → compose at least the single-item confirmation form (Exception above) — never a bare status report with zero `AskUserQuestion` call
+5. Am I about to re-ask the same set a 2nd+ time in this chain hoping for a different answer? → Forbidden. Report and stop, or escalate to Step 0.65's direct free-text ask only if the set is now genuinely empty
+
+### Case history
+
+A session ran a RAG session-import skill (NOT `/cleanup`) mid-session, then `next` fired twice in the same chain. Both times the assistant applied this step's exemption on the "candidate set unchanged" test alone (2 carryover backlog items) and ended with a plain-text status report, no `AskUserQuestion` — even after the Stop hook re-fired the same "no next call" complaint twice. The precondition that was missing: the intervening action was an import, not a cleanup, so the silent-skip path was never actually available — at minimum a single-item confirmation ask was owed each time. The user corrected this directly, stating that skipping the ask is acceptable in exactly one case: right after a cleanup run.
 
 ## Step 0.7: User current-work confirmation ask (HARD STOP — required when user-action state is unclear)
 
