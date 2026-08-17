@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.7](https://github.com/es6kr/skills/compare/web-browser-v0.2.6...web-browser-v0.2.7) (2026-08-17)
+
+
+### Bug Fixes
+
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* **web-browser:** credential-issue backend routing — session-existence gate + account-mismatch rule ([e5a9098](https://github.com/es6kr/skills/commit/e5a90986812c90b101a24554f3de9038a59906b4))
+* **web-browser:** document virtualized table bulk row operation pattern ([c5bc8f0](https://github.com/es6kr/skills/commit/c5bc8f0610263a963e8a75bfd30f36f2a5dafa76))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.2.6](https://github.com/es6kr/skills/compare/web-browser-v0.2.5...web-browser-v0.2.6) (2026-08-09)
 
 

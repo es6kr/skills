@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/dotfile-v0.5.0...dotfile-v0.5.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/dotfile-v0.4.2...dotfile-v0.5.0) (2026-08-03)
 
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/fix-plan-v0.7.0...fix-plan-v0.8.0) (2026-08-17)
+
+
+### Features
+
+* **plane-backlog:** add Plane backlog skill with client and indexify scripts ([3bcc8cd](https://github.com/es6kr/skills/commit/3bcc8cd8f570bb53697f290e9e6e53069991822b))
+
+
+### Bug Fixes
+
+* **fix-plan:** add relocated es6kr skill path to post-ingest fallback chain ([56a8e74](https://github.com/es6kr/skills/commit/56a8e7454f64d70404f393f0ec34ba38a2f7d4ad))
+* **fix-plan:** compress SKILL.md description under the 1024-char lint budget ([28edaf2](https://github.com/es6kr/skills/commit/28edaf211196f174adb5f6313356447301dea70b))
+* **fix-plan:** keep open plan checklist items as tracker sub-checkboxes on add ([963a4d5](https://github.com/es6kr/skills/commit/963a4d59c01ceb8303156e5b27bcff8ab072394b))
+* **fix-plan:** require artifact verification for subagent-delegated pipeline runs ([#333](https://github.com/es6kr/skills/issues/333)) ([44dbf54](https://github.com/es6kr/skills/commit/44dbf5459390efc12b91a1334a1b23542b38aa10))
+* **fix-plan:** restore artifact-verification HARD STOP dropped by main merge ([084c669](https://github.com/es6kr/skills/commit/084c66908bceea07f067b9308c15ae88ed206766))
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/fix-plan-v0.6.2...fix-plan-v0.7.0) (2026-08-16)
 
 

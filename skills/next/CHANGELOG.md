@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/next-v0.8.0...next-v0.8.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **next:** add multi-finding per-question ask pattern ([a3f2e48](https://github.com/es6kr/skills/commit/a3f2e48bbfd38ebfa56ce8a713bf2cf42556b150))
+* **next:** translate ask-gates next-call mandate to English + add PR-URL option rule ([58cc17b](https://github.com/es6kr/skills/commit/58cc17b51507c8673d500cb31c15e51f3257fe76))
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/next-v0.7.3...next-v0.8.0) (2026-08-16)
 
 
