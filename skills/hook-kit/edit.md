@@ -57,7 +57,20 @@ echo '{"tool_input":{"command":"ls -la"}}' | bash ~/.claude/hooks/bash-guard.sh
 echo $?  # 0 = allowed
 ```
 
-### 4. Dual-Sync (reflect in source)
+### 4. Dual-Sync (reflect in source) — plugin management takes priority
+
+**Before syncing, check whether this script is already plugin-managed** — registered in a marketplace's own `hooks/hooks.json` (pointing at `${CLAUDE_PLUGIN_ROOT}/.../resources/<script>.sh`), not in `~/.claude/settings.json`:
+
+```bash
+find ~/.claude/plugins/marketplaces -iname hooks.json -exec grep -l "<script>.sh" {} \;
+```
+
+- **Plugin-managed** (a `hooks/hooks.json` references it): that plugin's own `resources/<script>.sh` is the single canonical copy. A loose `~/.claude/hooks/<script>.sh` alongside it is legacy dead weight (usually unregistered anywhere — confirm with `grep -n "<script>.sh" ~/.claude/settings.json` returning nothing). Diff it against the plugin copy to confirm nothing unique, fold in anything unique first, then **delete** the loose file — do not keep dual-maintaining it:
+  ```bash
+  diff ~/.claude/hooks/<script>.sh <plugin-root>/resources/<script>.sh   # confirm no unique content before deleting
+  rm ~/.claude/hooks/<script>.sh
+  ```
+- **Not plugin-managed** (only ever registered directly in `~/.claude/settings.json`'s own `hooks` block): dual-sync both copies as before.
 
 If the modification was made in hooks/, reverse-sync to resources:
 
