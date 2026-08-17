@@ -30,20 +30,27 @@ if [[ -z "$TRANSCRIPT" || ! -f "$TRANSCRIPT" ]]; then
   exit 0
 fi
 
-# Line number of the LAST assistant text block carrying the marker. Anchored to
-# assistant .message.content[] text blocks — tool_use echoes and user text must
-# not satisfy the disclosure duty.
-MARKER_LINE=$(grep -n '"type":"assistant"' "$TRANSCRIPT" 2>/dev/null | while IFS=: read -r n j; do
-  t=$(printf '%s' "$j" | jq -Rr 'fromjson? // empty | select(.type=="assistant") | [.message.content[]? | select(.type=="text") | .text] | join(" ")' 2>/dev/null) || true
-  if printf '%s' "$t" | grep -qiE 'agent-count estimate:[[:space:]]*~?[0-9]+'; then
-    echo "$n"
-  fi
-done | tail -1)
+# Structural scan (last 400 lines) for the marker + a genuine user reply after
+# it. Real user prompts carry string .message.content; tool_result entries
+# also have "type":"user" but array .message.content — those must NOT satisfy
+# the disclosure duty, or a tool result landing after the marker would pass
+# the gate without the user ever seeing the estimate.
+STATE=$(tail -n 400 "$TRANSCRIPT" 2>/dev/null | jq -rs '
+  def txt(m): [m.content[]? | select(.type? == "text") | .text] | join(" ");
+  [ .[] | select(type == "object") ] as $e
+  | ([ range(0; ($e|length))
+       | select($e[.].type == "assistant"
+                and (txt($e[.].message // {}) | test("agent-count estimate:[[:space:]]*~?[0-9]+"; "i"))) ] | max // -1) as $mk
+  | ([ range(0; ($e|length))
+       | select($e[.].type == "user"
+                and ((($e[.].message // {}).content | type) == "string")) ] | max // -1) as $lu
+  | "\($mk)\t\($lu)"
+' 2>/dev/null)
 
-if [[ -n "$MARKER_LINE" ]]; then
-  # Approval proxy: a user-type entry AFTER the disclosure (reply or ask answer).
-  LAST_USER_LINE=$(grep -n '"type":"user"' "$TRANSCRIPT" 2>/dev/null | tail -1 | cut -d: -f1)
-  if [[ -n "$LAST_USER_LINE" && "$LAST_USER_LINE" -gt "$MARKER_LINE" ]]; then
+if [[ -n "$STATE" ]]; then
+  MARKER_IDX=$(printf '%s' "$STATE" | cut -f1)
+  USER_IDX=$(printf '%s' "$STATE" | cut -f2)
+  if [[ "$MARKER_IDX" -ge 0 && "$USER_IDX" -gt "$MARKER_IDX" ]]; then
     exit 0
   fi
 fi
