@@ -1,5 +1,9 @@
 # Suggestion Patterns
 
+## Cross-cutting rule — PR/issue references in options require the full URL (HARD STOP)
+
+**When any option disposes of a PR or issue, expose the clickable full URL (`https://github.com/<owner>/<repo>/pull/<N>`) in the question text or that option's description.** A bare "PR #N" — even with the repo name attached — is insufficient: the ask is a self-contained decision UI, and the user must be able to open and inspect the PR before deciding, without hunting through scroll-back. Applies to every "After PR" pattern below. Enforced by the `block-tasklist-id-in-conversation.sh` PR-URL gate (a PR reference with no PR URL anywhere in the questions payload is denied). Recurrence history: see failed-attempts.md (grep "bare PR").
+
 ## Cross-cutting rule — Minor-or-below severity bundling across PRs (HARD STOP)
 
 **When composing next-action options after a PR is consolidated / merged, do NOT recommend addressing that PR's Minor/Nitpick deferred findings as a standalone follow-up (single-PR batch).** Minor-or-below severity findings should be bundled across related PRs, not surfaced per-PR.
@@ -130,6 +134,26 @@ cosmetic / style-only · already worked around · an external outage you cannot 
 2. SCOPE met (shared/production surface) AND ≥1 escalation test true? → If yes, it is Recommended #1 (or handled before the ask), not a diversity slot
 3. Before proposing a fix, did I confirm the cause is self-fixable vs external via primary evidence? → external → track, don't ship a speculative fix
 4. Excluded class (cosmetic / local-test / external outage / user-deferred)? → normal option, do not force first
+
+## After analysis / review producing multiple findings (HARD STOP)
+
+**Precondition**: The just-completed work (code review, issue-comment analysis, audit, verification) produced **N ≥ 2 discrete findings** whose handling the user must decide — include in a comment, apply, correct, drop, or defer.
+
+**One question per finding — never bundle findings into one option.** Each finding is an independent decision axis. Packing N findings into a single option description ("post the review comment with all 4 findings") strips the user's per-finding authority: they can only take all-or-nothing. Automated ask-guards may not catch description-level bundling (descriptions are excluded from axis detection to avoid false positives), so this composition rule is the first line of defense.
+
+**Pattern (two-stage ask)**:
+
+1. **Per-finding call**: one question per finding via the `questions` array (max 4 questions per call; when N > 4, chunk into sequential calls of ≤4 — never drop the tail). Options per finding: `Include / Apply` · `Exclude / Drop` · `Defer` (+ auto "Other").
+2. **Disposition call**: after the per-finding answers arrive, ask the overall action (post the comment / record locally only / hold), composed from what the user selected. Phrase it without re-enumerating finding counts (a "N findings" token in a single question is itself a bundling signal).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | One option labeled "post comment with all N findings" | One question per finding first, disposition ask second |
+| 2 | `questions.length == 1` with the findings enumerated inside an option description | Split into the `questions` array — description-level bundling evades keyword/path axis detection |
+| 3 | Pre-deciding which findings are "obviously worth including" and bundling the rest | Obviousness is not a substitute for the user's per-finding decision |
+| 4 | Handling N > 4 by silently dropping low-priority findings | Chunk into sequential ≤4-question calls; every finding gets its own question |
+
+**Self-check (before any ask that disposes of analysis/review results)**: Did the completed work produce ≥2 discrete findings? → per-finding questions first, disposition second.
 
 ## After code writing/modification
 

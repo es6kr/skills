@@ -58,6 +58,7 @@ See the user-local `~/.claude/skills/cleanup/data/failed-attempts.md` HOT entry 
 
 ## Related topics
 
+- `hunk-split` — when a file has 2+ unrelated hunks mixed in the working tree (e.g. a concurrent session's change alongside yours) and `git add -p` isn't usable; the non-interactive `git apply --cached` procedure for isolating exactly your intended hunk
 - `interactive-amend` — when the wrong fileset is already committed and needs amend recovery
 - `soft-reset-amend` — when multiple wrong commits need a soft-reset re-stage cycle
 - `security-scan` — pre-commit secret scan for PUBLIC repos (runs AFTER staging-discipline gate passes)
@@ -148,6 +149,7 @@ See `~/.claude/skills/cleanup/data/failed-attempts.md` "squash-scan-scope-narrow
 3. Every hunk matches the intended edit → proceed to stage.
 4. Any hunk is unfamiliar or doesn't match the intended edit (extra hunks, unfamiliar lines, sections not touched this session) → **halt, do not stage**, even if the `--stat` totals look right. A concurrent session's commit already landed on this file.
 5. Re-`Read` the file for its current on-disk state, reconcile the intended change against it (re-apply the edit on top of the new baseline if it still applies cleanly), then re-check `git diff HEAD -- <file>` before staging again.
+6. If the file now genuinely mixes your intended hunk with the concurrent session's unrelated hunk(s) in the working tree (not just a moved baseline you can re-apply onto) — do not hand-roll a base/target reconstruction. Use `hunk-split.md`'s `git apply --cached` procedure to isolate exactly your hunk into the index while leaving the other hunk(s) unstaged.
 
 ### Don't / Do
 

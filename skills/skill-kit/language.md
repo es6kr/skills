@@ -58,9 +58,46 @@
 
 ## Hook installed
 
-- Script: `~/.claude/skills/hook/resources/block-skill-language-mismatch.sh` (sole source of truth)
-- Install location: `~/.claude/hooks/block-skill-language-mismatch.sh` (copy, executable bit set)
-- Matchers: `PreToolUse:Edit` and `PreToolUse:Write` in `~/.claude/settings.json`
+- Script: `~/.agents/skills/hook-kit/resources/edit-guard.sh` — function `check_skill_language_mismatch()` (consolidated from the retired standalone `block-skill-language-mismatch.sh`, now in `~/.claude/.bak/`)
+- Registration: PreToolUse:Edit and PreToolUse:Write matchers in `~/.claude/settings.json` reference `edit-guard.sh` directly (no separate install copy)
 - Scope: only `.md` files under `*/skills/<name>/`. Code/data files unaffected
-- Detection: zero Hangul in SKILL.md `description` → strict mode (any Hangul in new content → DENY exit 2). Hangul in description → permissive (Korean skills may include English technical terms)
+- Detection: zero Hangul in SKILL.md `description` → strict mode (any Hangul in `NEW_CONTENT` → DENY exit 2). Hangul in description → permissive (Korean skills may include English technical terms)
 - Quote handling: user quotes must be paraphrased into English before pasting into English skill files. The hook does not distinguish quote vs body content
+
+### Untracked-file audit gap (HARD STOP for hook migration)
+
+`check_skill_language_mismatch()` fires only at PreToolUse:Edit/Write — it does not scan pre-existing untracked files. A file written under a **hook migration gap** (old standalone retired → new consolidation not yet active) persists indefinitely as untracked Korean in an English skill dir. Detect and remediate via:
+
+1. Any hook migration (retiring or renaming a guard hook) must **grep the replacement location for the guard function/logic** before retiring the old script. Emit the grep result in the migration commit body
+2. `check-hangul.py` `.md` scan already covers untracked files at commit time — but only when at least one file in the same skill dir is staged, so orphan untracked drift can persist across sessions
+3. Session-start or periodic audit — enumerate every English skill dir and grep newer-than-`SKILL.md` `.md` files for the Hangul range U+AC00–U+D7A3 (the range used by `check_skill_language_mismatch` in `edit-guard.sh`). Any match = drift candidate for review
+
+## PUBLIC repo locale-pattern externalization — `data/` folder (HARD STOP)
+
+When a PUBLIC repo skill needs Korean detection regex or locale-specific keyword matching (e.g., a Hangul-text-detection hook, Korean keyword alternation), **do NOT inline it in the skill body**. Externalize to **`<skill>/data/*.regex`**.
+
+### Why
+
+- PUBLIC repos enforce English (the repository language rule + `check-hangul` lint)
+- But some hooks must detect Korean phrasing in user input (e.g., Korean keywords for merge/issue/complete) to function
+- Inlining gets blocked by lint. An `# check-hangul: allow` inline marker still leaves Korean in the PUBLIC repo — not a clean solution
+- `data/` folder registered in `.gitignore` + `.clawhubignore` → **zero Korean in PUBLIC repo**, locale data preserved locally
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Inline Korean detection regex in hook body (`*.sh`/`*.md`) → `check-hangul` blocked | Externalize locale data to `data/*.regex` + hook `source`s it at runtime |
+| 2 | `# check-hangul: allow` inline marker to bypass lint (Korean still in PUBLIC) | data/ externalization (zero Korean in PUBLIC) |
+| 3 | Leave `data/` unregistered in `.gitignore` → tracked and pushed to PUBLIC | Register `data/` in both `.gitignore` and `.clawhubignore` |
+| 4 | Hook crashes on missing data file (`unbound variable`) | `${VAR:-english-default}` fallback — silent no-op or English-only matching when locale data absent |
+| 5 | Use `.sh` / `.md` extension for data file → scanned by `check-hangul` | Use `.regex` / `.txt` / `.conf` or any extension outside `SCAN_EXTS` |
+
+### Self-check (before adding/modifying a hook in a PUBLIC skill)
+
+1. Does the hook contain Korean detection regex or locale-specific keywords?
+2. Yes → separate to `<skill>/data/<purpose>.regex`. Confirm `data/` registered in `.gitignore` + `.clawhubignore`
+3. Hook uses `. "$HG_DATA_FILE"` to source + `${VAR:-english-default}` fallback
+4. Verify `python3 scripts/check-hangul.py skills/<skill>` passes (zero matches)
+5. Confirm data file does not appear in `git status --short skills/<skill>/`
+

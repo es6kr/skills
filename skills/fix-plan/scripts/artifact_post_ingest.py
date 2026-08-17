@@ -17,9 +17,13 @@ from workspace_profile import get_profile, resolve_tracker_root
 
 def ingest_md_to_qdrant(md_path: Path, profile: dict):
     """Trigger qdrant-import.py via uvx in markdown mode for the active workspace."""
-    qdrant_import_script = Path.home() / ".gemini" / "config" / "skills" / "es6kr" / "scripts" / "qdrant-import.py"
-    if not qdrant_import_script.exists():
-        qdrant_import_script = Path.home() / ".claude" / "skills" / "es6kr" / "scripts" / "qdrant-import.py"
+    candidates = [
+        Path.home() / ".gemini" / "config" / "skills" / "es6kr" / "scripts" / "qdrant-import.py",
+        Path.home() / ".claude" / "skills" / "es6kr" / "scripts" / "qdrant-import.py",
+        # es6kr skill relocated into the es6kr-plugins root plugin (2026-07) — installed marketplace clone path
+        Path.home() / ".claude" / "plugins" / "marketplaces" / "es6kr-plugins" / "skills" / "es6kr" / "scripts" / "qdrant-import.py",
+    ]
+    qdrant_import_script = next((p for p in candidates if p.exists()), candidates[-1])
 
     if not qdrant_import_script.exists():
         print(f"WARN: qdrant-import.py script not found at {qdrant_import_script}", file=sys.stderr)

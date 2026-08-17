@@ -31,6 +31,7 @@ bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh <repo> <old-name> <new
 | `<old-name>` | Current directory name under the worktree base | `claude` |
 | `<new-name>` | New directory name | `chore-cleanup-pr17-leftovers` |
 | `--branch` | (optional) Branch to switch to. Checkout if local, create otherwise | `chore/cleanup-pr17-leftovers` |
+| `--base` | (optional) Base ref for a **newly created** branch. Ignored when `--branch` already exists locally or on origin | `origin/main` |
 | `--wt-base` | (optional) Worktree base dir relative to `<repo>` (default `.worktrees`). Set for repos that keep worktrees elsewhere | `.worktrees` |
 
 
@@ -38,7 +39,19 @@ Only the **worktree directory** base is affected by `--wt-base`. The `.git/workt
 
 ### Examples
 
+**Pass `--base` whenever the new branch should not start where the old work ended (HARD STOP for the reuse path).** Without it a newly created branch starts at the worktree's **current HEAD** — and in this script's primary use case, reclaiming an inactive worktree, that HEAD is the stale tip of the work the worktree used to hold. The new branch then silently carries commits that are already merged (or abandoned), and a PR opened from it shows them as its own. The script cannot pick a default safely, because the integration branch is not always `main` — some repos accumulate onto a staging branch — so it warns and names the HEAD it fell back to instead of guessing.
+
 ```bash
+# Reclaiming an inactive worktree: base the new branch on the integration branch,
+# not on whatever the old branch ended at
+bash <skill-dir>/scripts/rename-worktree.sh \
+  ~/ghq/github.com/myorg/myrepo \
+  fix-old-merged-pr \
+  fix-new-work \
+  --branch fix/new-work \
+  --base origin/main \
+  --wt-base .worktrees
+
 # Rename worktree + switch branch
 bash ~/.claude/skills/git-repo/scripts/rename-worktree.sh \
   ~/ghq/github.com/myorg/myrepo \
@@ -104,6 +117,7 @@ Use only when the script cannot run (permission issues, non-standard paths, etc.
 | `fatal: <path> is already registered` | old metadata not fully renamed | Remove old entry, re-register |
 | worktree shows `prunable` after rename | metadata file paths are Unix-style on Windows | Rewrite `.git` and `.git/worktrees/<name>/gitdir` with `C:/...` paths, then `git worktree repair` |
 | `ERROR: metadata directory not found at <repo>/.git/worktrees/<name>` in a bare-with-worktree layout | Older script revision hardcoded `<repo>/.git/worktrees` and did not resolve from the worktree `.git` pointer | Script now derives `GIT_WT_BASE` from `dirname(gitdir)` of the worktree's `.git` file — pull the latest skill version |
+| `ERROR: metadata directory not found at ../../.git/worktrees/<name>` (note the **relative** path in the message) | The worktree's `.git` file holds a relative gitdir (`gitdir: ../../.git/worktrees/<name>`) instead of an absolute one. Both forms are valid git, and which one a worktree gets depends on how it was created, but the script resolves the pointer without first making it absolute relative to the worktree directory. It aborts before renaming anything, so the worktree is left intact | Rewrite the pointer as absolute, then retry: `printf 'gitdir: %s/.git/worktrees/%s\n' "<repo>" "<name>" > <worktree>/.git && git -C <repo> worktree repair`. Confirm with `cat <worktree>/.git` — a working example in the same repo shows the expected absolute form |
 | Directory + metadata renamed successfully but branch is unchanged (`git branch --show-current` still shows `<old>`) | `--branch <target>` is already checked out in another worktree — the final `git checkout <branch>` step fails after the mv steps already succeeded, and the script does not roll back | Check out under a differently-named local branch instead: `git -C <renamed-worktree> checkout -b <local-name>-tmp origin/<target>`, do the work there, then push its content to the target ref: `git push origin <local-name>-tmp:<target>` (see failed-attempts.md "rename-worktree.sh partial failure") |
 
 ### Windows path compatibility (2026-05-21 fix)

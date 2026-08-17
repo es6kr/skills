@@ -111,13 +111,68 @@ A PreToolUse hook is not limited to allow/deny — it can also **rewrite the too
 }
 ```
 
-`updatedInput` is a **partial merge** into `tool_input` — only the listed keys are overwritten, everything else (prompt, other params) passes through untouched. Confirmed to work for the `Agent`/`Task` tool specifically (no restriction blocking mutation on it), per the official Claude Code hooks docs.
+`updatedInput` is a **partial merge** into `tool_input` — only the listed keys are overwritten, everything else (prompt, other params) passes through untouched. Confirmed to work for the `Agent`/`Task` tool specifically (no restriction blocking mutation on it), per the official Claude Code hooks docs. For every other tool, treat this as a confirmed exception, not the default — see "PreToolUse `updatedInput` replaces, does not merge" below.
 
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Hard-block (`exit 2`) every time a field is missing when a safe default exists | Auto-inject the default via `updatedInput` + `permissionDecision: "allow"`, exit 0 — the call proceeds corrected instead of forcing a manual retry |
 | 2 | Mix a blocking gate and an auto-fix gate in one script without ordering them | If a hard-block condition and an auto-fix condition can both apply to the same call, evaluate the **block first** — an auto-fix branch that exits 0 early will skip any block check that comes after it in the script |
 | 3 | Print extra log lines alongside the JSON on stdout | stdout must contain **only** the JSON object — banner/debug text breaks parsing |
+
+## PreToolUse `updatedInput` replaces, does not merge (HARD STOP)
+
+When a PreToolUse hook returns `hookSpecificOutput.updatedInput` to modify the tool call in place (e.g. injecting a default parameter), the harness treats that object as the **full replacement** for `tool_input`, not a merge. Returning a partial object (only the field you're adding) silently drops every other field the caller passed — the tool call then fails schema validation for those missing required fields, even on an otherwise-valid call.
+
+**Exception**: the `Agent`/`Task` tool is confirmed to merge partially (see "Auto-fixing via `updatedInput`" above, per the official Claude Code hooks docs). Treat that as the one verified exception, not the default — for every other tool, assume full replacement until proven otherwise.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `updatedInput: { newField: "value" }` — constructs a new object from scratch | `updatedInput: (.tool_input + { newField: "value" })` — merge onto the original `tool_input` read from stdin |
+| 2 | `jq -n '{...}'` (no input, builds output from literals only) when the output includes `updatedInput` | `echo "$INPUT" \| jq '{...}'` so `.tool_input` is available to merge from |
+| 3 | Assume a hook that "worked in testing" (tested only with a full-field sample payload) generalizes to every real call shape | Test with the *minimal* valid payload for the target tool, not just a fully-populated one — the field-drop only surfaces when the caller omits the field the hook is injecting |
+| 4 | Trust a 3-payload smoke test that only checks response *shape* (block / pass / inject) | Also assert that injected responses preserve every original input field, not just that `updatedInput` exists in the response |
+
+## Shared pattern variables across hooks (HARD STOP)
+
+When several hooks load match patterns from one shared data file, a variable defined
+there **always wins over each hook's inline fallback** — including hooks whose comments
+declare a narrower policy. `HG_X="${HG_X:-<strict default>}"` reads as "strict unless
+overridden", but the data file *is* the override, so that strict default is dead code the
+moment the data file defines `HG_X`. A hook can therefore document one policy and enforce
+a completely different one.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Write a narrow inline default, document it as the hook's policy, and leave a shared data file defining the same variable name | Give the narrow consumer its own variable (`HG_X_STRICT`), or narrow the shared value so every consumer agrees |
+| 2 | Trust a hook's comment about which patterns it matches | Resolve the variable the way the hook does — source the data file, then echo the value |
+| 3 | Widen the shared variable to satisfy one consumer | Widening leaks into every other consumer. Add a variable instead |
+| 4 | Match a command-shaped token (`/cleanup`) without a boundary | Anchor it (`(^\|[[:space:]])/cleanup`) — otherwise it matches inside unrelated words such as `wrap-up/cleanup` |
+
+**Self-check (before editing any pattern variable)**:
+
+1. `grep -rn "<VAR_NAME>" resources/ data/` — enumerate every consumer
+2. Does the data file define it? If so, every consumer's inline fallback is unreachable
+3. Does one consumer need a narrower set? → separate variable, never a shared widening
+
+## Advisory hooks: inspect the edited text, not the whole file
+
+A PostToolUse hook that re-reads its target file sees every pre-existing violation on
+every edit, so the advisory fires constantly and stops being read. Inspect the payload's
+edited text instead — `tool_input.new_string` (Edit), `tool_input.content` (Write),
+`tool_input.edits[].new_string` (MultiEdit) — so the message covers only what this edit
+introduced.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Read the file at `tool_input.file_path` and scan it whole | Scan the edited text from the payload. Legacy violations stay silent until touched |
+| 2 | Hard-block a file that autonomous loops write frequently | Advisory only — report on stderr and let the edit stand. The write already happened |
+| 3 | Let two hooks cover overlapping item states | Partition explicitly (one owns completed items, the other open items) so a single item never draws two advisories |
+
+The same scoping trap applies when reading the **transcript**: taking only the last
+assistant entry's uuid group misses a turn that emitted text and then ended on a tool
+call, because those are separate entries with different uuids. Anchor on the last real
+user prompt (a `user` entry whose `content` is a string — `tool_result` entries carry
+`type: "user"` with an array content) and concatenate every assistant text after it.
 
 ## Cross-platform (Claude Code + Antigravity) dual I/O
 
@@ -160,6 +215,7 @@ The same shape applies in Python (`payload.get("tool_name")` vs `payload.get("to
 | 2 | Block on `stderr` + `exit 2` in the Antigravity branch (copy-pasting the Claude Code block path) | Antigravity does not read stderr/exit-code as a block signal — it reads stdout `{"decision":"deny"}` with `exit 0`. Wrong branch = silent allow, not a loud failure |
 | 3 | Guess Antigravity arg key names (`TargetFile` vs `path` vs `file_path`) without flagging the guess | Antigravity's exact key casing is often unconfirmed until live-verified in a real session — try multiple candidate keys and document the guess as an explicit unverified note rather than presenting it as confirmed |
 | 4 | Register the dual-I/O script in only one runtime's config file | Register in **both** `~/.claude/settings.json` and `~/.gemini/config/hooks.json` — that's the entire point of writing the dual branch |
+| 5 | Register hooks in `~/.gemini/config/hooks.json` without checking the matcher string covers the tools actually invoked | Before registering, verify the matcher (e.g. `Edit\|Write\|replace_file_content\|write_to_file`) matches the real tool names for both runtimes — a mismatched matcher (e.g. `TaskCreate\|TaskUpdate` when the target is a file-edit tool) silently never fires |
 
 **Precedent implementations**: `consolidate/resources/block-noncompliant-review-comment.sh`, `hook-kit/resources/block-wip-register-before-execute.py`, `hook-kit/resources/block-write-file-overwrite.sh`.
 
