@@ -21,7 +21,7 @@ if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
 # Load locale-specific regex patterns from data/. The file is git-ignored so
 # the public repo never sees Korean characters. When absent, cleanup detection
 # falls back to English-only markers.
-HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
+HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
 if [ -f "$HG_DATA_FILE" ]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
@@ -35,6 +35,10 @@ fi
 #   - header-form session-end report marker
 # Locale-specific marker variants (the wrap-up phrase and header marker in
 # non-English locales) live in data/hangul-patterns.regex (HG_CLEANUP_MARKERS).
+# Additive, not override (`:+…|` rather than `:-`) — the data file is sourced first,
+# so `:-` let an untracked local file decide the whole marker set and silently retire
+# the committed one. Union keeps the committed baseline authoritative; the git-ignored
+# file only ADDS locale variants.
 HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:+${HG_CLEANUP_MARKERS}|}/cleanup|cleanup run|cleanup wrap-up"
 HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBILITY}|}chunks added|qdrant"
 

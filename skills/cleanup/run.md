@@ -720,6 +720,25 @@ cleanup's core purpose is **tidying (state refresh + pruning completed items)**,
 | No matching item + remaining work | Append `- [ ]` to `## Priority Work` or the appropriate category |
 | No matching item + waiting externally | Append `- [ ] [BLOCKED] {summary}` to the `## Hold` section |
 
+2.5. **Step B-gate — canonical medium check before any append (HARD STOP — creation direction)**: the last two rows of the table above **create** entries. Before appending either, determine whether this checklist file is the canonical backlog or an index into an external tracker. This is the mirror of the "Plane-indexed item completion order" gate earlier in this file — that one guards the **completion** direction (do not flip `[x]` locally before the external record reflects it); this one guards the **creation** direction (do not append locally without creating the external record first). Guarding only one direction leaves every newly created item unprotected.
+
+   Detect the canonical medium from **both** signals — either alone is insufficient:
+
+   - **Pinned header declaration**: read the file's top block (roughly the first 10 lines). A tracker delegating to an external system declares it there. Note that cleanup normally reaches this file by keyword grep (Step A) — grep never surfaces the header, so this read is a separate, deliberate step.
+   - **Existing index-line density**: count entries carrying an external reference suffix (e.g. `→ <Tracker> (<issue URL>)`). A file where such entries dominate is an index in practice, whatever the header says.
+
+   | Canonical medium | Handling for the two creating rows |
+   |------------------|------------------------------------|
+   | This file | Append normally, per the table above |
+   | External tracker | **Create the item in the external tracker first**, then append the local line as an index carrying the returned URL. If the external tracker is unreachable this run, say so explicitly in the Step 5 report and register a retry — do not silently append local-only |
+
+   | # | Don't | Do |
+   |---|-------|-----|
+   | 1 | Append `- [ ]` / `- [ ] [BLOCKED]` per the table and treat the item as recorded | Run this gate first. Under an external canonical medium a local-only append is a pointer to nothing, and it is lost the moment the file is regenerated or overwritten by a concurrent writer |
+   | 2 | Rely on Step A's grep having "read the file" | Step A greps by keyword; it never returns the header where delegation is declared. The header read is its own step |
+   | 3 | Assume the completion-direction Plane gate covers this | That gate fires only when flipping an existing marker to `[x]`. A brand-new item never passes through it |
+   | 4 | Append locally now and plan to sync later in the same run | An unsynced local-only entry is exactly the state this gate prevents. Either create externally first, or report the failure and register a retry |
+
 3. **Step C — no creating new date-header sections (HARD STOP)**: creating **`##`/`###`-level per-session date-header sections** like `## Session Work (YYYY-MM-DD)` / `### Session Work (YYYY-MM-DD, session <UUID>)` requires **explicit user approval only**. Adding a date section every session causes the file to grow append-only unbounded and the same work to scatter across multiple sections, making tracking difficult. Applies equally to `fix_plan.md` and `checklist.md`
 
 #### Don't / Do table
