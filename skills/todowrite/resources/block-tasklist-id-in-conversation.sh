@@ -12,6 +12,22 @@
 # format. TaskList IDs are NOT shown in the user's UI, so a bare #NN in an
 # option label is meaningless to the user and collides visually with PR/issue
 # numbers.
+#
+# PR-URL gate (2nd guard, same file): every DISTINCT PR number referenced in ask
+# text requires its OWN matching clickable PR URL somewhere in the same questions
+# payload, so the user can open and inspect each PR before deciding. A bare "PR #N"
+# — even with the repo name — is insufficient, and one PR's URL does not satisfy
+# references to other PR numbers in the same payload (payload-wide "any URL exists"
+# checking under-enforces multi-PR asks). Enforces question skill options.md
+# section 4. Tracked in failed-attempts.md (grep "bare PR").
+#
+# The gate was authored in the hook-kit copy of this file, then silently dropped
+# when the TaskList-ID check was re-homed here: the re-home carried only the
+# TaskList-ID logic, and the split-out target the refactor announced
+# (github-flow/resources/block-pr-url-gate.sh) was never created. The surviving
+# hook-kit copy kept the gate but was never registered in hooks/hooks.json, so
+# the gate stopped running entirely. Merged back here and the hook-kit copy
+# deleted so exactly one implementation exists, on the registered path.
 
 set -uo pipefail
 
@@ -38,7 +54,12 @@ if [[ "${1:-}" == "--test" ]]; then
   # literal "task #118" bare TaskList reference is NOT denied. See
   # failed-attempts.md "TaskList-ID hook: Task-word ordinal-exception ambiguity".
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"do task #118","description":"x"}]}]}}'
-  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"merge PR #118","description":"x"}]}]}}'
+  # PR-URL gate: a PR reference needs its OWN clickable URL in the same payload
+  check DENY  '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"merge PR #118","description":"x"}]}]}}'
+  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"merge PR #118","description":"https://github.com/es6kr/skills/pull/118"}]}]}}'
+  # one PR URL does not cover a different PR number in the same payload
+  check DENY  '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"PR #12 https://github.com/es6kr/claude-plugins/pull/12","options":[{"label":"also PR #13","description":"x"}]}]}}'
+  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"PR #12 https://github.com/es6kr/claude-plugins/pull/12","options":[{"label":"also PR #13","description":"https://github.com/es6kr/claude-plugins/pull/13"}]}]}}'
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"see issue #42","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Finding #3 is real","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"already merged #57","description":"x"}]}]}}'
@@ -61,6 +82,45 @@ ASK_TEXT=$(echo "$INPUT" | jq -r '
   (.question // ""),
   (.options[]? | (.label // ""), (.description // ""))
 ' 2>/dev/null)
+
+# --- PR-URL gate: each DISTINCT PR number must have its own matching URL ---
+# (payload-wide "any URL exists" checking under-enforces multi-PR asks — a URL
+# for PR #A does not satisfy a bare reference to PR #B in the same payload)
+PR_NUMS_REFERENCED=$(echo "$ASK_TEXT" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
+if [[ -n "$PR_NUMS_REFERENCED" ]]; then
+  PR_NUMS_WITH_URL=$(echo "$ASK_TEXT" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
+  MISSING_URL_FOR=()
+  while IFS= read -r n; do
+    [[ -z "$n" ]] && continue
+    if ! grep -qxF "$n" <<< "$PR_NUMS_WITH_URL"; then
+      MISSING_URL_FOR+=("$n")
+    fi
+  done <<< "$PR_NUMS_REFERENCED"
+  if [[ ${#MISSING_URL_FOR[@]} -gt 0 ]]; then
+    {
+      echo "DENIED: AskUserQuestion references PR number(s) without a matching URL for each."
+      echo ""
+      echo "Why blocked:"
+      echo "  - An ask is a self-contained decision UI: the user must be able to open"
+      echo "    and inspect EVERY referenced PR before deciding, without hunting through"
+      echo "    scroll-back"
+      echo "  - A bare 'PR #N' — even with the repo/project name — is not clickable"
+      echo "  - One PR's URL does not satisfy references to a DIFFERENT PR number in the"
+      echo "    same payload — each distinct number needs its own URL"
+      echo ""
+      echo "PR number(s) missing their own URL: ${MISSING_URL_FOR[*]}"
+      echo ""
+      echo "Required action:"
+      echo "  Add the full PR/MR URL (e.g., https://github.com/<owner>/<repo>/pull/<N> or"
+      echo "  GitLab MR URL) for each PR number listed above, in the question text or"
+      echo "  the relevant option's description, then retry."
+      echo ""
+      echo "Reference: question skill options.md section 4 (metadata + full URL);"
+      echo "  failed-attempts.md (grep \"bare PR\")"
+    } >&2
+    exit 2
+  fi
+fi
 
 # PR / issue / pull #N -> explicit GitHub reference, allowed
 ISSUE_PREFIX='(PR|issue|pull)[[:space:]]*#[0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]'
