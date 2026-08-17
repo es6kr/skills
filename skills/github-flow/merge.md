@@ -450,6 +450,8 @@ gh pr view <PR_NUMBER> --json mergeable
 ```
 - If `CONFLICTING`, resolve conflicts first.
 
+**Empty-PR guard (HARD STOP)**: before `gh pr ready` or `gh pr merge`, also confirm the PR actually has content — `gh pr view <PR_NUMBER> --json commits,additions,deletions,changedFiles`. A PR created via a non-standard path (cross-repo/temp-fork source, a GraphQL `createPullRequest` workaround after the standard `gh pr create` shorthand failed) can register with `commits: []` even though `gh pr diff --name-only` still prints file names — that command reflects a diff computation, not the PR's own registered commit range, and is not proof of content. `mergeable` staying `UNKNOWN`/`null` for an unusually long time after creation is a signal to check this before assuming it's just slow to compute.
+
 ### Per-repository Formal Review policy
 
 | Repository profile | Self-approve | Formal Review |

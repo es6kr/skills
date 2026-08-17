@@ -137,6 +137,17 @@ If any of the four commands matches, **HARD STOP** — abort `gh issue create/ed
 1. `gh issue create --title "..." --body "..."`
 2. Follow up with discussion comment if needed
 
+**HARD STOP — `--body-file` must never point at the raw draft file.** Draft files always open with the YAML frontmatter block (see "Draft File Format" and Step 8-1), and `gh` uploads the file verbatim — so passing the draft path publishes `---` / `title:` / `labels:` / `repo:` as the opening lines of a live, public issue body. Strip the frontmatter into a separate temp file first:
+
+```bash
+# body only — everything after the frontmatter's closing `---`
+# (a later `---` horizontal rule inside the body is preserved)
+awk 'f{print} /^---$/{c++; if(c==2 && !f){f=1}}' "$draft" > .tmp/issue-body.md
+gh issue create --title "..." --body-file .tmp/issue-body.md
+```
+
+Self-check before every `gh issue create|edit --body-file <path>`: is the first line of `<path>` exactly `---`? If so it is still the raw draft — strip it and re-check. Observed 2026-08-15: es6kr/skills issue #304 went out with its frontmatter intact and needed a follow-up `gh issue edit --body-file` to repair the public body.
+
 ### Step 7: Suggest Milestone
 
 After issue creation/update, suggest a Milestone based on existing milestones:

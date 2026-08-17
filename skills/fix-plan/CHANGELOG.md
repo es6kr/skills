@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/fix-plan-v0.6.2...fix-plan-v0.7.0) (2026-08-16)
+
+
+### Features
+
+* **fix-plan:** add claim topic — multi-session in-progress lease ([#300](https://github.com/es6kr/skills/issues/300)) ([7bd1439](https://github.com/es6kr/skills/commit/7bd14396cef45738207d400053c8e8aade8d3c94))
+* merge next-feat into main ([#313](https://github.com/es6kr/skills/issues/313)) ([2d9308a](https://github.com/es6kr/skills/commit/2d9308ab3e7e0086a88a7f64d3ed4d5c4d36e017))
+
 ## [0.6.2](https://github.com/es6kr/skills/compare/fix-plan-v0.6.1...fix-plan-v0.6.2) (2026-08-12)
 
 

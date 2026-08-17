@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/claude-session-v0.7.1...claude-session-v0.8.0) (2026-08-16)
+
+
+### Features
+
+* **claude-session:** add Antigravity (Gemini IDE) engine support to search/list ([19ecb7a](https://github.com/es6kr/skills/commit/19ecb7ac8b7d604e3c2af42ee31bc70d81eb824e))
+* merge next-feat into main ([#313](https://github.com/es6kr/skills/issues/313)) ([2d9308a](https://github.com/es6kr/skills/commit/2d9308ab3e7e0086a88a7f64d3ed4d5c4d36e017))
+
+
+### Bug Fixes
+
+* **claude-session:** add language tag to Call-tool fences + sanitize personal path ([#251](https://github.com/es6kr/skills/issues/251)) ([acb48ea](https://github.com/es6kr/skills/commit/acb48eaee58263b587777f699fb25b601633c0b0))
+* declare undeclared skill-to-skill dependencies (next, claude-session) ([#272](https://github.com/es6kr/skills/issues/272)) ([566d584](https://github.com/es6kr/skills/commit/566d584e41acc89f594b1d66dd712b2cfa4feed5))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/claude-session-v0.7.0...claude-session-v0.7.1) (2026-08-05)
 
 

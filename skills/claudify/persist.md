@@ -54,8 +54,9 @@ Save session-learned project knowledge to persistent memory.
 
 | Priority | Condition | Tool |
 |----------|-----------|------|
-| 1 | Serena MCP available | `activate_project` → `list_memories` → `read_memory` → `edit_memory` / `write_memory` |
-| 2 | Serena unavailable (fallback) | Claude Code auto memory (`memory/MEMORY.md` + individual `.md` files) |
+| 1 | RAG receiver available (readyz / MCP responds) | RAG receiver structured-store dispatch — the cross-session semantic-search medium, already primary for 3-C.1 (session chunk) / 3-C.2 (structured fact). Prefer it whenever available. **Dual-write, not replacement**: RAG is the search index; pair every fact with a source-of-truth text entry (domain skill / memory) per 3-C.2 — RAG does not substitute for the durable text medium |
+| 2 | Serena MCP available | `activate_project` → `list_memories` → `read_memory` → `edit_memory` / `write_memory` |
+| 3 | RAG + Serena unavailable (fallback) | Claude Code auto memory (`memory/MEMORY.md` + individual `.md` files) |
 
 **Serena procedure**: `read_memory` to check existing topic → `edit_memory` if exists, `write_memory` if not. No overwrites.
 

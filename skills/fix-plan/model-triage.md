@@ -38,7 +38,7 @@ Maintain a dedicated tracker section named `## <Model> Target Tasks` (e.g., a to
 
 ## Discovery Procedure
 
-1. **Scan** every tracker section outside the dedicated one (priority work, TODO, hold/deferred, plan drafts, carry-over) — title-level scan first, entry-level read only for ambiguous items
+1. **Scan** every tracker section outside the dedicated one (priority work, TODO, hold/deferred, plan drafts, carry-over), **plus any `impl`-promoted plan artifact awaiting audit** (see [draft.md](./draft.md) "Role ownership" — `impl` promotes drafts by default; this scan is where architecture-scale output gets picked up for `deep` review, not authored by `deep` from scratch) — title-level scan first, entry-level read only for ambiguous items
 2. **Classify** each candidate against the category table; discard anti-fit matches
 3. **Verify premises** — a candidate carried from old notes is a claim, not a fact; re-check its current state against primary sources before proposing (category III items are themselves evidence this matters)
 4. **Propose** the candidate set to the user grouped by category (multi-select ask); never auto-move items

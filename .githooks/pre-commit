@@ -112,7 +112,16 @@ while IFS= read -r f; do
     FAIL2=1
   fi
 
-  path_hits=$(printf '%s\n' "$content" | grep -nE '/Users/[a-zA-Z][a-zA-Z0-9_-]*/|/home/[a-zA-Z][a-zA-Z0-9_-]*/|C:\\Users\\[a-zA-Z][a-zA-Z0-9_-]*\\' || true)
+  # Generic placeholder usernames (`/home/user/`, `C:\Users\username\`) are the
+  # sanitized form this repo tells authors to write — several skills document
+  # exactly that substitution, so flagging them blocks the guidance rather than
+  # any personal data. Neutralize the placeholders in place (line count and
+  # numbering preserved) so a real username elsewhere on the SAME line is still
+  # caught by the scan below.
+  placeholder_safe=$(printf '%s\n' "$content" | sed -E \
+    -e 's#/(Users|home)/(user|username|youruser|your-user|name|yourname|me|someone|example)/#/\1/<placeholder>/#g' \
+    -e 's#C:\\Users\\(user|username|youruser|your-user|name|yourname|me|someone|example)\\#C:\\Users\\<placeholder>\\#g')
+  path_hits=$(printf '%s\n' "$placeholder_safe" | grep -nE '/Users/[a-zA-Z][a-zA-Z0-9_-]*/|/home/[a-zA-Z][a-zA-Z0-9_-]*/|C:\\Users\\[a-zA-Z][a-zA-Z0-9_-]*\\' || true)
   if [ -n "$path_hits" ]; then
     echo "BLOCKED: personal-machine path (embeds a real username) in staged file: $f"
     printf '%s\n' "$path_hits" | head -5 | sed 's/^/    /'

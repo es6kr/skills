@@ -6,6 +6,22 @@ Finds the session ID (UUID) of the current conversation.
 
 Claude's text output is recorded in session JSONL files. By leaving a unique marker in the conversation, you can grep for that marker to identify the current session file.
 
+## System reminder shortcut (HARD STOP — check first)
+
+**Before running the marker+script procedure, check whether `UserPromptSubmit hook additional context` in the current turn already exposes `Current session ID: <uuid>` (and a `Transcript:` path).** If it does, cite that UUID directly in your reply and skip the marker+script procedure entirely — re-running the script wastes a tool call and produces an identical result.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Output a placeholder line ("I'll provide the current session ID.") and stop without citing the UUID | Cite the UUID from the system reminder in the same turn, in plain text (e.g., `Session ID: e3ab36b6-...`) |
+| 2 | Run marker + `find-session-id.sh` when the reminder already shows the UUID | Quote the reminder's UUID directly; only fall back to marker+script when the reminder is absent |
+| 3 | Treat `/session id` as "trivial → skip the topic procedure" and end with no concrete output | The topic procedure has two paths — shortcut (reminder available) or marker+script (reminder absent). Always execute one |
+
+**Self-check (every `/session id` invocation, before any other action)**:
+
+1. Does the current turn's system reminder contain `Current session ID: <uuid>`?
+2. Yes → emit the UUID in plain text reply → done
+3. No → proceed to the marker+script Procedure below
+
 ## Procedure
 
 ### 0. Check Context First (Preferred — no marker needed)
