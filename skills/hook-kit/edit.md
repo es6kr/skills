@@ -148,7 +148,7 @@ The same shape applies in Python (`payload.get("tool_name")` vs `payload.get("to
 | 3 | Guess Antigravity arg key names (`TargetFile` vs `path` vs `file_path`) without flagging the guess | Antigravity's exact key casing is often unconfirmed until live-verified in a real session — try multiple candidate keys and document the guess as an explicit unverified note rather than presenting it as confirmed |
 | 4 | Register the dual-I/O script in only one runtime's config file | Register in **both** `~/.claude/settings.json` and `~/.gemini/config/hooks.json` — that's the entire point of writing the dual branch |
 
-**Precedent implementations**: `consolidate/resources/block-noncompliant-review-comment.sh`, `hook-kit/resources/block-wip-register-before-execute.py`, `hook-kit/resources/block-write-file-overwrite.sh`.
+**Precedent implementations**: `consolidate/resources/block-noncompliant-review-comment.sh`, `wip/resources/block-wip-register-before-execute.py`, `hook-kit/resources/block-write-file-overwrite.sh`.
 
 ## Notes
 

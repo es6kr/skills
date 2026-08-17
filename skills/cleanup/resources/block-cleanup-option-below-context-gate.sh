@@ -35,7 +35,7 @@ THRESHOLD=45
 # Korean wrap-up keyword overlay (git-ignored in the PUBLIC repo — see
 # hook-kit/data/hangul-patterns.regex header). Falls back to English-only
 # detection when the data file is absent (published/local-no-data installs).
-HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
 if [[ -f "$HG_DATA_FILE" ]]; then
   . "$HG_DATA_FILE"
 fi
@@ -147,24 +147,25 @@ fi
 # from the transcript's last assistant-message usage field via
 # context-usage-inject.sh (the same source the injection hook uses).
 #
-# The script lives in different places depending on which marketplace this copy
-# was installed from, so probe a chain instead of hardcoding one path — a single
-# hardcoded path silently degrades this guard to "no signal" wherever it does not
-# resolve, and the failure is invisible: LATEST_PCT stays empty and the guard
-# falls back to the STALE injected figure, which is exactly the bug this LIVE
-# reading exists to avoid. Observed 2026-08-16: two installed copies of this
-# guard returned 62.8% and 24.0% for the same ask, purely because one resolved
-# its path and the other did not.
-#   1. same-directory sibling      — hook-kit ships its own copy (es6kr-skills)
-#   2. sibling context-measure skill — after the 2026-08-10 split-out
+# This script now lives in cleanup/resources/ (moved out of hook-kit, which
+# still owns context-usage-inject.sh itself), so it is no longer a
+# same-directory sibling — probe a path chain instead of hardcoding one path.
+# A single hardcoded path silently degrades this guard to "no signal"
+# wherever it does not resolve, and the failure is invisible: LATEST_PCT
+# stays empty and the guard falls back to the STALE injected figure, which is
+# exactly the bug this LIVE reading exists to avoid. Observed 2026-08-16: two
+# installed copies of this guard returned 62.8% and 24.0% for the same ask,
+# purely because one resolved its path and the other did not.
+#   1. hook-kit sibling resource   — current real location (this repo)
+#   2. context-measure skill       — anticipated future split-out location
 #   3. ${CLAUDE_PLUGIN_ROOT}       — plugin-relative, set when run as a plugin hook
 #   4. $HOME/.claude/skills/...    — legacy absolute path, kept for back-compat
 CTX_INJECT=""
 for _cand in \
-  "$(dirname "$0")/context-usage-inject.sh" \
+  "$(dirname "$0")/../../hook-kit/resources/context-usage-inject.sh" \
   "$(dirname "$0")/../../context-measure/resources/context-usage-inject.sh" \
-  "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/context-measure/resources/context-usage-inject.sh" \
-  "$HOME/.claude/skills/context-measure/resources/context-usage-inject.sh"; do
+  "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/hook-kit/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/hook-kit/resources/context-usage-inject.sh"; do
   if [[ -f "$_cand" ]]; then CTX_INJECT="$_cand"; break; fi
 done
 LATEST_PCT=""

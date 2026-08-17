@@ -125,7 +125,7 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | 7 | Omit the physical numerical chunk count `N` (e.g. replacing `N chunks added` with vague prose omitting `N`) | Always include the concrete integer number of chunks `N` (e.g., `12 chunks added`) and imported artifacts count `M` in row 3-C.1 (e.g. `12 chunks added (receiver: RAG import dispatch) — session UUID <uuid>. 0 artifacts imported.`) |
 | 8 | On a 2nd+ `/cleanup` invocation in the same session, reconstruct this table from memory of the prior pass's report shape | Re-read this section's literal row text before composing — a remembered shape silently drops compound sub-clauses (e.g., the Session identity row's `/rename` sub-clause) that a fresh read would catch. Enforced by `block-cleanup-missing-rename.sh` (Stop) for the Session identity row specifically |
 
-For accumulated violation cases, see failed-attempts.md HOT (occurrence classification + escalation specification). Escalation from the 3rd occurrence: hook automation — `~/.agents/skills/hook-kit/resources/block-cleanup-without-rag.sh` registered. Injects a reminder when the cleanup/session-end response text matches the marker + lacks a RAG-visual-highlight row + has RAG-receiver call traces.
+For accumulated violation cases, see failed-attempts.md HOT (occurrence classification + escalation specification). Escalation from the 3rd occurrence: hook automation — `~/.agents/skills/cleanup/resources/block-cleanup-without-rag.sh` registered. Injects a reminder when the cleanup/session-end response text matches the marker + lacks a RAG-visual-highlight row + has RAG-receiver call traces.
 
 ## Prerequisites
 
