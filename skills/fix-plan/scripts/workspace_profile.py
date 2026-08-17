@@ -55,8 +55,8 @@ def load_user_config():
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: failed to parse {CONFIG_FILE}: {e}", file=sys.stderr)
     return {}
 
 
@@ -69,17 +69,20 @@ def detect_workspace(target_path: str = None) -> str:
     if env_profile in profiles:
         return env_profile
 
-    # 2. Check path against each configured profile's cwd_match tokens
+    # 2. Check path against each configured profile's cwd_match tokens.
+    # Match against path components (not a raw substring of the full path string) so a
+    # token like "es6kr" doesn't also match an unrelated sibling such as "not-es6kr-workspace".
     cwd = Path(target_path or os.getcwd()).resolve()
-    cwd_str = str(cwd)
+    cwd_parts = cwd.parts
 
     for name, cfg in profiles.items():
         for token in cfg.get("cwd_match", [name]):
-            if token in cwd_str:
+            if token in cwd_parts:
                 return name
 
-    # 3. Default fallback — first configured profile, or "default" if none configured
-    return next(iter(profiles), "default")
+    # 3. No match — "default" only. Do NOT fall back to an arbitrary configured profile;
+    # that would silently target the wrong workspace's Plane token/Qdrant collection.
+    return "default"
 
 
 def resolve_tracker_root(target_path: str = None, workspace_name: str = None) -> str:

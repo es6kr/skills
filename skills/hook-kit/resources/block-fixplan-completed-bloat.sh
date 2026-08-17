@@ -35,15 +35,22 @@ esac
 [ -f "$FP" ] || exit 0
 
 # Report completed "- [x]" top-level items whose inline span exceeds THRESHOLD lines.
-# A top-level item starts at column 0 with "- [". Its span runs until the next top-level
-# "- [" line or a "#"-header line (whichever comes first) or EOF.
+# A top-level item starts at column 0 with "- ". Its span runs until the NEXT top-level
+# "- " line or a "#"-header line (whichever comes first) or EOF.
+#
+# The terminator is any column-0 "- ", not only "- [". Checkbox-less top-level bullets are
+# a normal convention in the Completed section (e.g. "- 2026-08-12 — <one-line entry>"), and
+# terminating only on "- [" swallowed every such sibling into the preceding [x] item's span.
+# That reported a genuinely one-line [x] entry as ~30 lines of bloat and sent the reader off
+# to condense something that was already condensed. Sub-bullets are indented, so a column-0
+# "- " is always a new top-level item and never part of the current one's body.
 OVERSIZED=$(awk -v th="$THRESHOLD" '
   function flush(endnr) {
     if (in_item && is_done && (endnr - start + 1) > th) {
       printf "  L%d (~%d lines): %s\n", start, endnr - start + 1, substr(head, 1, 70)
     }
   }
-  /^- \[/ {
+  /^- / {
     flush(NR - 1)
     start = NR; head = $0; in_item = 1
     is_done = ($0 ~ /^- \[x\]/) ? 1 : 0

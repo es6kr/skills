@@ -5,6 +5,9 @@ description: |
 metadata:
   author: es6kr
   version: "0.1.5"
+depends-on:
+  - cleanup
+  - git-repo
 ---
 
 # Session
@@ -167,6 +170,7 @@ Calls `mcp__claude-sessions-mcp__compress_session` directly (registers the MCP s
 /session list                       # list current-project sessions (UUID + mtime + size)
 /session list --all-projects        # summary across all projects
 /session list --limit 20            # top N by mtime
+/session list --engine antigravity  # list Antigravity (Gemini IDE) sessions instead
 ```
 
 Non-destructive enumeration. For categorization or cleanup, use `classify` or `purge` instead.
@@ -190,10 +194,13 @@ Non-destructive enumeration. For categorization or cleanup, use `classify` or `p
 ### Search (Keyword Session Search)
 
 ```bash
-/session search Makefile remove          # find sessions by keyword
-/session search --today ansible/Makefile # only sessions modified today
-/session id <keyword>                    # legacy alias — routed to search
+/session search Makefile remove                  # find sessions by keyword
+/session search --today ansible/Makefile          # only sessions modified today
+/session search --engine antigravity <keyword>    # search Antigravity (Gemini IDE) sessions instead
+/session id <keyword>                             # legacy alias — routed to search
 ```
+
+Default engine is Claude Code (`~/.claude/projects/`). Pass `--engine antigravity` (or reference a known `~/.gemini/antigravity-ide/brain/<uuid>/` session) to search Antigravity's `transcript.jsonl` instead — see `search.md` "Engine Selection" for both engines' procedures, including the SQLite-DB fallback for content not mirrored into the Antigravity transcript.
 
 Always run the result-validation gate (verb ambiguity, artifact location, action class) before reporting matches as the answer to "which session did X" — a misplaced artifact path is a "task orphaned" signal, not a successful match.
 

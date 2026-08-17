@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.3](https://github.com/es6kr/skills/compare/consolidate-v0.5.2...consolidate-v0.5.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* **consolidate:** clarify tracking medium is the session workspace, not the reviewed PR's repo ([435b997](https://github.com/es6kr/skills/commit/435b997fa83072538393576b771efe3846e2da69))
+* **consolidate:** clarify tracking medium is the session workspace, not the reviewed PR's repo ([544bbca](https://github.com/es6kr/skills/commit/544bbca50b15ed22a18441b7848e8b96fa8e4bb1))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
 ## [0.5.2](https://github.com/es6kr/skills/compare/consolidate-v0.5.1...consolidate-v0.5.2) (2026-08-09)
 
 

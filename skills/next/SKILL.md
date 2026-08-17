@@ -5,6 +5,7 @@ metadata:
 name: next
 depends-on:
   - fix
+  - hook-kit
 description: |
   Suggest next actions after completing any task. Auto-invocation via Stop hook + UserPromptSubmit reactive backstop, owned by the `next-invocation-guard` plugin (local-only, ported from `resources/next-trigger.sh` + `resources/next-reactive-guard.sh`). Fires when assistant response contains completion keywords (locale patterns in `data/*.regex`).
   stall-detect - detect stalled follow-up steps and invoke /fix [stall-detect.md], ask-gates - recording-skip / decision-deferral forced-ask / TaskList primary-source / current-work confirmation gates [ask-gates.md], suggestion-patterns - per-context "After X" next-action option templates [suggestion-patterns.md].
@@ -87,10 +88,11 @@ Antigravity offers limited backend hooks, so environment detection and session c
 
 **Dependency precondition (HARD STOP)**: the context-usage measurement and cleanup recommendation in this step apply only when a session-cleanup skill is available in the environment (see "Dependency-gated behaviors"). If none is available, skip this gate entirely — do not measure context usage or set a cleanup option.
 
-1. **Detect Environment**: Check if running in Antigravity / Gemini environment.
-2. **Evaluate Context Usage**: Check the size of `transcript_full.jsonl` in the conversation log directory. In Antigravity (Gemini), compute context usage empirically: `tokens = 30,000 (system prompt baseline) + (transcript_full_bytes / 4)` and `pct = (tokens / 1,000,000) * 100`. Never copy example placeholder numbers.
-3. **Explicit Usage Display**: In the `AskUserQuestion` question text, **always explicitly state the estimated context usage percentage and token estimate** computed from `transcript_full.jsonl` with an explicit estimate disclaimer (e.g. `[Context Usage: Estimated ~XX.X% (~YYK tokens based on transcript size)]`). Never claim exact precision when using an estimated baseline.
-4. **Threshold Gate**: If context usage >= 45% (or script emits CONTEXT_WARN), **set `(Recommended) Session cleanup and retrospective (/cleanup)` as the #1 option** to prevent context degradation.
+1. **Detect Environment**: Check if running in Antigravity / Gemini environment (`$env:ANTIGRAVITY_AGENT` or `transcript.jsonl` log path presence).
+2. **Evaluate Context Usage (MANDATORY Physical Measurement HARD STOP)**: Check the size of `transcript.jsonl` in the conversation log directory via physical shell measurement (e.g. `powershell -Command "Get-Item <log-dir>\transcript.jsonl | Select-Object Length"`). In Antigravity (Gemini 1M capacity), compute context usage empirically: `tokens = 65,000 + ([math]::Round(transcript_bytes / 3.5))` and `pct = [math]::Round(($tokens / 1,000,000) * 100, 1)`. **Never invent, estimate, or hardcode example numbers from previous turns or memory.**
+3. **Explicit Usage Display**: In the `AskUserQuestion` question text, **always explicitly state the physically measured context usage percentage and token count** (e.g. `[Context Usage: Physical Measured ~XX.X% (~YYK tokens based on ZZKB transcript.jsonl)]`). Never claim exact precision without physical file measurement.
+4. **Antigravity Hook Manifest Verification (HARD STOP)**: In Antigravity environment, verify if `~/.agents/hooks.json` or active plugin hooks exist. If Antigravity hooks manifest is missing or inactive, audit the gap in prose before option generation.
+5. **Threshold Gate**: If context usage >= 40% in Antigravity (or script emits CONTEXT_WARN), **set `(Recommended) Session cleanup and retrospective (/cleanup)` as the #1 option** to prevent context degradation.
 
 ### Step 0: Stall Detection (mandatory)
 

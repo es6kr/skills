@@ -16,8 +16,16 @@ from pathlib import Path
 from workspace_profile import get_profile
 
 
-def query_qdrant_context(profile: dict, query_text: str, top_k: int = 3) -> list:
-    """Query Qdrant collections for relevant past context."""
+def query_qdrant_context(profile: dict, query_text: str, top_k: int = 3, scroll_limit: int = 200) -> list:
+    """Keyword-filter recent Qdrant points for past context.
+
+    This is NOT a semantic vector search — no query embedding is computed (the module
+    is zero-dependency stdlib-only, so there is no embedding model available), and
+    `/points/scroll` returns points in storage order, not relevance order. It fetches
+    up to `scroll_limit` recent points per collection and keyword-filters them
+    client-side. Real semantic ranking would require an embedding step (e.g. fastembed,
+    as used by qdrant-import.py) and the `/points/query` search endpoint instead.
+    """
     results = []
     qdrant_url = profile["qdrant_url"]
     collections = [profile["qdrant_wiki_collection"], profile["qdrant_memory_collection"]]
@@ -25,7 +33,7 @@ def query_qdrant_context(profile: dict, query_text: str, top_k: int = 3) -> list
     for col in collections:
         try:
             url = f"{qdrant_url}/collections/{col}/points/scroll"
-            req_data = json.dumps({"limit": top_k, "with_payload": True, "with_vector": False}).encode("utf-8")
+            req_data = json.dumps({"limit": scroll_limit, "with_payload": True, "with_vector": False}).encode("utf-8")
             req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"}, method="POST")
 
             with urllib.request.urlopen(req, timeout=3) as resp:

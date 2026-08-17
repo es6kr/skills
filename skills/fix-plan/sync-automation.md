@@ -51,3 +51,4 @@ Stop-hook checkpoint that nudges a `sync` run when a tracker referencing PR/Issu
 
 - [sync.md](./sync.md) — the actual GitHub polling procedure this topic nudges toward
 - `es6kr` skill's `check-session-import-gap.sh` — the sibling Stop-hook pattern this design mirrors (local checkpoint, zero in-hook network calls, block-decision envelope)
+- SKILL.md "Default invocation (no args)" Step 0 — the opposite-direction counterpart. This topic's checkpoint nudges *toward* running `sync` when the tracker is **stale**; Step 0 gates/asks *before* running the full default-invocation pipeline when the tracker shows it was already run very **recently**. Complementary, not duplicates — one triggers on staleness, the other on freshness.

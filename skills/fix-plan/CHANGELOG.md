@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/fix-plan-v0.6.2...fix-plan-v0.7.0) (2026-08-16)
+
+
+### Features
+
+* **fix-plan:** add claim topic — multi-session in-progress lease ([#300](https://github.com/es6kr/skills/issues/300)) ([7bd1439](https://github.com/es6kr/skills/commit/7bd14396cef45738207d400053c8e8aade8d3c94))
+* merge next-feat into main ([#313](https://github.com/es6kr/skills/issues/313)) ([2d9308a](https://github.com/es6kr/skills/commit/2d9308ab3e7e0086a88a7f64d3ed4d5c4d36e017))
+
+## [0.6.2](https://github.com/es6kr/skills/compare/fix-plan-v0.6.1...fix-plan-v0.6.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **fix-plan:** reclassify model-triage BLOCKED marker as external, not selfable ([#291](https://github.com/es6kr/skills/issues/291)) ([60e687c](https://github.com/es6kr/skills/commit/60e687c36a9e9b16493d8c48711bf14cf01d3441))
+* **fix-plan:** route cleanup.py and plane_sync.py through resolve_tracker_root ([#285](https://github.com/es6kr/skills/issues/285)) ([a42af9d](https://github.com/es6kr/skills/commit/a42af9d02cf2f56d9ae082ae7594976484bd7baa))
+* promote accumulated next-fix fixes to main ([803bbd3](https://github.com/es6kr/skills/commit/803bbd3b9e4f8367ee1b955cfa2b6a536f85cee0))
+
 ## [0.6.1](https://github.com/es6kr/skills/compare/fix-plan-v0.6.0...fix-plan-v0.6.1) (2026-08-11)
 
 

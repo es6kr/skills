@@ -57,7 +57,7 @@ cp ~/.claude/projects/<project_name>/<session_id>.jsonl ~/.claude/projects/.bak/
 
 ### 5. Call compress_session
 
-```
+```text
 Call mcp__claude-sessions-mcp__compress_session tool:
 - project_name: "<project folder name>"  // e.g. "-Users-user-works--vscode"
 - session_id: "<session UUID>"

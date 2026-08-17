@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/git-repo-v0.7.2...git-repo-v0.8.0) (2026-08-16)
+
+
+### Features
+
+* merge next-feat into main ([#313](https://github.com/es6kr/skills/issues/313)) ([2d9308a](https://github.com/es6kr/skills/commit/2d9308ab3e7e0086a88a7f64d3ed4d5c4d36e017))
+
 ## [0.7.2](https://github.com/es6kr/skills/compare/git-repo-v0.7.1...git-repo-v0.7.2) (2026-08-09)
 
 

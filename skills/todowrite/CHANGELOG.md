@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/todowrite-v0.7.1...todowrite-v0.8.0) (2026-08-16)
+
+
+### Features
+
+* **hooks:** add root plugin hooks.json, pruned to tracked scripts ([#302](https://github.com/es6kr/skills/issues/302)) ([e37f756](https://github.com/es6kr/skills/commit/e37f756af990ceb0eed7f3d7ec2200bcd4de8b6c))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/todowrite-v0.7.0...todowrite-v0.7.1) (2026-08-09)
 
 

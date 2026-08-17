@@ -40,7 +40,7 @@ if [ -f "$HG_DATA_FILE" ]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
 fi
-HG_RAG_AUDIT_SIGNAL="${HG_RAG_AUDIT_SIGNAL:-audit|discovery|decision|deployment|fa-prune|self-improving|retrospect}"
+HG_RAG_AUDIT_SIGNAL="${HG_RAG_AUDIT_SIGNAL:+${HG_RAG_AUDIT_SIGNAL}|}audit|discovery|decision|deployment|fa-prune|self-improving|retrospect"
 export HG_RAG_AUDIT_SIGNAL
 
 input="$(cat)"

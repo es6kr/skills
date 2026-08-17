@@ -107,6 +107,31 @@ check "fp5 merge --abort" 0 "$(run "$(mk \
 check "fp6 retrospective validation only" 0 "$(run "$(mk \
   'PR #63 post-merge validation::verification only, no code change. Squash type was already chosen')")"
 
+# 7. task-clustering "merge/split" (non-PR merge noun) co-present with a real PR #.
+check "fp7 clustering merge/split" 0 "$(run "$(mk \
+  'Start FA corpus clustering::review the 200-class merge/split candidates in a dedicated session' \
+  'Hold::leave for later; PR #255 unrelated')")"
+
+# 8. PR-state "await-merge" description (not a merge proposal) + real PR #s.
+check "fp8 await-merge PR state" 0 "$(run "$(mk \
+  'Ready drafts, hold for review::transition PR #258 to ready; all three await-merge until your go-ahead' \
+  'Leave as draft::no change; PR #255 stays open')")"
+
+# 9. meta-discussion of this very guard ("ask-guard merge-keyword false positive").
+check "fp9 ask-guard merge-keyword meta" 0 "$(run "$(mk \
+  'Proceed now::fix ask-guard.sh merge-keyword false-positive and run regression tests, relates to finding #3' \
+  'Hold::start another guard first')")"
+
+# 10. meta-discussion of check_push_without_details() itself — fixing/describing
+#     the push-detail gate, not proposing an actual push (2026-08-09 live repro:
+#     this exact option text collaterally blocked an unrelated co-occurring
+#     option in the same AskUserQuestion call). Second option deliberately has
+#     no push/no-push/negation wording of its own, isolating the new
+#     meta-discussion exemption from the pre-existing "no push" negation one.
+check "fp10 push-gate meta discussion" 0 "$(run "$(mk \
+  'Fix ask-guard.sh Git Push gate false positive::the hooks Git Push detail-requirement gate blocks pure-commit option text with no push token present' \
+  'Apply pending review findings::PR seven and PR two-thirteen, both self-authored')")"
+
 # ---- TP cases: must BLOCK (exit 2) — attestation/verification genuinely absent ----
 
 # 7. active "Squash and merge PR #N" without AI Review Summary attestation.
@@ -122,6 +147,10 @@ check "tp2 active release-please close no verify" 2 "$(run "$(mk \
 check "tp3 plain merge proposal no attestation" 2 "$(run "$(mk \
   'Land it::merge PR #90 into next-fix now')")"
 
+# 10. genuine active push proposal with no remote/branch or commit detail —
+#     the new push-gate-meta exemption (fp10) must NOT let this slip through.
+check "tp4 active push no detail" 2 "$(run "$(mk \
+  'Push it::just push the changes now, no further detail')")"
 # ---- CI-gate-only base exemption (new allowlist) ----
 # Must ALLOW when the referenced PR's base has reviews disabled; must still BLOCK
 # when the base is a normal (reviewed) branch. gh is stubbed per-case.

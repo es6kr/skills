@@ -45,6 +45,7 @@ Top-level sections:
 | `- [BLOCKED:P0-P3:reason]` | Priority-annotated BLOCKED (see [priority.md](./priority.md)) | `## Progress`, `## Hold` |
 | `-` followed by space, no checkbox | Already-summarised historical line | `## Completed` only |
 | `- [REPEAT]` | Persistent recurring item (Ralph-specific — see ralph/periodic.md) | `## REPEAT` section only (out of scope for this skill) |
+| `[CLAIMED:<sid>:<ts>]` | Multi-session in-progress lease (suffix **annotation**, not a checkbox state) — see [claim.md](./claim.md) | appended after `- [ ]` / `- [BLOCKED:*:selfable]` |
 
 When an item completes, change `- [ ]` → `- [x]` and append session ID + timestamp to the title line.
 
@@ -140,6 +141,7 @@ Exceptions:
 ## See also
 
 - [priority.md](./priority.md) — `[BLOCKED:P0-P3:reason]` annotation convention
+- [claim.md](./claim.md) — `[CLAIMED:<sid>:<ts>]` multi-session in-progress lease (suffix annotation)
 - [add.md](./add.md) — new item authoring schema
 - [move.md](./move.md) — `[x]` → Completed summary rules + subtree-move
 - [sync.md](./sync.md) — GitHub PR/Issue state polling
