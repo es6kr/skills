@@ -169,7 +169,7 @@ chain: []                  # optional: issue dependency chain (see github-flow/d
 
 The plan body starts after the frontmatter with `# Plan: [Title]` heading. The heading title should match the frontmatter `title` field.
 
-**Backlog & LLM Wiki Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) and `llm-wiki/index.md` / `log.md` is MANDATORY**. Never leave a newly created plan un-indexed in the backlog or LLM Wiki repository.
+**Backlog & LLM Wiki Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) and `llm-wiki/index.md` / `log.md` is MANDATORY**. Never leave a newly created plan un-indexed in the backlog or LLM Wiki repository. **If the plan was promoted from a Plan Draft, the entry MUST be moved from `## Plan Drafts` to `## Fable Target Tasks` (with `audit_status: pending_opus_fable_audit` / `[BLOCKED:P*:selfable]`) for Fable/Opus+ model deep audit before implementation.** Leaving `[PROMOTED]` items in `## Plan Drafts` is strictly prohibited.
 
 **Mandatory sections** (Plan is incomplete if any are missing):
 1. **Approach** — Detailed explanation of the chosen approach
@@ -330,6 +330,8 @@ grep -l '^- \[ \]' {output-dir}/plan-*.md
 ```
 
 ## Step 3: User Review & Branch Creation
+
+**Mandatory User Review Gate (HARD STOP)**: Skipping Step 3 User Review or immediately proceeding to implementation/completion without obtaining explicit user review and approval via `AskUserQuestion` is STRICTLY FORBIDDEN. After Research → Plan (Step 2), the agent MUST always pause and present the plan summary, trade-offs, and open questions, and obtain explicit user disposition (`AskUserQuestion`) before modifying target code or marking the workflow complete.
 
 1. **Report BLOCKED or Open Questions**: If there are any ambiguities, report them and wait for user feedback.
 2. **Obtain Approval — via a structured entry ask, not a prose wait (HARD STOP)**: Once ALL plan decision axes are resolved (post-write ask answered + reflected), collect the approval decision with an **AskUserQuestion at turn wrap-up** whose options are next-actions (e.g., "Start implementation (Phase 1)", "Hold — plan stays at status: review", other pending candidates). Ending the turn with prose like "implementation starts on your approval" / "awaiting your go-ahead" and no ask forces the user to type a free-form prompt to proceed — that is a wrap-up violation, not a sanctioned wait state. The "Plan ask scope" rule (trade-offs/open-decisions only) forbids **plan-body-review** options ("Plan review", "annotation cycle"), NOT the implementation-entry next-action ask.

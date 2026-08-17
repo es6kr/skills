@@ -4,7 +4,11 @@ Mandatory plan/research pre-search on entering a Task/issue/PR. Applies equally 
 
 ## Rule Body
 
-When the user mentions `#N` or a domain keyword, the first action is a **Glob search for plan/research files**. **Plan Glob comes before** query commands such as `gh issue view`, `gh pr view`, and `git log`. When found, **Read the body and map it to the work scope** → add a cross-reference to tracking documents such as fix_plan.md.
+When the user mentions `#N` or a domain keyword, the first action is a **Mandatory RAG & Corpus Pre-Lookup (HARD STOP)**:
+1. **RAG Semantic Search**: Run vector memory / RAG semantic search (e.g. `python3 scripts/qdrant-search.py "<keywords>"`) to look up past research, plans, and session decisions.
+2. **LLM Wiki & Corpus Glob Search**: Search across active and peer LLM Wiki repositories (`llm-wiki/outputs/*<keyword>*.md`, `daegunsoftDev/llm-wiki/outputs/*<keyword>*.md`, `.agents/docs/generated/*<keyword>*.md`) using keyword matching regardless of prefix (`find -iname '*<keyword>*.md'`).
+3. **Plan Glob before Query Commands**: Plan/Research search comes before query commands such as `gh issue view`, `gh pr view`, and `git log`.
+4. **Mandatory Read & Prior Knowledge Section**: When relevant artifacts are found, **Read the body and map it to the work scope** → cite and synthesize them under a `## Prior Knowledge & Context` section in the new research document. Asserting "no prior plan/research exists" without physically executing RAG semantic search and LLM Wiki corpus search is STRICTLY FORBIDDEN.
 
 ### Trigger Verbs (all apply equally)
 
@@ -19,7 +23,7 @@ Both change verbs and query verbs trigger this rule:
 Domain keywords in task descriptions and user messages are equal triggers alongside `#N`:
 
 - Filenames/paths: specific files such as `deploy-master.yml`, `inventory.yml`, `proxy.ts`, `examples.tf`
-- Tool/service names: `blueprint`, `semaphore`, `terraform`, `authentik`, `argocd`, etc.
+- Tool/service names: `blueprint`, `semaphore`, `terraform`, `authentik`, `argocd`, `fable`, `harness`, etc.
 - Job/step/resource names: workflow job names, terraform resources, ansible roles, etc.
 - Work code names: task-unit aliases such as `Web-E2E-A/B/C`, `SSO-FIX-1`
 
