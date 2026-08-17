@@ -4,9 +4,12 @@
 # Consolidates 4 source hooks (a 5th, TaskList #NN ambiguity, was re-homed to
 # todowrite/resources/block-tasklist-id-in-conversation.sh — that check is
 # domain-specific to TaskList conventions, not a general AskUserQuestion
-# concern, per automation.md's hook-ownership policy. A 6th, the PR-URL gate
-# that used to live bundled inside the old TaskList-ID hook's file, was split
-# out to github-flow/resources/block-pr-url-gate.sh for the same reason):
+# concern, per automation.md's hook-ownership policy. A 6th, the PR-URL gate,
+# stays bundled in that same re-homed file as its 2nd guard — an earlier version
+# of this comment announced a split into github-flow/resources/block-pr-url-gate.sh,
+# but that file was never created and the gate silently stopped running until it
+# was merged into the re-homed file; do not re-announce a split without creating
+# and registering the target first):
 #   1. block-merge-without-review.sh           (merge option without AI Review Summary + Test Plan)
 #   2. block-release-please-close-without-verification.sh (release-please/semantic-release close without verification)
 #   3. block-vendor-in-generic-skill.sh        (AskUserQuestion branch: vendor names not introduced by user)
@@ -87,10 +90,18 @@ HG_ASK_PUSH_KO="${HG_ASK_PUSH_KO:-}"
 HG_ASK_COMMIT_KO="${HG_ASK_COMMIT_KO:-}"
 HG_ASK_PR_STRONG_KO="${HG_ASK_PR_STRONG_KO:-}"
 HG_ASK_PR_READY_KO="${HG_ASK_PR_READY_KO:-}"
+# Missing on this branch: check_stateful_data_safety() (below) references
+# these 4 vars under `set -uo pipefail` with no assignment anywhere in the
+# file, crashing every invocation with "unbound variable" regardless of what
+# is being checked. Restored from the branch that has them.
 HG_ASK_STATEFUL_RESOURCE="${HG_ASK_STATEFUL_RESOURCE:+${HG_ASK_STATEFUL_RESOURCE}|}longhorn|replica|PVC|persistentvolume|volume\.longhorn|storage|snapshot|etcd|vault|qdrant.*data|postgres.*data|mysql.*data|database.*volume"
 HG_ASK_DESTRUCTIVE_VOLUME_OP="${HG_ASK_DESTRUCTIVE_VOLUME_OP:+${HG_ASK_DESTRUCTIVE_VOLUME_OP}|}PV[[:space:]]+(recreate|delete|wipe|reset)|volume[[:space:]]+(recreate|delete|wipe|reset|purge)|PVC[[:space:]]+(delete|recreate)|replica[[:space:]]+(force[[:space:]]*delete|force[[:space:]]*remove|wipe)|snapshot[[:space:]]+(delete|purge)|wipe[[:space:]]+(data|volume)|fresh[[:space:]]+volume"
 HG_ASK_DATA_SAFETY_CLAIM="${HG_ASK_DATA_SAFETY_CLAIM:+${HG_ASK_DATA_SAFETY_CLAIM}|}no[[:space:]]+data[[:space:]]+loss|data[[:space:]]+(safe|intact|preserved|integrity)|auto[- ]?recover|salvage|safely[[:space:]]+(delete|remove)|safe[[:space:]]+to[[:space:]]+(delete|remove|recreate)"
-HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:+${HG_ASK_STATE_ATTESTATION}|}kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*(verified)|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified"
+HG_ASK_STATE_ATTESTATION="${HG_ASK_STATE_ATTESTATION:+${HG_ASK_STATE_ATTESTATION}|}kubectl[[:space:]]+(get|describe)[[:space:]]+(replica|volume|pv|pvc|snapshot)|replica[[:space:]]+count[[:space:]]*(=|:)|spec\.numberOfReplicas|status\.robustness|replica[[:space:]]*verified|primary[- ]?source[[:space:]]+(verified|checked)|attestation|attested|state[[:space:]]+verified"
+# check_push_without_details() below reads these Korean-locale overrides;
+# no default declaration existed on this branch either (same unbound-var class).
+HG_ASK_PUSH_KO="${HG_ASK_PUSH_KO:-}"
+HG_ASK_COMMIT_KO="${HG_ASK_COMMIT_KO:-}"
 
 INPUT=$(cat)
 
@@ -688,6 +699,7 @@ check_push_without_details() {
   if [[ -n "$HG_ASK_PUSH_KO" ]]; then
     push_pattern="$push_pattern|$HG_ASK_PUSH_KO"
   fi
+
   if ! echo "$OPTIONS_BLOB" | grep -qiE "$push_pattern"; then
     return 0
   fi

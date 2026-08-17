@@ -122,6 +122,39 @@ done
 | 2 | Scope 3-A's chmod scan to `~/.claude/hooks/*.sh` only, reasoning "that's where hooks live" | Hooks can be registered from any skill's `resources/` directory. Scan the same path set Step 1 already resolved |
 | 3 | Skip the extended scan because a skill split/rename "just moves files, permissions carry over" | File copies (not `mv`) commonly reset the executable bit — verify, don't assume |
 
+### 3-A.2 Interpreter mismatch check (shebang content vs. registration prefix)
+
+A registered `command` with no interpreter prefix (bare `${CLAUDE_PLUGIN_ROOT}/.../foo.sh` or `~/.claude/hooks/foo.sh`) only works if the OS honors the file's `#!` shebang line — which Windows Git Bash does **not** for a `.sh`-suffixed file (it falls back to `sh <file>`, executing the file line-by-line regardless of its shebang). A `.sh` file containing Python/Node/Ruby source with a `#!/usr/bin/env python3` shebang but no explicit interpreter prefix in its registration silently fails every invocation with cryptic "command not found" errors on the first non-shell line — and because every hook under the same matcher runs and reports its own failure, this can present as *all* hooks under that matcher failing, not just the broken one.
+
+```bash
+# For every resolved command (Step 1's path set), check: does the first line's shebang
+# interpreter match the command's own leading token (or is a prefix present at all)?
+for f in <resolved-command-paths>; do
+  shebang=$(head -1 "$f" 2>/dev/null)
+  case "$shebang" in
+    '#!'*python*) needs="python3 or python" ;;
+    '#!'*node*)   needs="node" ;;
+    '#!'*ruby*)   needs="ruby" ;;
+    *) continue ;;  # bash/sh shebang or no shebang — bare registration is fine
+  esac
+  echo "check registration for $f — shebang expects: $needs"
+done
+```
+
+| Registration form | Shebang content | Verdict |
+|---|---|---|
+| Bare path, no prefix | `#!/bin/bash` or `#!/bin/sh` or none | OK — matches the fallback interpreter |
+| Bare path, no prefix | `#!/usr/bin/env python3` (or node/ruby) | **INTERPRETER-MISMATCH** — add the matching prefix (`python3 <path>`) to the registration |
+| Explicit prefix (`python3 <path>`) | matches | OK |
+
+**Scope note**: this check applies to every `command` resolved in Step 1 — including a **plugin's own `hooks/hooks.json`** (`${CLAUDE_PLUGIN_ROOT}/...` entries), not just `~/.claude/settings.json`/`settings.local.json`. A plugin-level hooks.json bug reproduces for every user of that marketplace plugin, so it is worth flagging even more than a local settings.json entry.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume a bare `.sh` registration is safe because "the shebang will handle it" | Verify per-OS — Windows Git Bash does not honor shebangs on `.sh`-suffixed files; check content against registration explicitly |
+| 2 | Diagnose "every Bash hook is broken" as an environment-wide failure before checking for one bad entry among many | One INTERPRETER-MISMATCH entry under a shared matcher (e.g. `PreToolUse:Bash`) can make the whole matcher's hook chain report errors on every call — audit each entry individually before concluding the whole environment is broken |
+| 3 | Fix only `~/.claude/settings.json` and skip plugin-distributed `hooks/hooks.json` files | Scan plugin hooks.json too — those bugs affect every installer of that marketplace plugin |
+
 ### 3-B. Orphan hook check (no resources source + not in settings)
 
 Validates the "every hook must have an owning skill" policy from `automation.md`. For each `~/.claude/hooks/*.sh`:
