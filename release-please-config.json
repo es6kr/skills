@@ -132,16 +132,6 @@
         }
       ]
     },
-    "skills/doc-convert": {
-      "package-name": "doc-convert",
-      "component": "doc-convert",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ]
-    },
     "skills/dotfile": {
       "package-name": "dotfile",
       "component": "dotfile",
