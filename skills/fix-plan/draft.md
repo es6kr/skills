@@ -82,11 +82,11 @@ A plan-draft follows three stages.
 
 ### 2. Promote
 
-When the resume trigger is met:
+When the resume trigger is met or the user requests promotion:
 
 1. **Re-verify the stub's premises against first sources before planning.** A stub is a defer-time snapshot; by promote time its premises drift — the config it targets may already be fixed, the question it poses may already be answered, or its proposed flag/approach may now conflict with a changed contract. Check each premise at a first source (grep the code/config, `gh`/`git`/`npm`/registry state, the tracker's `## Completed`). If any premise is invalidated, record it at the head of the research seed (passed to `code-workflow`) so the plan starts from current reality, not the stale stub.
-2. Dispatch the stub to the planning workflow: `Skill("code-workflow", "steps")` (research → plan → user review) using the stub's Purpose + Expected deliverable — plus any premise corrections from step 1 — as the seed.
-3. After the real research/plan artifact exists, **remove the stub entry** from `## Plan Drafts` (its job is done — the artifact supersedes it).
+2. **Draft-to-Plan Mandatory Authoring Gate (HARD STOP)**: When the user requests draft promotion ("promote draft", "promote remaining drafts", etc.), **skipping `code-workflow` plan authoring or leaving draft stubs unauthored in `## Plan Drafts` is STRICTLY FORBIDDEN**. You MUST immediately dispatch the stub to `code-workflow` (Research → Plan → User Review) and produce the formal `plan-*.md` document.
+3. After the real research/plan artifact exists and user review is completed, move the entry to `## Fable Target Tasks` (with `audit_status: pending_opus_fable_audit` / `[BLOCKED:P*:selfable]`) for Fable/Opus+ model deep audit before implementation. Leaving `[PROMOTED]` stubs in `## Plan Drafts` is strictly prohibited.
 4. If a `plan-drafts/<slug>.md` body file existed, add valid YAML frontmatter (`title`, `status: superseded`, `created`, `share_eligibility: public|private`, `relates_to`, `archived: true`, `archived_at`, `archive_reason`) and move it to the unified `.ralph/` backup directory (`mkdir -p .ralph/.bak && mv plan-drafts/<slug>.md .ralph/.bak/draft-<slug>.md`). All `.ralph/` sub-document backups MUST be unified in `.ralph/.bak/` (never create sub-folder `.bak/` directories like `plan-drafts/.bak/` or `docs/generated/.bak/`).
 
 ### Role ownership (promote execution)

@@ -19,6 +19,26 @@ Create PRs with structured body, test plan, and optional visual attachments.
 
 ## Procedure
 
+### Step -1: Overlapping open-PR check (HARD STOP — run before Step 0, every time)
+
+**Before creating a new PR, check whether any file in this change is already touched by an open PR against the same base.** Creating a second PR for a file another open PR is already modifying produces an avoidable merge conflict the moment either one lands — no principled "separate concerns get separate PRs" convention exists anywhere in this skill set that would justify defaulting to a new PR without this check (verified: `merge.md`'s "distinct concerns" language governs whether commits *within one PR* squash cleanly, not whether separate PRs should exist).
+
+```bash
+# List open PRs against the same base, then check each for file overlap
+gh pr list -R <owner/repo> --base <base-branch> --state open --json number,title,headRefName
+gh pr diff <N> -R <owner/repo> --name-only   # per candidate PR
+```
+
+If any target file overlaps an open PR's diff:
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Silently open a new PR because the change is "conceptually different" from the open PR's purpose | `AskUserQuestion`: "add a commit to PR #N" vs "open a separate PR" — state the overlapping file(s) explicitly in the option description |
+| 2 | Assume the open PR will merge first (or won't) without checking its state | Check the open PR's mergeability/CI state (`gh pr view <N> --json mergeable,state`) before presenting options — sequencing affects which choice avoids the conflict |
+| 3 | Rationalize a "separate by concern" convention after the fact to justify a new PR | No such convention is documented in this skill set — don't invent one. The actual decision axis is file overlap risk, not conceptual grouping |
+
+**Self-check (before every `gh pr create`)**: did I run the overlap check above? If any target file matches an open PR's diff, did I `AskUserQuestion` before creating a second PR?
+
 ### Step 0: Visibility + language decision guard (HARD STOP — run every time, right before PR creation)
 
 **Before writing the PR title and body, always check repository visibility and map the language.**

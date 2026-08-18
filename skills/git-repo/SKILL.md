@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), fix-worktree (bare repo recovery), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, rebase-audit (accidental-revert detection during an active rebase), to-ghq (formerly migrate), to-bare, worktree-register (metadata register/relink), patrol (batch inspect), move-worktree (register/reclaim merged PR), rename-worktree, sourcegit, ssh-key (multi-account SSH map), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely). Use when: "reuse worktree", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), fix-worktree (bare repo recovery), githooks (hook silently never runs — hooksPath precedence, passthrough chain, install trade-off), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, rebase-audit (accidental-revert detection during an active rebase), to-ghq (formerly migrate), to-bare, worktree-register (metadata register/relink), patrol (batch inspect), move-worktree (register/reclaim merged PR), rename-worktree, sourcegit, ssh-key (multi-account SSH map), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely). Use when: "reuse worktree", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -31,6 +31,7 @@ Git repository management and SourceGit GUI client integration.
 | conflict-dry-run | test merge/cherry-pick applicability in an isolated worktree, without touching the main working tree | [conflict-dry-run.md](./conflict-dry-run.md) |
 | credential-helper | pin a per-org GitHub token for HTTPS remotes (fixes recurring `Repository not found` from active-account mismatch); HTTPS counterpart to ssh-key | [credential-helper.md](./credential-helper.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
+| githooks | diagnose a `.githooks/` hook that silently never runs (hooksPath precedence, passthrough chains, execute bit) and choose an install method that keeps machine-wide hooks | [githooks.md](./githooks.md) |
 | isolate-hunk | stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing (no working-tree changes) | [isolate-hunk.md](./isolate-hunk.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
@@ -80,7 +81,23 @@ rebase-audit (active-rebase revert detection)  ──restoration mechanism share
    Any hit = a cherry-pick/merge/rebase/bisect is **mid-flight** (likely the user's active operation) → the worktree is **NOT an inactive candidate**, its dirty files are the operation's payload (never offer discard / `git add` resolution / stash), and reuse is forbidden — report to the user instead. Merge-status heuristics (branch merged + ahead=0) do NOT override this gate. (see failed-attempts.md "cherry-pick in progress misclassified as abandoned")
 3. Identify inactive candidates (only among worktrees that passed the gate):
    - **Merged-PR worktrees** (commit hash equals the base branch's merge commit)
+   - **Squash-merged-PR worktrees** — see the caveat below; the hash test above does **not** find these
    - **Stale fix/refactor branch worktrees** (confirm with the user)
+
+   **Hash-equality misses every squash merge (HARD STOP)**: a squash merge creates a new single commit on the base with no parent link to the branch, so a worktree whose PR was squashed keeps a HEAD that matches nothing on the base. The test in the first bullet reports it as *not* merged, and its N original commits still read as unmerged work — which both hides a reclaimable worktree and, worse, makes a genuinely stale branch look active. Ask GitHub for the PR state instead of inferring it from hashes:
+
+   ```bash
+   B=$(git -C <worktree> branch --show-current)
+   gh pr list --head "$B" --state all --json number,state,mergedAt --jq '.[0]'
+   ```
+
+   | PR state for the worktree's branch | Classification |
+   |------------------------------------|----------------|
+   | `MERGED` (regardless of merge method) | Inactive candidate — reclaimable |
+   | `OPEN` | Active — not a candidate |
+   | `CLOSED` unmerged, or no PR | Stale candidate — confirm with the user before reuse |
+
+   For a `MERGED` squashed branch, reuse means re-pointing the worktree at a fresh branch off the updated base (`rename-worktree`) — do **not** rebase or merge the old branch forward, since its commits duplicate content the base already carries in squashed form.
 4. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
 5. If no inactive worktree exists or the user opts for new → `git worktree add`
 

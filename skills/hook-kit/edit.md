@@ -217,7 +217,7 @@ The same shape applies in Python (`payload.get("tool_name")` vs `payload.get("to
 | 4 | Register the dual-I/O script in only one runtime's config file | Register in **both** `~/.claude/settings.json` and `~/.gemini/config/hooks.json` — that's the entire point of writing the dual branch |
 | 5 | Register hooks in `~/.gemini/config/hooks.json` without checking the matcher string covers the tools actually invoked | Before registering, verify the matcher (e.g. `Edit\|Write\|replace_file_content\|write_to_file`) matches the real tool names for both runtimes — a mismatched matcher (e.g. `TaskCreate\|TaskUpdate` when the target is a file-edit tool) silently never fires |
 
-**Precedent implementations**: `consolidate/resources/block-noncompliant-review-comment.sh`, `hook-kit/resources/block-wip-register-before-execute.py`, `hook-kit/resources/block-write-file-overwrite.sh`.
+**Precedent implementations**: `consolidate/resources/block-noncompliant-review-comment.sh`, `wip/resources/block-wip-register-before-execute.py`, `hook-kit/resources/block-write-file-overwrite.sh`.
 
 ## Notes
 

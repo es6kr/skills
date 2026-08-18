@@ -49,7 +49,13 @@ esac
 # Best-effort: check session transcript for prior qdrant-store invocation.
 TRANSCRIPT="${CLAUDE_TRANSCRIPT_PATH:-}"
 if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
-  if grep -qE 'mcp__qdrant__qdrant-store|"name":[[:space:]]*"qdrant-store"|--rag=' "$TRANSCRIPT" 2>/dev/null; then
+  # Detect BOTH dispatch surfaces:
+  #   (a) MCP tool call  — mcp__<vendor>__*-store
+  #   (b) CLI dispatch   — the receiver topic's own documented script path, which is
+  #       what `--rag=<skill>:<topic>` actually shells out to. Omitting (b) made this
+  #       hook fire on correctly-dispatched writes (the caller stored via the script,
+  #       the hook only looked for the MCP tool and saw nothing).
+  if grep -qE 'mcp__[a-z_]+__[a-z-]*store|"name":[[:space:]]*"[a-z-]*store"|--rag=|qdrant-import\.py|qdrant-store-chunk\.py|qdrant-fact\.py|fix-plan-to-qdrant\.py' "$TRANSCRIPT" 2>/dev/null; then
     # Already dispatched in this session — quiet exit
     exit 0
   fi

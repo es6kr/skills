@@ -131,6 +131,48 @@ if [[ "${1:-}" == "--test" ]]; then
   # automation, not delegation).
   test_case "Automated option describing absence of manual re-trigger" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Scripted integration test","description":"Real install against the marketplace, asserts activation completes within one call, no second manual trigger needed"},{"label":"skip","description":"skip"}]}]}}'
 
+  # Regression: assistant-subject manual work is not user-delegation (FP class
+  # manual-delegation-guard-fp-on-self-describing-text). The ASSISTANT performs
+  # the manual step and there is no user cue -> allow.
+  test_case "Assistant performs the manual step (no user cue)" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Split now","description":"I will split the run.md hunk manually and stage only my edit"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Exception B (edit-verb, no subject): "Manual" + an editing verb (split /
+  # reconstruct / stage / edit) with NO user cue describes an assistant tool
+  # action, not delegation. Covers FP cases 1-3 where the self-describing text
+  # carried no explicit "I will" subject. FN-safe: still blocks a bare
+  # "Manual sync" (no editing verb) and any user-directive delegation.
+  test_case "Manual + editing verb, no subject (assistant tool work)" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Split","description":"Manual split of the run.md hunk, staging only that edit"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Regression: a genuine user-directive delegation with an editing-adjacent
+  # word must still block (edit-verb exception must not swallow it). "User
+  # pastes ... and edits" carries a user subject + paste directive -> block.
+  test_case "User-directive delegation with edit word still blocks" 2 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Manual","description":"User pastes the token then edits the config in the dashboard"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Exception C (abstract/meta reference, 6th recurrence): "manual" inside a
+  # noun phrase naming an existing practice, no verb/subject at all.
+  test_case "Abstract-practice-noun reference (6th occurrence)" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Delete the task","description":"Not worth pursuing -- rely on the existing manual self-check discipline instead of a new hook"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Exception C (meta-reference, 7th recurrence): citing the FP class itself
+  # while describing the bug re-triggers the bug -- must allow.
+  test_case "Meta-reference to the FP class itself (7th occurrence)" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Fix both hook gaps now","description":"Implement fixes for the manual-delegation English-token false positive in the delegation-check hook"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Regression: Exception C must not swallow a genuine delegation phrased with
+  # one of its abstract-noun words -- user subject present -> still blocks.
+  test_case "Abstract-noun word with user subject still blocks" 2 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Manual","description":"As a matter of practice the user should manually paste the token from the console"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Regression: Exception C must not swallow a genuine delegation phrased with
+  # a directive verb -- click present -> still blocks.
+  test_case "Abstract-noun word with directive verb still blocks" 2 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Manual","description":"Standard practice: manually click the console button to grant access"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Negative control: a normal automated option with no "manual" keyword at
+  # all must pass regardless of Exception C's word list.
+  test_case "Automated option, no manual keyword, unrelated to Exception C" 0 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Run script","description":"Scripted deploy via CI, no manual step, false alarms handled by retry"},{"label":"skip","description":"skip"}]}]}}'
+
+  # Negative control: ordinary UI-delegation text using one of the excluded
+  # generic nouns ("process") must still block -- confirms the word list stayed
+  # narrow and did not accidentally include overly common words.
+  test_case "Ordinary delegation using excluded generic noun 'process' still blocks" 2 '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Manual","description":"User must manually complete the process in the console dashboard"},{"label":"skip","description":"skip"}]}]}}'
+
   # Regression: BROWSER_CTX must stay case-sensitive. "PAT" (bare, no word
   # boundary) case-insensitively matches "pat" inside ordinary words like
   # "path" -- found while fixing the two bugs above, when a manual+evidence
@@ -242,6 +284,80 @@ while IFS=$'\t' read -r label desc; do
   # working copy above, so even a fixed `local`->plain-assignment version
   # would have shadowed the better pattern. Removed rather than repaired —
   # the first copy already covers everything this one attempted.
+
+  # Assistant-subject exception (FP class manual-delegation-guard-fp-on-self-describing-text):
+  # the manual work is performed by the ASSISTANT, not delegated to the user
+  # (e.g. "I'll split the hunk manually"; the locale assistant-subject set is
+  # loaded from the git-ignored hangul-patterns data file). Narrow and FN-safe:
+  # requires an explicit assistant subject AND the absence of any user cue, so an
+  # option that actually delegates to the user (which carries a user subject or a
+  # bare browser/console instruction) is still evaluated normally below.
+  assistant_subj='(I will|I'"'"'ll|I am|assistant|we will|we'"'"'ll)'
+  [[ -n "$HG_MD_ASSISTANT_KO" ]] && assistant_subj="(${assistant_subj}|${HG_MD_ASSISTANT_KO})"
+  user_subj='\b(you|user|human)\b'
+  [[ -n "$HG_MD_USER_KO" ]] && user_subj="(${user_subj}|${HG_MD_USER_KO})"
+  if echo "$desc" | grep -qEi "$assistant_subj" && ! echo "$desc" | grep -qEi "$user_subj"; then
+    continue
+  fi
+
+  # Sentence-form reclassification (FP class manual-delegation-guard-fp-on-self-
+  # describing-text, 5 recurrences). The prior exceptions keyed on an explicit
+  # subject; these key on the sentence FORM instead. A UI-directive verb is the
+  # shared guard: whenever the option tells the user to perform an actionable UI
+  # step (paste / click / issue-a-token / ...), neither exception fires and the
+  # option is still evaluated as delegation below. This keeps them FN-safe.
+  directive_v='\b(paste|pastes|click|clicks|navigate|fill|generate|grant|rename|issue|enter|sign[ -]?in|log[ -]?in)\b'
+  [[ -n "${HG_MD_DIRECTIVE_KO:-}" ]] && directive_v="(${directive_v}|${HG_MD_DIRECTIVE_KO})"
+
+  # Exception A (case 4): the user is described as the ACTOR of their own
+  # past/intent choice (e.g. "the user directly, intending to reverse it, chose
+  # X") rather than being delegated to. The delegation keyword that triggered
+  # this was a "user directly" phrase, but the operative verb is a self-action/
+  # intent verb, not a UI step. Requires that self-action verb AND no
+  # UI-directive verb. Korean-only (the locale self-action verb set is loaded
+  # from the git-ignored data file); English has no bare "user directly"
+  # delegation keyword to false-positive on (English MD keywords are all
+  # UI-directive already).
+  user_selfact="${HG_MD_USER_SELFACT_KO:-}"
+  if [[ -n "$user_selfact" ]] && echo "$desc" | grep -qE "$user_selfact" \
+     && ! echo "$desc" | grep -qEi "$directive_v"; then
+    continue
+  fi
+
+  # Exception B (cases 1-3): "manual" (or its locale equivalent) describing an
+  # ASSISTANT editing action (split/reconstruct/restage/edit a file) with NO
+  # user subject and NO UI-directive verb -- assistant tool work, not
+  # delegation. Still blocks a bare "manual sync" (no editing verb) and any
+  # user-directive delegation. Locale editing verbs load from the data file.
+  edit_v='\b(split|splitting|reconstruct|restructure|reorganiz(e|ing)|re-?stage|re-?staging|stage|edit|editing|rewrite|reorder|reassemble)\b'
+  [[ -n "${HG_MD_EDIT_VERB_KO:-}" ]] && edit_v="(${edit_v}|${HG_MD_EDIT_VERB_KO})"
+  if echo "$combined" | grep -qEi "$edit_v" \
+     && ! echo "$desc" | grep -qEi "$user_subj" \
+     && ! echo "$desc" | grep -qEi "$directive_v"; then
+    continue
+  fi
+
+  # Exception C (abstract/meta reference, 6th-7th recurrence, 2026-08-09):
+  # "manual" appearing inside an abstract noun phrase that NAMES an existing
+  # practice or the FP class itself (e.g. "rely on the existing manual
+  # self-check discipline"; "manual-delegation English-token false positive
+  # in the delegation-check hook") rather than describing an action anyone
+  # is being asked to perform. Neither Exception A (self-action verb) nor B
+  # (edit verb) fires here -- there is no verb at all, just a noun phrase.
+  # Keeps the same FN-safety shape as A/B: still requires NO user subject and
+  # NO UI-directive verb, so a real delegation phrased with one of these nouns
+  # (unlikely in practice) still blocks. Word list intentionally narrow --
+  # generic nouns like "process"/"issue"/"check" are excluded because they
+  # occur too often in ordinary UI-delegation text and would silently widen
+  # this into a bypass for genuine delegation.
+  abstract_ref='\b(discipline|convention|practice|self[- ]?describing|meta[- ]?reference|false[- ]?positive|\bFP\b)\b'
+  [[ -n "${HG_MD_ABSTRACT_REF_KO:-}" ]] && abstract_ref="(${abstract_ref}|${HG_MD_ABSTRACT_REF_KO})"
+  if echo "$combined" | grep -qEi "$abstract_ref" \
+     && ! echo "$desc" | grep -qEi "$user_subj" \
+     && ! echo "$desc" | grep -qEi "$directive_v"; then
+    continue
+  fi
+
   if echo "$md_check_text" | grep -qEi "$MD_PATTERN"; then
     # Check automation evidence in description (case-insensitive)
     if ! echo "$desc" | grep -qEi "$EVIDENCE_PATTERN"; then

@@ -97,6 +97,7 @@ fi
 # work to do (a next-action option) and approving WHICH TIER runs it are two
 # separate axes; collapsing them is what caused an unapproved fable spawn after
 # the user merely picked a "Delegate to Fable" work item.
+# See improvements.md "High-tier (Opus+) agent autonomous execution — missing explicit ask".
 #
 # Contract:
 #   BLOCK when model is opus/fable AND neither approval signal is present:

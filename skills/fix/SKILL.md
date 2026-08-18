@@ -27,10 +27,10 @@ Activated when user gives feedback with "fix:" prefix. Finds the root cause of t
   - **Trade-off-axis questions FIRST, disposition LAST (HARD STOP — applies to ANY /fix flow that authors or promotes a plan artifact, not only `--plan`)**: a generic disposition-only ask (`Apply plan now` / `Refine plan` / `Hold`) is FORBIDDEN when the plan contains Trade-offs rows or unresolved human-review questions (open interpretation notes, "confirm on review" markers). Convert **each** trade-off axis / open review question into its own question object in the `questions` array (one axis per question, max 4 per call — chunk sequential calls when more, never drop the tail), then ask the disposition (`Apply plan now` / `Refine plan` / `Hold`) as the **last** question or a follow-up call. Recurrence source: a promote-completion ask that offered only approve/refine/hold caused the user to re-request the trade-off review manually.
 - `--local`: Scope Step 2 rule modifications to the **workspace-local** or **project-local** rule directory only. Use when the rule applies to a specific workspace (e.g., `~/ghq/github.com/<org>/`) or a specific repo, not globally.
   - Resolution order (Step 2 picks the innermost matching location):
-    1. **Project-local** — `<repo>/.claude/rules/` if cwd is inside a git repo
-    2. **Workspace-local** — nearest `.claude/rules/` walking up from cwd (typically `<workspace-root>/.claude/rules/`)
-    3. **Fallback** — if neither exists, ask the user whether to create one (do NOT silently fall through to global `~/.agents/rules/`)
-  - **Do not** write to `~/.agents/rules/` when `--local` is set. Global-rule cost is context-inflation on every session; `--local` opts into scoped protection.
+    1. **Project-local** — `<repo>/.claude/rules/` or `<repo>/.agents/AGENTS.md` if cwd is inside a git repo
+    2. **Workspace-local** — nearest `.claude/rules/` or `<workspace-root>/.agents/AGENTS.md` walking up from cwd
+    3. **Fallback** — if neither exists, ask the user whether to create one (do NOT silently fall through to global `~/.agents/rules/` or global `~/.agents/GEMINI.md`)
+  - **Do not** write to `~/.agents/rules/` or `~/.agents/GEMINI.md` (and its symlinks like `~/.gemini/GEMINI.md`) when `--local` is set. Global rule files are synced across devices via chezmoi/Syncthing; `--local` opts into workspace/project-scoped protection only.
   - Rule-file location + strength still respect the `rule-management.md` location-plus-method dual-axis ask when the scope choice within the local set is ambiguous (project vs workspace).
 
 ## Topic Dispatch
@@ -136,10 +136,12 @@ TodoWrite([
 Routing table by detected environment:
 - **Antigravity (Gemini)**:
   - Permissions config: Guide user to edit `~/.gemini/config/config.json`. Do not edit it directly.
-  - Behavioral rules: Edit `~/.gemini/GEMINI.md`. Never touch shared `~/.agents/rules/` or Claude Code settings.
+  - Behavioral rules (Global): Edit `~/.gemini/GEMINI.md` (points to `~/.agents/GEMINI.md`, synced via chezmoi/Syncthing).
+  - Behavioral rules (`--local`): Edit nearest `<workspace>/.agents/AGENTS.md` or `<repo>/.agents/AGENTS.md`. NEVER touch `~/.agents/GEMINI.md` or `~/.agents/rules/` when `--local` is active.
 - **Claude Code** (neither Antigravity env var is set):
   - Permissions config: Edit `~/.claude/settings.json`.
-  - Behavioral rules: Edit `CLAUDE.md` or `.claude/rules/`.
+  - Behavioral rules (Global): Edit `CLAUDE.md` or `~/.agents/rules/`.
+  - Behavioral rules (`--local`): Edit `<repo>/.claude/rules/` or `<workspace-root>/.claude/rules/`.
 
 Do NOT use file-existence checks to detect the environment — both `.gemini/` and `.claude/` coexist on the same machine.
 

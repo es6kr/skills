@@ -35,6 +35,10 @@ fi
 #   - header-form session-end report marker
 # Locale-specific marker variants (the wrap-up phrase and header marker in
 # non-English locales) live in data/hangul-patterns.regex (HG_CLEANUP_MARKERS).
+# Additive, not override (`:+…|` rather than `:-`) — the data file is sourced first,
+# so `:-` let an untracked local file decide the whole marker set and silently retire
+# the committed one. Union keeps the committed baseline authoritative; the git-ignored
+# file only ADDS locale variants.
 HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:+${HG_CLEANUP_MARKERS}|}/cleanup|cleanup run|cleanup wrap-up"
 HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBILITY}|}chunks added|qdrant"
 

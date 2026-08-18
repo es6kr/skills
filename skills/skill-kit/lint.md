@@ -521,6 +521,49 @@ Same allowed exception (sanitize/strip lists) and report format as the vendor-pa
 | 2 | Reference `ralph improve 5-A2` step from a non-Ralph-dependent skill | Generalize to "a post-hoc supervision flow" (or whichever abstract role the vendor instantiates) |
 | 3 | Treat sanitize/strip lists as structural references | Sanitize/strip lists = informational; preserve as examples. Step D should NOT flag them |
 
+### Step E: Documented script path drift (HARD STOP)
+
+A skill body that tells the caller to run `bash <path>/script.sh` is making a claim the filesystem can settle. When the skill later moves — into a plugin, out of `~/.claude/skills/`, under a different scope — the prose keeps naming the old location. The call then fails at the moment of use, in someone else's session, with a bare "No such file or directory" and no hint that the doc is the thing that is wrong.
+
+This is not hypothetical: `git-repo/rename-worktree.md` documented `~/.claude/skills/git-repo/scripts/rename-worktree.sh` while the only real copy lived under the plugin marketplace root, and `cleanup` documented `cleanup/scripts/fa-classify.py` the same way. Both were found by a caller hitting the failure, not by lint.
+
+**Scan**: extract every script-like path from skill bodies and resolve it.
+
+```bash
+# Script-like references: bash/sh/python3/node <path> and bare <path>/<file>.(sh|py|js|mjs)
+SCRIPT_REF='(bash|sh|python3?|node|uvx?)[[:space:]]+["'"'"']?([^"'"'"'[:space:]]+\.(sh|py|js|mjs))|([^"'"'"'[:space:]]*scripts/[^"'"'"'[:space:]]+\.(sh|py|js|mjs))'
+grep -rnoE "$SCRIPT_REF" <skill-dir>/*.md <skill-dir>/**/*.md 2>/dev/null
+```
+
+**Resolve each hit** in this order, and report BROKEN only when all of them miss:
+
+| Order | Candidate root | Rationale |
+|-------|----------------|-----------|
+| 1 | `${CLAUDE_PLUGIN_ROOT}` | The runtime-correct root when the skill ships inside a plugin |
+| 2 | The skill's own directory (the file's parent tree) | Relative `./scripts/...` references |
+| 3 | Any documented env override the skill itself defines (e.g. a `*_SCRIPTS` variable) | The skill's declared escape hatch |
+| 4 | Literal path as written, expanded | Catches genuinely absolute installs |
+
+**Exclusions — do not flag these**: paths inside fenced blocks marked as illustrative (`# example`, placeholder `<...>` segments), references to scripts owned by *another* skill that this one declares in `depends-on` (Step A already covers those), and shell variables that are assigned earlier in the same block.
+
+**Report format**:
+
+| Source file | Documented path | Resolved at | Status |
+|---|---|---|---|
+| `git-repo/rename-worktree.md:25` | `~/.claude/skills/git-repo/scripts/rename-worktree.sh` | `${CLAUDE_PLUGIN_ROOT}/skills/git-repo/scripts/rename-worktree.sh` | DRIFTED |
+| `cleanup/fa-prune.md:99` | `fa-classify.py` | (skill dir) | OK |
+
+**Fix direction**: prefer a resolution loop over a corrected literal. A literal that is right today drifts again on the next move; a loop that tries `${CLAUDE_PLUGIN_ROOT}` then the skill dir then an env override survives it. Rewriting one hardcoded home path into a different hardcoded home path is not a fix.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Trust a documented script path because the skill is in active use | Active use exercises the paths people happen to run. Resolve every documented path each lint pass |
+| 2 | Report DRIFTED after checking only the literal path | Walk the full candidate-root table first — a plugin-relative hit is not drift |
+| 3 | Fix by substituting the current absolute path | Emit the resolution loop, so the next relocation does not reopen this |
+| 4 | Flag placeholder paths inside illustrative examples | Honour the exclusion list; a `<skill-dir>/scripts/x.sh` placeholder is documentation, not a call site |
+
 ## Related Actions
 
 After lint completes, recommend:

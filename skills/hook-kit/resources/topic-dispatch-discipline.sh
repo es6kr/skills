@@ -23,8 +23,7 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 SKILL_NAME=$(echo "$INPUT" | jq -r '.tool_input.skill // empty' 2>/dev/null)
 ARGS=$(echo "$INPUT" | jq -r '.tool_input.args // empty' 2>/dev/null)
 
-# No skill name, or no args at all (bare invocation — no topic requested).
-[[ -z "$SKILL_NAME" || -z "$ARGS" ]] && exit 0
+[[ -z "$SKILL_NAME" ]] && exit 0
 
 # Best-effort SKILL.md resolution across common roots. Skill names can carry
 # a "marketplace:skill" or "plugin:skill" prefix — only the last segment
@@ -38,7 +37,11 @@ for root in ~/.claude/skills ~/.agents/skills; do
   fi
 done
 if [[ -z "$SKILL_MD" ]]; then
-  CANDIDATE=$(find ~/.claude/plugins/marketplaces ~/.claude/plugins/cache -maxdepth 6 -type d -iname "$BARE_NAME" 2>/dev/null | head -1)
+  # -L is required: marketplace entries are usually symlinks into a checkout,
+  # and a plain `find` will not descend through them — every skill that lives
+  # under a symlinked marketplace silently fails to resolve, so the hook exits
+  # "fail open" and never reminds about the very skills it should cover.
+  CANDIDATE=$(find -L ~/.claude/plugins/marketplaces ~/.claude/plugins/cache -maxdepth 6 -type d -iname "$BARE_NAME" 2>/dev/null | head -1)
   if [[ -n "$CANDIDATE" && -f "$CANDIDATE/SKILL.md" ]]; then
     SKILL_MD="$CANDIDATE/SKILL.md"
   fi
@@ -46,6 +49,43 @@ fi
 
 # Could not resolve the skill directory — fail open (no reminder, no block).
 [[ -z "$SKILL_MD" ]] && exit 0
+
+TARGET_DIR="$(dirname "$SKILL_MD")"
+
+# Bare invocation (no args at all) on a MULTI-TOPIC skill.
+#
+# This branch used to be an unconditional early exit, on the reasoning that no
+# args means no topic was requested and therefore nothing to remind about. But
+# the injected body for a multi-topic skill is only its router page — the rules
+# live in the topic files. A caller who invokes bare, reads the Topics table,
+# and proceeds gets the index and never the rules, with no signal that anything
+# is missing. That is exactly how a HARD STOP living in one topic file went
+# unread and its rule was violated in the same turn the skill was invoked.
+#
+# Single-topic skills (no Topics/Topic Dispatch table) are unaffected: their
+# SKILL.md body IS the content, so a bare invocation is complete on its own.
+if [[ -z "$ARGS" ]]; then
+  TOPIC_ROWS=$(grep -cE '^\|[^|]+\|[^|]*\|[^|]*\[[a-zA-Z0-9_.-]+\.md\]\(\./[a-zA-Z0-9_.-]+\.md\)' "$SKILL_MD" 2>/dev/null)
+  [[ "${TOPIC_ROWS:-0}" -lt 2 ]] && exit 0
+
+  TOPIC_LIST=$(grep -oE '\(\./[a-zA-Z0-9_.-]+\.md\)' "$SKILL_MD" 2>/dev/null \
+    | tr -d '()' | sed 's|^\./||' | sort -u | head -12 | tr '\n' ' ')
+
+  cat >&2 <<MSG
+Skill("$SKILL_NAME") was invoked with no topic argument, and this skill is
+multi-topic ($TOPIC_ROWS topic rows). What got injected is the router page —
+the Topics table — NOT the topic bodies. Any HARD STOP, procedure, or gate
+defined in a topic file is absent from your context right now.
+
+Topic files in $TARGET_DIR:
+  $TOPIC_LIST
+
+Read the topic(s) covering what you are about to do before acting. If the
+index genuinely suffices (you only needed the topic list), proceed — but do
+not treat the router page as the skill's rules.
+MSG
+  exit 2
+fi
 
 # First whitespace-delimited token of the FIRST LINE of args is the candidate
 # topic keyword (args after that, including any further lines, are free-text
@@ -65,7 +105,6 @@ TOPIC_FILE=$(grep -iE "^\|[[:space:]]*\`?${TOPIC_WORD}\`?[[:space:]]*\|" "$SKILL
 # table — nothing to remind about (bare-args skills, free-text procedures).
 [[ -z "$TOPIC_FILE" ]] && exit 0
 
-TARGET_DIR="$(dirname "$SKILL_MD")"
 TARGET_PATH="$TARGET_DIR/${TOPIC_FILE#./}"
 
 cat >&2 <<MSG

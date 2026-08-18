@@ -13,6 +13,27 @@ Every new fix_plan entry contains three required elements. Single-line action-on
   - {optional sub-steps, command examples, file paths}
 ```
 
+### Canonical medium gate (HARD STOP — creation direction)
+
+**Before adding a new item, determine whether this tracker is the canonical backlog or an index into an external one.** When an external tracker is canonical, an entry written only here is not a record — it is a pointer with nothing behind it, and it disappears the moment the file is regenerated or overwritten by a concurrent writer.
+
+Detect the canonical medium from **both** signals — either alone is insufficient:
+
+1. **Pinned header declaration** — read the file's top block (roughly the first 10 lines) before the session's first add. A tracker that delegates to an external system declares it there.
+2. **Existing index lines** — count entries carrying an external reference suffix (e.g. `→ <Tracker> (<issue URL>)`). A file where such entries dominate is an index in practice, whatever the header does or does not say.
+
+| Canonical medium | How to add |
+|------------------|-----------|
+| This file | Add the three-element entry normally (see below) |
+| External tracker | **Create the item in the external tracker first**, then write the local entry as an index line carrying the returned URL |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Add `- [ ]` here and consider the item recorded, without checking whether an external tracker owns this backlog | Read the pinned header + count existing index lines first. External canonical → create there, then index here |
+| 2 | Reach the file by targeted read (`offset`) or grep and therefore never see the header | The header is where delegation is declared. A targeted read that skips it also skips the rule governing the write you are about to make — under context pressure this is the normal access pattern, not an edge case |
+| 3 | Defer the external write ("record locally now, sync later") | The local file is not durable against regeneration or a concurrent writer. Unsynced local-only entries are the exact loss this gate exists to prevent |
+| 4 | Treat the completion-direction guard (verify the external item before flipping `[x]`) as covering this | Completion and creation are separate directions. Guarding only completion leaves every new item unprotected |
+
 ### Why each element is required
 
 | Element | Purpose | What breaks if omitted |
@@ -38,6 +59,7 @@ fix_plan is a **session-to-session information transfer medium**. The context in
 2. **Why**: 1-2 sentences explaining the motivation?
 3. **How to apply**: core procedure / tools / commands?
 4. **Future-session test**: "Can a future session proceed from this entry alone without asking the user?" — If no, the entry is information-incomplete
+5. **Canonical medium**: did you confirm, from the pinned header **and** the existing index-line count, whether an external tracker owns this backlog? If it does, was the item created there first and is this entry carrying its URL? — A local-only entry under an external canonical medium is not a record
 
 ## Length budget — verbose body forbidden (HARD STOP)
 

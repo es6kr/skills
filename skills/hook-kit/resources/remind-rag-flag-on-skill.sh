@@ -34,7 +34,7 @@ ARGS=$(echo "$INPUT" | jq -r '.tool_input.args // empty' 2>/dev/null)
 is_whitelist=0
 case "$SKILL" in
   cleanup)
-    if [[ "$ARGS" == fa-prune* ]]; then is_whitelist=1; fi
+    if [[ "$ARGS" == fa-prune* ]] || [[ "$ARGS" == run* ]] || [[ -z "$ARGS" ]]; then is_whitelist=1; fi
     ;;
   archive|code-workflow)
     is_whitelist=1

@@ -35,7 +35,7 @@ THRESHOLD=45
 # Korean wrap-up keyword overlay (git-ignored in the PUBLIC repo — see
 # hook-kit/data/hangul-patterns.regex header). Falls back to English-only
 # detection when the data file is absent (published/local-no-data installs).
-HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
 if [[ -f "$HG_DATA_FILE" ]]; then
   . "$HG_DATA_FILE"
 fi
@@ -144,9 +144,30 @@ fi
 # (many tool calls, no intervening user prompt) it freezes at an early-turn
 # value; both the over- and under-offer checks then misfire (the exact 2nd
 # recurrence this guard was defeated by). Recompute the live figure on demand
-# from the transcript's last assistant-message usage field via the sibling
+# from the transcript's last assistant-message usage field via
 # context-usage-inject.sh (the same source the injection hook uses).
-CTX_INJECT="$(dirname "$0")/context-usage-inject.sh"
+#
+# This script now lives in cleanup/resources/ (moved out of hook-kit, which
+# still owns context-usage-inject.sh itself), so it is no longer a
+# same-directory sibling — probe a path chain instead of hardcoding one path.
+# A single hardcoded path silently degrades this guard to "no signal"
+# wherever it does not resolve, and the failure is invisible: LATEST_PCT
+# stays empty and the guard falls back to the STALE injected figure, which is
+# exactly the bug this LIVE reading exists to avoid. Observed 2026-08-16: two
+# installed copies of this guard returned 62.8% and 24.0% for the same ask,
+# purely because one resolved its path and the other did not.
+#   1. hook-kit sibling resource   — current real location (this repo)
+#   2. context-measure skill       — anticipated future split-out location
+#   3. ${CLAUDE_PLUGIN_ROOT}       — plugin-relative, set when run as a plugin hook
+#   4. $HOME/.claude/skills/...    — legacy absolute path, kept for back-compat
+CTX_INJECT=""
+for _cand in \
+  "$(dirname "$0")/../../hook-kit/resources/context-usage-inject.sh" \
+  "$(dirname "$0")/../../context-measure/resources/context-usage-inject.sh" \
+  "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/hook-kit/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/hook-kit/resources/context-usage-inject.sh"; do
+  if [[ -f "$_cand" ]]; then CTX_INJECT="$_cand"; break; fi
+done
 LATEST_PCT=""
 if [[ -f "$CTX_INJECT" ]]; then
   # One invocation yields both figures. CC_EMIT_THRESHOLD makes the script
@@ -272,6 +293,43 @@ if [[ ( "$HAS_ENDSTOP" == "1" || "$HAS_NEXTACTION" == "1" ) && "$HAS_CLEANUP" ==
     echo ""
     echo "Reference: next skill suggestion-patterns.md 'Context-usage gate' positive trigger;"
     echo "  failed-attempts.md (grep \"context-usage\")"
+  } >&2
+  exit 2
+fi
+
+# GENERIC-CITATION (5th check, new -- closes the gap where an end/stop-framed
+# ask never offers a cleanup-labeled option at all (below threshold, or the
+# composer chose a plain "continue vs stop" framing instead) and therefore
+# skips every check above untouched -- all of them require a cleanup option
+# to be present or the reading to already be at/above threshold before they
+# even look at citation. The point of citing % is to let the user judge for
+# themselves regardless of which side of the cleanup threshold the ask lands
+# on, so this check fires whenever the ask carries end/stop framing
+# (HAS_ENDSTOP==1) and NO number appears anywhere in the ask (question text
+# or any option text), independent of HAS_CLEANUP/BELOW.
+ALL_ASK_TEXT=$(echo "$INPUT" | jq -r '
+  .tool_input.questions[]? |
+  (.question // ""), (.options[]? | (.label // "") + " " + (.description // ""))
+' 2>/dev/null)
+
+if [[ "$HAS_ENDSTOP" == "1" ]] && ! echo "$ALL_ASK_TEXT" | grep -qE '[0-9]+(\.[0-9]+)?[[:space:]]*%'; then
+  {
+    echo "DENIED: end/stop-session ask cites no live context-usage percentage anywhere."
+    echo ""
+    echo "Live context usage: ${LATEST_PCT}% (threshold ${THRESHOLD}% -- informational here, not the gate)."
+    echo ""
+    echo "Why blocked:"
+    echo "  - A plain 'continue vs stop' ask with end/stop framing but no cleanup-labeled"
+    echo "    option falls outside the OVER/MISSING-CITATION/UNDER-offer checks above,"
+    echo "    which all require a cleanup option or an at/above-threshold reading first"
+    echo "  - The user needs the number to judge for themselves whether to keep going,"
+    echo "    independent of whether this ask crosses the cleanup-recommendation threshold"
+    echo ""
+    echo "Required action:"
+    echo "  Cite the live figure in the question text or an option, e.g."
+    echo "  \"... (context usage: ~${LATEST_PCT}%) ...\""
+    echo ""
+    echo "Reference: failed-attempts.md class context-usage-stale (19th occurrence)"
   } >&2
   exit 2
 fi

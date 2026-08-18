@@ -483,6 +483,31 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 
 **Concrete operational cost, not just traceability**: in a workspace running multiple concurrent worktree branches against the same target branch (a common pattern here), squashing collapses commits that other in-flight branches may already share as ancestors — those branches then hit avoidable conflicts the next time they rebase onto the target, because the target's history no longer contains the individual commit objects they diverged from. `--merge` (preserving the original commits) avoids this. This is a second, independent reason (beyond traceability) to route distinct-concern multi-commit PRs to `--merge`.
 
+**The PR's OWN source branch is the certain case, not the probabilistic one (HARD STOP)**: the paragraph above points outward, at *sibling* branches that may or may not share the commits. The branch this PR is merged **from** always holds them — and in a worktree workflow it is still checked out, still on those exact commits, after the squash lands a single unrelated commit on the target. Checking siblings and calling the local-history risk assessed is the exact gap this rule closes: the rare case gets inspected while the guaranteed one goes unexamined.
+
+Squash-merging while that branch survives locally leaves two histories for the same change with no common commit. The next rebase or merge of that worktree replays all N commits onto a target that already contains their squashed equivalent — conflicts on every hunk, and the branch cannot be fast-forwarded away, so it has to be force-reset or deleted by hand later, from a state the operator no longer remembers.
+
+**Therefore: before offering `Squash merge` as an option at all, verify the source branch's local state and its cleanability.**
+
+```bash
+R=<repo-path>; B=<pr-head-branch>
+git -C "$R" rev-parse --verify --quiet "$B" >/dev/null && echo "branch present locally"
+git -C "$R" worktree list | grep -F "[$B]"          # is a worktree pinned to it?
+W=$(git -C "$R" worktree list --porcelain | grep -B2 "branch refs/heads/$B" | sed -n 's/^worktree //p')
+# Cleanability — all three must be empty for the branch to be safely removable after merge
+git -C "${W:-$R}" status --porcelain                 # uncommitted work
+git -C "${W:-$R}" stash list                         # stashed work
+git -C "${W:-$R}" log @{u}..HEAD --oneline           # commits not on the remote
+```
+
+| Source-branch state | Squash allowed? |
+|---------------------|-----------------|
+| Branch absent locally (already deleted) | Yes — no residue to diverge |
+| Branch present, **cleanable** (no uncommitted / stashed / unpushed work) | Yes, **only if** the post-merge branch deletion is stated in the merge ask and actually carried out |
+| Branch present with uncommitted, stashed, or unpushed work | **No — squash forbidden.** Either preserve history with `--merge`, or surface the residue to the user and let them decide what to salvage first. Never delete or reset a branch holding unpushed work to make squash viable |
+
+Report the state in the merge ask itself, so the user weighs a fact rather than an assumption.
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api --paginate repos/{owner}/{repo}/pulls/<N>/commits \| jq -s 'add \| length'` before composing the option — the bare (non-paginated) form silently caps at the API's default page size (30), undercounting larger PRs; `--paginate` alone still applies `--jq` per page rather than aggregating, so slurp+combine with an external `jq -s`. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
@@ -490,6 +515,9 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 | 3 | Present only "Squash merge (Recommended)" as an option when commit count ≥ 3 and concerns are distinct | Present both `Squash merge` and `Merge commit (preserve history)` as co-equal options **only when repository policy permits both** — let the user weigh the trade-off, do not silently pick one |
 | 4 | Bury the commit list in a follow-up message after the user asks for it | Include the commit SHA + one-line summary list directly in the option description (or the question text) the first time a multi-commit PR's merge is proposed |
 | 5 | State only a commit **count** ("1 commit", "3 commits") without listing the actual commit(s) — even for a single-commit PR | Always show the commit SHA + one-line summary for every commit being merged, regardless of count. A bare count is an unverifiable assertion; the list lets the user check it themselves instead of having to ask |
+| 6 | Check whether *sibling* branches share the commits as ancestors, get "no", and treat the local-history risk as assessed | Siblings are the probabilistic case; the PR's own source branch is the certain one. Run the source-branch residue check above **as well** — a clean sibling report says nothing about the branch being merged from |
+| 7 | Offer `Squash merge` for a PR whose source branch still holds uncommitted, stashed, or unpushed work | That state makes squash unsafe — the branch cannot be cleaned up afterwards without losing work. Offer `--merge`, or surface the residue and let the user salvage it first |
+| 8 | Delete or force-reset the source branch on your own to make squash viable | Branch deletion after merge is fine when the branch is already clean **and** the ask said so. Destroying unpushed work to unblock a merge method is not a cleanup step |
 
 **Policy-required exception (release-please / changesets repos)**: when the merge-method policy pre-check above (condition 6) signals that individual commits must be preserved, `Squash merge` is not a valid co-equal option for that PR — squashing collapses the Conventional Commit history release-please/changesets parses per-commit, breaking their version-bump detection. Present `Merge commit (preserve history)` as the only method, still disclosing the commit count and per-commit summaries so the user can verify the list, but do not offer squash as a choice to weigh.
 
@@ -499,7 +527,9 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 1. Run the commit-count query above. Is it ≥ 3?
 2. If yes, do the commits span distinct concerns (different subsystems/files/one-line summaries)? — if unclear, list them and let the user judge, don't decide unilaterally
 3. Does the option set include the actual commit SHA + one-line summary list (not just a count), and — when count ≥ 3 with distinct concerns — both squash and merge-commit as co-equal options?
-4. If any answer above was skipped, the AskUserQuestion is incomplete — add it before presenting
+4. Did you run the **source-branch residue check** (branch present locally? worktree pinned to it? uncommitted / stashed / unpushed work?) and put its result in the ask? A sibling-ancestry check does not substitute for it
+5. If that check found work that is not on the remote, is `Squash merge` **absent** from the options?
+6. If any answer above was skipped, the AskUserQuestion is incomplete — add it before presenting
 
 **Stale-knowledge trap in multi-PR sessions (HARD STOP)**: this gate — like the rest of "Merge Execution" — can change between when you first Read this file and the Nth merge decision later in the same long session (e.g. a just-merged PR updated this very file). Recalling "CI + Test Plan + Mergeable were the conditions" from an early-session Read and never re-checking the *current* six conditions per PR is exactly how a real gate (commit count queried, but its consequence unknown/forgotten) gets silently skipped. Before each individual merge-recommendation ask in a session touching 2+ PRs, treat your in-context knowledge of this file as a snapshot, not a live source — run the commit-count query fresh and apply its current consequence, don't just reuse conclusions from earlier in the session.
 
@@ -532,6 +562,9 @@ gh pr merge <PR_NUMBER> --merge
 - **Always confirm**: `gh pr checks` right before merging is non-optional.
 - **Message quality**: at squash time, write a message that actually reveals the work — not GitHub's default "Merge pull request #..." text.
 - **Post-merge cleanup**: after a successful merge, delete the local branch and check the corresponding `fix_plan.md` item as `[x]`. **Worktree removal requires AskUserQuestion (HARD STOP)** — `git worktree remove` is a destructive action and the `git-repo` skill recommends reusing worktrees for the next PR rather than removing them. After merge, the worktree must be left in place by default; only remove on explicit user instruction. Listing "remove worktree" as a default cleanup step (or executing it autonomously) is forbidden.
+  - **Branch deletion after a squash merge is mandatory, not optional (HARD STOP)** — and it is the reason the pre-merge residue check above exists. "Keep the worktree" and "keep the branch" are different decisions: the worktree stays (so it can be reused), the **branch it points at must not**, because after a squash it holds N commits whose squashed equivalent is already on the target with no shared history. Leaving both is what produces a worktree that conflicts on every hunk the next time it rebases.
+  - Sequence: confirm the branch is still clean (the pre-merge check's three probes — nothing uncommitted, stashed, or unpushed), `git branch -D <branch>`, then leave the worktree in place by re-pointing it at a fresh branch off the updated target (`git-repo` `rename-worktree`) rather than removing it. If the branch turns out **not** to be clean at this point, stop and report — the pre-merge gate should have caught it, so its appearance here means the state changed mid-merge and the user must decide.
+  - After a `--merge` (history-preserving) merge this does not apply: the commits are on the target, so the local branch fast-forwards and carries no divergent history.
 - **Post-merge AI Review Summary sync (HARD STOP)**: after a successful merge, immediately PATCH the AI Review Summary comment (the one posted in `consolidate/post.md` Step 7) to reflect the merged state — do NOT leave the Summary frozen at its pre-merge snapshot. The Summary is the user-facing record of the PR's final disposition; if it still says "⏳ Actionable PENDING" or shows an incomplete Test Plan after merge, anyone reading the PR later will see a contradictory record.
   - **What to update**: (a) verdict line: `⏳ Actionable PENDING fix.` → `✅ MERGED <YYYY-MM-DD>` + merge commit SHA + `(#<PR>)` suffix. (b) findings table `Status` column: each "⏳ Pending decision" → either `🟢 Applied (commit <sha>)` or `🟢 Deferred (<tracking-medium reference>)` per the actual outcome. (c) any inline "Test Plan N/M items checked" → "Test Plan M/M ✅" if CI re-pass confirmed.
   - **How**: `gh api repos/{owner}/{repo}/issues/comments/{comment_id} -X PATCH --input <(jq -n --rawfile body <updated-summary-file> '{body: $body}')` — find the comment id via `gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("## AI Review Summary")) | .id'`. Reuse the same id (PATCH, not new POST) — `consolidate/post.md` "Single Summary preservation guard" applies post-merge too.
