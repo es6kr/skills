@@ -41,7 +41,7 @@ AskUserQuestion {
 ### 3. Execute Script
 
 ```bash
-python ~/.claude/skills/claude-session/scripts/move-session.py \
+python scripts/move-session.py \
   <session_id> [session_id2 ...] <target_project_path> \
   --cwd-mode <first|all>
 ```

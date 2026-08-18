@@ -3,7 +3,7 @@
 #                     to ~/.claude/projects/.bak/<project-key>_<uuid>.jsonl
 #
 # Naming convention matches the existing ~/.claude/projects/.bak/ layout
-# (flat: <project-key>_<uuid>.jsonl). See claude-session/archive.md.
+# (flat: <project-key>_<uuid>.jsonl). See session/archive.md.
 #
 # Usage: archive-session.sh <session-uuid> [--dry-run]
 #        archive-session.sh --dry-run <session-uuid>   # --dry-run accepted in any positional slot
