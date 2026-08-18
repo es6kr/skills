@@ -258,7 +258,12 @@ Do not re-dump the entire plan body into chat — chat shows only path + 3-5 lin
 3. If any target was not modified, **do not advance to Step 3 — finish the modifications first**
 4. **Do not pass on "existing rule not followed" alone without modifications** — if a rule existed but wasn't followed, strengthen its text to be more specific/explicit, or add examples / forbidden patterns. "Just naming the rule path" and moving on permits the same mistake to recur
 5. **Do not check only Why 3 while omitting Why 1-2 targets** — if Why 2 says "X causes misunderstanding", X must be modified
-6. **Verify escalation artifacts**: if this fix is the Nth recurrence, confirm the artifact for that count was actually produced in Step 2. 2nd time = hook design doc, **3rd time = hook script file + settings.json registration + parse-based verification**. Missing artifact = Step 2 incomplete.
+6. **Verify escalation artifacts**: if this fix is the Nth recurrence, confirm the artifact for
+   that count was actually produced in Step 2, per the primary "4-stage progressive" matrix
+   above (this item does not use a separate numbering): **3rd time** = rule-file edit if the
+   4-filter gate passes (mark the FA entry `status=hook-pending` when filter #3's deterministic
+   check looks likely to need automation soon), **4th time** = hook script file + settings.json
+   registration + parse-based verification. Missing artifact = Step 2 incomplete.
    - **HARD STOP — "script file authored alone = done" is FALSE**: hook script + chmod +x + copy to `~/.claude/hooks/` + **`settings.json` PostToolUse/PreToolUse matcher registration + post-registration parse verification (`jq` or `python3 -c "import json"`) confirming actual registration** is the full Step 2 deliverable.
    - Mandatory verification command: `python3 -c "import json; d=json.load(open('~/.claude/settings.json')); ..."` to confirm the registered hook command is present in the matcher array. Skipping this = Step 2 incomplete.
    - **HARD STOP — authoring the script alone is not enough**: a hook is only "done" once it is registered AND the registration is parse-verified. Omitting settings.json registration silently disables the hook. (Case history: see failed-attempts.md "RAG store mandate".)
