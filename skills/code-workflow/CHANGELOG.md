@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/es6kr/skills/compare/code-workflow-v0.6.2...code-workflow-v0.6.3) (2026-08-17)
+
+
+### Bug Fixes
+
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.6.2](https://github.com/es6kr/skills/compare/code-workflow-v0.6.1...code-workflow-v0.6.2) (2026-08-11)
 
 

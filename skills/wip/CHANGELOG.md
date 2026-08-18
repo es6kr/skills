@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.5](https://github.com/es6kr/skills/compare/wip-v0.4.4...wip-v0.4.5) (2026-08-17)
+
+
+### Bug Fixes
+
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* wip single-item ask skip + hunk-split cross-ref ([0c4007a](https://github.com/es6kr/skills/commit/0c4007a18ae65b31ac7d308ea7d96a68b76b9ca4))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.4.4](https://github.com/es6kr/skills/compare/wip-v0.4.3...wip-v0.4.4) (2026-08-12)
 
 

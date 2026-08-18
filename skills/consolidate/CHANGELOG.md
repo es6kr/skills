@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/es6kr/skills/compare/consolidate-v0.5.3...consolidate-v0.5.4) (2026-08-17)
+
+
+### Bug Fixes
+
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.5.3](https://github.com/es6kr/skills/compare/consolidate-v0.5.2...consolidate-v0.5.3) (2026-08-12)
 
 

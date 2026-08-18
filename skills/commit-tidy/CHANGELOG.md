@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.4](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.3...commit-tidy-v0.5.4) (2026-08-17)
+
+
+### Bug Fixes
+
+* **commit-tidy:** cross-reference hunk-split from staging-discipline ([1ef05f3](https://github.com/es6kr/skills/commit/1ef05f31e40fe48c53f1b87ab3d4238db506d2cd))
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* wip single-item ask skip + hunk-split cross-ref ([0c4007a](https://github.com/es6kr/skills/commit/0c4007a18ae65b31ac7d308ea7d96a68b76b9ca4))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.5.3](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.2...commit-tidy-v0.5.3) (2026-08-11)
 
 

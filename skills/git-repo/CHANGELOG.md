@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/git-repo-v0.8.0...git-repo-v0.8.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **git-repo:** add worktree-ancestry divergence pre-check for staging-branch model ([d28bbdb](https://github.com/es6kr/skills/commit/d28bbdb29a76306d143c812bef6363afb5c66fea))
+* **git-repo:** let rename-worktree base a new branch somewhere other than stale HEAD ([98e9201](https://github.com/es6kr/skills/commit/98e92018b94a9b52bb2c585fdabf158c2347379a))
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/git-repo-v0.7.2...git-repo-v0.8.0) (2026-08-16)
 
 

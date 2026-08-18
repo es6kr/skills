@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/todowrite-v0.8.0...todowrite-v0.8.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* **todowrite:** require verifiable URL for external-resource completion reports ([4c967eb](https://github.com/es6kr/skills/commit/4c967eb36db6aaecb2fd09944014500ad413394c))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/todowrite-v0.7.1...todowrite-v0.8.0) (2026-08-16)
 
 

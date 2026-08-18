@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.3](https://github.com/es6kr/skills/compare/github-flow-v0.8.2...github-flow-v0.8.3) (2026-08-17)
+
+
+### Bug Fixes
+
+* **github-flow:** CI-gate-only base check before ready-transition claims ([435d43c](https://github.com/es6kr/skills/commit/435d43cd023e91688da8e5ffcd5c3c655605abbb))
+* **github-flow:** CI-gate-only base means skip ready transition, not just no review cost ([9418c40](https://github.com/es6kr/skills/commit/9418c408a4503402167bbd17706656f62789a287))
+* **github-flow:** forbid raw draft paths in plan-to-issue --body-file ([d0911f0](https://github.com/es6kr/skills/commit/d0911f0f0e742dd7cdf239ce880d4dfce3e0ab9e))
+* **github-flow:** require CI-gate-only base check before ready-transition claims ([6a94549](https://github.com/es6kr/skills/commit/6a9454941f40e26a9e7ef544db915c63f3b007cf))
+* **github-flow:** require open-PR check before repo-wide fix work ([#329](https://github.com/es6kr/skills/issues/329)) ([5da8855](https://github.com/es6kr/skills/commit/5da88554a3e425738ef5003e20ff32b96d96b4a5))
+* **github-flow:** verify PR creation via authoritative commit fields, not diff listing ([568ec87](https://github.com/es6kr/skills/commit/568ec874e2ad18f88b1c45bcc15e809786f5822d))
+* plan-to-issue frontmatter guard, cleanup gap-baseline sync, pre-commit placeholder exemption ([20e1698](https://github.com/es6kr/skills/commit/20e1698b3b3ee435b8c2705dfe32124567eedd29))
+* promote next-fix staging (30 fixes across 14 skills) ([ee467c0](https://github.com/es6kr/skills/commit/ee467c045d779d7b80d30f160763ec3534a9742b))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+
 ## [0.8.2](https://github.com/es6kr/skills/compare/github-flow-v0.8.1...github-flow-v0.8.2) (2026-08-09)
 
 
