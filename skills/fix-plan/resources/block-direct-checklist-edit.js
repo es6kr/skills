@@ -1,0 +1,54 @@
+#!/usr/bin/env node
+// block-direct-checklist-edit.js
+// Physically blocks direct edits on fix_plan.md and checklist.md via Edit/Write tools.
+// Enforces that modifications must be routed through fix-plan skill scripts.
+
+const fs = require('fs');
+
+function safeParse(str) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return {};
+  }
+}
+
+function readStdin() {
+  try {
+    return fs.readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+const input = safeParse(readStdin());
+let filePath = (input.tool_input && input.tool_input.file_path) || '';
+if (!filePath) {
+  filePath = (input.tool_input && input.tool_input.TargetFile) || '';
+}
+if (!filePath) {
+  filePath = (input.tool_input && input.tool_input.path) || '';
+}
+
+if (filePath) {
+  const norm = filePath.replace(/\\/g, '/');
+  if (norm.endsWith('fix_plan.md') || norm.endsWith('checklist.md') || norm.includes('/fix_plan.md') || norm.includes('/checklist.md')) {
+    if (process.env.ALLOW_CHECKLIST_DIRECT_EDIT === '1') {
+      process.exit(0);
+    }
+    process.stderr.write('============================================================\n');
+    process.stderr.write('⛔ [BLOCKED: HARD STOP] Direct text edit on checklist is strictly prohibited!\n');
+    process.stderr.write(`Target File: ${filePath}\n`);
+    process.stderr.write('Reason: Editing fix_plan.md or checklist.md via Edit/Write/replace tools corrupts schema.\n');
+    process.stderr.write('Required Action: You MUST run fix-plan scripts in terminal via run_command/Bash:\n');
+    process.stderr.write('  - ADD a new item:  python skills/fix-plan/scripts/add_item.py --file <path> \\\n');
+    process.stderr.write('        --action "..." --why "..." --how "..." [--marker "[BLOCKED:P1:external]"] [--dry-run]\n');
+    process.stderr.write('  - python skills/fix-plan/scripts/detect_bloated_tasks.py --file <path>\n');
+    process.stderr.write('  - python skills/fix-plan/scripts/stale_check.py --root <path>\n');
+    process.stderr.write('  - python skills/fix-plan/scripts/cleanup.py --file <path>\n');
+    process.stderr.write('============================================================\n');
+    process.exit(2);
+  }
+}
+
+process.exit(0);
