@@ -75,6 +75,22 @@ Parse cloned path from output:
 
 - Extract path from `clone https://... -> /path/to/repo` format
 
+### Step 1.5: Repository `.gitignore` Hygiene Baseline Check
+
+Verify that the cloned repository has standard baseline ignores configured (or add to `.git/info/exclude` / `.gitignore`):
+
+- `.worktrees/` (Worktree isolation)
+- `.DS_Store` (OS junk)
+- `__pycache__/` (Python bytecode cache)
+- `*.bak` (Local backup files)
+- `*.tmp` (Temporary files)
+
+```bash
+# Verify baseline ignore patterns
+cd /path/to/repo
+grep -q "^\.worktrees/" .gitignore 2>/dev/null || echo -e "\n# Worktrees & Runtime\n.worktrees/\n.DS_Store\n__pycache__/\n*.bak\n*.tmp" >> .gitignore
+```
+
 ### Step 2: Parse Repository Info
 
 Extract host/group/repo from URL:
