@@ -74,18 +74,31 @@ A worktree is **repurposable** when both checks are empty (fully pushed + clean)
 
 ### 3. Decision — reuse or create
 
-```
-inactive candidates found?
-├─ YES → AskUserQuestion: which one to reuse?
-│        ├─ User selects one → Step 4A (rename/move)
-│        └─ User says "create new" → Step 4B (new)
-└─ NO  → worktree count over the limit (see "Inactive Worktree Count Limit")?
-         ├─ YES → repurposable candidate found (§2.5)? → oldest one → Step 4A (rename/move)
-         │        └─ none found → report to user, ask before creating new
-         └─ NO  → Step 4B (new)
+**Cost gate first (HARD STOP).** What reuse buys back is a **dependency install / build cache**, not the worktree directory. Where no dependency manifest exists, a fresh worktree is a checkout and nothing more — reuse saves seconds, while renaming a branch destroys whatever intent its name encoded. Classify the repo before consulting the tree:
+
+```bash
+ls <repo>/package.json <repo>/pnpm-lock.yaml <repo>/yarn.lock <repo>/Cargo.toml \
+   <repo>/go.mod <repo>/pom.xml <repo>/build.gradle <repo>/requirements.txt \
+   <repo>/uv.lock <repo>/Gemfile
 ```
 
-**AskUserQuestion options must include both reuse and new-create** when inactive candidates exist.
+Any hit → **heavy**. No hit → **lightweight** (a docs or shell-skill repo, for instance).
+
+```
+repo has a dependency manifest / lockfile?
+├─ NO  (lightweight) → Step 4B (new). Reuse is opt-in — offer it only if the user asks.
+└─ YES (heavy) ↓
+   inactive candidates found?
+   ├─ YES → AskUserQuestion: which one to reuse?
+   │        ├─ User selects one → Step 4A (rename/move)
+   │        └─ User says "create new" → Step 4B (new)
+   └─ NO  → worktree count over the limit (see "Inactive Worktree Count Limit")?
+            ├─ YES → repurposable candidate found (§2.5)? → oldest one → Step 4A (rename/move)
+            │        └─ none found → report to user, ask before creating new
+            └─ NO  → Step 4B (new)
+```
+
+**In a heavy repo, AskUserQuestion options must include both reuse and new-create** when inactive candidates exist. In a lightweight repo the same offer is noise — new-create is the recommended option, and a branch name that encodes planned intent is preserved rather than renamed.
 
 ### 4A. Reuse via rename or move
 
@@ -226,10 +239,13 @@ Reuse via rename is the default for inactive worktrees (Don't/Do rule #5). Howev
 
 ### Decision matrix
 
-| Inactive count (after cleanup of just-completed worktree) | Action for the just-completed worktree | Rationale |
-|-----------------------------------------------------------|----------------------------------------|-----------|
-| ≤ 5 | **B: reuse** — `git checkout --detach origin/main` + `git branch -D <feature>` | Pool is healthy. Reuse avoids the cost of fresh worktree creation (~10-30s + ENOSPC risk on small `.git/worktrees`) |
-| > 5 | **A: remove** — `git worktree remove <path>` + `git branch -D <feature>` | Pool is full. Removing the just-completed worktree (rather than an older inactive one) avoids touching others' historical workspaces |
+| Repo weight | Inactive count (after cleanup of just-completed worktree) | Action for the just-completed worktree | Rationale |
+|-------------|-----------------------------------------------------------|----------------------------------------|-----------|
+| **Lightweight** (no dependency manifest — see §3 cost gate) | any | **A: remove** — `git worktree remove <path>` + `git branch -D <feature>` | There is nothing to preserve: a replacement worktree is a plain checkout. Keeping it only grows `git worktree list` and the cost of every future reuse-vs-create decision |
+| Heavy | ≤ 5 | **B: reuse** — `git checkout --detach origin/main` + `git branch -D <feature>` | Pool is healthy. What reuse preserves is the installed dependency tree / build cache — that is the actual saving, not the directory |
+| Heavy | > 5 | **A: remove** — `git worktree remove <path>` + `git branch -D <feature>` | Pool is full. Removing the just-completed worktree (rather than an older inactive one) avoids touching others' historical workspaces |
+
+**Lightweight repos — removal is offerable at any completion stage.** Once work in a lightweight repo's worktree reaches a completion point — pushed, PR opened, or merged — offering to remove that worktree is appropriate; it need not be held as a reuse candidate. Ask rather than remove silently, since the user may still be reading the diff or expecting review feedback.
 
 ### Don't / Do
 
@@ -312,13 +328,15 @@ User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktre
 
 ## Inactive worktree inventory before creating a new one (HARD STOP)
 
-**When a worktree is needed, inspect existing worktrees before creating a new one with `git worktree add`.**
+**In a heavy repo, inspect existing worktrees before creating a new one with `git worktree add`.** Run the §3 cost gate first — this inventory obligation applies only where a fresh worktree would cost a dependency install or build.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Default to creating a new worktree with `git worktree add` whenever one is needed | Run `git worktree list` first → identify inactive / merged-PR worktrees → reuse via `/git-repo rename-worktree` or `/git-repo move-worktree` |
-| 2 | AskUserQuestion options default to "create new and remove later" | Include "rename and reuse an inactive worktree" whenever at least one inactive candidate exists |
-| 3 | Ignore worktrees pinned at the merge commit of a merged PR | The base commit hash matching a merge commit = a reuse candidate |
+| 1 | Apply the inventory-first obligation regardless of repo weight | Run the §3 cost gate first. Heavy → inventory first. Lightweight → create new and move on |
+| 2 | In a heavy repo, default to creating a new worktree with `git worktree add` whenever one is needed | Run `git worktree list` first → identify inactive / merged-PR worktrees → reuse via `/git-repo rename-worktree` or `/git-repo move-worktree` |
+| 3 | In a heavy repo, let AskUserQuestion options default to "create new and remove later" | Include "rename and reuse an inactive worktree" whenever at least one inactive candidate exists |
+| 4 | Ignore worktrees pinned at the merge commit of a merged PR (heavy repo) | The base commit hash matching a merge commit = a reuse candidate |
+| 5 | In a lightweight repo, surface inactive candidates as if reuse were preferable | Create new. Mention candidates only if the user asks, or to offer removal of ones already finished |
 
 See the "Worktree decision tree" section above for the full procedure.
 
@@ -335,7 +353,7 @@ See the "Worktree decision tree" section above for the full procedure.
 | 3 | Assume "only my changes are staged, so other changes don't matter" | The same push can include unpushed commits from another task, and other dirty working-directory state can leak into the next step |
 | 4 | Omit "split into worktree" from the commit-options AskUserQuestion list | When branch is main/master/develop AND there are 1+ other-task changes, "split into worktree" is a required option |
 | 5 | Leave another task's unstaged changes in place and push only the new commit | Confirm the other-task intent (report to the user) → split into a worktree or separate it into another task |
-| 6 | **Place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **If 1+ inactive worktree candidates exist, place "rename and reuse" as option 1 / Recommended**. New goes to option 2 or lower |
+| 6 | **In a heavy repo, place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **In a heavy repo with 1+ inactive candidates, place "rename and reuse" as option 1 / Recommended**; new goes to option 2 or lower. **In a lightweight repo the ordering reverses** — new-create is option 1, because reuse saves nothing there and renaming discards a branch name's intent |
 | 7 | Assume "worktree split = move the working-tree changes out of the current repo" (stash + checkout) when the current repo is a live runtime environment whose working tree state is actively consumed by the user (e.g., `~/.agents` — rules are loaded always_on, skills are hardlinked to `~/.claude/skills/`) | Distinguish two split modes: **(a) move** — stash + checkout to a new branch (default for one-off feature work) vs **(b) copy** — leave the source working tree untouched + replicate the diff into a separate worktree via `cp`/`rsync` and commit there. Use (b) whenever the source repo's working tree is a live runtime environment. The source working tree must not change state for the user during commit/PR |
 
 ### Self-check (every time before presenting commit options)
