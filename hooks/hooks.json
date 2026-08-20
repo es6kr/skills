@@ -132,6 +132,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-fabricated-claims.sh"
           }
         ]
       },
