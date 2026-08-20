@@ -285,7 +285,7 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 Analyze session mistakes, review hooks/skills, and detect patterns.
 
 **Automated Script Execution**:
-- Run `python scripts/fa-analyze.py` to automatically analyze `failed-attempts.md` rules, status tags, and detect recurring error classes.
+- Run `python <skill-dir>/scripts/fa-analyze.py` to audit the retrospect log's rules and status tags and surface recurring error classes. The log lives in this skill's own gitignored data directory, so a fresh install will not have one — the script raises `FileNotFoundError` rather than skipping, so pass `--file` a log that exists.
 
 [claudify/improve.md](../claudify/improve.md) — planned conversion to a `Skill("claudify", "improve")` call.
 Currently the procedure below runs directly within cleanup.
