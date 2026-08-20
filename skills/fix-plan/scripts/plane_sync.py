@@ -30,6 +30,11 @@ from pathlib import Path
 from workspace_profile import get_profile, resolve_tracker_root
 
 
+# plane.es6.kr sits behind Cloudflare, which 403s the default `Python-urllib`
+# User-Agent. A browser-like User-Agent header is required — same constant as
+# plane_create_comment.py, the in-repo precedent that already clears the WAF.
+UA = "Mozilla/5.0 (plane-backlog)"
+
 INDEX_LINE_RE = re.compile(
     r'^(?P<indent>\s*)-\s+\[(?P<marker>[^\]]*)\]\s+\[(?P<ident>[A-Z]+-\d+)\]\s+(?P<title>.+?)\s+'
     r'→\s+Plane\s+\((?P<url>https://[^\s)]+)\)(?P<rest>.*)$'
@@ -58,7 +63,8 @@ def make_plane_request(profile: dict, path: str, method: str = "GET", data: dict
     url = f"{profile['plane_host'].rstrip('/')}/api/v1/{path.lstrip('/')}"
     headers = {
         "x-api-key": token,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": UA
     }
 
     req_data = json.dumps(data).encode("utf-8") if data else None

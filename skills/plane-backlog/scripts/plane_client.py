@@ -36,6 +36,11 @@ DEFAULT_THROTTLE = 1.2
 RATE_LIMIT_FIRST_WAIT = 65
 RATE_LIMIT_RETRY_WAIT = 30
 MAX_ATTEMPTS = 4
+
+# plane.es6.kr sits behind Cloudflare, which 403s the default `Python-urllib`
+# User-Agent. A browser-like User-Agent header is required — same constant as
+# plane_create_comment.py, the in-repo precedent that already clears the WAF.
+UA = "Mozilla/5.0 (plane-backlog)"
 PAGE_SIZE = 100
 
 
@@ -135,7 +140,7 @@ class PlaneClient:
     def request(self, path, method="GET", data=None):
         """Issue one API call, retrying on 429 and throttling every response."""
         url = "%s/api/v1/%s" % (self.profile["plane_host"], path.lstrip("/"))
-        headers = {"x-api-key": self.profile["token"], "Content-Type": "application/json"}
+        headers = {"x-api-key": self.profile["token"], "Content-Type": "application/json", "User-Agent": UA}
         body = json.dumps(data).encode("utf-8") if data is not None else None
 
         last_error = None
