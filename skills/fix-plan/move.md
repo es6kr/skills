@@ -18,7 +18,7 @@ Keep the Completed file minimal — detailed steps, commit hashes, session IDs, 
 - **Forbidden**: Do **not** manually insert one-line summaries at random locations (such as above `## REPEAT` or in active lists) to keep track of them. Once mapped to RAG or archived, they must be **deleted** from the active file.
 - **Automated Bloated Task Detection (HARD STOP)**: Before executing the move pipeline or wrap-up, run `detect_bloated_tasks.py` script to audit for remaining `[x]` items or unmarked sub-residuals in active sections:
    ```bash
-   python ~/.gemini/config/skills/fix-plan/scripts/detect_bloated_tasks.py --file <path/to/fix_plan.md>
+   python <skill-dir>/scripts/detect_bloated_tasks.py --file <path/to/fix_plan.md>
    ```
 
 
@@ -181,7 +181,7 @@ archive-receiver.
 To automate the checklist parsing, subtree-move, and size archiving procedure, run the Python utility script included in the skill:
 
 ```bash
-python3 ~/.claude/skills/fix-plan/scripts/cleanup.py [--file <path>] [--cutoff <YYYY-MM-DD>] [--period monthly|weekly] [--dry-run]
+python3 <skill-dir>/scripts/cleanup.py [--file <path>] [--cutoff <YYYY-MM-DD>] [--period monthly|weekly] [--dry-run]
 ```
 
 This script:

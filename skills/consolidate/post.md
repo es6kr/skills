@@ -103,7 +103,26 @@ Self-check (before posting a new Step 7 Summary comment):
 2. If yes, does an Internal Code Review also already exist? — same query for `## Internal Code Review`
 3. If both exist and the Summary's `created_at` precedes the Internal Review's `created_at` → **order is reversed**. Apply the PATCH-swap damage control. Do not create a third comment
 
+### Mechanical Verification Gate (HARD STOP — verify_consolidate.py)
+
+**After posting or updating consolidation comments (or before marking consolidation complete), running `python3 skills/consolidate/scripts/verify_consolidate.py --pr <NUMBER>` is MANDATORY.**
+
+This script deterministically verifies:
+1. **Chronological order**: Internal Code Review comment created_at precedes AI Review Summary.
+2. **Reviewer count accuracy**: Every active reviewer in `pulls/<N>/comments` (Copilot, CodeRabbit) has exact matching comment counts in the Reviewer Matrix.
+3. **Table row completeness (1:1)**: Total table rows in `Consolidated Findings` equals sum of external inline comments + superpowers internal findings (no dropped or compressed rows).
+4. **Superpowers inclusion**: Internal Code Review findings are physically included in the Consolidated Findings table.
+5. **SHA validation**: Every commit SHA referenced is verified with `git cat-file -e <sha>` (zero SHA hallucinations).
+6. **Role isolation**: Internal Code Review contains zero echoes/reviews of external tools.
+7. **Merge format**: Recommendation specifies `/github-flow merge <N>` (never raw `gh pr merge`).
+
+```bash
+python3 skills/consolidate/scripts/verify_consolidate.py --pr <NUMBER>
+```
+If the script exits with non-zero, the consolidation is **INVALID and INCOMPLETE**. All errors must be corrected via PATCH before proceeding.
+
 ### Medium selection — Mergeable + Formal Review action → unified POST (HARD STOP — 2026-05-22 reinforcement)
+
 
 The Summary body and the Formal Review body carry the **same verdict information** for Mergeable PRs. Posting them as separate media (issue comment + Formal Review) duplicates content. **When all of the following hold, Summary is posted as the Formal Review body (single POST). Issue comment Summary is forbidden:**
 
