@@ -2,8 +2,8 @@
 # workspace-config.sh — shared workspace config resolver.
 #
 # Single entry point for every hook/script that needs to know which
-# receivers (checklist / backlog / rag / wiki) the current workspace is
-# wired to. Consumers do not parse the config themselves:
+# receivers (checklist / backlog / rag / wiki / artifacts) the current
+# workspace is wired to. Consumers do not parse the config themselves:
 #
 #     eval "$(workspace-config.sh --export)"
 #     [ "${WSCFG_RAG_KIND:-none}" = "none" ] && exit 0   # receiver absent -> skip
@@ -47,7 +47,7 @@ done
 # Roles a consumer may rely on existing, whatever the config says.
 emit_safe_defaults() {
   echo "WSCFG_PROFILE=default"
-  for role in CHECKLIST BACKLOG RAG WIKI; do
+  for role in ARTIFACTS CHECKLIST BACKLOG RAG WIKI; do
     echo "WSCFG_${role}_KIND=none"
   done
 }
@@ -79,8 +79,13 @@ from pathlib import Path
 
 cfg_path, target, mode = sys.argv[1], sys.argv[2], sys.argv[3]
 
-ROLES = ("checklist", "backlog", "rag", "wiki")
+ROLES = ("artifacts", "checklist", "backlog", "rag", "wiki")
 BUILTIN_DEFAULTS = {
+    # Where generated research/plan/walkthrough documents land. Unlike the
+    # other receivers this one has no meaningful "none" state — something is
+    # always written somewhere — so the default is a real path rather than an
+    # absence, and a workspace overrides it like any other setting.
+    "artifacts": {"kind": "dir", "path": ".agents/docs/generated"},
     "checklist": {"kind": "file", "path": ".agents/fix_plan.md"},
     "backlog": {"kind": "none"},
     "rag": {"kind": "none"},
