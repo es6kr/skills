@@ -32,8 +32,14 @@ import json
 import argparse
 from pathlib import Path
 
-# Config file location
+# Config file locations, newest first. v2 names roles ("rag", "backlog") and
+# carries the vendor in a `kind` field, so swapping a vendor is a one-line
+# config edit. v1 named the vendor in the key itself. Consumers of this module
+# still read the v1-shaped flat keys, so v2 is translated down to them here —
+# a v2 file that reached consumers untranslated would look like an empty
+# profile and hand every caller the placeholder defaults.
 CONFIG_FILE = Path.home() / ".config" / "plane-backlog" / "config.json"
+CONFIG_FILE_V2 = Path.home() / ".config" / "agent-workspace" / "config.json"
 
 DEFAULT_PROFILE = {
     "workspace_name": "default",
@@ -49,14 +55,87 @@ DEFAULT_PROFILE = {
 }
 
 
+def v2_profile_to_flat(profile: dict, defaults: dict) -> dict:
+    """Translate one v2 role-shaped profile into the v1 flat keys.
+
+    A role set to kind "none" means "not configured for this workspace", which
+    must surface as an empty value rather than falling through to
+    DEFAULT_PROFILE's placeholder (localhost) — otherwise "unconfigured" and
+    "configured, pointing at localhost" become indistinguishable downstream.
+    """
+    roles = dict(defaults or {})
+    roles.update(profile.get("roles") or {})
+    flat = {}
+
+    match = profile.get("match") or {}
+    if match.get("path_components"):
+        flat["cwd_match"] = match["path_components"]
+    elif profile.get("cwd_match"):
+        flat["cwd_match"] = profile["cwd_match"]
+
+    backlog = roles.get("backlog") or {}
+    if backlog.get("kind", "none") != "none":
+        flat["plane_host"] = backlog.get("endpoint", "")
+        flat["plane_token_env"] = backlog.get("token_env", "PLANE_API_KEY")
+        flat["default_project"] = backlog.get("project", "")
+    else:
+        flat["plane_host"] = ""
+
+    rag = roles.get("rag") or {}
+    if rag.get("kind", "none") != "none":
+        flat["qdrant_url"] = rag.get("endpoint", "")
+        for key, value in (rag.get("collections") or {}).items():
+            flat["qdrant_%s_collection" % key] = value
+    else:
+        flat["qdrant_url"] = ""
+
+    wiki = roles.get("wiki") or {}
+    if wiki.get("kind") == "git" and wiki.get("path"):
+        flat["llm_wiki_path"] = wiki["path"]
+
+    checklist = roles.get("checklist") or {}
+    if checklist.get("kind") == "file" and checklist.get("path"):
+        parent = str(Path(checklist["path"]).parent)
+        if parent not in ("", "."):
+            flat["tracker_root"] = parent
+
+    return flat
+
+
 def load_user_config():
-    """Load user config from ~/.config/plane-backlog/config.json (holds all real per-workspace values)."""
-    if CONFIG_FILE.exists():
+    """Load the first available user config, translating v2 down to v1 keys.
+
+    v2 wins when present; v1 stays readable for the migration window so a
+    machine that has not been migrated keeps working unchanged.
+    """
+    for path in (CONFIG_FILE_V2, CONFIG_FILE):
+        if not path.exists():
+            continue
         try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            with open(path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: failed to parse {CONFIG_FILE}: {e}", file=sys.stderr)
+            print(f"Warning: failed to parse {path}: {e}", file=sys.stderr)
+            continue
+        if not isinstance(cfg, dict):
+            continue
+        profiles = cfg.get("profiles") or {}
+        is_v2 = any(
+            isinstance(p, dict) and "roles" in p for p in profiles.values()
+        )
+        if is_v2:
+            defaults = cfg.get("defaults") or {}
+            cfg = {
+                "profiles": {
+                    # workspace_name must be carried explicitly: DEFAULT_PROFILE
+                    # already holds "default" for that key, so get_profile's
+                    # setdefault cannot correct it later.
+                    name: dict(v2_profile_to_flat(p, defaults), workspace_name=name)
+                    for name, p in profiles.items()
+                    if isinstance(p, dict)
+                }
+            }
+        return cfg
     return {}
 
 
