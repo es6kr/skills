@@ -1,7 +1,7 @@
 ---
 metadata:
   author: es6kr
-  version: "0.1.5"
+  version: "0.1.6"
 name: fix
 depends-on:
   - cleanup
@@ -279,6 +279,8 @@ Report the fix (🔍 root cause / 🔧 improvement / 🔄 current fix / 📋 wra
 
 ## Anti-patterns
 
+- Calling the full /fix procedure just to log a 1st/2nd-occurrence mistake — use `/fa` (the
+  `fa` skill) for a record-only entry that reports the escalation stage without Step 0-4
 - Repeating "already fixed" without actually fixing the root cause
 - Patching only the current issue without improving prompts (skill/rule/agent/memory/CLAUDE.md/hook)
 - Text response without TodoWrite after /fix activation
