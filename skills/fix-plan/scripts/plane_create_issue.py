@@ -21,8 +21,14 @@ import urllib.error
 import subprocess
 import base64
 import re
+import shutil
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# plane.es6.kr sits behind Cloudflare, which 403s the default `Python-urllib`
+# User-Agent. A browser-like User-Agent header is required — same constant as
+# plane_create_comment.py, the in-repo precedent that already clears the WAF.
+UA = "Mozilla/5.0 (plane-backlog)"
 
 
 def _shared_script_dirs():
@@ -127,7 +133,7 @@ def parse_bullet_tokens(tokens):
             "content": item_tiptap_content
         })
         html_items.append(f"<li>{html_item_str}</li>")
-        
+
     tiptap_bullet_list = {
         "type": "bulletList",
         "content": list_content
@@ -231,9 +237,10 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
     url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/issues/"
     headers = {
         "x-api-key": token,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": UA
     }
-    
+
     tiptap_doc, html_desc, plain_desc = markdown_to_tiptap_and_html(description)
     payload = {
         "name": title,
@@ -276,36 +283,21 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
         return {"success": False, "reason": str(e)}
 
 
-def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True) -> dict:
-    workspace_slug = profile.get("workspace_slug")
-    prj_id = project_id or profile.get("default_project")
-    plane_host = (profile.get("plane_host") or "").rstrip("/")
+def build_k3s_py_script(workspace_slug: str, prj_id: str, plane_host: str, title: str, description: str, is_intake: bool) -> str:
+    """Build the Django-shell script executed inside the Plane API pod.
 
-    missing = [
-        name
-        for name, value in (
-            ("workspace_slug", workspace_slug),
-            ("project_id", prj_id),
-            ("plane_host", plane_host),
-        )
-        if not value
-    ]
-    if missing:
-        return {
-            "success": False,
-            "reason": (
-                f"Unresolved workspace profile fields: {', '.join(missing)}. "
-                "Refusing to fall back to an arbitrary workspace or project."
-            ),
-        }
-
-    py_script = f"""import json, re
+    Caller-supplied values (title, description, slugs) are injected via
+    json.dumps — never raw f-string interpolation — and every literal brace in
+    the generated source is doubled, so quotes/braces in user input cannot
+    raise ValueError at build time or break the generated code.
+    """
+    return f"""import json, re
 from plane.db.models import Issue, IntakeIssue, Workspace, Project, User
 
-ws = Workspace.objects.filter(slug='{workspace_slug}').first()
-prj = Project.objects.filter(id='{prj_id}').first()
+ws = Workspace.objects.filter(slug={json.dumps(workspace_slug)}).first()
+prj = Project.objects.filter(id={json.dumps(prj_id)}).first()
 if prj is None:
-    print(json.dumps({{"success": False, "reason": "project {prj_id} not found"}}))
+    print(json.dumps({{"success": False, "reason": {json.dumps(f"project {prj_id} not found")}}}))
     raise SystemExit(0)
 u = User.objects.filter(is_superuser=True).first() or User.objects.first()
 
@@ -383,7 +375,7 @@ def parse_bullet_tokens(tokens):
     html_items = []
     for item_text, sub_tokens in items:
         inline_nodes = parse_inline_tiptap(item_text)
-        item_tiptap_content = [{"type": "paragraph", "content": inline_nodes}]
+        item_tiptap_content = [{{"type": "paragraph", "content": inline_nodes}}]
         html_item_str = inline_to_html(item_text)
         
         if sub_tokens:
@@ -392,17 +384,17 @@ def parse_bullet_tokens(tokens):
                 item_tiptap_content.append(sub_tiptap)
                 html_item_str += sub_html
                 
-        list_content.append({
+        list_content.append({{
             "type": "listItem",
             "content": item_tiptap_content
-        })
-        html_items.append(f"<li>{html_item_str}</li>")
-        
-    tiptap_bullet_list = {
+        }})
+        html_items.append(f"<li>{{html_item_str}}</li>")
+
+    tiptap_bullet_list = {{
         "type": "bulletList",
         "content": list_content
-    }
-    html_bullet_list = f"<ul>{''.join(html_items)}</ul>"
+    }}
+    html_bullet_list = f"<ul>{{''.join(html_items)}}</ul>"
     return tiptap_bullet_list, html_bullet_list
 
 def markdown_to_tiptap_and_html(md_text: str):
@@ -449,7 +441,7 @@ def markdown_to_tiptap_and_html(md_text: str):
         elif tok_type == 'heading':
             inline_nodes = parse_inline_tiptap(text)
             tiptap_content.append({{"type": "heading", "attrs": {{"level": indent}}, "content": inline_nodes}})
-            html_parts.append(f"<h{{indent}}>{{inline_to_html(text)}}</h{{level}}>")
+            html_parts.append(f"<h{{indent}}>{{inline_to_html(text)}}</h{{indent}}>")
             i += 1
         elif tok_type == 'paragraph':
             inline_nodes = parse_inline_tiptap(text)
@@ -501,9 +493,46 @@ res = {{
 print("RESULT_JSON:" + json.dumps(res))
 """
 
+
+def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True) -> dict:
+    workspace_slug = profile.get("workspace_slug")
+    prj_id = project_id or profile.get("default_project")
+    plane_host = (profile.get("plane_host") or "").rstrip("/")
+
+    missing = [
+        name
+        for name, value in (
+            ("workspace_slug", workspace_slug),
+            ("project_id", prj_id),
+            ("plane_host", plane_host),
+        )
+        if not value
+    ]
+    if missing:
+        return {
+            "success": False,
+            "reason": (
+                f"Unresolved workspace profile fields: {', '.join(missing)}. "
+                "Refusing to fall back to an arbitrary workspace or project."
+            ),
+        }
+
+    if shutil.which("kubectl") is None:
+        return {
+            "success": False,
+            "reason": "kubectl not available on PATH — skipping K3s fallback",
+        }
+
+    # Live cluster reality: the Plane deployment runs in the `plane-ce`
+    # namespace (es6.kr), not `plane` — resolve from the workspace profile
+    # first so other clusters can override without a code change.
+    k3s_namespace = profile.get("k3s_namespace") or "plane-ce"
+    k3s_workload = profile.get("k3s_workload") or "deploy/plane-api-wl"
+
+    py_script = build_k3s_py_script(workspace_slug, prj_id, plane_host, title, description, is_intake)
     b64_script = base64.b64encode(py_script.encode('utf-8')).decode('utf-8')
     cmd = [
-        "kubectl", "exec", "-n", "plane", "deploy/plane-api-wl", "--",
+        "kubectl", "exec", "-n", k3s_namespace, k3s_workload, "--",
         "python3", "manage.py", "shell", "-c",
         f"import base64; exec(base64.b64decode('{b64_script}').decode('utf-8'))"
     ]
