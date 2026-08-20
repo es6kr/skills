@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/fix-v0.3.12...fix-v0.4.0) (2026-08-20)
+
+
+### Features
+
+* **fa:** add lightweight FA-record entry point ([8860a0c](https://github.com/es6kr/skills/commit/8860a0c98de74b909d04ee0d756d77234ab6a496))
+* promote next-feat batch (hook registry schema, self-reference path anchoring) ([0c33ffa](https://github.com/es6kr/skills/commit/0c33ffac99a9237f4530566470dabeaea128c209))
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **fix:** correct escalation-matrix stage numbering + point to /fa ([fde51ea](https://github.com/es6kr/skills/commit/fde51eaf488d83a5e05aad31d31c713e87b57c48))
+* **hook-kit:** repair hook paths broken by the within-marketplace relocation ([#340](https://github.com/es6kr/skills/issues/340)) ([0d9b701](https://github.com/es6kr/skills/commit/0d9b70181015e4822c7cf5cd2fe122d5af708d26))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
 ## [0.3.12](https://github.com/es6kr/skills/compare/fix-v0.3.11...fix-v0.3.12) (2026-08-17)
 
 

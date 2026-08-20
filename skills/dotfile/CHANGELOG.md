@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/dotfile-v0.5.1...dotfile-v0.6.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/dotfile-v0.5.0...dotfile-v0.5.1) (2026-08-17)
 
 
