@@ -306,9 +306,10 @@ def _check_registrations(hook: dict, present: set[str], findings: list) -> None:
 
     registered_runtimes = set()
     for reg in regs:
-        for rel in iter_command_paths(reg.get("command", "")) or (
-            [reg["file"]] if reg.get("file") else []
-        ):
+        paths = list(iter_command_paths(reg.get("command", "")))
+        if not paths and reg.get("file"):
+            paths = [reg["file"]]
+        for rel in paths:
             registered_runtimes.add(runtime_of(rel))
     if len(registered_runtimes - {"other"}) > 1:
         findings.append(
@@ -377,12 +378,13 @@ def _check_wrapper_pairing(hook: dict, findings: list) -> None:
 def _check_dual_marketplace(hooks: list, findings: list) -> None:
     by_id: dict[str, set] = {}
     for hook in hooks:
-        if hook.get("status") == "removed":
+        if hook.get("status") == "removed" or not hook.get("registrations"):
             continue
         hook_id = hook.get("id")
         if not hook_id:
             continue
         by_id.setdefault(hook_id, set()).add(hook.get("marketplace"))
+
     for hook_id, marketplaces in sorted(by_id.items()):
         if len(marketplaces) > 1:
             findings.append(

@@ -209,6 +209,11 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="with --bootstrap, print instead of write"
     )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="with --bootstrap, allow writing partial registry when a marketplace root is missing",
+    )
     args = parser.parse_args(argv)
 
     if not (args.bootstrap or args.check):
@@ -220,6 +225,11 @@ def main(argv=None) -> int:
     }
     missing_root = [m for m, r in roots.items() if not os.path.isdir(r)]
     if missing_root:
+        if args.bootstrap and not args.allow_partial:
+            parser.error(
+                f"marketplace root not found: {missing_root}. "
+                "Pass --allow-partial to write a partial registry anyway."
+            )
         print(
             f"warning: marketplace root not found, skipping: {missing_root}",
             file=sys.stderr,
@@ -254,7 +264,13 @@ def main(argv=None) -> int:
         print(f"no registry at {registry_path} — run --bootstrap first", file=sys.stderr)
         return 2
     disk_index = {m: hr.scan_resources(r, m) for m, r in roots.items()}
-    return report(hr.validate(registry, disk_index))
+    if missing_root:
+        active_hooks = [h for h in registry.get("hooks", []) if h.get("marketplace") in roots]
+        registry_to_validate = dict(registry, hooks=active_hooks)
+    else:
+        registry_to_validate = registry
+    return report(hr.validate(registry_to_validate, disk_index))
+
 
 
 if __name__ == "__main__":

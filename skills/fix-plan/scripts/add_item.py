@@ -26,34 +26,45 @@ Exit codes: 0 = ok, 1 = validation failure, 2 = usage error.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import io
 import os
 import re
 import sys
 import tempfile
 
-MARKER_RE = re.compile(r"^\[(?: |x|BLOCKED:P[0-3]:(?:external|selfable))\]$")
-MAX_BODY_LINES = 7  # Action + sub-bullets, per add.md length budget
+DEFAULT_TRACKER = "fix_plan.md"
+DEFAULT_SECTION = "## Priority Tasks"
+DEFAULT_MARKER = "[ ]"
+MAX_BODY_LINES = 10  # 3 elements + up to 7 --sub entries (budget target 5-7, hard cap 10)
 
 
 def validate_marker(marker: str) -> None:
-    if not MARKER_RE.match(marker):
-        raise ValueError(
-            f"invalid marker {marker!r}. Allowed: '[ ]', '[x]', "
-            "'[BLOCKED:P<0-3>:external]', '[BLOCKED:P<0-3>:selfable]'"
-        )
+    marker = marker.strip()
+    if marker in ("[ ]", "[x]", "[-]"):
+        return
+    # [BLOCKED:P0-P3:external|selfable]
+    if marker.startswith("[BLOCKED:") and marker.endswith("]"):
+        parts = marker[len("[BLOCKED:") : -1].split(":")
+        if len(parts) == 2:
+            pri, kind = parts
+            if pri in ("P0", "P1", "P2", "P3") and kind in ("external", "selfable"):
+                return
+    raise ValueError(
+        f"invalid marker {marker!r}. Allowed: '[ ]', '[x]', '[-]', or '[BLOCKED:P0-P3:external|selfable]'"
+    )
 
 
 def validate_action(action: str) -> None:
-    a = action.strip()
-    if not a:
+    if not action or not action.strip():
         raise ValueError("--action must not be empty")
-    if "\n" in a:
-        raise ValueError("--action must be a single line (one sentence, imperative)")
-    if a.startswith("- ") or a.startswith("["):
+    if "\n" in action or "\r" in action:
+        raise ValueError("--action must be a single line (no newlines)")
+    if action.startswith(("- ", "* ", "1. ", "[")):
         raise ValueError(
             "--action must not include the list bullet or marker; pass the marker via --marker"
         )
+
 
 
 def build_item(marker: str, action: str, why: str, how: str, subs: list[str] | None = None) -> str:
@@ -63,6 +74,13 @@ def build_item(marker: str, action: str, why: str, how: str, subs: list[str] | N
         raise ValueError("--why is required (future-session test: motivation in 1-2 sentences)")
     if not how.strip():
         raise ValueError("--how is required (procedure / tools / verification approach)")
+
+    for name, val in [("--why", why), ("--how", how)]:
+        if "\n" in val or "\r" in val:
+            raise ValueError(f"{name} must not contain newline characters")
+    for s in subs:
+        if "\n" in s or "\r" in s:
+            raise ValueError("--sub arguments must not contain newline characters")
 
     lines = [f"- {marker} {action.strip()}"]
     lines.append(f"  - **Why**: {why.strip()}")
@@ -141,29 +159,46 @@ def atomic_write(path: str, text: str) -> None:
 def run_add(args: argparse.Namespace) -> int:
     validate_marker(args.marker)
     validate_action(args.action)
-    item = build_item(args.marker, args.action, args.why, args.how, args.sub or [])
+
+    if args.section.strip() == "## Completed" and args.marker.strip() in ("[ ]", "[-]"):
+        print("ERROR: cannot add active items to '## Completed' section", file=sys.stderr)
+        return 1
+
+    try:
+        item = build_item(args.marker, args.action, args.why, args.how, args.sub or [])
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
 
     if not os.path.exists(args.file):
         print(f"ERROR: tracker not found: {args.file}", file=sys.stderr)
         return 1
-    src = io.open(args.file, encoding="utf-8").read()
 
-    if args.action.strip() in src:
-        print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
-        return 0
+    escaped_action = re.escape(args.action.strip())
+    pattern = re.compile(rf"^[ \t]*-[ \t]+\[[ x/X-]\][ \t]+{escaped_action}(?:[ \t]|$)", re.MULTILINE)
 
-    out = insert_item(src, args.section, item, args.position)
+    with io.open(args.file, "r+", encoding="utf-8") as fh:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            src = fh.read()
+            if pattern.search(src):
+                print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
+                return 0
 
-    if args.dry_run:
-        print("--- dry-run: item that would be inserted ---")
-        print(item)
-        print(f"--- into section {args.section!r} at {args.position} ---")
-        return 0
+            out = insert_item(src, args.section, item, args.position)
 
-    atomic_write(args.file, out)
-    print(f"OK: added to {args.section!r} in {args.file} (+{len(out) - len(src)} chars)")
-    print(item)
-    return 0
+            if args.dry_run:
+                print("--- dry-run: item that would be inserted ---")
+                print(item)
+                print(f"--- into section {args.section!r} at {args.position} ---")
+                return 0
+
+            atomic_write(args.file, out)
+            print(f"OK: added to {args.section!r} in {args.file} (+{len(out) - len(src)} chars)")
+            print(item)
+            return 0
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def self_test() -> int:

@@ -41,11 +41,12 @@ if (filePath) {
     process.stderr.write(`Target File: ${filePath}\n`);
     process.stderr.write('Reason: Editing fix_plan.md or checklist.md via Edit/Write/replace tools corrupts schema.\n');
     process.stderr.write('Required Action: You MUST run fix-plan scripts in terminal via run_command/Bash:\n');
-    process.stderr.write('  - ADD a new item:  python skills/fix-plan/scripts/add_item.py --file <path> \\\n');
+    process.stderr.write('  - ADD a new item:  python <skill-dir>/scripts/add_item.py --file <path> \\\n');
     process.stderr.write('        --action "..." --why "..." --how "..." [--marker "[BLOCKED:P1:external]"] [--dry-run]\n');
-    process.stderr.write('  - python skills/fix-plan/scripts/detect_bloated_tasks.py --file <path>\n');
-    process.stderr.write('  - python skills/fix-plan/scripts/stale_check.py --root <path>\n');
-    process.stderr.write('  - python skills/fix-plan/scripts/cleanup.py --file <path>\n');
+    process.stderr.write('  - python <skill-dir>/scripts/detect_bloated_tasks.py --file <path>\n');
+    process.stderr.write('  - python <skill-dir>/scripts/stale_check.py --root <path>\n');
+    process.stderr.write('  - python <skill-dir>/scripts/cleanup.py --file <path>\n');
+
     process.stderr.write('============================================================\n');
     process.exit(2);
   }
