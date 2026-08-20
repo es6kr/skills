@@ -111,3 +111,60 @@ _native_path() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
   source=$(_python -c "import json; m=json.load(open(r'$fpath')); print(m['plugins'][0]['source'])")
   [[ "$source" == "./" ]]
 }
+
+# --- hooks.json registration integrity ---
+#
+# A registration whose script is missing on disk does not fail loudly: the hook
+# exits 127 and the harness cannot tell that apart from "the guard had no
+# objection", so the guard is silently inert while still listed. Relocating a
+# hook into its owning skill without updating hooks.json produces exactly that,
+# and the same three cleanup-guard paths have already been corrected three times
+# and reverted twice through messy local-branch merges. This test is the guard
+# that makes the next revert fail in CI instead of going unnoticed.
+
+@test "hooks.json is valid JSON" {
+  [[ -f "$REPO_ROOT/hooks/hooks.json" ]]
+  _python -m json.tool "$(_native_path "$REPO_ROOT/hooks/hooks.json")" > /dev/null
+}
+
+@test "every hooks.json command path exists on disk" {
+  local missing
+  missing=$(_python - "$(_native_path "$REPO_ROOT/hooks/hooks.json")" "$(_native_path "$REPO_ROOT")" <<'PY'
+import json
+import os
+import sys
+
+hooks_path, repo_root = sys.argv[1], sys.argv[2]
+MARKER = "${CLAUDE_PLUGIN_ROOT}/"
+missing = set()
+
+
+def walk(node):
+    if isinstance(node, dict):
+        command = node.get("command")
+        if isinstance(command, str):
+            # commands may be bare, quoted, or prefixed with an interpreter
+            for token in command.replace('"', " ").replace("'", " ").split():
+                if MARKER in token:
+                    rel = token.split(MARKER, 1)[1]
+                    if not os.path.exists(os.path.join(repo_root, rel)):
+                        missing.add(rel)
+        for value in node.values():
+            walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            walk(value)
+
+
+with open(hooks_path, encoding="utf-8") as fh:
+    walk(json.load(fh))
+
+print("\n".join(sorted(missing)))
+PY
+)
+  if [[ -n "$missing" ]]; then
+    echo "hooks.json registers scripts that are not on disk (they would exit 127 and silently do nothing):" >&2
+    echo "$missing" >&2
+    return 1
+  fi
+}

@@ -71,6 +71,26 @@ If a safety hook blocks `git merge --abort` (treating it as "discarding in-progr
 | 2 | Trust `git merge-tree <base> <a> <b>` (legacy 2-tree form) with the wrong base argument (e.g. passing one of the branches itself as base) | Compute the actual merge-base first (`git merge-base <a> <b>`) and pass that, or just do a real `git merge --no-commit` in an isolated worktree — it's authoritative where `merge-tree` misuse is not |
 | 3 | Interpret a platform's `mergeable: false` / `mergeable_state: "dirty"` API field as possibly stale without checking | Reproduce locally via this dry-run procedure before concluding the platform's mergeability computation is wrong |
 | 4 | Leave the scratch worktree registered after the test | Remove it (`git worktree remove --force`) unless a safety hook blocks the abort step — in that case leaving it is harmless (see Step 3) |
+| 5 | With `git merge-tree --write-tree <branch1> <branch2>` (no explicit base), read the printed unmerged stages by intuition | Stage numbers are fixed regardless of which side "looks like" base: **1 = merge-base, 2 = branch1 (ours), 3 = branch2 (theirs)**. Mislabeling these inverts which side's content you think is which — verify by diffing each stage's blob against the actual ref tips, don't assume from context |
+
+## Diagnosing why a conflict exists (base staleness vs. genuine divergence)
+
+A conflict against an accumulation branch has two structurally different causes that call for different fixes:
+
+- **Base staleness**: the target base is behind another branch it should track — switching base or rebasing resolves it trivially
+- **Genuine parallel divergence**: an equivalent fix already landed on the target via a different commit, so the conflicting commit's content is now partially or fully redundant — switching base changes nothing (the same conflict reproduces against any branch containing that equivalent fix)
+
+Before assuming staleness, check whether the conflict is redundant, not just stale:
+
+```bash
+# Does the target already contain equivalent content for the touched files?
+git diff origin/<candidate-base-A> origin/<candidate-base-B> -- <touched-paths>   # empty = both bases identical here, switching base won't help
+
+# Is the conflicting commit's content already upstream (a "straggler")?
+git cherry -v origin/<base> <branch>   # '-' prefix = already upstream (delta 0), '+' = real delta
+```
+
+`git cherry -v` showing `+` (real delta) does not rule out redundancy at the *file* level — a commit can carry one hunk that's genuinely new and another that's fully superseded by a separate, already-merged commit. When that's the case, resolving via `git rebase <target>` and taking the target's version for the superseded hunk often makes the redundant sub-commit collapse to empty (git drops it automatically) while the genuinely new content survives untouched — a cleaner outcome than manually splicing the two versions.
 
 ## Related
 

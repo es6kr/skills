@@ -274,6 +274,9 @@ After writing or updating `plan-*.md`, **AI must actively scan the plan for unde
 | 4 | Single question with 5+ mixed-axis options | Split into multiple questions (max 4) using `questions` array. Each question = one decision axis |
 | 5 | Ask "Plan OK? proceed?" without enumerating undecided items | Enumerate each undecided item as its own question option |
 | 6 | Use "save plan as file vs print in chat" as one of the options | Forbidden by the always-on rule "target-unspecified document artifacts = file save default". Medium is decided by default rule |
+| 7 | Call this skill's `steps` topic **and** `vibe-coding`'s `plan-guard` on the same plan edit because both PostToolUse triggers fired | The two triggers are redundant on this axis — both demand the same undecided-item scan. **Satisfying either satisfies the axis**; invoking both doubles the skill load per document edit for no extra check. Honour one and state which |
+
+**Redundant-trigger note**: editing a `plan-*.md` / `research-*.md` fires two PostToolUse skill-triggers at once — `code-workflow` (pointing here) and `vibe-coding` (pointing at `plan-guard`). Their undecided-item obligations overlap almost entirely: scan the plan body for unresolved markers, convert each into an `AskUserQuestion` axis, write the answers back. Treat them as one obligation with two entry points. Consolidating the triggers themselves is separate work; until then, honouring one and naming it is correct behaviour, not a skipped step.
 
 #### Self-check (every time after writing/updating plan file)
 

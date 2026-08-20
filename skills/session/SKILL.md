@@ -1,10 +1,10 @@
 ---
-name: claude-session
+name: session
 description: |
-  Claude Code session management. Topics — id (current session UUID), list (enumerate sessions), search (keyword + result validation), import, summarize, analyze (stats), archive (move to ~/.claude/projects/.bak/ with flat naming), classify, clean-profanity (sanitize text in session JSONL), split (topic boundaries), compress (MCP-direct), destroy, dual-sync (Windows/WSL memory path mapping), install (hook), memory-trim (MEMORY.md index byte-budget trim), migrate (project to worktree), move (with cwd update), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "chain repair", "session rename", "session split", "session purge", "dead session", "session url", "session analyze", "session import", "session summarize", "session archive", "archive session", "session clean", "clean profanity", "sanitize session", "redact session", "worktree session", "session cleanup", "memory trim", "MEMORY.md over budget", "dual sync", "WSL memory", "Windows memory path"
+  Claude Code & Antigravity session management. Topics — id (lookup UUID), list (enumerate), search (keyword validate), import, summarize, analyze (stats), archive (flat bak), classify, clean-profanity (sanitize JSONL), split (boundaries), compress (MCP), destroy, dual-sync (Win/WSL memory), install (hook), memory-trim (budget trim), migrate (to worktree), move (update cwd), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), rewind (context truncate), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "session rename", "session split", "session purge", "session rewind", "session analyze", "session import", "session summarize", "session archive", "archive session", "clean profanity", "session cleanup", "memory trim", "dual sync"
 metadata:
   author: es6kr
-  version: "0.1.5"
+  version: "0.8.0"
 depends-on:
   - cleanup
   - git-repo
@@ -16,7 +16,7 @@ Integrated skill for managing Claude Code sessions.
 
 ## Topic Dispatch
 
-**When this skill is invoked with a topic specifier (e.g., `/claude-session id` or `Skill("claude-session", "id")`), load and follow only the matching topic file (`id.md`). Do not echo the Topics table or summarize other topics in the response.** The Topics table below is an index for invocations without a topic specifier — it is not user-facing output when a topic is named.
+**When this skill is invoked with a topic specifier (e.g., `/session id` or `Skill("session", "id")`), load and follow only the matching topic file (`id.md`). Do not echo the Topics table or summarize other topics in the response.** The Topics table below is an index for invocations without a topic specifier — it is not user-facing output when a topic is named.
 
 ### HARD STOP — unknown topic word + extra args
 
@@ -58,6 +58,7 @@ Decision procedure:
 | purge | Delete dead sessions (hook-only, no assistant response) permanently | [purge.md](./purge.md) |
 | rename | Assign and look up custom title for session | [rename.md](./rename.md) |
 | repair | Restore session structure (chain, tool_result, UUID) | [repair.md](./repair.md) |
+| rewind | Soft-rewind conversation context without reverting local workspace code | [rewind.md](./rewind.md) |
 | search | Keyword session search with result validation (verb/path/class checks) | [search.md](./search.md) |
 | summarize | View and summarize conversation content from other sessions | [summarize.md](./summarize.md) |
 | url | Generate claude-sessions web URL from session ID | [url.md](./url.md) |
@@ -97,8 +98,8 @@ Decision procedure:
 
 ```bash
 /session archive <session_id>                                     # move to ~/.claude/projects/.bak/<project-key>_<uuid>.jsonl
-bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>           # direct script call
-bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id> --dry-run # preview only
+bash scripts/archive-session.sh <session_id>           # direct script call
+bash scripts/archive-session.sh <session_id> --dry-run # preview only
 ```
 
 Moves to `~/.claude/projects/.bak/<project-key>_<uuid>.jsonl` (flat naming, single backup root shared with transient backups). UUID portion preserved unchanged. Updates `INDEX.md` ledger.
@@ -231,10 +232,10 @@ Script: `scripts/purge-dead-sessions.sh <project_name> [--delete]`
 
 ```bash
 # Single session
-python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py <session_file.jsonl>
+python3 scripts/clean-profanity.py <session_file.jsonl>
 
 # Multiple sessions
-python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py file1.jsonl file2.jsonl
+python3 scripts/clean-profanity.py file1.jsonl file2.jsonl
 
 # Resolve UUID → path first (glob catches both bare <uuid>.jsonl and
 # archived flat names like <project-key>_<uuid>.jsonl)
@@ -257,8 +258,8 @@ Replaces matched tokens with `****` in place. Patterns loaded from `data/profani
 **Primary script** (full pipeline: backup → dedup → 400 error → orphan tool_result → chain → validate):
 
 ```bash
-python3 ~/.claude/skills/claude-session/scripts/repair-session.py <session_file>
-python3 ~/.claude/skills/claude-session/scripts/repair-session.py <session_file> --dry-run
+python3 scripts/repair-session.py <session_file>
+python3 scripts/repair-session.py <session_file> --dry-run
 ```
 
 Repair targets:
