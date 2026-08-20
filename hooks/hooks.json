@@ -242,6 +242,11 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-squash-recommend-multi-commit.sh",
+            "timeout": 15
           }
         ]
       },
