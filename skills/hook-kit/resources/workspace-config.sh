@@ -186,11 +186,18 @@ if name not in profiles:
             name = pname
             break
 
+# v2 is identified by the top-level version, not by a profile carrying `roles`:
+# a v2 profile may define only `match` and rely entirely on top-level defaults.
+# Keying off per-profile `roles` would misclassify such a profile as v1, and
+# v1_to_roles would overwrite its configured (default) checklist path.
+is_v2 = cfg.get("version") == 2 or any(
+    isinstance(p, dict) and "roles" in p for p in profiles.values()
+)
 profile = profiles.get(name) or {}
 roles = dict(cfg.get("defaults") or BUILTIN_DEFAULTS)
 if isinstance(profile, dict):
-    if isinstance(profile.get("roles"), dict):
-        roles.update(profile["roles"])
+    if is_v2:
+        roles.update(profile.get("roles") or {})
     else:
         roles.update(v1_to_roles(profile))
 for role, spec in BUILTIN_DEFAULTS.items():

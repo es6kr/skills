@@ -59,10 +59,22 @@ fi
 HG_RAG_AUDIT_SIGNAL="${HG_RAG_AUDIT_SIGNAL:-audit|discovery|decision|deployment|fa-prune|self-improving|retrospect}"
 export HG_RAG_AUDIT_SIGNAL
 
+# Probe for a Python that actually runs — the Windows py3 stub exits 49 instead
+# of executing. Match workspace-config.sh's probe so this scan degrades the same
+# way: no usable interpreter -> skip (fail-safe), never a bogus block.
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c 'import json,sys' >/dev/null 2>&1; then
+    PY="$cand"
+    break
+  fi
+done
+[ -z "$PY" ] && exit 0
+
 input="$(cat)"
 [ -z "$input" ] && exit 0
 
-transcript="$(printf '%s' "$input" | python3 -c "
+transcript="$(printf '%s' "$input" | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -75,7 +87,7 @@ except Exception:
 [ ! -f "$transcript" ] && exit 0
 
 # Single transcript scan extracting all metrics for both checks
-metrics="$(python3 - "$transcript" <<'PYEOF'
+metrics="$("$PY" - "$transcript" <<'PYEOF'
 import json, os, re, sys
 
 path = sys.argv[1]

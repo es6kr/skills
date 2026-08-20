@@ -120,7 +120,11 @@ def load_user_config():
         if not isinstance(cfg, dict):
             continue
         profiles = cfg.get("profiles") or {}
-        is_v2 = any(
+        # v2 is identified by the top-level version, not by a profile carrying
+        # `roles`: a v2 profile may define only `match`/`defaults`. Keying off
+        # per-profile `roles` alone would leave such a config untranslated and
+        # then mangle it through the v1 path in get_profile.
+        is_v2 = cfg.get("version") == 2 or any(
             isinstance(p, dict) and "roles" in p for p in profiles.values()
         )
         if is_v2:

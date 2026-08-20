@@ -158,5 +158,28 @@ check "T18 v1 llm_wiki_path -> wiki kind=git"   "git"                    "${WSCF
 load "/tmp/ghq/github.com/not-wsLegacy-scratch/repo"
 check "T19 substring-only path does not match"  "default"                "${WSCFG_PROFILE:-}"
 
+# --- v2 profile with no `roles` key inherits top-level defaults ---------
+# Regression: v2 used to be detected per-profile via `roles` presence. A v2
+# profile that defines only `match` and relies on top-level `defaults` was
+# misread as v1, and v1_to_roles overwrote its configured checklist path with
+# the `.agents/fix_plan.md` v1 fallback. version==2 must win regardless.
+cat > "$FIXTURE/v2-noroles.json" <<'JSON'
+{
+  "version": 2,
+  "defaults": {
+    "checklist": { "kind": "file", "path": ".custom/tracker.md" },
+    "rag": { "kind": "qdrant", "endpoint": "http://example.invalid:6333", "mcp_prefix": "mcp__qdrant__" }
+  },
+  "profiles": {
+    "wsBare": { "match": { "path_components": ["wsBare"] } }
+  }
+}
+JSON
+export AGENT_WORKSPACE_CONFIG="$FIXTURE/v2-noroles.json"
+load "/tmp/wsBare/repo"
+check "T20 no-roles v2 profile resolves"        "wsBare"                 "${WSCFG_PROFILE:-}"
+check "T21 no-roles v2 keeps default checklist" ".custom/tracker.md"     "${WSCFG_CHECKLIST_PATH:-}"
+check "T22 no-roles v2 keeps default rag kind"  "qdrant"                 "${WSCFG_RAG_KIND:-}"
+
 printf -- '---\npass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

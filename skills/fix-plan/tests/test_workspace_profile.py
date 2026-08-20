@@ -157,6 +157,34 @@ check("T15 v2 profile reports its own workspace_name", "wsV2", p["workspace_name
 pn = workspace_profile.get_profile(target_path="/Users/x/wsV2NoRag/repo")
 check("T13 v2 kind=none leaves qdrant_url unset", "",                        pn["qdrant_url"])
 
+# --- v2 config whose only profile omits `roles` (top-level defaults only) ---
+# Regression: v2 was detected per-profile via `roles` presence. When no profile
+# carries `roles`, the whole config was read as v1 and translated through
+# v1_to_roles, replacing every top-level default receiver with the v1
+# placeholder. version==2 alone must translate it.
+CONFIG_V2_BARE = {
+    "version": 2,
+    "defaults": {
+        "backlog": {
+            "kind": "plane",
+            "endpoint": "https://plane.bare.invalid",
+            "project": "bare-proj",
+            "token_env": "BARE_TOKEN",
+        },
+        "checklist": {"kind": "file", "path": ".bare/fix_plan.md"},
+        "rag": {"kind": "none"},
+        "wiki": {"kind": "none"},
+    },
+    "profiles": {"wsBare": {"match": {"path_components": ["wsBare"]}}},
+}
+tmp3 = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+json.dump(CONFIG_V2_BARE, tmp3)
+tmp3.close()
+setattr(workspace_profile, "CONFIG_FILE_V2", Path(tmp3.name))
+pb = workspace_profile.get_profile(target_path="/tmp/wsBare/repo")
+check("T16 no-roles v2 keeps default backlog", "https://plane.bare.invalid", pb["plane_host"])
+check("T17 no-roles v2 keeps default tracker", ".bare",                      pb["tracker_root"])
+
 # v1 remains readable when no v2 file is present (migration window).
 setattr(workspace_profile, "CONFIG_FILE_V2", Path(tmp2.name + ".absent"))
 check(
