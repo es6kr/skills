@@ -370,11 +370,13 @@ Get the number the same way the cleanup-gate section does: the latest injected `
 |---|-------|-----|
 | 1 | Compose a next-action ask with zero cleanup candidates and omit the context percentage because "no cleanup option is being offered, so the citation rule doesn't apply" | Cite the live percentage in the question text regardless — it is baseline situational awareness for the user, independent of whether cleanup is being recommended |
 | 2 | Assume `block-cleanup-option-below-context-gate.sh` will catch a missing percentage | That hook only fires when a cleanup/wrap-up option is present in the payload. A plain "what next" ask with no such option is invisible to it — this is a skill-level obligation, not a hook-enforced one |
+| 3 | Assume the gate is NOT met because an earlier reading this turn/chain was below threshold (**stale-LOW**) — a long tool-call chain (audits, a full /fix flow) can grow usage tens of points past the old number | Re-measure immediately before deciding next-vs-cleanup and before composing the ask. A below-threshold reading taken more than a few tool calls ago never proves the gate is still unmet — staleness cuts both ways (stale-HIGH overstates after a compact; stale-LOW understates after a long chain) |
 
 ### Self-check (every time before calling `AskUserQuestion` from this skill)
 
 1. Does the question text include the live percentage (`NN%` or `NN.N%`)? → If no, add it before calling
-2. Is the reading fresh (post-compact, not from a stale earlier turn in a long tool-call chain)? → If stale, get a live reading first (suggestion-patterns.md "Live-check fallback")
+2. Is the reading fresh (post-compact, not from a stale earlier turn in a long tool-call chain)? → If stale, get a live reading first (suggestion-patterns.md "Live-check fallback") — stale in EITHER direction: an old high reading overstates post-compact, an old low reading understates after a long tool-call chain
+3. Is the fresh reading at/above the session model's threshold (or did the injection script emit a `CLEANUP-GATE` directive)? → The cleanup/retrospective option becomes **REQUIRED as the Recommended #1 option** of the turn-final ask — next-action candidate discovery is secondary and may be skipped
 
 ---
 
