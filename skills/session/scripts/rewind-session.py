@@ -193,6 +193,94 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
     print(f"Successfully truncated DB {db_path} to idx <= {cutoff_step} (Deleted {delete_count} steps). Backup saved to {backup_db}")
     return True
 
+def find_claude_session_file(uuid_or_path):
+    if os.path.exists(uuid_or_path):
+        return os.path.abspath(uuid_or_path)
+    projects_dir = os.path.expanduser("~/.claude/projects")
+    if not os.path.exists(projects_dir):
+        return None
+    for root, dirs, files in os.walk(projects_dir):
+        if ".bak" in root:
+            continue
+        for f in files:
+            if f == f"{uuid_or_path}.jsonl" or f == uuid_or_path:
+                return os.path.join(root, f)
+    return None
+
+def list_claude_sessions():
+    projects_dir = os.path.expanduser("~/.claude/projects")
+    if not os.path.exists(projects_dir):
+        return []
+    results = []
+    for root, dirs, files in os.walk(projects_dir):
+        if ".bak" in root:
+            continue
+        for f in files:
+            if f.endswith(".jsonl"):
+                full_path = os.path.join(root, f)
+                cid = os.path.splitext(f)[0]
+                mtime = datetime.fromtimestamp(os.path.getmtime(full_path)).strftime('%Y-%m-%d %H:%M:%S')
+                line_count = 0
+                title = "(No Title)"
+                try:
+                    with open(full_path, "r", encoding="utf-8") as s_file:
+                        for idx, line in enumerate(s_file):
+                            line_count += 1
+                            if idx < 5 and title == "(No Title)" and line.strip():
+                                try:
+                                    data = json.loads(line)
+                                    if "custom-title" in data:
+                                        title = data["custom-title"]
+                                    elif data.get("type") == "user":
+                                        msg = data.get("message", {})
+                                        text = msg.get("content", "") if isinstance(msg, dict) else str(msg)
+                                        if text:
+                                            title = text[:60].replace("\n", " ")
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass
+                results.append({
+                    "uuid": cid,
+                    "title": title,
+                    "mtime": mtime,
+                    "lines": line_count,
+                    "path": full_path
+                })
+    results.sort(key=lambda x: x["mtime"], reverse=True)
+    return results
+
+def rewind_claude_session(uuid_or_path, keep_lines):
+    session_file = find_claude_session_file(uuid_or_path)
+    if not session_file or not os.path.exists(session_file):
+        print(f"Error: Claude Code session file not found for UUID: {uuid_or_path}", file=sys.stderr)
+        return False
+    if keep_lines < 0:
+        print(f"Error: keep_lines must be non-negative (got {keep_lines})", file=sys.stderr)
+        return False
+
+    backup_path = session_file + ".bak"
+    import shutil
+    shutil.copy2(session_file, backup_path)
+
+    retained_lines = []
+    total_lines = 0
+    with open(session_file, "r", encoding="utf-8") as f:
+        for idx, line in enumerate(f):
+            total_lines += 1
+            if idx < keep_lines:
+                retained_lines.append(line.rstrip("\r\n"))
+
+    tmp_path = session_file + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        if retained_lines:
+            f.write("\n".join(retained_lines) + "\n")
+    os.replace(tmp_path, session_file)
+
+    deleted_lines = max(0, total_lines - len(retained_lines))
+    print(f"Successfully truncated Claude Code session {session_file} to {len(retained_lines)} lines (Deleted {deleted_lines} lines). Backup saved to {backup_path}")
+    return True
+
 def main():
     parser = argparse.ArgumentParser(description="Direct Session Rewind Engine")
     parser.add_argument("--list-sessions", choices=["antigravity-ide", "antigravity-cli", "claude-code"], help="List sessions for engine")
@@ -213,6 +301,8 @@ def main():
             sessions = list_antigravity_sessions("~/.gemini/antigravity-ide")
         elif engine == "antigravity-cli":
             sessions = list_antigravity_sessions("~/.gemini/antigravity-cli")
+        elif engine == "claude-code":
+            sessions = list_claude_sessions()
         else:
             sessions = []
         
@@ -238,6 +328,18 @@ def main():
         summary_db = os.path.expanduser(os.path.join(engine_dir, "conversation_summaries.db"))
         transcript_path = get_transcript_path(engine_dir, args.uuid)
         rewind_antigravity_db(db_path, args.step, cid=args.uuid, summary_db_path=summary_db, preserve_ask=args.preserve_ask, transcript_path=transcript_path)
+        sys.exit(0)
+
+    if args.claude_code:
+        if not args.uuid or args.line is None:
+            print("Error: --uuid and --line are required for Claude Code session truncation.", file=sys.stderr)
+            sys.exit(1)
+        success = rewind_claude_session(args.uuid, args.line)
+        sys.exit(0 if success else 1)
+
+    parser.print_help(file=sys.stderr)
+    sys.exit(1)
 
 if __name__ == "__main__":
     main()
+

@@ -47,7 +47,7 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 0
 fi
 
-COMMIT_COUNT=$(GH_TOKEN="$(gh auth token --user DrumRobot 2>/dev/null)" gh pr view "$PR_NUM" -R es6kr/skills --json commits -q '.commits | length' 2>/dev/null)
+COMMIT_COUNT=$(gh pr view "$PR_NUM" -R es6kr/skills --json commits -q '.commits | length' 2>/dev/null)
 
 if [[ -z "$COMMIT_COUNT" ]]; then
   # Could not determine commit count (auth/network issue) — don't false-block.
