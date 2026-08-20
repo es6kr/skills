@@ -4,14 +4,14 @@ Register the `session-id-inject.sh` hook in `settings.json` so that every sessio
 
 ## When to Use
 
-- After installing `claude-session` skill via `clawhub install`
+- After installing `session` skill via `clawhub install`
 - When setting up a new machine/environment
 - When session ID is not appearing in context
 
 ## Prerequisites
 
 - `session-id-inject.sh` must exist at one of:
-  - `~/.claude/skills/claude-session/scripts/session-id-inject.sh` (ClawHub install — preferred)
+  - `scripts/session-id-inject.sh` (ClawHub install — preferred)
   - `~/.claude/hooks/session-id-inject.sh` (legacy location)
 - `jq` must be available in PATH
 
@@ -20,9 +20,9 @@ Register the `session-id-inject.sh` hook in `settings.json` so that every sessio
 ### 1. Verify Script Exists
 
 ```bash
-ls ~/.claude/skills/claude-session/scripts/session-id-inject.sh 2>/dev/null \
+ls scripts/session-id-inject.sh 2>/dev/null \
   || ls ~/.claude/hooks/session-id-inject.sh 2>/dev/null \
-  || echo "MISSING — run: clawhub install claude-session"
+  || echo "MISSING — run: clawhub install session"
 ```
 
 ### 2. Register in settings.json
@@ -38,7 +38,7 @@ Add to `SessionStart` and `UserPromptSubmit` hooks. The script accepts the event
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/skills/claude-session/scripts/session-id-inject.sh",
+            "command": "bash scripts/session-id-inject.sh",
             "timeout": 5
           }
         ]
@@ -57,7 +57,7 @@ Add to `SessionStart` and `UserPromptSubmit` hooks. The script accepts the event
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/skills/claude-session/scripts/session-id-inject.sh UserPromptSubmit",
+            "command": "bash ~/.agents/skills/session/scripts/session-id-inject.sh UserPromptSubmit",
             "timeout": 5
           }
         ]

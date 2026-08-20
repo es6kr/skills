@@ -12,10 +12,10 @@ Scrub profanity tokens from a session JSONL file in place. Designed for sanitizi
 
 ```bash
 # Single session
-python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py <session_file.jsonl>
+python3 scripts/clean-profanity.py <session_file.jsonl>
 
 # Multiple sessions in one call
-python3 ~/.claude/skills/claude-session/scripts/clean-profanity.py file1.jsonl file2.jsonl
+python3 scripts/clean-profanity.py file1.jsonl file2.jsonl
 ```
 
 Replaces matched tokens with `****` and rewrites the file in place. Reports `N lines modified` per file.
@@ -33,7 +33,7 @@ Apply the script to the discovered path.
 
 ## Pattern source
 
-Patterns are loaded from `~/.claude/skills/claude-session/data/profanity-patterns.json` (an array of `{pattern, replacement}` regex entries). If the file is absent, the script falls back to a minimal built-in pattern set.
+Patterns are loaded from `data/profanity-patterns.json` (an array of `{pattern, replacement}` regex entries). If the file is absent, the script falls back to a minimal built-in pattern set.
 
 To extend coverage, add entries to `data/profanity-patterns.json`. Use `\b` word boundaries to avoid matching substrings inside legitimate identifiers (e.g., `\bass\b` won't match `assistant`).
 

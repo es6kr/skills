@@ -8,10 +8,10 @@ Detects and repairs structural issues in session JSONL files.
 
 ```bash
 # Repair a specific session
-python3 ~/.claude/skills/claude-session/scripts/repair-session.py <session_file>
+python3 scripts/repair-session.py <session_file>
 
 # Preview without changes
-python3 ~/.claude/skills/claude-session/scripts/repair-session.py <session_file> --dry-run
+python3 scripts/repair-session.py <session_file> --dry-run
 ```
 
 The script uses `os.replace` for atomic file swap, bypassing macOS zsh `mv -i` alias prompts that would hang background bash calls. Use the script even when running checks manually — it is the source of truth for the repair pipeline.
