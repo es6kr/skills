@@ -41,7 +41,18 @@ if [[ -z "$SKILL_MD" ]]; then
   # and a plain `find` will not descend through them — every skill that lives
   # under a symlinked marketplace silently fails to resolve, so the hook exits
   # "fail open" and never reminds about the very skills it should cover.
-  CANDIDATE=$(find -L ~/.claude/plugins/marketplaces ~/.claude/plugins/cache -maxdepth 6 -type d -iname "$BARE_NAME" 2>/dev/null | head -1)
+  #
+  # Following the symlink lands inside a working checkout, which in this
+  # workspace routinely holds several git worktrees under .worktrees/ (or
+  # .claude/worktrees/). Each one carries its own copy of every skill, so a
+  # single skill name matches N+1 directories and `head -1` picks arbitrarily
+  # among them. Observed: this hook pointed at a worktree's cleanup/run.md that
+  # was two lines behind the live one, five times in one session. Worktrees are
+  # in-progress branches by definition — never the installed copy — so prune
+  # them rather than trying to rank the matches.
+  CANDIDATE=$(find -L ~/.claude/plugins/marketplaces ~/.claude/plugins/cache -maxdepth 6 \
+    \( -name '.worktrees' -o -name 'worktrees' -o -name '.git' \) -prune -o \
+    -type d -iname "$BARE_NAME" -print 2>/dev/null | head -1)
   if [[ -n "$CANDIDATE" && -f "$CANDIDATE/SKILL.md" ]]; then
     SKILL_MD="$CANDIDATE/SKILL.md"
   fi
