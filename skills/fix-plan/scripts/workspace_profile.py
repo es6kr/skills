@@ -60,6 +60,24 @@ def load_user_config():
     return {}
 
 
+def token_matches(token: str, parts) -> bool:
+    """True if `token` matches a contiguous run of path segments in `parts`.
+
+    Tokens are written in two shapes: a bare component ("es6kr") and a path
+    fragment ("ghq/github.com/es6kr"). Splitting on "/" and comparing segment
+    sequences handles both.
+
+    Comparing whole segments (rather than substrings) is what keeps a token
+    like "es6kr" from also matching an unrelated sibling such as
+    "not-es6kr-workspace" — that property must survive any change here.
+    """
+    seq = [s for s in str(token).split("/") if s]
+    if not seq:
+        return False
+    n = len(seq)
+    return any(list(parts[i:i + n]) == seq for i in range(len(parts) - n + 1))
+
+
 def detect_workspace(target_path: str = None) -> str:
     """Detect workspace profile based on env var, explicit path, or cwd match against configured profiles."""
     profiles = load_user_config().get("profiles", {})
@@ -70,14 +88,13 @@ def detect_workspace(target_path: str = None) -> str:
         return env_profile
 
     # 2. Check path against each configured profile's cwd_match tokens.
-    # Match against path components (not a raw substring of the full path string) so a
-    # token like "es6kr" doesn't also match an unrelated sibling such as "not-es6kr-workspace".
+    # Tokens may be a bare component or a multi-segment fragment; see token_matches.
     cwd = Path(target_path or os.getcwd()).resolve()
     cwd_parts = cwd.parts
 
     for name, cfg in profiles.items():
         for token in cfg.get("cwd_match", [name]):
-            if token in cwd_parts:
+            if token_matches(token, cwd_parts):
                 return name
 
     # 3. No match — "default" only. Do NOT fall back to an arbitrary configured profile;
