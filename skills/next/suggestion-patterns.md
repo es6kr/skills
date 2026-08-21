@@ -66,6 +66,21 @@
 - `github-flow/pr.md` lines 13-14, 276-279 (Draft-default HARD STOP at execution time) — this skill mirrors that rule into option-description time.
 - Triggering keyword in option description (any locale): `create PR`, `PR creation`, `register PR`, `worktree+PR`, `cherry-pick + PR`, `gh pr create`, and equivalent localized forms. Any of these without a "draft" qualifier = violation.
 
+## Cross-cutting rule — Antigravity unapproved PR clawo delegation in next-action options (HARD STOP)
+
+**In the Antigravity (Gemini) environment, whenever composing next-action options, proposing unapproved/unmerged PR review, consolidation, or remediation as a direct task for the main Antigravity session is strictly forbidden (`HARD STOP`).**
+
+If an unapproved PR is surfaced as a candidate from open PR discovery (`gh pr list`), it MUST be explicitly framed as delegating to `clawo` (e.g. `[clawo] PR #<N> delegate consolidate review (/clawo consolidate PR #<N>)`), never as direct in-session review. **When dispatching the clawo session, the prompt passed to clawo MUST explicitly execute `/consolidate pr <PR_URL>` (or `/consolidate pr #<N>`) as its entry point.**
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Propose "[repo] PR #<N> review & process" as a direct option in Antigravity | Frame explicitly as "[clawo] PR #<N> delegate consolidate (/clawo consolidate PR #<N>)" |
+| 2 | Start direct code review or consolidate inside the main Antigravity turn | Dispatch the PR workflow to an isolated `clawo` session (`Skill("clawo", "launch")`) |
+| 3 | Surface open PRs without checking if the current environment is Antigravity | When in Antigravity, all unapproved PR candidates must carry the `[clawo]` prefix and delegation command |
+| 4 | Send unstructured instructions ("verify and merge...") in the clawo prompt | Explicitly pass `/consolidate pr <PR_URL>` so the worker runs the standard consolidate workflow |
+
 ## Deferred-status overrides severity + pending-task precedence (HARD STOP)
 
 The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟠 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.

@@ -25,7 +25,15 @@ while IFS= read -r line; do
   # shellcheck disable=SC2086
   set -- $line
   local_ref="${1:-}"
+  local_sha="${2:-}"
   remote_ref="${3:-}"
+  remote_sha="${4:-}"
+
+  # Skip branch deletions immediately (prevents running heavy CI tests on branch deletion)
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ] || [ "$local_sha" = "(delete)" ]; then
+    exit 0
+  fi
+
   if [ "$local_ref" = "refs/heads/local" ] || [ "$remote_ref" = "refs/heads/local" ]; then
     LOCAL_PUSH_ATTEMPTED=1
   fi

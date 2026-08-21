@@ -156,6 +156,7 @@ Otherwise → proceed to Step 0.5.
 1. Does this ask relate to task progress direction? → If yes, TaskList Read is mandatory
 2. Do the tasks mentioned in option descriptions **actually exist in TaskList**? — 1:1 mapping with TaskList output
 3. If there are N pending tasks but only M < N appear in options → state the filtering reason in description or use the wrap-up pattern
+4. **Does any option/question text reference a PR or issue?** → If yes, the full clickable URL (`https://github.com/<owner>/<repo>/pull|issues/<N>`) must appear in that same ask — a bare `#N` is forbidden even when accompanied by a repo name. This is `suggestion-patterns.md`'s own "Cross-cutting rule — PR/issue references in options require the full URL" restated here because Step 0.5's TaskList check is exactly the point in the flow where a task's subject (which may itself be a bare `#N`) gets copied into an option — do not carry that bare reference forward without resolving its URL first. Recurred twice (2026-07-17 fix, 2026-08-18/19 recurrence) precisely because `suggestion-patterns.md` was not Read before composing the ask on the second occurrence — treat `SKILL.md`'s "Read suggestion-patterns.md BEFORE composing options" HARD STOP as non-optional, not as background context you can skip once you've read it before in the session
 
 ## Step 0.6: Workspace fix_plan.md active integration protocol (MANDATORY — when TaskList is empty, done, or unavailable)
 

@@ -42,6 +42,7 @@ Run all of the above items as **separate queries** (no single-prefix matching; m
 | 7 | Force only the `plan-*` prefix in Glob (e.g., `find -name 'plan-*blueprint*'`) — missing other format files (research-, analysis-, `<topic>-drift.md`, `<topic>.md`) | Search using keyword matching regardless of prefix: `find -iname '*<keyword>*.md'` or `Glob('**/.ralph/docs/generated/*<keyword>*')`. Use keyword-only matching to include all formats such as `plan-/research-/analysis-/...-drift.md` |
 | 8 | Skip Read for any Glob/find result by guessing "probably not directly related to this task" | **Mandatory Read for every found file**. No guessing. Determine irrelevance only after reading the body |
 | 9 | Search only one keyword from the task description (filename/tool name) and assert plan absence on 0 results | **Exhaustively extract** all domain keywords from the task description and run a separate Glob for each. Also search code names from user messages (e.g., `Web-E2E-B`) as separate keywords |
+| 10 | Conclude "cannot access this — need an external channel (mail auth, etc.) or ask the user to paste it" before searching fix_plan.md / docs for the domain keyword | Domain keywords apply even without a `#N` or GitHub context — a business/administrative document rewrite request (email, report) is an entry action too. Search fix_plan.md and `docs/generated/` for the subject/topic keyword first; the tracker often already records the correct access path (a different account, a CLI tool, a prior message's content) |
 
 ## Self-Check (every time on task entry — including query actions)
 
@@ -52,3 +53,4 @@ Run all of the above items as **separate queries** (no single-prefix matching; m
 5. Were all found files Read? — No skip-by-guess if even one file was found
 6. Was plan absence explicitly confirmed? (empty results for all keywords = may be cited as primary source)
 7. Were unfinished items identified? Were they registered as separate tasks or in the fix_plan.md BLOCKED section?
+8. About to say "cannot access this / need an external channel / please paste it"? — Search fix_plan.md and `docs/generated/` for the subject keyword FIRST. This applies to non-GitHub business/administrative requests too (e.g., "rewrite this email"), not just `#N` tasks.

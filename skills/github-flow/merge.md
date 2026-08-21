@@ -83,6 +83,7 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
    ```
 
 2. **No Summary comment → unconditionally auto-invoke `/consolidate pr`**:
+   - **Antigravity Unapproved PR clawo Delegation Gate (HARD STOP)**: In Antigravity (Gemini), directly executing `/consolidate pr` or remediating unapproved PRs in the main chat turn is strictly forbidden (`HARD STOP`). You MUST delegate unapproved PR review consolidation and remediation to `clawo` (`clawo session-send <session_name>` or `Skill("clawo", "launch")`).
    - **If any AI review (CodeRabbit / Copilot / etc.) is present, consolidate is the default** — not optional
    - After consolidate, confirm the Summary comment was posted → continue to Step 3
    - **Forbidden**: asking the user a merge / apply option without the Summary. consolidate must run first
