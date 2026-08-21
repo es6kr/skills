@@ -1,15 +1,27 @@
 name: auto-ready
 
-# Automatically converts draft PRs targeting next-feat / next-fix to ready_for_review
-# once required checks (branch-tag-adjudication, Test) pass.
+# Converts draft PRs *targeting* next-feat / next-fix to ready_for_review once
+# branch-tag-adjudication passes.
+#
+# The `branches:` filter of a workflow_run trigger matches the HEAD branch of
+# the run that fired, not the base of its PR. A PR into next-feat/next-fix runs
+# its checks on the feature branch (fix/…, feat/…), so filtering on
+# [next-feat, next-fix] never matched the PRs this workflow exists to serve —
+# it only matched promotion PRs (head next-*, base main), which are exactly the
+# ones it should leave alone. Every historical run of this workflow was such a
+# misfire.
+#
+# So: no branch filter, and the base is checked in the job instead. The
+# workflow_run payload does carry it — pull_requests[0].base.ref.
+#
+# Note `Test` is deliberately not listed: it triggers on `pull_request:
+# branches: [main]`, so it never runs for a PR into next-feat/next-fix and
+# waiting on it here would be waiting on something that cannot arrive.
 
 on:
   workflow_run:
-    workflows: ["branch-tag-adjudication", "Test"]
+    workflows: ["branch-tag-adjudication"]
     types: [completed]
-    branches:
-      - next-feat
-      - next-fix
 
 permissions:
   pull-requests: write
@@ -25,6 +37,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          BASE_REF: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
         run: |
           set -euo pipefail
           if [ -z "$PR_NUMBER" ]; then
@@ -32,11 +45,30 @@ jobs:
             exit 0
           fi
 
+          case "$BASE_REF" in
+            next-feat|next-fix) ;;
+            *)
+              echo "PR #$PR_NUMBER targets '${BASE_REF:-<unknown>}', not a staging branch — skipping."
+              exit 0
+              ;;
+          esac
+
           IS_DRAFT=$(gh pr view "$PR_NUMBER" -R "$REPO" --json isDraft --jq '.isDraft')
-          if [ "$IS_DRAFT" = "true" ]; then
-            echo "PR #$PR_NUMBER is draft. Converting to ready for review..."
-            gh pr ready "$PR_NUMBER" -R "$REPO"
+          if [ "$IS_DRAFT" != "true" ]; then
+            echo "PR #$PR_NUMBER is already ready for review or not draft."
+            exit 0
+          fi
+
+          echo "PR #$PR_NUMBER (base $BASE_REF) is draft. Converting to ready for review..."
+          # GITHUB_TOKEN cannot perform markPullRequestReadyForReview even with
+          # pull-requests: write — it fails with "Resource not accessible by
+          # integration". Report that plainly instead of failing the run: a red
+          # X here would say "the checks failed", which is not what happened.
+          # Until a token that can do it is wired up, the transition is the
+          # author's to make (github-flow's publish topic runs `gh pr ready`).
+          if gh pr ready "$PR_NUMBER" -R "$REPO" 2>/tmp/ready.err; then
             echo "Successfully converted PR #$PR_NUMBER to ready_for_review."
           else
-            echo "PR #$PR_NUMBER is already ready for review or not draft."
+            echo "::warning::Could not convert PR #$PR_NUMBER to ready — $(cat /tmp/ready.err)"
+            echo "GITHUB_TOKEN lacks markPullRequestReadyForReview. Convert manually or wire a token that can."
           fi

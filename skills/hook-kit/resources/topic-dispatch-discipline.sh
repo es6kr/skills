@@ -29,7 +29,14 @@ ARGS=$(echo "$INPUT" | jq -r '.tool_input.args // empty' 2>/dev/null)
 # a "marketplace:skill" or "plugin:skill" prefix — only the last segment
 # names the actual skill directory.
 BARE_NAME="${SKILL_NAME##*:}"
+# The prefix is not noise — when present it names the plugin, and a plugin name
+# is declared by exactly one marketplace's .claude-plugin/marketplace.json.
+# Resolving it back to that marketplace lets the search below stay inside the
+# right tree instead of matching same-named skills in unrelated marketplaces.
+PLUGIN_PREFIX=""
+[[ "$SKILL_NAME" == *:* ]] && PLUGIN_PREFIX="${SKILL_NAME%%:*}"
 SKILL_MD=""
+AMBIGUOUS_NOTE=""
 for root in ~/.claude/skills ~/.agents/skills; do
   if [[ -f "$root/$BARE_NAME/SKILL.md" ]]; then
     SKILL_MD="$root/$BARE_NAME/SKILL.md"
@@ -41,9 +48,52 @@ if [[ -z "$SKILL_MD" ]]; then
   # and a plain `find` will not descend through them — every skill that lives
   # under a symlinked marketplace silently fails to resolve, so the hook exits
   # "fail open" and never reminds about the very skills it should cover.
-  CANDIDATE=$(find -L ~/.claude/plugins/marketplaces ~/.claude/plugins/cache -maxdepth 6 -type d -iname "$BARE_NAME" 2>/dev/null | head -1)
+  #
+  # Following the symlink lands inside a working checkout, which in this
+  # workspace routinely holds several git worktrees under .worktrees/ (or
+  # .claude/worktrees/). Each one carries its own copy of every skill, so a
+  # single skill name matches N+1 directories and `head -1` picks arbitrarily
+  # among them. Observed: this hook pointed at a worktree's cleanup/run.md that
+  # was two lines behind the live one, five times in one session. Worktrees are
+  # in-progress branches by definition — never the installed copy — so prune
+  # them rather than trying to rank the matches.
+  # Pruning worktrees is necessary but not sufficient: several marketplaces can
+  # each ship a skill of the same name (consolidate, github-flow, code-quality
+  # …), and every one of those is a legitimate install, so no prune rule can
+  # separate them. `head -1` then picks by directory-walk order — observed
+  # answering Skill("es6kr:consolidate") and Skill("es6kr:github-flow") with a
+  # different marketplace's copy, even though the call named its plugin.
+  #
+  # So when the call carries a prefix, resolve it to the one marketplace whose
+  # manifest declares that plugin and search only there. Without a prefix there
+  # is nothing to narrow by, and the search stays global.
+  SEARCH_ROOTS=(~/.claude/plugins/marketplaces ~/.claude/plugins/cache)
+  if [[ -n "$PLUGIN_PREFIX" ]] && command -v jq >/dev/null 2>&1; then
+    for mf in ~/.claude/plugins/marketplaces/*/.claude-plugin/marketplace.json; do
+      [[ -f "$mf" ]] || continue
+      if jq -e --arg p "$PLUGIN_PREFIX" \
+           '(.plugins // []) | map(.name) | index($p)' "$mf" >/dev/null 2>&1; then
+        SEARCH_ROOTS=("$(dirname "$(dirname "$mf")")")
+        break
+      fi
+    done
+  fi
+
+  # Plain string + head/grep instead of mapfile: this hook also runs where
+  # `env bash` resolves to 3.2 (stock macOS), which has no mapfile.
+  CANDIDATE_LIST=$(find -L "${SEARCH_ROOTS[@]}" -maxdepth 6 \
+    \( -name '.worktrees' -o -name 'worktrees' -o -name '.git' \) -prune -o \
+    -type d -iname "$BARE_NAME" -print 2>/dev/null)
+  CANDIDATE=$(printf '%s\n' "$CANDIDATE_LIST" | head -1)
+  CANDIDATE_COUNT=$(printf '%s\n' "$CANDIDATE_LIST" | grep -c . )
   if [[ -n "$CANDIDATE" && -f "$CANDIDATE/SKILL.md" ]]; then
     SKILL_MD="$CANDIDATE/SKILL.md"
+  fi
+  # More than one survivor means the narrowing above could not decide. Say so
+  # rather than presenting an arbitrary pick as if it were the answer — a wrong
+  # path here is silent, because it still resolves to a real SKILL.md.
+  if [[ "$CANDIDATE_COUNT" -gt 1 ]]; then
+    AMBIGUOUS_NOTE=$'\n\n'"NOTE: ${CANDIDATE_COUNT} directories match \"${BARE_NAME}\" and the call did not narrow to one. The path above is simply the first match — verify it is the installed copy before trusting it:"$'\n'"$(printf '%s\n' "$CANDIDATE_LIST" | sed 's/^/  - /')"
   fi
 fi
 
@@ -82,7 +132,7 @@ Topic files in $TARGET_DIR:
 
 Read the topic(s) covering what you are about to do before acting. If the
 index genuinely suffices (you only needed the topic list), proceed — but do
-not treat the router page as the skill's rules.
+not treat the router page as the skill's rules.$AMBIGUOUS_NOTE
 MSG
   exit 2
 fi
@@ -113,6 +163,6 @@ carries "Launching skill: $SKILL_NAME" — the injected body is the SKILL.md
 router page, not topic content. Read $TARGET_PATH now before acting on the
 SKILL.md's own default section (failed-attempts.md
 "skill-topic-dispatch-returns-default-section", status=diagnosed — expected
-harness behavior, not a bug; topic routing is the skill's own self-instruction).
+harness behavior, not a bug; topic routing is the skill's own self-instruction).$AMBIGUOUS_NOTE
 MSG
 exit 2

@@ -1,81 +1,76 @@
 #!/usr/bin/env bash
-# block-squash-recommend-multi-commit.sh — PreToolUse:AskUserQuestion gate.
+# PreToolUse:AskUserQuestion — Block a squash-merge option for an es6kr/skills PR
+# whose commit count is not exactly 1.
 #
-# es6kr/skills uses semantic-release: commit-analyzer reads each commit's
-# Conventional Commit type (feat/fix/...) to decide the version bump.
-# Squash-merging a multi-commit PR collapses all of those types into one
-# squash-commit message, silently losing the bump signal for every commit
-# but the one chosen as the squash subject.
+# Trigger: AskUserQuestion contains an option (label or description) mentioning
+#          "squash" (case-insensitive) AND a github.com/es6kr/skills/pull/<N> URL.
+# Action: look up the PR's real commit count via `gh pr view`. Deny when it is
+#         not exactly 1.
 #
-# Rule: ~/ghq/github.com/es6kr/.claude/rules/skills-publishing.md
-#   "squash-merge recommendations are allowed only for single-commit PRs" —
-#   before presenting a "Squash merge" option, verify the PR's actual commit count via
-#   `gh pr view <N> --json commits`. If it isn't exactly 1, the option
-#   must not be offered (or not offered as Recommended).
-#
-# This hook re-verifies independently of whatever the option text claims —
-# it queries GitHub directly rather than trusting a commit-count string
-# the assistant may have typed (or miscounted) into the description.
-#
-# History: failed-attempts.md class=squash-recommend-multi-commit
-# (3+ recurrences before this hook existed; the hooks.json registration
-# for this file existed since 2026-08-17 but the script itself was never
-# actually written — this file closes that gap, 2026-08-20).
-
-set -uo pipefail
+# Why: es6kr/skills uses semantic-release, which assigns minor/patch bumps by
+# commit type (feat/fix). Squash-merging a multi-commit PR collapses those
+# distinct commit-type signals into a single squash commit, silently breaking
+# the bump matrix. See skills-publishing.md "squash-merge recommendation only
+# allowed for single-commit PRs" and failed-attempts.md "squash-recommend-multi-commit".
 
 INPUT=$(cat)
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
-[[ "$TOOL_NAME" != "AskUserQuestion" ]] && exit 0
+if [[ "$TOOL_NAME" != "AskUserQuestion" ]]; then
+  exit 0
+fi
 
-command -v gh >/dev/null 2>&1 || exit 0
-
-ASK_TEXT=$(echo "$INPUT" | jq -r '
-  .tool_input.questions[]? |
-  (.question // ""),
-  (.options[]? | (.label // ""), (.description // ""))
+# Collect every (label + description) pair across all questions/options.
+OPTION_TEXTS=$(echo "$INPUT" | jq -r '
+  .tool_input.questions[]?.options[]? |
+  ((.label // "") + "\n" + (.description // ""))
 ' 2>/dev/null)
 
-[[ -z "$ASK_TEXT" ]] && exit 0
+if [[ -z "$OPTION_TEXTS" ]]; then
+  exit 0
+fi
 
-# Only fire when a squash-merge option is actually being proposed.
-echo "$ASK_TEXT" | grep -qiE 'squash' || exit 0
+if ! echo "$OPTION_TEXTS" | grep -qiE 'squash'; then
+  exit 0
+fi
 
-# Extract every es6kr/skills PR number referenced in this ask.
-PR_NUMBERS=$(echo "$ASK_TEXT" | grep -oE 'github\.com/es6kr/skills/pull/[0-9]+' | grep -oE '[0-9]+$' | sort -u)
+PR_URL=$(echo "$OPTION_TEXTS" | grep -oE 'github\.com/es6kr/skills/pull/[0-9]+' | head -1)
+if [[ -z "$PR_URL" ]]; then
+  # A squash mention without an es6kr/skills PR URL isn't this hook's concern
+  # (either a different repo, or ask-guard's PR-URL-matching guard handles it).
+  exit 0
+fi
 
-[[ -z "$PR_NUMBERS" ]] && exit 0
+PR_NUM="${PR_URL##*/}"
 
-VIOLATIONS=""
-while IFS= read -r pr; do
-  [[ -z "$pr" ]] && continue
-  COUNT=$(timeout 8 gh pr view "$pr" -R es6kr/skills --json commits -q '.commits | length' 2>/dev/null)
-  [[ -z "$COUNT" ]] && continue  # gh call failed/timed out — do not block on an inconclusive read
-  if [[ "$COUNT" -ne 1 ]]; then
-    VIOLATIONS="${VIOLATIONS}  - PR #${pr}: ${COUNT} commits (squash would collapse ${COUNT} Conventional Commit types into 1)\n"
-  fi
-done <<< "$PR_NUMBERS"
+if ! command -v gh >/dev/null 2>&1; then
+  exit 0
+fi
 
-[[ -z "$VIOLATIONS" ]] && exit 0
+COMMIT_COUNT=$(gh pr view "$PR_NUM" -R es6kr/skills --json commits -q '.commits | length' 2>/dev/null)
 
-{
-  echo "DENIED: squash-merge option offered for a multi-commit es6kr/skills PR."
-  echo
-  echo "Why blocked:"
-  printf "%b" "$VIOLATIONS"
-  echo
-  echo "Why this matters:"
-  echo "  - semantic-release reads each commit's Conventional Commit type (feat/fix/...)"
-  echo "    to decide the version bump. Squashing collapses all commits into one message,"
-  echo "    silently losing the bump signal for every commit but the squash subject."
-  echo
-  echo "Required action (pick one before retrying):"
-  echo "  1. Remove the squash option — offer a merge-commit option instead"
-  echo "  2. If the commits should genuinely be 1 (already squashed locally),"
-  echo "     re-verify with 'gh pr view <N> --json commits' and retry once the count is 1"
-  echo "  3. Run commit-tidy to squash locally first, push, then re-offer squash-merge"
-  echo
-  echo "Reference: skills-publishing.md \"squash-merge recommendations are allowed only for single-commit PRs\""
-} >&2
-exit 2
+if [[ -z "$COMMIT_COUNT" ]]; then
+  # Could not determine commit count (auth/network issue) — don't false-block.
+  exit 0
+fi
+
+if [[ "$COMMIT_COUNT" != "1" ]]; then
+  {
+    echo "DENIED: squash-merge option proposed for es6kr/skills PR #$PR_NUM, which has $COMMIT_COUNT commits (not 1)."
+    echo ""
+    echo "Why blocked:"
+    echo "  - es6kr/skills uses semantic-release, which bumps versions by commit type"
+    echo "    (feat/fix). Squashing a multi-commit PR collapses that type information"
+    echo "    into one commit, silently corrupting the bump matrix."
+    echo ""
+    echo "Required action:"
+    echo "  Remove the squash option. Offer a non-squash merge (preserves each commit),"
+    echo "  or a 'commit-tidy first, then squash' option instead."
+    echo ""
+    echo "Reference: skills-publishing.md 'squash-merge recommendation only allowed for single-commit PRs'"
+    echo "           failed-attempts.md 'squash-recommend-multi-commit'"
+  } >&2
+  exit 2
+fi
+
+exit 0

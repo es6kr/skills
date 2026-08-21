@@ -38,7 +38,7 @@ Analyzes all Claude sessions in a project and classifies them as delete/keep/ext
 **Always use the script first** — do not inline grep/sed/jq for JSONL parsing:
 
 ```bash
-python3 ~/.claude/skills/claude-session/scripts/classify-sessions.py <project-name>
+python3 ~/.claude/skills/session/scripts/classify-sessions.py <project-name>
 ```
 
 Output: TSV with columns `ID | Lines | UserMsgs | FirstDate | LastDate | Title | LastMessages`
@@ -145,7 +145,7 @@ mcp__claude-sessions-mcp__summarize_session({
 re-scanned by Claude Code):
 
 ```bash
-bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>
+bash ~/.claude/skills/session/scripts/archive-session.sh <session_id>
 ```
 
 - The session disappears from the session list (same UX as delete) but stays recoverable.

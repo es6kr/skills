@@ -242,6 +242,16 @@
         }
       ]
     },
+    "skills/session": {
+      "package-name": "session",
+      "component": "session",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/skill-kit": {
       "package-name": "skill-kit",
       "component": "skill-kit",
