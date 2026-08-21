@@ -129,6 +129,21 @@ class TestPathContainment:
         assert "escapes" in errors[0]
 
 
+class TestSourceDirectoryExists:
+    def test_existing_directory_ok(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        (tmp_path / "plugins" / "real").mkdir(parents=True)
+        entry = {"name": "real", "source": "./plugins/real"}
+        assert verify_plugin_spec.check_source_directory_exists(entry) == []
+
+    def test_missing_directory_reported(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        entry = {"name": "ghost", "source": "./plugins/ghost"}
+        errors = verify_plugin_spec.check_source_directory_exists(entry)
+        assert len(errors) == 1
+        assert "does not exist" in errors[0]
+
+
 class TestMainIntegration:
     """End-to-end: build a tiny fake repo under tmp_path and point the
     script's module-level REPO_ROOT/MARKETPLACE_PATH constants at it."""
@@ -168,6 +183,15 @@ class TestMainIntegration:
     def test_no_mirror_still_passes(self, tmp_path, monkeypatch, capsys):
         self._build_fake_repo(tmp_path, mirror_content=None)
         assert self._run_main(monkeypatch, tmp_path) == 0
+
+    def test_stale_marketplace_entry_missing_directory_fails(self, tmp_path, monkeypatch, capsys):
+        self._build_fake_repo(tmp_path, mirror_content=json.dumps(VALID_MANIFEST))
+        marketplace_path = tmp_path / ".claude-plugin" / "marketplace.json"
+        marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+        marketplace["plugins"].append({"name": "ghost", "source": "./plugins/ghost", "version": "0.1.0"})
+        marketplace_path.write_text(json.dumps(marketplace), encoding="utf-8")
+        assert self._run_main(monkeypatch, tmp_path) == 1
+        assert "does not exist" in capsys.readouterr().err
 
 
 class TestRealRepoManifestsConform:

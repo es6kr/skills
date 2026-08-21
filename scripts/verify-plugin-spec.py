@@ -21,7 +21,12 @@ encode but this workspace requires:
     version (the exact 0.1.0-vs-0.1.1 drift class this linter exists to
     catch)
   - a marketplace.json entry's "source" path must stay within the repo root
-    (no ../ escape)
+    (no ../ escape) AND must resolve to a directory that actually exists on
+    disk -- a stale entry left over from a plugin that moved/was deleted
+    without its marketplace.json entry being cleaned up is caught here, not
+    silently skipped (this is deliberately stricter than the "manifest not
+    written yet" skip below: a missing directory is never valid, a missing
+    plugin.json inside an existing directory can be, during migration)
 """
 import json
 import re
@@ -98,6 +103,18 @@ def check_path_containment(entry: dict) -> list:
     return []
 
 
+def check_source_directory_exists(entry: dict) -> list:
+    """A marketplace.json entry's "source" directory must exist on disk --
+    unlike a missing plugin.json (which can mean "not migrated to a
+    standalone manifest yet"), a missing directory means the entry itself is
+    stale (its plugin moved or was deleted and the catalog wasn't updated)."""
+    source = entry.get("source", "./")
+    resolved = (REPO_ROOT / source).resolve()
+    if not resolved.is_dir():
+        return [f"marketplace.json entry {entry.get('name')!r}: source {source!r} does not exist on disk"]
+    return []
+
+
 def iter_marketplace_entries():
     marketplace = json.loads(MARKETPLACE_PATH.read_text(encoding="utf-8"))
     return marketplace.get("plugins", [])
@@ -108,6 +125,7 @@ def main() -> int:
     checked = 0
     for entry in iter_marketplace_entries():
         errors.extend(check_path_containment(entry))
+        errors.extend(check_source_directory_exists(entry))
 
         source = entry.get("source", "./")
         plugin_dir = (REPO_ROOT / source).resolve()
