@@ -74,18 +74,31 @@ A worktree is **repurposable** when both checks are empty (fully pushed + clean)
 
 ### 3. Decision — reuse or create
 
-```
-inactive candidates found?
-├─ YES → AskUserQuestion: which one to reuse?
-│        ├─ User selects one → Step 4A (rename/move)
-│        └─ User says "create new" → Step 4B (new)
-└─ NO  → worktree count over the limit (see "Inactive Worktree Count Limit")?
-         ├─ YES → repurposable candidate found (§2.5)? → oldest one → Step 4A (rename/move)
-         │        └─ none found → report to user, ask before creating new
-         └─ NO  → Step 4B (new)
+**Cost gate first (HARD STOP).** What reuse buys back is a **dependency install / build cache**, not the worktree directory. Where no dependency manifest exists, a fresh worktree is a checkout and nothing more — reuse saves seconds, while renaming a branch destroys whatever intent its name encoded. Classify the repo before consulting the tree:
+
+```bash
+ls <repo>/package.json <repo>/pnpm-lock.yaml <repo>/yarn.lock <repo>/Cargo.toml \
+   <repo>/go.mod <repo>/pom.xml <repo>/build.gradle <repo>/requirements.txt \
+   <repo>/uv.lock <repo>/Gemfile
 ```
 
-**AskUserQuestion options must include both reuse and new-create** when inactive candidates exist.
+Any hit → **heavy**. No hit → **lightweight** (a docs or shell-skill repo, for instance).
+
+```
+repo has a dependency manifest / lockfile?
+├─ NO  (lightweight) → Step 4B (new). Reuse is opt-in — offer it only if the user asks.
+└─ YES (heavy) ↓
+   inactive candidates found?
+   ├─ YES → AskUserQuestion: which one to reuse?
+   │        ├─ User selects one → Step 4A (rename/move)
+   │        └─ User says "create new" → Step 4B (new)
+   └─ NO  → worktree count over the limit (see "Inactive Worktree Count Limit")?
+            ├─ YES → repurposable candidate found (§2.5)? → oldest one → Step 4A (rename/move)
+            │        └─ none found → report to user, ask before creating new
+            └─ NO  → Step 4B (new)
+```
+
+**In a heavy repo, AskUserQuestion options must include both reuse and new-create** when inactive candidates exist. In a lightweight repo the same offer is noise — new-create is the recommended option, and a branch name that encodes planned intent is preserved rather than renamed.
 
 ### 4A. Reuse via rename or move
 
@@ -131,6 +144,34 @@ Post-create verification:
 git worktree list
 cd .worktrees/<branch-name>
 git branch --show-current
+```
+
+#### 4B-1. Default `.gitignore` Baseline Gate (HARD STOP)
+
+When standardizing on `<repo>/.worktrees/`, ensuring that `.worktrees/` is ignored in the root repository's `.gitignore` (or `.git/info/exclude`) is **mandatory**. Without this ignore rule, nested worktree trees, dirty edits, and untracked branches will bleed into `git status` in the main repository.
+
+Baseline default `.gitignore` patterns required for every managed repository:
+
+```gitignore
+# Runtime & Worktree Isolation
+.worktrees/
+
+# OS / Editor Junk
+.DS_Store
+
+# Language Caches & Bytecode
+__pycache__/
+
+# Backup & Transient Temp Files
+*.bak
+*.tmp
+```
+
+When creating a new worktree or initializing/migrating a repo, verify:
+
+```bash
+# Verify .worktrees/ is excluded
+grep -q "^\.worktrees/" .gitignore 2>/dev/null || echo ".worktrees/" >> .gitignore
 ```
 
 ### 5. Post-acquisition check (MANDATORY)
@@ -200,19 +241,21 @@ For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-firs
 | 3 | Create worktree outside `.worktrees/` | Use `.worktrees/` |
 | 4 | Start coding without branch verification | `git branch --show-current` before any Write/Edit |
 | 5 | Chain `git checkout -b <new> <ref>` immediately followed by `git cherry-pick`/`git reset`/other git commands in a repo with a large pre-existing dirty working tree (e.g. `~/.agents`) | In-place checkout can fail silently ("local changes would be overwritten") while staying on the original branch, so the chained command runs on the wrong branch. Prefer `git branch <new> <ref>` (no working-tree switch) + `git worktree add <path> <new>` from the start when the repo is known to carry unrelated uncommitted content; if in-place checkout is used anyway, verify `git branch --show-current` before the next command (see failed-attempts.md "git-checkout-unverified-chain", 2 occurrences) |
-| 5 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
-| 6 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
-| 7 | Classify "merged + ahead=0 + dirty" as abandoned leftovers | Run the operation-state gate first — a merged branch can host an in-progress cherry-pick applying new work on top |
-| 8 | Check multiple state files with one `ls fileA fileB fileC 2>/dev/null \|\| echo "no in-progress op"` call | `ls` returns nonzero if **any** argument is missing, even while printing the paths of the ones that DO exist — a partial hit still fires the `\|\|` fallback and prints a false "no in-progress op" alongside the real hit. Check each file individually (see the operation-state gate command above), and always re-read the raw stdout before trusting a fallback message (see failed-attempts.md "ls multi-arg false negative") |
-| 9 | Reuse an inactive worktree via `rename-worktree.sh` (or a manual `git checkout -b` inside it) without checking its parent directory | Before reusing, confirm the worktree's parent directory is already `<repo>/.worktrees/` — if not, relocate via [move-worktree](./move-worktree.md) Scenario B first, then rename/switch branch |
+| 6 | Delete inactive worktrees to "clean up" | Reuse them — rename is cheaper than delete+create (subject to count limit below) |
+| 7 | Treat unmerged status codes (`DU`/`UU`/`AA`…) as plain dirty files and offer discard/stash/`git add` resolution | Unmerged entries = a conflicted operation is mid-flight (§2 Step 2.0 gate). Exclude the worktree from candidates + report the in-progress operation to the user |
+| 8 | Classify "merged + ahead=0 + dirty" as abandoned leftovers | Run the operation-state gate first — a merged branch can host an in-progress cherry-pick applying new work on top |
+| 9 | Check multiple state files with one `ls fileA fileB fileC 2>/dev/null \|\| echo "no in-progress op"` call | `ls` returns nonzero if **any** argument is missing, even while printing the paths of the ones that DO exist — a partial hit still fires the `\|\|` fallback and prints a false "no in-progress op" alongside the real hit. Check each file individually (see the operation-state gate command above), and always re-read the raw stdout before trusting a fallback message (see failed-attempts.md "ls multi-arg false negative") |
+| 10 | Reuse an inactive worktree via `rename-worktree.sh` (or a manual `git checkout -b` inside it) without checking its parent directory | Before reusing, confirm the worktree's parent directory is already `<repo>/.worktrees/` — if not, relocate via [move-worktree](./move-worktree.md) Scenario B first, then rename/switch branch |
+| 11 | Create `<repo>/.worktrees/` without ignoring it in `.gitignore` | Ensure `.worktrees/` and baseline hygiene patterns (`__pycache__/`, `.DS_Store`, `*.bak`, `*.tmp`) exist in `.gitignore` or `.git/info/exclude` |
 
-### Self-check (before reusing any inactive/repurposable candidate — §3/§4A)
+### Self-check (before reusing or creating any worktree — §3/§4)
 
-1. Is the candidate's path already `<repo>/.worktrees/<name>`? Check with `git worktree list` — the path column shows the full location.
-2. If not (a legacy `.claude/worktrees/`, a sibling `<repo>-wt/`, a bare `~/.worktrees/`, or anything else) → relocate via move-worktree.md Scenario B **before** renaming/switching branch — do not reuse in place and leave the wrong location to persist across future reuse cycles.
-3. Only after the path is confirmed canonical, proceed with rename-worktree.sh or the manual branch switch.
+1. Is `<repo>/.gitignore` configured to ignore `.worktrees/` and baseline hygiene patterns (`__pycache__/`, `.DS_Store`, `*.bak`, `*.tmp`)?
+2. Is the candidate's path already `<repo>/.worktrees/<name>`? Check with `git worktree list` — the path column shows the full location.
+3. If not (a legacy `.claude/worktrees/`, a sibling `<repo>-wt/`, a bare `~/.worktrees/`, or anything else) → relocate via move-worktree.md Scenario B **before** renaming/switching branch — do not reuse in place and leave the wrong location to persist across future reuse cycles.
+4. Only after the path is confirmed canonical, proceed with rename-worktree.sh or the manual branch switch.
 
-Steps 1-2 can be run mechanically: `scripts/check-worktree-canonical.sh <repo> <candidate-name>` (exit 0 = canonical / 1 = non-canonical, prints the Scenario B move command / 2 = not registered).
+Steps 2-3 can be run mechanically: `scripts/check-worktree-canonical.sh <repo> <candidate-name>` (exit 0 = canonical / 1 = non-canonical, prints the Scenario B move command / 2 = not registered).
 
 ## Inactive Worktree Count Limit (HARD STOP)
 
@@ -226,10 +269,13 @@ Reuse via rename is the default for inactive worktrees (Don't/Do rule #5). Howev
 
 ### Decision matrix
 
-| Inactive count (after cleanup of just-completed worktree) | Action for the just-completed worktree | Rationale |
-|-----------------------------------------------------------|----------------------------------------|-----------|
-| ≤ 5 | **B: reuse** — `git checkout --detach origin/main` + `git branch -D <feature>` | Pool is healthy. Reuse avoids the cost of fresh worktree creation (~10-30s + ENOSPC risk on small `.git/worktrees`) |
-| > 5 | **A: remove** — `git worktree remove <path>` + `git branch -D <feature>` | Pool is full. Removing the just-completed worktree (rather than an older inactive one) avoids touching others' historical workspaces |
+| Repo weight | Inactive count (after cleanup of just-completed worktree) | Action for the just-completed worktree | Rationale |
+|-------------|-----------------------------------------------------------|----------------------------------------|-----------|
+| **Lightweight** (no dependency manifest — see §3 cost gate) | any | **A: remove** — `git worktree remove <path>` + `git branch -D <feature>` | There is nothing to preserve: a replacement worktree is a plain checkout. Keeping it only grows `git worktree list` and the cost of every future reuse-vs-create decision |
+| Heavy | ≤ 5 | **B: reuse** — `git checkout --detach origin/main` + `git branch -D <feature>` | Pool is healthy. What reuse preserves is the installed dependency tree / build cache — that is the actual saving, not the directory |
+| Heavy | > 5 | **A: remove** — `git worktree remove <path>` + `git branch -D <feature>` | Pool is full. Removing the just-completed worktree (rather than an older inactive one) avoids touching others' historical workspaces |
+
+**Lightweight repos — removal is offerable at any completion stage.** Once work in a lightweight repo's worktree reaches a completion point — pushed, PR opened, or merged — offering to remove that worktree is appropriate; it need not be held as a reuse candidate. Ask rather than remove silently, since the user may still be reading the diff or expecting review feedback.
 
 ### Don't / Do
 
@@ -312,13 +358,15 @@ User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktre
 
 ## Inactive worktree inventory before creating a new one (HARD STOP)
 
-**When a worktree is needed, inspect existing worktrees before creating a new one with `git worktree add`.**
+**In a heavy repo, inspect existing worktrees before creating a new one with `git worktree add`.** Run the §3 cost gate first — this inventory obligation applies only where a fresh worktree would cost a dependency install or build.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Default to creating a new worktree with `git worktree add` whenever one is needed | Run `git worktree list` first → identify inactive / merged-PR worktrees → reuse via `/git-repo rename-worktree` or `/git-repo move-worktree` |
-| 2 | AskUserQuestion options default to "create new and remove later" | Include "rename and reuse an inactive worktree" whenever at least one inactive candidate exists |
-| 3 | Ignore worktrees pinned at the merge commit of a merged PR | The base commit hash matching a merge commit = a reuse candidate |
+| 1 | Apply the inventory-first obligation regardless of repo weight | Run the §3 cost gate first. Heavy → inventory first. Lightweight → create new and move on |
+| 2 | In a heavy repo, default to creating a new worktree with `git worktree add` whenever one is needed | Run `git worktree list` first → identify inactive / merged-PR worktrees → reuse via `/git-repo rename-worktree` or `/git-repo move-worktree` |
+| 3 | In a heavy repo, let AskUserQuestion options default to "create new and remove later" | Include "rename and reuse an inactive worktree" whenever at least one inactive candidate exists |
+| 4 | Ignore worktrees pinned at the merge commit of a merged PR (heavy repo) | The base commit hash matching a merge commit = a reuse candidate |
+| 5 | In a lightweight repo, surface inactive candidates as if reuse were preferable | Create new. Mention candidates only if the user asks, or to offer removal of ones already finished |
 
 See the "Worktree decision tree" section above for the full procedure.
 
@@ -335,7 +383,7 @@ See the "Worktree decision tree" section above for the full procedure.
 | 3 | Assume "only my changes are staged, so other changes don't matter" | The same push can include unpushed commits from another task, and other dirty working-directory state can leak into the next step |
 | 4 | Omit "split into worktree" from the commit-options AskUserQuestion list | When branch is main/master/develop AND there are 1+ other-task changes, "split into worktree" is a required option |
 | 5 | Leave another task's unstaged changes in place and push only the new commit | Confirm the other-task intent (report to the user) → split into a worktree or separate it into another task |
-| 6 | **Place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **If 1+ inactive worktree candidates exist, place "rename and reuse" as option 1 / Recommended**. New goes to option 2 or lower |
+| 6 | **In a heavy repo, place "create new worktree" as option 1 / Recommended when inactive candidates exist** | **In a heavy repo with 1+ inactive candidates, place "rename and reuse" as option 1 / Recommended**; new goes to option 2 or lower. **In a lightweight repo the ordering reverses** — new-create is option 1, because reuse saves nothing there and renaming discards a branch name's intent |
 | 7 | Assume "worktree split = move the working-tree changes out of the current repo" (stash + checkout) when the current repo is a live runtime environment whose working tree state is actively consumed by the user (e.g., `~/.agents` — rules are loaded always_on, skills are hardlinked to `~/.claude/skills/`) | Distinguish two split modes: **(a) move** — stash + checkout to a new branch (default for one-off feature work) vs **(b) copy** — leave the source working tree untouched + replicate the diff into a separate worktree via `cp`/`rsync` and commit there. Use (b) whenever the source repo's working tree is a live runtime environment. The source working tree must not change state for the user during commit/PR |
 
 ### Self-check (every time before presenting commit options)
