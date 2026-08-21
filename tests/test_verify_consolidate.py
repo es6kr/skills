@@ -1,3 +1,5 @@
+"""Unit tests for verify_consolidate.py mechanical validation script."""
+
 from __future__ import annotations
 
 import os
@@ -11,7 +13,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from skills.consolidate.scripts.verify_consolidate import ConsolidateValidator
-
 
 
 class TestVerifyConsolidate(unittest.TestCase):

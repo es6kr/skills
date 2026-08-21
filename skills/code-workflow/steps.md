@@ -57,6 +57,18 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 
 **Prohibited**: Deciding the next action by only looking at task checklist items without reading the research/plan files. A task list is a summary; the plan file contains detailed sequences and constraints.
 
+## Milestone Checklist Sync Discipline (HARD STOP)
+ 
+When executing multi-phase workflows (`/code-workflow`, `/fix-plan add --deep`), 3 checklist surfaces exist:
+1. `task.md` (active in-session real-time tracker in `brain/<conversation-id>/task.md`): Used by IDE/CLI to show real-time progress steps.
+2. `plan-*.md` (the permanent plan artifact's Layered Roadmap / Progress Checklist): Section 3 of the plan document.
+3. `fix_plan.md` / `checklist.md` (the workspace global backlog under `.agents/fix_plan.md`): Global task tracker.
+ 
+**Compromise Rule (Milestone-Boundary Sync)**:
+- **Micro-steps**: Sub-step execution (tool calls, individual file edits) is tracked solely in `task.md` to prevent tool call churn and token budget waste.
+- **Phase & Milestone Boundaries**: At major boundaries (Phase 2 Plan authoring complete, Phase 3 User Review approved, Phase 4 TDD implementation complete, Phase 5 verification complete), the agent MUST synchronize the progress across `plan-*.md` (marking completed phases/items as `[x]`) and `fix_plan.md` (updating task status and audit/completion metadata).
+- **Phase-Completion Mandatory Commit Gate (HARD STOP)**: At the completion of each implementation Phase (e.g. Phase 1-B) or independent logical unit, the agent MUST review modified files, analyze commit split discipline via `commit-tidy`, and execute the Pre-Commit Verification Ask (`AskUserQuestion`) to secure user approval and commit changes before moving to the next Phase or suggesting `/next`.
+- **Session Wrap-up (`/cleanup`)**: Final reconciliation ensures all 3 surfaces are 100% consistent.
 **Examples**:
 - Even if `[ ] PR #278 merge` is in the task list, if the plan states "Phase 1 Unit Test → Phase 2 Proxy Test → ... → PR merge", start from Phase 1
 - Simple items with no plan file can be proceeded immediately

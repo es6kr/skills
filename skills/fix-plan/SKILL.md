@@ -89,6 +89,8 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 
 **Step 0 — Recency check (HARD STOP, runs before task registration)**: before registering pipeline tasks, scan the tracker's pinned/header block (if the tracker has one) for a "last full pipeline run" marker left by a prior invocation of this same default-invocation pipeline. If found and it indicates a very recent completion (same calling context, no new external trigger since), report what that run covered and call `AskUserQuestion` offering: skip entirely (report only) / run selective steps (e.g. Sync only, since external state may have moved) / run the full pipeline anyway. Do not silently start Step 1 when recent-completion evidence is already present in the file being read — the tracker is both the pipeline's operand and, when this marker exists, its own run log. If no marker exists (or the tracker has no pinned block), proceed directly into Step 1 as before — this step is a no-op on trackers that don't use the convention.
 
+**Recency-ask answer reuse (HARD STOP — never re-ask a scope question the user already answered)**: the Step 0 recency ask is a per-day, per-context decision — not a per-invocation ritual. Before calling `AskUserQuestion`, read the tracker's pipeline log for recency-ask answers the user already gave today in the same calling context: (a) if the user already answered a recency ask today, reuse that answer's pattern (e.g. "core only" → skip the steps that would duplicate a same-day 0-change run) instead of re-asking; (b) an explicit role-flagged re-invocation (e.g. `--deep`) made after a same-role run already completed today **is itself the scope answer** — do not ask; skip the pipeline steps that would duplicate that run (report what was skipped and why) and proceed straight to that role's remaining actionable work (for `deep`, the dedicated model-triage section's executable items; for `pm`/`impl`, due REPEAT items and surfaced `selfable` candidates); (c) re-ask only when external state has plausibly moved in a way the user has not seen (new merges/closes since the last run), or an explicit scope argument conflicts with the logged answer. The user answering the same scope question twice in one day is a defect, not diligence.
+
 1. **Move / Archive**: Dispatch to the configured **archive receiver** (or fall back to the `move` topic) to harvest/cleanup Completed entries.
 2. **Format**: Verify the schema, markers, and section structure of the tracker.
 3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
@@ -280,7 +282,12 @@ MERGED PR or CLOSED issue → auto `[x]`. PR CLOSED-without-merge → `[BLOCKED:
 
 `issue-drafts/<slug>.md` → `gh issue create` → archive to `.bak/` → delete from fix_plan. See [issue-drafts.md](./issue-drafts.md).
 
+### Plane Intake Ingestion Gate for PR & Completed Items (HARD STOP)
+
+Work items backed by GitHub PRs or completed during sessions without a Plane identifier (`[ES6KR-<N>]`, `[INFRA-<N>]`, etc.) MUST be ingested into Plane via Intake (`plane_create_issue.py`) to preserve historical audit logs and decisions. See `plane-backlog` skill.
+
 ## See Also
 
 - `github-flow` (depends-on) — `gh` CLI conventions for sync + register
+- `plane-backlog` (depends-on) — Plane issue/intake lifecycle and sync engine
 - Ralph integration is a separate workstream maintained outside this published skill. A Ralph wrapper, when present, owns Ralph-specific concerns: the `## REPEAT` persistent-item section, autonomous-loop `[BLOCKED]` skip semantics, and the caller-side `--rag=<skill>:<topic>` dispatch (this skill exposes only the abstract flag contract). See the Ralph project's documentation for wrapper details

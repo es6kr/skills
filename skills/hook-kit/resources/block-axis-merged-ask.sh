@@ -63,7 +63,7 @@ fi
 # multi-finding ask writes keywords without adjacent counts ("[#1 Refactor
 # variables.tf] ..."). False-positive case: a verdict ask quoting
 # "Critical 0 / Important 2 / Minor 2" → DENY incorrectly.
-FINDING_TEXT=$(echo "$OPT_TEXT" | sed -E "s/(Refactor|Tip|Nitpick|Critical|Important|Minor)[[:space:]]*[0-9]+${HG_AXIS_TALLY_KO_SUFFIX}//gI")
+FINDING_TEXT=$(echo "$OPT_TEXT" | sed -E "s/(Refactor|Tip|Nitpick|Critical|Important|Minor|Finding|Task)[[:space:]]*[0-9]+${HG_AXIS_TALLY_KO_SUFFIX}//gI")
 
 # Detect finding-type keywords (case-insensitive, word-boundary-ish)
 FINDING_KEYWORDS=$(echo "$FINDING_TEXT" | grep -oiE '\b(Refactor|Tip|Nitpick|Critical|Important|Minor)\b' | sort -u)

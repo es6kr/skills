@@ -56,6 +56,9 @@ scripts/repo-to-ghq.sh --no-symlink ~/ghq/local/archive/<name>
 cd ~/ghq/host/group/repo
 git status
 git log --oneline -1
+
+# Verify baseline .gitignore hygiene (.worktrees/, .DS_Store, __pycache__/, *.bak, *.tmp)
+grep -q "^\.worktrees/" .gitignore 2>/dev/null || echo -e "\n# Worktrees & Runtime\n.worktrees/\n.DS_Store\n__pycache__/\n*.bak\n*.tmp" >> .gitignore
 ```
 
 ### Step 4: Update SourceGit
@@ -192,5 +195,5 @@ The `repo-to-ghq.sh` script:
 ## Output
 
 ```
-Repository moved to '/Users/es6kr/ghq/github.com/org/repo'.
+Repository moved to '~/ghq/github.com/org/repo'.
 ```

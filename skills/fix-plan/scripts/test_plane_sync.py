@@ -39,6 +39,15 @@ class TestParseIndexLines(unittest.TestCase):
         self.assertEqual(entry["url_match"]["project"], "11111111-1111-1111-1111-111111111111")
         self.assertEqual(entry["url_match"]["issue"], "22222222-2222-2222-2222-222222222222")
 
+    def test_matches_ascii_arrow_delimiter(self):
+        # The index-line docstring documents an ASCII "->" delimiter, but real
+        # data uses the Unicode "→". Accept both so a hand-typed ASCII arrow
+        # still parses. (CodeRabbit/Copilot review, PR #253.)
+        ascii_line = PHASE3_LINE.replace("→", "->")
+        matches = plane_sync.parse_index_lines([ascii_line])
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["match"].group("ident"), "INFRA-6")
+
     def test_ignores_non_plane_lines(self):
         lines = ["- [ ] plain item, no Plane link", "some prose", ""]
         self.assertEqual(plane_sync.parse_index_lines(lines), [])

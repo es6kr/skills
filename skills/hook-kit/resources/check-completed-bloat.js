@@ -56,7 +56,13 @@ if (filePath && (filePath.includes('fix_plan.md') || filePath.includes('checklis
       const rest = content.slice(headingMatch.index + headingMatch[0].length);
       const nextHeadingMatch = rest.match(/(?:^|\n)## /);
       const completedSection = nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest;
-      const items = completedSection.split('\n').filter((line) => line.trim().startsWith('-'));
+      // Only top-level entries (marker at column 0) count as "completed items" —
+      // matches cleanup.py's own entry-boundary logic (indent == 0). A `.trim()`
+      // before the startsWith check would also match indented sub-bullets like
+      // "  - **Why**: ..." whose prose can cite unrelated historical dates
+      // (e.g. the item's original registration date), which is not the entry's
+      // completion date and must not be scanned for staleness.
+      const items = completedSection.split('\n').filter((line) => /^-\s/.test(line));
 
       const today = new Date();
       // Current week starts on Monday.
@@ -66,7 +72,14 @@ if (filePath && (filePath.includes('fix_plan.md') || filePath.includes('checklis
       monday.setHours(0, 0, 0, 0);
       const mondayStr = localDateStr(monday);
 
-      const dateRegex = /\b(20\d{2})-(\d{2})-(\d{2})\b/;
+      // Anchored at the start of the item's text (after the "- " marker) —
+      // matches cleanup.py's own date extraction (re.match(r"^(\d{4}-\d{2}-\d{2})",
+      // node.text), which is also start-anchored). A date appearing later in the
+      // line (e.g. a "(YYYY-MM-DD 추가)" registration-date aside before a later
+      // "완료(YYYY-MM-DD)" mention) is prose, not the entry's own leading date —
+      // scanning it produced false "stale" hits on entries cleanup.py itself
+      // never considers dated at all.
+      const dateRegex = /^-\s*(20\d{2})-(\d{2})-(\d{2})\b/;
       const staleItems = [];
 
       for (const item of items) {

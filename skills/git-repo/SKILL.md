@@ -225,6 +225,7 @@ Key features:
 1. **Repository migration**: Migrate to ghq structure with `to-ghq` topic (or `to-bare` for the inverse)
 2. **SourceGit update**: Register new paths with `sourcegit` topic
 3. **Batch inspection**: Clean up uncommitted/unpushed changes with `patrol` topic
+4. **Baseline .gitignore hygiene**: Ensure standard ignore rules (`.worktrees/`, `.DS_Store`, `__pycache__/`, `*.bak`, `*.tmp`) in `.gitignore` or `.git/info/exclude` to isolate worktrees and suppress runtime/editor clutter
 
 ## Scripts
 
