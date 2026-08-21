@@ -64,11 +64,22 @@ if [[ "${1:-}" == "--test" ]]; then
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Finding #3 is real","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"already merged #57","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"see https://github.com/es6kr/skills/pull/60","description":"x"}]}]}}'
+  # Quantity mention with quantifier ("PR 2 items", "PR 3 items") is NOT a PR number reference
+  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"PR 2 items to review?","options":[{"label":"proceed","description":"x"}]}]}}'
+  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"PR 3 items to check","options":[{"label":"yes","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"Bash","tool_input":{"command":"echo #123 not an ask"}}'
 
   echo "Total: $((pass+fail)), Pass: $pass, Fail: $fail"
   [[ "$fail" -eq 0 ]] && exit 0 || exit 1
 fi
+
+# Load locale-specific regex patterns from hook-kit data/
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
+if [[ -f "$HG_DATA_FILE" ]]; then
+  # shellcheck source=/dev/null
+  . "$HG_DATA_FILE"
+fi
+HG_QUANTIFIER_SUFFIX="${HG_QUANTIFIER_SUFFIX:-}"
 
 INPUT=$(cat)
 
@@ -86,7 +97,9 @@ ASK_TEXT=$(echo "$INPUT" | jq -r '
 # --- PR-URL gate: each DISTINCT PR number must have its own matching URL ---
 # (payload-wide "any URL exists" checking under-enforces multi-PR asks — a URL
 # for PR #A does not satisfy a bare reference to PR #B in the same payload)
-PR_NUMS_REFERENCED=$(echo "$ASK_TEXT" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
+# Strip PR quantity mentions (e.g. "PR 2 items", "PR 3 items", "PR 5 items") before finding referenced PR numbers
+CLEANED_ASK_TEXT=$(echo "$ASK_TEXT" | sed -E "s/\bPR[[:space:]]*[0-9]+[[:space:]]*(${HG_QUANTIFIER_SUFFIX}${HG_QUANTIFIER_SUFFIX:+|}items|prs|pull requests)\b//gI")
+PR_NUMS_REFERENCED=$(echo "$CLEANED_ASK_TEXT" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
 if [[ -n "$PR_NUMS_REFERENCED" ]]; then
   PR_NUMS_WITH_URL=$(echo "$ASK_TEXT" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
   MISSING_URL_FOR=()
