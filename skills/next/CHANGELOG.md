@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/next-v0.8.1...next-v0.9.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat batch (hook registry schema, self-reference path anchoring) ([0c33ffa](https://github.com/es6kr/skills/commit/0c33ffac99a9237f4530566470dabeaea128c209))
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **hooks:** correct ghost path for block-wip-register-before-execute.sh ([d5875a2](https://github.com/es6kr/skills/commit/d5875a2e624eeb4a3dce9beba5d96a4365a8f950))
+* **next:** require a re-measure before executing a context-gate-justified choice ([#325](https://github.com/es6kr/skills/issues/325)) ([ed76956](https://github.com/es6kr/skills/commit/ed769564400494fe3a3b84ebc52cfee4ab1bcbbe))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
+
+### Refactor
+
+* **session:** rename claude-session to session skill ([318d6a1](https://github.com/es6kr/skills/commit/318d6a1fcc04621459e7f3e6cab2394bc0b68590))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/next-v0.8.0...next-v0.8.1) (2026-08-17)
 
 
