@@ -50,7 +50,12 @@ python3 "$FIX_PLAN_SCRIPTS/artifact_post_ingest.py" <path/to/artifact.md>
 ### 3. Plane Checklist Sync
 ```bash
 python3 "$FIX_PLAN_SCRIPTS/plane_sync.py" --dry-run
+# --push-done: also transition Plane issues to Done when their linked local
+# item is already [x] but Plane hasn't caught up (never DELETEs; respects --dry-run)
+python3 "$FIX_PLAN_SCRIPTS/plane_sync.py" --dry-run --push-done
 ```
+
+Every sync run also prints a **priority-drift report** (report-only — compares each tracked issue's local `P0`-`P3` tag against Plane's live `priority` field, never writes either side). See "Plane Issue DELETE Prohibition & Priority Mapping (HARD STOP)" below.
 
 ### 4. Workspace Profile Verification
 ```bash
@@ -60,6 +65,9 @@ python3 "$FIX_PLAN_SCRIPTS/workspace_profile.py" --json
 ### 5. Plane Issue & Intake Creation
 ```bash
 python3 "$FIX_PLAN_SCRIPTS/plane_create_issue.py" --title "<title>" --description "<description>" --json
+# --priority accepts a fix_plan P0-P3 marker (case-insensitive) or a direct
+# Plane value (urgent/high/medium/low/none) -- both forms normalize the same way.
+python3 "$FIX_PLAN_SCRIPTS/plane_create_issue.py" --title "<title>" --priority P1 --json
 ```
 
 ### 6. Plane Issue Comment Creation
@@ -93,6 +101,13 @@ Plane's Issue model has (at least) three description-related fields:
 `PATCH /issues/<id>/` (or Django `Issue.save()`) accepting `description_html` does **not** auto-derive `description`. If you bulk-write only `description_html` (e.g. wrapping raw markdown in `<pre>` as a quick migration shortcut), the result is: (1) the read-only preview shows literal markdown syntax instead of rendered text, and (2) opening the issue in the editor shows **blank content**, because `description` is still `{}`.
 
 **Fix**: convert markdown to real HTML (`<strong>`, `<ul><li>`, `<code>`, etc. — not `<pre>`-escaped raw text) before writing `description_html`. If the editor-blank problem also needs fixing, `description` (the JSON doc) must be populated separately — the REST API does not do this for you.
+
+## Plane Issue DELETE Prohibition & Priority Mapping (HARD STOP)
+
+- **Never `DELETE` a Plane issue.** Deleted issues break inbound links from wikis/trackers that already cited them, and there is no first-class "undo". When a local `fix_plan.md` item completes (`[x]`), the corresponding Plane issue must transition to the project's `completed`-group ("Done") state instead — see `plane_sync.py`'s `transition_issue_to_done()` / `--push-done` flag. This is a policy guard, not an API limitation (the Plane REST API does expose a DELETE endpoint) — every script in this skill and `fix-plan/scripts/` must keep it that way.
+- **P0-P3 ↔ Plane native priority is a fixed 1:1 mapping**: `P0`=`urgent`, `P1`=`high`, `P2`=`medium`, `P3`=`low` (Plane's own `none` has no marker equivalent). `plane_create_issue.py --priority` and `plane_sync.py`'s internal `normalize_priority()`/`priority_to_marker()` both use this table — do not introduce a second mapping elsewhere.
+- **Priority drift is report-only by default.** `plane_sync.py` prints a mismatch (local `P*` tag vs Plane's live `priority`) on every run but never auto-writes either side — a first-adoption sync run stays advisory until a human confirms the direction, since an existing local marker may carry local triage judgment Plane doesn't know about (2026-08-20 Fable audit, `plan-plane-done-state-and-priority-mapping.md` §7-3).
+- **`plane_create_issue.py` exists as two copies** (`skills/fix-plan/scripts/` and `skills/plane-backlog/scripts/`) — keep both in sync when touching `--priority`/priority-injection logic (see `git.md`-adjacent "Duplicate Script Drift" risk in the plan doc). `plane_sync.py` has no such duplicate; its priority-mapping constants are self-contained rather than cross-imported.
 
 ## LLM Wiki Storage Architecture (HARD STOP)
 

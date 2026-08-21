@@ -200,6 +200,167 @@ class TestSyncChecklistWithPlane(unittest.TestCase):
             self.assertFalse((Path(d) / "fix_plan.md.tmp").exists())
 
 
+class TestPriorityMapping(unittest.TestCase):
+    def test_normalize_priority_marker_tags(self):
+        self.assertEqual(plane_sync.normalize_priority("P0"), "urgent")
+        self.assertEqual(plane_sync.normalize_priority("p1"), "high")
+        self.assertEqual(plane_sync.normalize_priority("P2"), "medium")
+        self.assertEqual(plane_sync.normalize_priority("p3"), "low")
+
+    def test_normalize_priority_native_values_passthrough(self):
+        for v in ("urgent", "high", "medium", "low", "none"):
+            self.assertEqual(plane_sync.normalize_priority(v), v)
+
+    def test_normalize_priority_rejects_unknown(self):
+        with self.assertRaises(ValueError):
+            plane_sync.normalize_priority("P9")
+
+    def test_priority_to_marker_reverse(self):
+        self.assertEqual(plane_sync.priority_to_marker("urgent"), "P0")
+        self.assertEqual(plane_sync.priority_to_marker("low"), "P3")
+        self.assertIsNone(plane_sync.priority_to_marker("none"))
+
+
+class TestExtractLocalPriority(unittest.TestCase):
+    def test_extracts_p_tag_from_blocked_marker(self):
+        self.assertEqual(plane_sync.extract_local_priority("BLOCKED:P1:external"), "high")
+
+    def test_returns_none_for_plain_open_marker(self):
+        self.assertIsNone(plane_sync.extract_local_priority(" "))
+
+    def test_returns_none_for_x_marker(self):
+        self.assertIsNone(plane_sync.extract_local_priority("x"))
+
+
+class TestDetectPriorityDrift(unittest.TestCase):
+    """Report-only drift detection (Fable audit §7-3): a first-adoption
+    priority-sync run stays advisory until a human confirms the direction,
+    so this must never write to fix_plan.md or Plane."""
+
+    def _profile(self):
+        return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
+
+    def test_reports_mismatch(self):
+        with patch.object(
+            plane_sync, "fetch_issue_state",
+            return_value={"state": "s1", "priority": "urgent"},
+        ):
+            drifts = plane_sync.detect_priority_drift([PHASE3_LINE], self._profile())
+        self.assertEqual(len(drifts), 1)
+        self.assertEqual(drifts[0]["local_priority"], "low")  # P3
+        self.assertEqual(drifts[0]["plane_priority"], "urgent")
+
+    def test_no_drift_when_matching(self):
+        with patch.object(
+            plane_sync, "fetch_issue_state",
+            return_value={"state": "s1", "priority": "low"},
+        ):
+            drifts = plane_sync.detect_priority_drift([PHASE3_LINE], self._profile())
+        self.assertEqual(drifts, [])
+
+    def test_skips_lines_without_p_tag(self):
+        line = PHASE3_LINE.replace("[BLOCKED:P3:external]", "[x]")
+        with patch.object(plane_sync, "fetch_issue_state") as mock_fetch:
+            drifts = plane_sync.detect_priority_drift([line], self._profile())
+        mock_fetch.assert_not_called()
+        self.assertEqual(drifts, [])
+
+    def test_api_error_no_drift_reported(self):
+        with patch.object(plane_sync, "fetch_issue_state", return_value={"error": "timeout"}):
+            drifts = plane_sync.detect_priority_drift([PHASE3_LINE], self._profile())
+        self.assertEqual(drifts, [])
+
+    def test_never_mutates_input_lines(self):
+        original = [PHASE3_LINE]
+        with patch.object(
+            plane_sync, "fetch_issue_state",
+            return_value={"state": "s1", "priority": "urgent"},
+        ):
+            plane_sync.detect_priority_drift(original, self._profile())
+        self.assertEqual(original, [PHASE3_LINE])
+
+
+class TestDoneStateTransition(unittest.TestCase):
+    """Plane Issue DELETE Prohibition & Done State Preservation (HARD STOP):
+    a local [x] item whose linked Plane issue isn't yet `completed` gets a
+    PATCH to the project's completed-group state -- DELETE is never used."""
+
+    def _profile(self):
+        return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
+
+    def test_find_state_id_by_group(self):
+        states = [
+            {"id": "s-todo", "group": "unstarted"},
+            {"id": "s-done", "group": "completed"},
+        ]
+        self.assertEqual(plane_sync.find_state_id_by_group(states, "completed"), "s-done")
+
+    def test_find_state_id_by_group_missing(self):
+        self.assertIsNone(
+            plane_sync.find_state_id_by_group([{"id": "s1", "group": "started"}], "completed")
+        )
+
+    def test_transition_issue_to_done_patches_state(self):
+        captured = {}
+
+        def fake_request(profile, path, method="GET", data=None):
+            if path.endswith("states/"):
+                return {"results": [{"id": "done-id", "group": "completed"}]}
+            captured["path"] = path
+            captured["method"] = method
+            captured["data"] = data
+            return {"id": "issue1", "state": "done-id"}
+
+        with patch.object(plane_sync, "make_plane_request", side_effect=fake_request):
+            result = plane_sync.transition_issue_to_done(self._profile(), "ws", "proj1", "issue1")
+        self.assertEqual(captured["method"], "PATCH")
+        self.assertEqual(captured["data"], {"state": "done-id"})
+        self.assertNotIn("error", result)
+
+    def test_transition_issue_to_done_no_completed_state(self):
+        with patch.object(plane_sync, "make_plane_request", return_value={"results": []}):
+            result = plane_sync.transition_issue_to_done(self._profile(), "ws", "proj1", "issue1")
+        self.assertIn("error", result)
+
+    def test_no_delete_call_anywhere_in_module_source(self):
+        import inspect
+        source = inspect.getsource(plane_sync)
+        self.assertNotIn('method="DELETE"', source)
+        self.assertNotIn("method='DELETE'", source)
+
+
+class TestComputeLocalToPlaneUpdates(unittest.TestCase):
+    def _profile(self):
+        return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
+
+    def test_queues_transition_when_local_done_but_plane_not(self):
+        completed_line = PHASE3_LINE.replace("[BLOCKED:P3:external]", "[x]")
+        with patch.multiple(
+            plane_sync,
+            fetch_issue_state=lambda *a, **kw: {"state": "s1"},
+            fetch_state_group=lambda *a, **kw: {"group": "started"},
+        ):
+            updates = plane_sync.compute_local_to_plane_updates([completed_line], self._profile())
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(updates[0]["ident"], "INFRA-6")
+
+    def test_no_queue_when_plane_already_completed(self):
+        completed_line = PHASE3_LINE.replace("[BLOCKED:P3:external]", "[x]")
+        with patch.multiple(
+            plane_sync,
+            fetch_issue_state=lambda *a, **kw: {"state": "s1"},
+            fetch_state_group=lambda *a, **kw: {"group": "completed"},
+        ):
+            updates = plane_sync.compute_local_to_plane_updates([completed_line], self._profile())
+        self.assertEqual(updates, [])
+
+    def test_no_queue_for_non_x_local_marker(self):
+        with patch.object(plane_sync, "fetch_issue_state") as mock_fetch:
+            updates = plane_sync.compute_local_to_plane_updates([PHASE3_LINE], self._profile())
+        mock_fetch.assert_not_called()
+        self.assertEqual(updates, [])
+
+
 class TestAutoDetectTrackerRoot(unittest.TestCase):
     """Issue #262: the __main__ fallback (no --fix-plan passed) must resolve
     .agents/fix_plan.md, not just .ralph/fix_plan.md."""
