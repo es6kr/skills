@@ -475,7 +475,7 @@ After upgrade Edit/Write is complete, **commit the changed skill files in the `~
 
 #### Branch guard (HARD STOP): PUBLIC skill → feat/fix branch, never develop/main direct
 
-**For a PUBLIC skill (in `published.json`), the commit MUST land on a dedicated `feat/<slug>-...` or `fix/<slug>-...` branch (worktree-isolated), never directly on `develop`/`master`/`main`.** The es6kr/skills repo flow is feat/fix branch → PR → main (release-please runs on main). `develop` is NOT a change-accumulation branch for published skills. This mirrors `es6kr` `deploy-skill.md` §6 Branch strategy — keep the two consistent.
+**For a PUBLIC skill (in `published.json`), the commit MUST land on a dedicated `feat/<slug>-...` or `fix/<slug>-...` branch (worktree-isolated), never directly on a shared integration branch (`develop`/`master`/`main`).** The PR **base** is a per-workspace customization, not a skill constant — resolve it from the workspace's `staging` role in works-config (see the works-config v0.2.0 schema). Where a two-tier staging is configured (`staging.kind: "branch"`), a `fix/*` branch PRs into the configured `next_fix` staging branch and a `feat/*` branch into the configured `next_feat`, and those staging branches are promoted to the release branch (where release-please runs) via a separate promotion PR. Where no staging layer is configured (`staging.kind: "none"`), `feat/fix` PRs into the repo's default integration branch directly. **Do not hardcode `next-*` or `main` as the base** — the staging convention lives in works-config, not in this skill.
 
 | # | Don't | Do |
 |---|-------|-----|
