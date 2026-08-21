@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.1 (2026-08-20)
+
+
+### Bug Fixes
+
+* **hook-kit,session:** resolve copilot review findings on ambient auth and claude-code rewind ([055c8a2](https://github.com/es6kr/skills/commit/055c8a26d9c5a1ec440b87c729e5148fdd2c9c65))
+* **hooks:** correct ghost path for block-wip-register-before-execute.sh ([d5875a2](https://github.com/es6kr/skills/commit/d5875a2e624eeb4a3dce9beba5d96a4365a8f950))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([4982364](https://github.com/es6kr/skills/commit/49823641a7b08123ebd0325273892bee41bc3280))
+* **wip:** cross-ref PR-URL and TaskCreate subject repo-qualifier rules ([#186](https://github.com/es6kr/skills/issues/186)) ([951c1e6](https://github.com/es6kr/skills/commit/951c1e6871e78e226757c6a7ae5ae53efeb7bfb0))
+
+
+### Refactor
+
+* **session:** rename claude-session to session skill ([318d6a1](https://github.com/es6kr/skills/commit/318d6a1fcc04621459e7f3e6cab2394bc0b68590))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/claude-session-v0.8.0...claude-session-v0.8.1) (2026-08-17)
 
 
