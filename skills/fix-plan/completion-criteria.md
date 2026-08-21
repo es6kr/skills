@@ -33,6 +33,8 @@ Promoting every subject named in `Why` into a completion condition is the primar
 
 ## Marker transition
 
+> **Model-triage audit-stage exception**: items in a dedicated model-triage section (see [model-triage.md](./model-triage.md)) whose **audit stage** completes (`audit_status: approved_by_*`) do NOT follow the generic "deliverable complete → `[x]` + residual split" rows below. Audit approval is a stage transition — the item stays unchecked and relocates to the tracker's implementation-queue section (e.g. `## TODO`) per model-triage's move obligation; `[x]` comes only when the implementation itself completes.
+
 | Situation | Marker | Action |
 |-----------|--------|--------|
 | Deliverable per `How to apply` complete, no residual scope | `[x]` | Append dated result annotation, then move per the `move` topic |
