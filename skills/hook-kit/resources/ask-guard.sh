@@ -425,6 +425,41 @@ MSG
   exit 2
 }
 
+resolve_guards_config() {
+  if [[ -n "${GUARDS_CONFIG:-}" && -f "${GUARDS_CONFIG}" ]]; then
+    echo "$GUARDS_CONFIG"
+    return 0
+  fi
+  local target_dir="${1:-$PWD}"
+  local repo_root
+  repo_root=$(git -C "$target_dir" rev-parse --show-toplevel 2>/dev/null || echo "$target_dir")
+  for candidate in "$repo_root/.agents/guards-config.json" "$repo_root/.claude/guards-config.json" "$target_dir/.agents/guards-config.json"; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  if [[ -f "$HOME/.config/agent-workspace/guards-config.json" ]]; then
+    echo "$HOME/.config/agent-workspace/guards-config.json"
+    return 0
+  fi
+  if [[ -f "$HOME/.config/plane-backlog/guards-config.json" ]]; then
+    echo "$HOME/.config/plane-backlog/guards-config.json"
+    return 0
+  fi
+  local plugin_data="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
+  if [[ -n "$plugin_data" && -f "$plugin_data/guards-config.json" ]]; then
+    echo "$plugin_data/guards-config.json"
+    return 0
+  fi
+  local default_data="$(dirname "$0")/../data/guards-config.json"
+  if [[ -f "$default_data" ]]; then
+    echo "$default_data"
+    return 0
+  fi
+  return 1
+}
+
 # ============================================================================
 # Check 4: Vendor name leak in question/options (not introduced by user)
 # ============================================================================
@@ -446,7 +481,19 @@ check_vendor_leak() {
     return 0
   fi
 
-  for vendor in qdrant chroma weaviate pinecone milvus pgvector redis-search; do
+  local vendors_list="qdrant chroma weaviate pinecone milvus pgvector redis-search"
+  local cli_list="qdrant-find qdrant-store chroma-find chroma-store"
+  local guards_cfg
+  guards_cfg="$(resolve_guards_config "$PWD" 2>/dev/null || true)"
+  if [[ -n "$guards_cfg" && -f "$guards_cfg" ]] && command -v jq >/dev/null 2>&1; then
+    local loaded_vendors loaded_clis
+    loaded_vendors=$(jq -r '.lists.vendors[]? // empty' "$guards_cfg" 2>/dev/null | tr '\n' ' ')
+    [[ -n "$loaded_vendors" ]] && vendors_list="$loaded_vendors"
+    loaded_clis=$(jq -r '.lists.vendor_cli_tools[]? // empty' "$guards_cfg" 2>/dev/null | tr '\n' ' ')
+    [[ -n "$loaded_clis" ]] && cli_list="$loaded_clis"
+  fi
+
+  for vendor in $vendors_list; do
     if echo "$ASK_TEXT" | grep -qiE "\b${vendor}\b|mcp__${vendor}([_-]|$)"; then
       if ! echo "$USER_TEXT" | grep -qiE "\b${vendor}\b"; then
         local hits
@@ -456,7 +503,7 @@ check_vendor_leak() {
     fi
   done
 
-  for cli in qdrant-find qdrant-store chroma-find chroma-store; do
+  for cli in $cli_list; do
     if echo "$ASK_TEXT" | grep -qiE "\b${cli}\b"; then
       if ! echo "$USER_TEXT" | grep -qiE "\b${cli}\b"; then
         local hits

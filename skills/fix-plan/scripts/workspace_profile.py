@@ -56,13 +56,21 @@ DEFAULT_PROFILE = {
 }
 
 
-def v2_profile_to_flat(profile: dict, defaults: dict) -> dict:
+def v2_profile_to_flat(profile: dict, defaults: dict, global_roles: dict = None) -> dict:
     """Translate one v2 role-shaped profile into the v1 flat keys.
 
     A role set to kind "none" means "not configured for this workspace", which
     must surface as an empty value rather than falling through to
     DEFAULT_PROFILE's placeholder (localhost) — otherwise "unconfigured" and
     "configured, pointing at localhost" become indistinguishable downstream.
+
+    ``global_roles`` is the config's top-level ``global`` block: receivers that
+    are the same no matter which workspace is active (session transcripts,
+    failed-attempts, shared/personal knowledge). It is deliberately NOT folded
+    into ``defaults`` — ``defaults`` is what an *unconfigured* workspace
+    inherits, so putting a live endpoint there would turn every unknown
+    workspace into a configured one and destroy the ``kind: "none"``
+    quiet-pass guarantee that guards rely on.
     """
     roles = dict(defaults or {})
     roles.update(profile.get("roles") or {})
@@ -79,6 +87,12 @@ def v2_profile_to_flat(profile: dict, defaults: dict) -> dict:
         flat["plane_host"] = backlog.get("endpoint", "")
         flat["plane_token_env"] = backlog.get("token_env", "PLANE_API_KEY")
         flat["default_project"] = backlog.get("project", "")
+        if "k3s_namespace" in backlog:
+            flat["k3s_namespace"] = backlog["k3s_namespace"]
+        if "k3s_kubeconfig" in backlog:
+            flat["k3s_kubeconfig"] = backlog["k3s_kubeconfig"]
+        if "k3s_ssh_host" in backlog:
+            flat["k3s_ssh_host"] = backlog["k3s_ssh_host"]
     else:
         flat["plane_host"] = ""
 
@@ -89,6 +103,18 @@ def v2_profile_to_flat(profile: dict, defaults: dict) -> dict:
             flat["qdrant_%s_collection" % key] = value
     else:
         flat["qdrant_url"] = ""
+
+    # Global RAG tier — same receiver for every workspace. Exposed under its own
+    # `qdrant_global_*_collection` names so a consumer can state which tier it
+    # wants, and mirrored onto the plain names only when the workspace itself
+    # did not claim that key (back-compat for readers predating the split).
+    grag = (global_roles or {}).get("rag") or {}
+    if grag.get("kind", "none") != "none":
+        if grag.get("endpoint") and not flat.get("qdrant_url"):
+            flat["qdrant_url"] = grag["endpoint"]
+        for key, value in (grag.get("collections") or {}).items():
+            flat["qdrant_global_%s_collection" % key] = value
+            flat.setdefault("qdrant_%s_collection" % key, value)
 
     wiki = roles.get("wiki") or {}
     if wiki.get("kind") == "git" and wiki.get("path"):
@@ -148,12 +174,13 @@ def load_user_config():
         )
         if is_v2:
             defaults = cfg.get("defaults") or {}
+            global_roles = cfg.get("global") or {}
             cfg = {
                 "profiles": {
                     # workspace_name must be carried explicitly: DEFAULT_PROFILE
                     # already holds "default" for that key, so get_profile's
                     # setdefault cannot correct it later.
-                    name: dict(v2_profile_to_flat(p, defaults), workspace_name=name)
+                    name: dict(v2_profile_to_flat(p, defaults, global_roles), workspace_name=name)
                     for name, p in profiles.items()
                     if isinstance(p, dict)
                 }
@@ -188,6 +215,10 @@ def detect_workspace(target_path: str = None) -> str:
     env_profile = os.environ.get("PLANE_WORKSPACE_PROFILE")
     if env_profile in profiles:
         return env_profile
+
+    # 1.5 Direct profile name match
+    if target_path and target_path in profiles:
+        return target_path
 
     # 2. Check path against each configured profile's cwd_match tokens.
     # Tokens may be a bare component or a multi-segment fragment; see token_matches.

@@ -65,7 +65,8 @@ cat > "$FIXTURE/config.json" <<'JSON'
           "collections": { "wiki": "a-wiki", "task": "a-task" }
         },
         "wiki": { "kind": "skill", "skill": "x:wiki", "topic": "query" },
-        "artifacts": { "kind": "dir", "path": "docs/plans" }
+        "artifacts": { "kind": "dir", "path": "docs/plans" },
+        "staging": { "kind": "branch", "next_fix": "next-fix", "next_feat": "next-feat", "main": "main" }
       }
     },
     "wsB": {
@@ -202,6 +203,16 @@ export AGENT_WORKSPACE_CONFIG="$FIXTURE/v1.json"
 load "/tmp/ghq/github.com/wsLegacy/repo"
 check "T26 v1 profile also gets a default"      ".agents/docs/generated" "${WSCFG_ARTIFACTS_PATH:-}"
 
+# --- staging role: release branch staging routing ----------------------
+export AGENT_WORKSPACE_CONFIG="$FIXTURE/config.json"
+load "/tmp/wsA/repo"
+check "T27 staging kind from profile"           "branch"                 "${WSCFG_STAGING_KIND:-}"
+check "T28 staging next_fix from profile"       "next-fix"               "${WSCFG_STAGING_NEXT_FIX:-}"
+check "T29 staging next_feat from profile"      "next-feat"              "${WSCFG_STAGING_NEXT_FEAT:-}"
+check "T30 staging main from profile"           "main"                   "${WSCFG_STAGING_MAIN:-}"
+
+load "/tmp/wsB/repo"
+check "T31 unset staging degrades to none"      "none"                   "${WSCFG_STAGING_KIND:-}"
 
 printf -- '---\npass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
