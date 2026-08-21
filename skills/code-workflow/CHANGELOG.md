@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/code-workflow-v0.6.3...code-workflow-v0.7.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **code-workflow:** record that the plan-edit trigger duplicates plan-guard ([aba3eeb](https://github.com/es6kr/skills/commit/aba3eeb30a1a9b4cde9235020bcbf01643ae0696))
+* **hook-kit:** stop topic dispatch from resolving into nested worktrees ([e81bb4c](https://github.com/es6kr/skills/commit/e81bb4c2aa6e817318950de8ae53b475dc2999aa))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
 ## [0.6.3](https://github.com/es6kr/skills/compare/code-workflow-v0.6.2...code-workflow-v0.6.3) (2026-08-17)
 
 
