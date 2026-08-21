@@ -167,3 +167,19 @@ See `~/.claude/skills/cleanup/data/failed-attempts.md` "squash-scan-scope-narrow
 3. Only stage once every hunk matches this session's edit exactly
 
 See `~/.claude/skills/cleanup/data/failed-attempts.md` "concurrent-session-overwrites-hardlinked-shared-config" for case history (related failure mode: a prior Edit lost, not just an unrelated edit bundled into a commit).
+
+---
+
+## Monorepo / Multi-Package Staging Routing (Abstract Contract)
+
+When working in a monorepo or multi-package repository configured with release branches (e.g. `roles.staging` in `config.json` exporting `WSCFG_STAGING_KIND=branch`), commits and PRs MUST follow the staging branch routing contract to prevent unintentional version inflation (e.g. bumping patch-only packages to minor releases):
+
+1. **Staging Role Resolution**:
+   - Check workspace config via `workspace-config.sh --export` or `$WSCFG_STAGING_*` variables.
+   - If `WSCFG_STAGING_KIND=branch`, resolve target staging branches: `WSCFG_STAGING_NEXT_FIX` (patch releases), `WSCFG_STAGING_NEXT_FEAT` (minor releases), and `WSCFG_STAGING_MAIN` (direct/architecture PRs).
+2. **Commit & PR Target Classification**:
+   - `fix:` / `chore:` / `ci:` commits without feature riders ➔ Route to staging fix branch (`$WSCFG_STAGING_NEXT_FIX`).
+   - `feat:` commits and co-located same-package fixes ➔ Route to staging feature branch (`$WSCFG_STAGING_NEXT_FEAT`).
+   - Global specification / architectural changes ➔ Route directly to primary branch (`$WSCFG_STAGING_MAIN`).
+3. **Portability Principle**:
+   - Never hardcode specific repository names in generic skills. Rely on workspace config resolver (`roles.staging`) and repository maintainer scripts (`scripts/staging-route.py`).
