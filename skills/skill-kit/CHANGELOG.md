@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/skill-kit-v0.7.0...skill-kit-v0.7.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* **skill-kit:** resolve upgrade PR base from works-config staging role, not hardcoded main ([#362](https://github.com/es6kr/skills/issues/362)) ([c7a8c45](https://github.com/es6kr/skills/commit/c7a8c45d28be511fa7e645d00fe49050f1d14ba0))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/skill-kit-v0.6.3...skill-kit-v0.7.0) (2026-08-20)
 
 

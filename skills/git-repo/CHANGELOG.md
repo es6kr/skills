@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.1](https://github.com/es6kr/skills/compare/git-repo-v0.9.0...git-repo-v0.9.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* **git-repo:** add baseline .gitignore hygiene gate for worktrees and runtime artifacts ([32713d9](https://github.com/es6kr/skills/commit/32713d91e0e05936a78ea7df717b8fe87568269b))
+* **git-repo:** gate worktree reuse on dependency-install cost ([387653c](https://github.com/es6kr/skills/commit/387653c69e5a5172c37dc8f77261ae5ebc9013e7))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/git-repo-v0.8.1...git-repo-v0.9.0) (2026-08-20)
 
 

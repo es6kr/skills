@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/wip-v0.5.0...wip-v0.5.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* **wip,hook-kit:** enhance register-before-execute and block-axis-merged-ask ([ee95d6f](https://github.com/es6kr/skills/commit/ee95d6f2df4f40a22b48b807b443185828422bc2))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/wip-v0.4.5...wip-v0.5.0) (2026-08-20)
 
 

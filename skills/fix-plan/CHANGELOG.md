@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.1](https://github.com/es6kr/skills/compare/fix-plan-v0.9.0...fix-plan-v0.9.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* **fix-plan:** accept ASCII arrow delimiter in plane_sync index lines ([c2fd069](https://github.com/es6kr/skills/commit/c2fd06927ab253b81566047f7bfa9ccded7a97d9))
+* **fix-plan:** decouple plane_create_issue to plane-backlog and update schema validation ([42273f4](https://github.com/es6kr/skills/commit/42273f46180b0f13bf7e094f6c5bb75adda6ad45))
+* **fix-plan:** parse nested hooks.json schema in hook_integrity_check ([b9bde23](https://github.com/es6kr/skills/commit/b9bde23cf4a60dee28b8ea43462c4d37200e33f4))
+* **fix-plan:** require recency-ask answer reuse in default-invocation Step 0 ([c7ad963](https://github.com/es6kr/skills/commit/c7ad963223e50e187442f7eeb271a75baafd4c96))
+* **fix-plan:** resolve plane_bulk_update config from workspace profile ([35a664b](https://github.com/es6kr/skills/commit/35a664b460834f4fb2185a48e3b040d72a6707d6))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* resolve PR [#363](https://github.com/es6kr/skills/issues/363) audit Pending findings (plane_bulk_update profile, hook checker schema, regex, dedup) ([19ffc83](https://github.com/es6kr/skills/commit/19ffc83f296ad5568b82a85b104fcf419580c102))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/fix-plan-v0.8.0...fix-plan-v0.9.0) (2026-08-20)
 
 

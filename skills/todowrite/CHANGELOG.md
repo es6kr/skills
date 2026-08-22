@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.2](https://github.com/es6kr/skills/compare/todowrite-v0.8.1...todowrite-v0.8.2) (2026-08-22)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* **todowrite:** enforce clickable PR URL matching in AskUserQuestion guard ([aa1c34a](https://github.com/es6kr/skills/commit/aa1c34aa69ea249ec28259a65cc20edc1d969f41))
+* **todowrite:** enforce tasklist ID conversation blocking and media separation ([471ed1c](https://github.com/es6kr/skills/commit/471ed1c780c23e3cc3b596c77ef0e561c80cf5d5))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/todowrite-v0.8.0...todowrite-v0.8.1) (2026-08-17)
 
 

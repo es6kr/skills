@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.1](https://github.com/es6kr/skills/compare/consolidate-v0.6.0...consolidate-v0.6.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* apply PR [#363](https://github.com/es6kr/skills/issues/363) Copilot Minor review findings ([731745c](https://github.com/es6kr/skills/commit/731745c6d67c329c8c6dde666107672282a3894a))
+* **consolidate:** add block-summary-fabricated-claims guard for Summary POST ([e2d054e](https://github.com/es6kr/skills/commit/e2d054edad4cca08307a99ceef927c156903f3e5))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* resolve PR [#363](https://github.com/es6kr/skills/issues/363) audit Pending findings (plane_bulk_update profile, hook checker schema, regex, dedup) ([19ffc83](https://github.com/es6kr/skills/commit/19ffc83f296ad5568b82a85b104fcf419580c102))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/consolidate-v0.5.4...consolidate-v0.6.0) (2026-08-20)
 
 
