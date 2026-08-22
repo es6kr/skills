@@ -232,6 +232,22 @@ Full conditions:
 
 **Resolving deployment-required verification items**: If the Test Plan has "post-deployment verification" items, pre-verify on a legacy/staging environment using the feature branch image. Since this is verifiable without master merge, do not record "post-deployment verification required" as a merge-blocking reason.
 
+### Fact-verification before POST — no fabricated SHA / inflated reviewer count (HARD STOP)
+
+Every verifiable specific written into a Summary or Internal Code Review is an audit-trail claim a merge is read against. Confirm each against a primary source before POST — never invent precise-looking detail:
+
+1. **Cited commit SHAs must exist.** For every `commit <sha>` in the body, run `git cat-file -e <sha>^{commit}` (in a checkout of the target repo) or `gh api repos/<owner>/<repo>/commits/<sha>`. Remove or correct any that 404.
+2. **External-reviewer finding counts must reconcile with the source.** A "Copilot: N findings" claim must equal `gh api repos/<owner>/<repo>/pulls/<PR>/comments --jq '[.[] | select(.user.login | test("copilot"; "i"))] | length'` (a case-insensitive contains-match is robust across the inline-comment surface login `Copilot` and the review-author `copilot-pull-request-reviewer[bot]`). Never label an internal-reviewer finding as `copilot`; internal output is sourced `Internal Code Review`.
+3. **Line numbers and test counts come from real output, not memory.** If a count is unconfirmable, write a verifiable level ("CI green") instead of a fabricated number.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Cite `commit <sha>` from memory or a plausible guess | Resolve each SHA (`git cat-file -e` / `gh api commits`) before writing it; drop any that 404 |
+| 2 | Label a finding `copilot` when Copilot did not raise it, or claim more Copilot findings than exist | Reconcile the count against `pulls/<PR>/comments`; source internal-only findings as `Internal Code Review` |
+| 3 | Invent line numbers or "N/N tests" precision | Copy line numbers and test counts from the actual review/run output; otherwise write "CI green" |
+
+The `block-summary-fabricated-claims` guard (PreToolUse hook) enforces 1 and 2 mechanically: a consolidate-provenance POST citing a nonexistent SHA, or claiming more Copilot findings than the PR actually has, is denied at source. It fails open on any ambiguity (no `gh` / offline / unreadable body / a SHA on an unfetched branch — use `ALLOW_SUMMARY_FABRICATED_CLAIMS=1` per-command in the last case), so the discipline above is the primary defense and the hook is the backstop.
+
 When unmet, write `Actionable Items PENDING fix.` in the Summary + state the unmet conditions. **Do not ask "shall we merge?"**
 
 If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --commits`) **AND the PR's stated intent (description/body, checklist referenced)** to recommend a merge strategy:

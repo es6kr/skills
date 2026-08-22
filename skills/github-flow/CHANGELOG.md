@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/github-flow-v0.8.3...github-flow-v0.9.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
 ## [0.8.3](https://github.com/es6kr/skills/compare/github-flow-v0.8.2...github-flow-v0.8.3) (2026-08-17)
 
 

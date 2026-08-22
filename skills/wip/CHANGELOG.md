@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/wip-v0.4.5...wip-v0.5.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **hook-kit:** repair hook paths broken by the within-marketplace relocation ([#340](https://github.com/es6kr/skills/issues/340)) ([0d9b701](https://github.com/es6kr/skills/commit/0d9b70181015e4822c7cf5cd2fe122d5af708d26))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
 ## [0.4.5](https://github.com/es6kr/skills/compare/wip-v0.4.4...wip-v0.4.5) (2026-08-17)
 
 

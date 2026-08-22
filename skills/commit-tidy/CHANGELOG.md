@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.5](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.4...commit-tidy-v0.5.5) (2026-08-20)
+
+
+### Bug Fixes
+
+* **commit-tidy:** add 5+ files large-scale modification mandatory gate ([2eca0a0](https://github.com/es6kr/skills/commit/2eca0a085295dae3707bd4447f2ec1996023e1bf))
+* **hooks:** correct ghost path for block-wip-register-before-execute.sh ([d5875a2](https://github.com/es6kr/skills/commit/d5875a2e624eeb4a3dce9beba5d96a4365a8f950))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
 ## [0.5.4](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.3...commit-tidy-v0.5.4) (2026-08-17)
 
 

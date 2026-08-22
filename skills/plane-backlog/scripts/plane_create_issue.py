@@ -21,8 +21,14 @@ import urllib.error
 import subprocess
 import base64
 import re
+import shutil
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# plane.es6.kr sits behind Cloudflare, which 403s the default `Python-urllib`
+# User-Agent. A browser-like User-Agent header is required — same constant as
+# plane_create_comment.py, the in-repo precedent that already clears the WAF.
+UA = "Mozilla/5.0 (plane-backlog)"
 
 
 def _shared_script_dirs():
@@ -49,7 +55,7 @@ for _shared_dir in _shared_script_dirs():
 # Single source of truth for profile resolution. Importing it eagerly is
 # deliberate: a missing resolver must fail loudly rather than silently degrade
 # into a run that targets whichever workspace the environment happens to name.
-from plane_client import resolve_profile  # noqa: E402
+from plane_client import resolve_profile, normalize_priority  # noqa: E402
 
 
 def parse_inline_tiptap(text: str) -> list:
@@ -202,7 +208,7 @@ def markdown_to_tiptap_and_html(md_text: str):
     return tiptap_doc, html_out, md_text
 
 
-def create_via_rest_api(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True) -> dict:
+def create_via_rest_api(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
     plane_host = (profile.get("plane_host") or "").rstrip("/")
     token = profile.get("token")
     workspace_slug = profile.get("workspace_slug")
@@ -231,9 +237,10 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
     url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/issues/"
     headers = {
         "x-api-key": token,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": UA
     }
-    
+
     tiptap_doc, html_desc, plain_desc = markdown_to_tiptap_and_html(description)
     payload = {
         "name": title,
@@ -241,6 +248,8 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
         "description_html": html_desc,
         "description_stripped": plain_desc
     }
+    if priority:
+        payload["priority"] = normalize_priority(priority)
 
     try:
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
@@ -276,30 +285,15 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
         return {"success": False, "reason": str(e)}
 
 
-def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True) -> dict:
-    workspace_slug = profile.get("workspace_slug")
-    prj_id = project_id or profile.get("default_project")
-    plane_host = (profile.get("plane_host") or "").rstrip("/")
+def build_k3s_py_script(workspace_slug: str, prj_id: str, plane_host: str, title: str, description: str, is_intake: bool, normalized_priority: str = None) -> str:
+    """Build the Django-shell script executed inside the Plane API pod.
 
-    missing = [
-        name
-        for name, value in (
-            ("workspace_slug", workspace_slug),
-            ("project_id", prj_id),
-            ("plane_host", plane_host),
-        )
-        if not value
-    ]
-    if missing:
-        return {
-            "success": False,
-            "reason": (
-                f"Unresolved workspace profile fields: {', '.join(missing)}. "
-                "Refusing to fall back to an arbitrary workspace or project."
-            ),
-        }
-
-    py_script = f"""import json, re
+    Caller-supplied values (title, description, slugs) are injected via
+    json.dumps — never raw f-string interpolation — and every literal brace in
+    the generated source is doubled, so quotes/braces in user input cannot
+    raise ValueError at build time or break the generated code.
+    """
+    return f"""import json, re
 from plane.db.models import Issue, IntakeIssue, Workspace, Project, User
 
 ws = Workspace.objects.filter(slug={json.dumps(workspace_slug)}).first()
@@ -449,7 +443,7 @@ def markdown_to_tiptap_and_html(md_text: str):
         elif tok_type == 'heading':
             inline_nodes = parse_inline_tiptap(text)
             tiptap_content.append({{"type": "heading", "attrs": {{"level": indent}}, "content": inline_nodes}})
-            html_parts.append(f"<h{{indent}}>{{inline_to_html(text)}}</h{{level}}>")
+            html_parts.append(f"<h{{indent}}>{{inline_to_html(text)}}</h{{indent}}>")
             i += 1
         elif tok_type == 'paragraph':
             inline_nodes = parse_inline_tiptap(text)
@@ -480,7 +474,7 @@ issue = Issue.objects.create(
     description_stripped=plain_desc,
     project=prj,
     workspace=ws,
-    created_by=u
+    created_by=u{("," + chr(10) + "    priority=" + json.dumps(normalized_priority)) if normalized_priority else ""}
 )
 
 if {str(is_intake)}:
@@ -501,9 +495,47 @@ res = {{
 print("RESULT_JSON:" + json.dumps(res))
 """
 
+
+def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
+    normalized_priority = normalize_priority(priority) if priority else None
+    workspace_slug = profile.get("workspace_slug")
+    prj_id = project_id or profile.get("default_project")
+    plane_host = (profile.get("plane_host") or "").rstrip("/")
+
+    missing = [
+        name
+        for name, value in (
+            ("workspace_slug", workspace_slug),
+            ("project_id", prj_id),
+            ("plane_host", plane_host),
+        )
+        if not value
+    ]
+    if missing:
+        return {
+            "success": False,
+            "reason": (
+                f"Unresolved workspace profile fields: {', '.join(missing)}. "
+                "Refusing to fall back to an arbitrary workspace or project."
+            ),
+        }
+
+    if shutil.which("kubectl") is None:
+        return {
+            "success": False,
+            "reason": "kubectl not available on PATH — skipping K3s fallback",
+        }
+
+    # Live cluster reality: the Plane deployment runs in the `plane-ce`
+    # namespace (es6.kr), not `plane` — resolve from the workspace profile
+    # first so other clusters can override without a code change.
+    k3s_namespace = profile.get("k3s_namespace") or "plane-ce"
+    k3s_workload = profile.get("k3s_workload") or "deploy/plane-api-wl"
+
+    py_script = build_k3s_py_script(workspace_slug, prj_id, plane_host, title, description, is_intake, normalized_priority)
     b64_script = base64.b64encode(py_script.encode('utf-8')).decode('utf-8')
     cmd = [
-        "kubectl", "exec", "-n", "plane", "deploy/plane-api-wl", "--",
+        "kubectl", "exec", "-n", k3s_namespace, k3s_workload, "--",
         "python3", "manage.py", "shell", "-c",
         f"import base64; exec(base64.b64decode('{b64_script}').decode('utf-8'))"
     ]
@@ -519,14 +551,14 @@ print("RESULT_JSON:" + json.dumps(res))
         return {"success": False, "reason": f"K3s execution failed: {str(e)}"}
 
 
-def create_plane_issue(title: str, description: str = "", project_id: str = None, is_intake: bool = True, cwd: str = None) -> dict:
+def create_plane_issue(title: str, description: str = "", project_id: str = None, is_intake: bool = True, cwd: str = None, priority: str = None) -> dict:
     profile = resolve_profile(cwd or os.getcwd())
-    res = create_via_rest_api(profile, title, description, project_id, is_intake)
+    res = create_via_rest_api(profile, title, description, project_id, is_intake, priority)
     if res.get("success"):
         return res
-    
+
     # Fallback to K3s django shell
-    res_k3s = create_via_k3s_fallback(profile, title, description, project_id, is_intake)
+    res_k3s = create_via_k3s_fallback(profile, title, description, project_id, is_intake, priority)
     if res_k3s.get("success"):
         return res_k3s
     
@@ -540,9 +572,13 @@ def main():
     parser.add_argument("--project", default=None, help="Project ID or slug")
     parser.add_argument("--no-intake", action="store_true", help="Do not mark as intake issue")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
+    parser.add_argument(
+        "-p", "--priority", default=None,
+        help="P0-P3 (case-insensitive) or a native Plane priority (urgent/high/medium/low/none)"
+    )
 
     args = parser.parse_args()
-    res = create_plane_issue(args.title, args.description, args.project, is_intake=not args.no_intake)
+    res = create_plane_issue(args.title, args.description, args.project, is_intake=not args.no_intake, priority=args.priority)
 
     if args.json:
         print(json.dumps(res, indent=2, ensure_ascii=False))

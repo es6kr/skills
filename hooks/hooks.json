@@ -132,12 +132,20 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-fabricated-claims.sh"
           }
         ]
       },
       {
         "matcher": "Edit",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/block-direct-checklist-edit.js"
+          },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/complex-logic-guard.sh"
@@ -160,7 +168,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wip-register-before-execute.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh"
           },
           {
             "type": "command",
@@ -181,6 +189,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/block-direct-checklist-edit.js"
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/staged-protect.sh"
           },
           {
@@ -193,7 +205,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wip-register-before-execute.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh"
           },
           {
             "type": "command",
@@ -231,7 +243,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-option-below-context-gate.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-option-below-context-gate.sh",
             "timeout": 10
           },
           {
@@ -242,6 +254,11 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-squash-recommend-multi-commit.sh",
+            "timeout": 15
           }
         ]
       },
@@ -312,11 +329,11 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-without-rag.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-rag.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-without-claudify.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-claudify.sh"
           },
           {
             "type": "command",
@@ -341,7 +358,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-missing-rename.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-rename.sh"
           }
         ]
       }

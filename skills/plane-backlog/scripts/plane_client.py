@@ -36,7 +36,58 @@ DEFAULT_THROTTLE = 1.2
 RATE_LIMIT_FIRST_WAIT = 65
 RATE_LIMIT_RETRY_WAIT = 30
 MAX_ATTEMPTS = 4
+
+# plane.es6.kr sits behind Cloudflare, which 403s the default `Python-urllib`
+# User-Agent. A browser-like User-Agent header is required — same constant as
+# plane_create_comment.py, the in-repo precedent that already clears the WAF.
+UA = "Mozilla/5.0 (plane-backlog)"
 PAGE_SIZE = 100
+
+# fix_plan `[BLOCKED:P0-P3:...]` marker <-> Plane native `priority` field.
+# Single source of truth — plane_create_issue.py and plane_sync.py both
+# import this instead of re-declaring the mapping (drift class already hit
+# once this session with the two plane_create_issue.py copies).
+MARKER_TO_PRIORITY = {
+    "P0": "urgent",
+    "P1": "high",
+    "P2": "medium",
+    "P3": "low",
+}
+PRIORITY_TO_MARKER = {native: marker for marker, native in MARKER_TO_PRIORITY.items()}
+VALID_PLANE_PRIORITIES = frozenset(MARKER_TO_PRIORITY.values()) | {"none"}
+
+
+def normalize_priority(value):
+    """Normalize a priority value to one of Plane's native priority strings.
+
+    Accepts case-insensitive P-tags (``p0``/``P0`` ... ``p3``/``P3``), Plane's
+    own native values (``urgent``/``high``/``medium``/``low``/``none``), or a
+    falsy value (treated as ``"none"``). Raises ``ValueError`` on anything
+    else — a typo in ``--priority`` should fail loudly, not silently post an
+    issue with no priority set.
+    """
+    if not value:
+        return "none"
+    text = str(value).strip()
+    upper = text.upper()
+    if upper in MARKER_TO_PRIORITY:
+        return MARKER_TO_PRIORITY[upper]
+    lower = text.lower()
+    if lower in VALID_PLANE_PRIORITIES:
+        return lower
+    raise ValueError(
+        f"unrecognized priority {value!r} — expected one of P0-P3 "
+        f"(case-insensitive) or {sorted(VALID_PLANE_PRIORITIES)}"
+    )
+
+
+def priority_to_marker(native_priority):
+    """Reverse of normalize_priority: Plane native value -> P0-P3 marker.
+
+    Returns ``None`` for ``"none"`` or an unrecognized value — callers decide
+    whether the absence of a marker is itself meaningful.
+    """
+    return PRIORITY_TO_MARKER.get((native_priority or "").strip().lower())
 
 
 def _workspace_profile_dirs():
@@ -135,7 +186,7 @@ class PlaneClient:
     def request(self, path, method="GET", data=None):
         """Issue one API call, retrying on 429 and throttling every response."""
         url = "%s/api/v1/%s" % (self.profile["plane_host"], path.lstrip("/"))
-        headers = {"x-api-key": self.profile["token"], "Content-Type": "application/json"}
+        headers = {"x-api-key": self.profile["token"], "Content-Type": "application/json", "User-Agent": UA}
         body = json.dumps(data).encode("utf-8") if data is not None else None
 
         last_error = None

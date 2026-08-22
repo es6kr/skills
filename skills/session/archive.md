@@ -124,7 +124,7 @@ Always show the preview before invoking the destructive move.
 Use the script:
 
 ```bash
-bash ~/.claude/skills/claude-session/scripts/archive-session.sh <session_id>
+bash ~/.claude/skills/session/scripts/archive-session.sh <session_id>
 ```
 
 Or inline (single session):

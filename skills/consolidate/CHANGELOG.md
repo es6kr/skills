@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/consolidate-v0.5.4...consolidate-v0.6.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat batch (hook registry schema, self-reference path anchoring) ([0c33ffa](https://github.com/es6kr/skills/commit/0c33ffac99a9237f4530566470dabeaea128c209))
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **consolidate:** refresh the AI Review Summary before the merge ask when findings were fixed ([#348](https://github.com/es6kr/skills/issues/348)) ([9512c9c](https://github.com/es6kr/skills/commit/9512c9cdff7d1a0d2e36a8c70a468e2abca6e977))
+* **hook-kit,fix-plan,consolidate:** resolve review findings on registry fail-fast, add-item safety, and mechanical verification ([72fb280](https://github.com/es6kr/skills/commit/72fb28054ccd858aa56617e8a6a5d1fb5b9d2384))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
 ## [0.5.4](https://github.com/es6kr/skills/compare/consolidate-v0.5.3...consolidate-v0.5.4) (2026-08-17)
 
 

@@ -89,6 +89,18 @@ check "path-fp1 single option bundles 2 files" 0 "$(run "$(mk \
   'Apply to skill.md and topic.md::update both docs together' \
   'Defer::not now')")"
 
+# 8. Finding count with Korean counter suffix ("Finding 3" + counter) → ALLOW.
+check "kw-fp2 Korean finding tally" 0 "$(run "$(mk \
+  "$(printf 'Finding 3\uac74 \uac80\ud1a0 \uc644\ub8cc \u2014 \ub2e4\uc74c \uc9c4\ud589?')" \
+  "$(printf '\ubc18\uc601::\ud328\uce58 \uc801\uc6a9')" \
+  "$(printf '\ubcf4\ub958::\ub2e4\uc74c\uc5d0')")")"
+
+# 9. Korean severity tally ("Critical 0 / Important 2 / Minor 2" + counter) → ALLOW.
+check "kw-fp3 Korean severity tally with counter" 0 "$(run "$(mk \
+  "$(printf '\uba38\uc9c0 \uc900\ube44 \uc644\ub8cc: Critical 0\uac74 / Important 2\uac74 / Minor 2\uac74')" \
+  "$(printf '\uba38\uc9c0 \uc9c4\ud589::\ubaa8\ub4e0 \uc218\uce58 \uc9a9\uc871')" \
+  "$(printf '\ubcf4\ub958::\uc7ac\uac80\ud1a0')")")"
+
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "ALL PASS"

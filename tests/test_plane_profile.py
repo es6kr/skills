@@ -87,6 +87,14 @@ def isolated_workspace(tmp_path, monkeypatch, scripts_on_path):
     import workspace_profile
 
     monkeypatch.setattr(workspace_profile, "CONFIG_FILE", config_file)
+    # The v2 loader reads CONFIG_FILE_V2 (~/.config/agent-workspace/config.json)
+    # before CONFIG_FILE. On a machine that has a real v2 config, that file would
+    # shadow this fixture and the workspace would resolve to the wrong (or
+    # default) profile. Point it at a path that does not exist so the loader
+    # falls through to the fixture on CONFIG_FILE.
+    monkeypatch.setattr(
+        workspace_profile, "CONFIG_FILE_V2", tmp_path / "no-agent-workspace.json"
+    )
 
     # Environment must not be able to satisfy the assertions on its own.
     for var in (

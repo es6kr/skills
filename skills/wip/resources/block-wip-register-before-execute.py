@@ -141,9 +141,52 @@ def was_registration_wip_without_followup(log_path, registered_pattern):
             return False
     return True
 
+def find_antigravity_active_log_path():
+    brain_root = os.path.expanduser("~/.gemini/antigravity-ide/brain")
+    if not os.path.isdir(brain_root):
+        return ""
+    candidates = []
+    try:
+        for d in os.listdir(brain_root):
+            full_d = os.path.join(brain_root, d)
+            log_file = os.path.join(full_d, ".system_generated", "logs", "transcript.jsonl")
+            if os.path.isfile(log_file):
+                try:
+                    candidates.append((os.path.getmtime(log_file), log_file))
+                except Exception:
+                    pass
+    except Exception:
+        return ""
+    if not candidates:
+        return ""
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+def was_workflow_or_registration_without_followup(log_path, registered_pattern):
+    events = load_events(log_path)
+    last_user = find_last_genuine_user_prompt(events)
+    if last_user is None:
+        return False
+    raw_user, e_user = events[last_user]
+    utext = text_of(e_user) or raw_user
+    
+    # Check for slash commands or explicit task directives
+    is_workflow = bool(re.search(r"/(fix|fa|code-workflow|deploy|consolidate|wip|fix-plan)\b", utext, re.I)
+                      or re.search(r"command-name>/?(fix|fa|code-workflow|deploy|consolidate|wip|fix-plan)<", raw_user, re.I)
+                      or (re.search(r"command-name>/?wip<", raw_user) and re.search(r"(" + REGISTER_VERBS + r")", utext, re.I)))
+    
+    if not is_workflow:
+        return False
+
+    for j in range(last_user + 1, len(events)):
+        rawj, _ = events[j]
+        if re.search(registered_pattern, rawj):
+            return False
+    return True
+
 if AG_TOOL:
     # Antigravity runtime. Matcher mirrors ~/.gemini/config/hooks.json's
-    # "Edit|Write|write_to_file" (tool-name spelling unconfirmed - kept broad).
+    # "Edit|Write|write_to_file|replace_file_content|multi_replace_file_content"
     if AG_TOOL not in ("Edit", "Write", "write_to_file", "replace_file_content", "multi_replace_file_content"):
         allow()
     ag_args = payload.get("toolCall", {}).get("args", {}) or {}
@@ -154,30 +197,25 @@ if AG_TOOL:
         or ""
     )
     if str(target_path).endswith("task.md"):
-        # The write IS the registration act (wip/antigravity.md's task.md
-        # medium) - never block it.
+        # The write IS the registration act - never block it.
         allow()
-    # Best-effort: try guessed transcript/conversation-log field names. If
-    # Antigravity's real payload uses a different key, this silently falls
-    # through to allow() below rather than erroring - documented gap, not a
-    # silent false-negative masquerading as verified coverage.
+    
     ag_log_path = (
         payload.get("transcriptPath")
         or payload.get("transcript_path")
         or (payload.get("toolCall", {}) or {}).get("transcriptPath")
+        or find_antigravity_active_log_path()
         or ""
     )
     if ag_log_path and os.path.exists(ag_log_path):
         try:
-            # Antigravity has no TaskCreate/TodoWrite tool_use to scan for;
-            # the registration signal is a write to task.md, which we can
-            # only detect here as a raw-line substring on the artifact path.
-            if was_registration_wip_without_followup(ag_log_path, r"task\.md"):
+            if was_workflow_or_registration_without_followup(ag_log_path, r"task\.md"):
                 deny_antigravity(
-                    "/wip register-before-execute (HARD STOP): a registration-mode "
-                    "/wip was invoked but task.md has not been written since. "
-                    "Register the task in task.md FIRST, then edit the deliverable. "
-                    "Ref: wip/antigravity.md Step 2 'Initialize'."
+                    "Tool Call #1 MANDATORY & /wip register-before-execute (HARD STOP): "
+                    "A workflow slash-command (/fix, /fa, /wip, /code-workflow, etc.) was invoked "
+                    "but task.md has not been updated in the current turn. "
+                    "The VERY FIRST tool call MUST update task.md before editing deliverable files. "
+                    "Ref: GEMINI.md 'Tool Call #1 MANDATORY' & wip/antigravity.md Step 2."
                 )
         except Exception:
             pass  # fall through to allow()

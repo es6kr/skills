@@ -98,6 +98,34 @@ During a closed shadow DOM `ak-library` cascade investigation, used a `npx playw
 
 While building a domain-registration payment-request report, captured the domain-search-result page (showing a promotional price) and the login screen, then stopped at the login wall with a disclaimer ("have finance/ops enter payment details"), never asking whether to continue via login to verify the real checkout price. The report's stated price differed from the actual payment-screen price. User feedback (paraphrased): "don't arbitrarily skip capturing screens that require login — ask first."
 
+## Known Automation Limitations — SaaS Portal Action-Level CAPTCHA Gates
+
+Some SaaS portals allow full browser login automation but selectively trigger CAPTCHA challenges
+on **creation/mutation actions** (not just on login). Document confirmed cases here so agents do
+not repeat failed automation attempts.
+
+| Service | Automatable | CAPTCHA-blocked | Fallback |
+|---------|-------------|-----------------|----------|
+| **Discord Developer Portal** | Login (via persistent profile with saved credentials) | **New application creation**, bot token reset | Keep browser visible (`headless: false`); user handles hCaptcha manually; script polls `page.url()` for `/bot` URL and auto-captures token once user navigates there |
+| **Discord Developer Portal** | Reading existing app info, navigating between tabs | _(same)_ | _(same)_ |
+
+### Discord Developer Portal — specific notes (2026-08-18, 1st confirmed)
+
+- **Login**: Playwright persistent context (`launchPersistentContext`) with a saved user data directory
+  retains Discord session cookies. Navigation to `discord.com/developers/applications` succeeds
+  without re-authentication.
+- **Bot creation blocked**: Clicking "New Application" and submitting the modal triggers an hCaptcha
+  dialog (e.g. "Hold on! You are human, right?"). The `force: true` checkbox click and JS `dispatchEvent`
+  workarounds successfully activate the Create button, but Discord's backend detects the automated
+  browser and intercepts submission with CAPTCHA.
+- **Recommended hybrid flow**:
+  1. Launch Playwright with `headless: false` + `launchPersistentContext` (reuses login session).
+  2. Navigate to the applications page.
+  3. Set up a polling loop watching `page.url()` for the `/bot` path (every 2s, max ~4min timeout).
+  4. Inform user to manually create the application (handle hCaptcha) and navigate to the Bot tab.
+  5. When `/bot` URL is detected, script resumes: click "Reset Token" → capture `input[readonly]` value → enable `[role="switch"]` intents → save changes.
+  6. Write token to a temp file → hand off to next automation (K8s Secret injection, etc.).
+
 ---
 
 ## Step 0: Environment Detection (MANDATORY — before any browser action)

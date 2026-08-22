@@ -58,13 +58,23 @@ Use the same format as [format.md](./format.md) item state changes: `(YYYY-MM-DD
 
 Items just synced to `[x]` are immediate candidates for the next [move](./move.md) cycle. The recommended sequence is `sync` → `move` so the freshly-merged items roll into Completed in the same pass.
 
+### 6. Milestone-Boundary Sync (task.md ↔ plan-*.md ↔ fix_plan.md)
+
+When executing deep tasks (`/fix-plan add --deep`, `/code-workflow`), real-time sub-step tool calls are tracked in `task.md` to avoid token churn on large files.
+
+At **major phase boundaries** (Phase 2 Plan authoring, Phase 3 Review disposition, Phase 4 TDD completion, Phase 5 verification), synchronize state across all 3 surfaces:
+- `task.md`: Current execution step marked `[x]`
+- `plan-*.md`: Section 3 Layered Roadmap / Progress Checklist marked `[x]`
+- `fix_plan.md`: Task status updated with model + timestamp metadata `(YYYY-MM-DD, <Model> <SessionID8>; completed: YYYY-MM-DD, <Model> <SessionID8>)`
+- `/cleanup`: Final verification ensuring zero sync gap across all 3 files.
+
 ## Secondary-tracker sync cadence
 
 When a project mirrors its backlog into a second external tracker (a project-management tool, issue tracker, etc.) alongside GitHub, run that tracker's own sync in the same cadence as this GitHub sync — poll both together rather than letting them drift independently.
 
 The fix-plan skill stays vendor-agnostic here too: no tracker name is hardcoded. Dispatch via `--secondary-sync=<skill>:<topic>` (same caller-supplied receiver pattern as `--archive=<skill>:<topic>` — see the top-level Configuration table). The caller wires this to whichever skill owns that tracker's sync script (e.g., a project-management-tool skill's own dry-run sync command); this skill only documents the cadence contract.
 
-**Example receiver — `scripts/plane_sync.py`**: parses `- [<marker>] [<IDENT>-<seq>] <title> -> Plane (<issue URL>)` index lines (the format `plane-backlog`'s Phase-3 migration produces), and maps each issue's `state_detail.group` back onto the fix_plan marker — `completed` -> `[x]`, `cancelled` -> `[BLOCKED:P2:external]`, mirroring this file's own MERGED/CLOSED-without-merge rules above. Non-terminal states and API errors leave the line untouched, same as the GitHub rules table.
+**Example receiver — `scripts/plane_sync.py`**: parses `- [<marker>] [<IDENT>-<seq>] <title> -> Plane (<issue URL>)` index lines (the format `plane-backlog`'s Phase-3 migration produces), and maps each issue's `state_detail.group` back onto the fix_plan marker — `completed` -> `[x]`, `cancelled` -> `[BLOCKED:P2:external]`, mirroring this file's own MERGED/CLOSED-without-merge rules above. Non-terminal states and API errors leave the line untouched, same as the GitHub rules table. It also runs the reverse leg (`--push-done`: local `[x]` -> Plane Done) and a report-only P0-P3 priority-drift check — never `DELETE`s a Plane issue. See `plane-backlog/SKILL.md` "Plane Issue DELETE Prohibition & Priority Mapping (HARD STOP)" for the full rule.
 
 ### Auto-supplying the secondary-sync receiver from a workspace profile
 

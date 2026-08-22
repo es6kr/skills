@@ -8,7 +8,15 @@ Delivers session data to other agents/skills via pipeline.
 /session import --hookify          # Fetch session and deliver to hookify
 /session import --analyze          # Session analysis pipeline
 /session import --to <agent>       # Deliver to a specific agent
+/session import --to-agy           # Migrate IDE session to agy CLI
 ```
+
+## Cross-Platform Migration (IDE ↔ agy CLI)
+
+To migrate an active IDE session (`<conversation-id>`) to `antigravity-cli`:
+1. Copy SQLite session DB: `~/.gemini/antigravity-ide/conversations/<uuid>.db` → `~/.gemini/antigravity-cli/conversations/<uuid>.db`
+2. Copy Brain artifacts: `~/.gemini/antigravity-ide/brain/<uuid>/` → `~/.gemini/antigravity-cli/brain/<uuid>/`
+3. Upsert session summary into SQLite index: `~/.gemini/antigravity-cli/conversation_summaries.db` (`conversation_summaries` table with `app_data_dir='antigravity-cli'`).
 
 ## Prerequisites
 
