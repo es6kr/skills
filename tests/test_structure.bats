@@ -85,7 +85,7 @@ tracked_skills() {
   registered=$(jq -r '.. | objects | select(.command) | .command' "$REPO_ROOT/hooks/hooks.json" 2>/dev/null \
     | grep -oE '[^ /]+\.(sh|py|js)' | sort -u)
   local dupes
-  dupes=$(git -C "$REPO_ROOT" ls-files -- 'skills/*/resources/*.sh' 'skills/*/scripts/*.sh' 'skills/*/resources/*.py' 'skills/*/scripts/*.py' \
+  dupes=$(git -C "$REPO_ROOT" ls-files -- 'skills/*/resources/*.sh' 'skills/*/scripts/*.sh' 'skills/*/resources/*.py' 'skills/*/scripts/*.py' 'skills/*/resources/*.js' 'skills/*/scripts/*.js' \
     | awk -F/ '{print $NF, $0}' | sort | awk '
         { if ($1 == prev_name) { print prev_line; print $0; dup=1 }
           else if (dup) { dup=0 }

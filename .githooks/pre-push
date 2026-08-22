@@ -18,6 +18,7 @@ cd "$repo_root"
 # and it is not a valid PR head (see git.md "PR head branch name convention").
 # stdin is the pre-push protocol: `<local_ref> <local_sha> <remote_ref> <remote_sha>` lines.
 LOCAL_PUSH_ATTEMPTED=0
+HAS_REAL_PUSH=0
 LOCAL_STDIN=""
 while IFS= read -r line; do
   LOCAL_STDIN="${LOCAL_STDIN}${line}
@@ -29,10 +30,14 @@ while IFS= read -r line; do
   remote_ref="${3:-}"
   remote_sha="${4:-}"
 
-  # Skip branch deletions immediately (prevents running heavy CI tests on branch deletion)
+  # Skip branch deletions with `continue` (skip THIS ref only). `exit 0` here would
+  # abort the whole hook on the first delete ref, bypassing the 'local'-guard for any
+  # non-delete ref in the same push (a mixed delete + 'local' update). Heavy CI is still
+  # skipped for a delete-only push via the HAS_REAL_PUSH check after the loop.
   if [ "$local_sha" = "0000000000000000000000000000000000000000" ] || [ "$local_sha" = "(delete)" ]; then
-    exit 0
+    continue
   fi
+  HAS_REAL_PUSH=1
 
   if [ "$local_ref" = "refs/heads/local" ] || [ "$remote_ref" = "refs/heads/local" ]; then
     LOCAL_PUSH_ATTEMPTED=1
@@ -59,6 +64,11 @@ fi
 # (Currently downstream CI checks below do not read stdin, but preserve the
 # contract for future hook chaining.)
 printf '%s' "$LOCAL_STDIN"
+
+# Delete-only push (every ref was a deletion): nothing to test — skip heavy CI.
+if [ "$HAS_REAL_PUSH" = "0" ]; then
+  exit 0
+fi
 
 echo "Running pre-push checks (CI parity)..."
 
