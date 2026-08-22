@@ -17,3 +17,4 @@ docs/generated/
 rules/
 skills/*/data
 skills/*/LICENSE
+tests/.infra-denylist.local
