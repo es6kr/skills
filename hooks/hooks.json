@@ -127,7 +127,7 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-new-skill-ready-without-ask.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh"
           },
           {
             "type": "command",
@@ -257,7 +257,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-squash-recommend-multi-commit.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-squash-recommend-multi-commit.sh",
             "timeout": 15
           }
         ]
