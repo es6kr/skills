@@ -27,7 +27,7 @@ Convert plans, research, and implementation results into GitHub issues and PRs.
 | identity-auth | Owner-based gh account mapping for commit author identity + gh auth scope refresh + GH_TOKEN env fallback for org repo 404 | [identity-auth.md](./identity-auth.md) |
 | merge | CI success and AI review check then merge with commit cleanup, including pre-merge blockedBy verification | [merge.md](./merge.md) |
 | plan-to-issue | Convert plan/research MD to GitHub issue body or comments | [plan-to-issue.md](./plan-to-issue.md) |
-| pr | Create PR with structured body, test plan, and optional visual attachments. Multi-PR references in an AskUserQuestion payload are enforced by `resources/block-pr-url-gate.sh` (PreToolUse:AskUserQuestion, registered in `settings.json`) — every distinct PR number needs its own clickable URL | [pr.md](./pr.md) |
+| pr | Create PR with structured body, test plan, and optional visual attachments. Every distinct PR number in an AskUserQuestion payload needs its own clickable URL — this is an authoring rule you apply yourself. `resources/block-pr-url-gate.sh` exists but is **not currently registered in any hook config**, so nothing enforces it at runtime | [pr.md](./pr.md) |
 | publish | Package a working-tree change into its own branch + draft PR against a staging-base branch, watch CI, ready-transition, content-review ask, merge — the full repeated sequence in one topic | [publish.md](./publish.md) |
 | push-guards | Branch-change ask + push rejection ask + force-push CI status check + main/master push restriction + shared-branch direct-push restriction | [push-guards.md](./push-guards.md) |
 | register | Evaluate duplicates and decide registration strategy (new issue vs comment vs sub-issue) | [register.md](./register.md) |
