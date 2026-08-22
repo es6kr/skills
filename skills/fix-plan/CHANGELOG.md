@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/fix-plan-v0.8.0...fix-plan-v0.9.0) (2026-08-20)
+
+
+### Features
+
+* **fix-plan:** read the role-shaped v2 workspace config, falling back to v1 ([83ec4f0](https://github.com/es6kr/skills/commit/83ec4f016d1f99c00ffa2d612a0b49e7467d48a5))
+* promote next-feat batch (hook registry schema, self-reference path anchoring) ([0c33ffa](https://github.com/es6kr/skills/commit/0c33ffac99a9237f4530566470dabeaea128c209))
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **cleanup,fix-plan:** anchor script paths to the skill directory ([8a2f9be](https://github.com/es6kr/skills/commit/8a2f9be6f5bba1f9a9ec35ca2616fabf7addf847))
+* **fix-plan,cleanup:** replace absolute self-reference script paths with relative form ([91e99e2](https://github.com/es6kr/skills/commit/91e99e2f4f2657b7646a886d4d98ec5e2dbb09c0))
+* **fix-plan,cleanup:** replace absolute self-reference script paths with relative form ([8b6a1e6](https://github.com/es6kr/skills/commit/8b6a1e627584866cef43f1866548f3ef32d2a849))
+* **fix-plan:** add add_item.py and track the checklist-edit guard ([#339](https://github.com/es6kr/skills/issues/339)) ([b9bbc08](https://github.com/es6kr/skills/commit/b9bbc0829f23ecf8b63d0d4e0f65888dcac5344e))
+* **fix-plan:** match multi-segment cwd_match tokens in workspace_profile ([90f942a](https://github.com/es6kr/skills/commit/90f942a25a668b778bedde9d28996c102e91966f))
+* **fix-plan:** reconcile plane_create_issue with the repaired plane-backlog copy and inject User-Agent into plane_sync ([69cce36](https://github.com/es6kr/skills/commit/69cce36f645c3106e4bea2c8305330978785f37f))
+* **fix-plan:** require artifact verification for subagent-delegated pipeline runs ([7a4e1c0](https://github.com/es6kr/skills/commit/7a4e1c0cb6b8065e4dd3ed3079923967e1d545dc))
+* **hook-kit,fix-plan,consolidate:** resolve review findings on registry fail-fast, add-item safety, and mechanical verification ([72fb280](https://github.com/es6kr/skills/commit/72fb28054ccd858aa56617e8a6a5d1fb5b9d2384))
+* **hook-kit:** detect v2 config by version, not per-profile roles; probe interpreter in RAG guard ([13042e6](https://github.com/es6kr/skills/commit/13042e6f95ee3e566dd4e029d029bfdcfdb34de6))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+* repair plane script defects — WAF-safe User-Agent + K3s fallback template ([d8c2871](https://github.com/es6kr/skills/commit/d8c287132867b88225e01f5031e658df1e05d027))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/fix-plan-v0.7.0...fix-plan-v0.8.0) (2026-08-17)
 
 

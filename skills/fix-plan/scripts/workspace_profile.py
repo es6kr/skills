@@ -32,8 +32,14 @@ import json
 import argparse
 from pathlib import Path
 
-# Config file location
+# Config file locations, newest first. v2 names roles ("rag", "backlog") and
+# carries the vendor in a `kind` field, so swapping a vendor is a one-line
+# config edit. v1 named the vendor in the key itself. Consumers of this module
+# still read the v1-shaped flat keys, so v2 is translated down to them here —
+# a v2 file that reached consumers untranslated would look like an empty
+# profile and hand every caller the placeholder defaults.
 CONFIG_FILE = Path.home() / ".config" / "plane-backlog" / "config.json"
+CONFIG_FILE_V2 = Path.home() / ".config" / "agent-workspace" / "config.json"
 
 DEFAULT_PROFILE = {
     "workspace_name": "default",
@@ -45,19 +51,130 @@ DEFAULT_PROFILE = {
     "qdrant_task_collection": "fix-plan",
     "llm_wiki_path": "",
     "default_project": "default",
-    "tracker_root": ".ralph"
+    "tracker_root": ".ralph",
+    "artifacts_path": ".agents/docs/generated"
 }
 
 
+def v2_profile_to_flat(profile: dict, defaults: dict) -> dict:
+    """Translate one v2 role-shaped profile into the v1 flat keys.
+
+    A role set to kind "none" means "not configured for this workspace", which
+    must surface as an empty value rather than falling through to
+    DEFAULT_PROFILE's placeholder (localhost) — otherwise "unconfigured" and
+    "configured, pointing at localhost" become indistinguishable downstream.
+    """
+    roles = dict(defaults or {})
+    roles.update(profile.get("roles") or {})
+    flat = {}
+
+    match = profile.get("match") or {}
+    if match.get("path_components"):
+        flat["cwd_match"] = match["path_components"]
+    elif profile.get("cwd_match"):
+        flat["cwd_match"] = profile["cwd_match"]
+
+    backlog = roles.get("backlog") or {}
+    if backlog.get("kind", "none") != "none":
+        flat["plane_host"] = backlog.get("endpoint", "")
+        flat["plane_token_env"] = backlog.get("token_env", "PLANE_API_KEY")
+        flat["default_project"] = backlog.get("project", "")
+    else:
+        flat["plane_host"] = ""
+
+    rag = roles.get("rag") or {}
+    if rag.get("kind", "none") != "none":
+        flat["qdrant_url"] = rag.get("endpoint", "")
+        for key, value in (rag.get("collections") or {}).items():
+            flat["qdrant_%s_collection" % key] = value
+    else:
+        flat["qdrant_url"] = ""
+
+    wiki = roles.get("wiki") or {}
+    if wiki.get("kind") == "git" and wiki.get("path"):
+        flat["llm_wiki_path"] = wiki["path"]
+
+    checklist = roles.get("checklist") or {}
+    if checklist.get("kind") == "file" and checklist.get("path"):
+        parent = str(Path(checklist["path"]).parent)
+        if parent not in ("", "."):
+            flat["tracker_root"] = parent
+
+    artifacts = roles.get("artifacts") or {}
+    if artifacts.get("kind") in ("dir", "file") and artifacts.get("path"):
+        flat["artifacts_path"] = artifacts["path"]
+    elif artifacts.get("kind") == "none":
+        flat["artifacts_path"] = ""
+
+    return flat
+
+
 def load_user_config():
-    """Load user config from ~/.config/plane-backlog/config.json (holds all real per-workspace values)."""
-    if CONFIG_FILE.exists():
+    """Load the first available user config, translating v2 down to v1 keys.
+
+    v2 wins when present; v1 stays readable for the migration window so a
+    machine that has not been migrated keeps working unchanged.
+    """
+    explicit = os.environ.get("AGENT_WORKSPACE_CONFIG")
+    if explicit:
+        paths = [Path(explicit)]
+    elif CONFIG_FILE != Path.home() / ".config" / "plane-backlog" / "config.json":
+        # Test monkeypatching target
+        paths = [CONFIG_FILE, CONFIG_FILE_V2]
+    else:
+        paths = [CONFIG_FILE_V2, CONFIG_FILE]
+
+    for path in paths:
+        if not path.exists():
+            continue
         try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            with open(path, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: failed to parse {CONFIG_FILE}: {e}", file=sys.stderr)
+            print(f"Warning: failed to parse {path}: {e}", file=sys.stderr)
+            continue
+        if not isinstance(cfg, dict):
+            continue
+        profiles = cfg.get("profiles") or {}
+        # v2 is identified by the top-level version, not by a profile carrying
+        # `roles`: a v2 profile may define only `match`/`defaults`. Keying off
+        # per-profile `roles` alone would leave such a config untranslated and
+        # then mangle it through the v1 path in get_profile.
+        is_v2 = cfg.get("version") == 2 or any(
+            isinstance(p, dict) and "roles" in p for p in profiles.values()
+        )
+        if is_v2:
+            defaults = cfg.get("defaults") or {}
+            cfg = {
+                "profiles": {
+                    # workspace_name must be carried explicitly: DEFAULT_PROFILE
+                    # already holds "default" for that key, so get_profile's
+                    # setdefault cannot correct it later.
+                    name: dict(v2_profile_to_flat(p, defaults), workspace_name=name)
+                    for name, p in profiles.items()
+                    if isinstance(p, dict)
+                }
+            }
+        return cfg
     return {}
+
+
+def token_matches(token: str, parts) -> bool:
+    """True if `token` matches a contiguous run of path segments in `parts`.
+
+    Tokens are written in two shapes: a bare component ("es6kr") and a path
+    fragment ("ghq/github.com/es6kr"). Splitting on "/" and comparing segment
+    sequences handles both.
+
+    Comparing whole segments (rather than substrings) is what keeps a token
+    like "es6kr" from also matching an unrelated sibling such as
+    "not-es6kr-workspace" — that property must survive any change here.
+    """
+    seq = [s for s in str(token).split("/") if s]
+    if not seq:
+        return False
+    n = len(seq)
+    return any(list(parts[i:i + n]) == seq for i in range(len(parts) - n + 1))
 
 
 def detect_workspace(target_path: str = None) -> str:
@@ -70,14 +187,13 @@ def detect_workspace(target_path: str = None) -> str:
         return env_profile
 
     # 2. Check path against each configured profile's cwd_match tokens.
-    # Match against path components (not a raw substring of the full path string) so a
-    # token like "es6kr" doesn't also match an unrelated sibling such as "not-es6kr-workspace".
+    # Tokens may be a bare component or a multi-segment fragment; see token_matches.
     cwd = Path(target_path or os.getcwd()).resolve()
     cwd_parts = cwd.parts
 
     for name, cfg in profiles.items():
         for token in cfg.get("cwd_match", [name]):
-            if token in cwd_parts:
+            if token_matches(token, cwd_parts):
                 return name
 
     # 3. No match — "default" only. Do NOT fall back to an arbitrary configured profile;
@@ -159,3 +275,4 @@ if __name__ == "__main__":
         print(f"  Wiki Collection: {profile['qdrant_wiki_collection']}")
         print(f"  LLM Wiki Path: {profile['llm_wiki_path']}")
         print(f"  Tracker Root: {profile['tracker_root']}")
+        print(f"  Artifacts Path: {profile['artifacts_path']}")
