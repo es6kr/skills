@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/skill-kit-v0.6.3...skill-kit-v0.7.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
 ## [0.6.3](https://github.com/es6kr/skills/compare/skill-kit-v0.6.2...skill-kit-v0.6.3) (2026-08-17)
 
 
