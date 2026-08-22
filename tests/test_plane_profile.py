@@ -202,6 +202,12 @@ def test_k3s_fallback_script_survives_quote_in_workspace_slug(monkeypatch):
     plane_create_issue = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(plane_create_issue)
 
+    # create_via_k3s_fallback() returns before subprocess.run() when kubectl is
+    # absent from PATH. Without this stub the test asserts on ambient tooling
+    # rather than on the escaping behaviour it is about, and fails on any host
+    # (or git hook with a trimmed PATH) that has no kubectl installed.
+    monkeypatch.setattr(plane_create_issue.shutil, "which", lambda _cmd: "/usr/bin/kubectl")
+
     captured_cmd = {}
 
     class _FakeCompletedProcess:

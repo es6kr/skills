@@ -194,3 +194,29 @@ def test_k3s_fallback_skips_gracefully_without_kubectl(script_path, monkeypatch)
     assert res["success"] is False
     assert "kubectl" in res["reason"]
     assert not ran, "fallback must not shell out when kubectl is absent"
+
+
+def test_index_line_re_matches_identifier_prefix_containing_digits():
+    """A Plane project identifier may contain digits (e.g. ES6KR-117).
+
+    INDEX_LINE_RE previously matched the prefix with `[A-Z]+`, so no index line
+    from such a workspace ever matched. plane_sync then reported "0 index lines"
+    and every marker stayed unsynced — a silent no-op rather than a loud error.
+    """
+    mod = load_module(FIX_PLAN_SCRIPTS / "plane_sync.py", "plane_sync_ident")
+    url = (
+        "https://plane.example.invalid/acme/projects/"
+        "4b4d8bfc-5e5d-495b-bd4c-301fe89e5bb0/issues/"
+        "016a702b-11aa-424d-834c-53a818e9de0c"
+    )
+
+    for ident in ("ES6KR-117", "INFRA-12", "A1-3"):
+        line = f"- [ ] [{ident}] some tracked item → Plane ({url})"
+        match = mod.INDEX_LINE_RE.match(line)
+        assert match, f"index line with identifier {ident} must match"
+        assert match.group("ident") == ident
+
+    # The prefix must still start with a letter — a purely numeric prefix is not
+    # a Plane identifier and must not be absorbed.
+    numeric = f"- [ ] [123-4] not an identifier → Plane ({url})"
+    assert mod.INDEX_LINE_RE.match(numeric) is None

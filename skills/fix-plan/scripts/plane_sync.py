@@ -35,8 +35,11 @@ from workspace_profile import get_profile, resolve_tracker_root
 # plane_create_comment.py, the in-repo precedent that already clears the WAF.
 UA = "Mozilla/5.0 (plane-backlog)"
 
+# The identifier prefix is a Plane project identifier, which may contain digits
+# (e.g. ES6KR-117). A letters-only prefix class silently matched nothing for such
+# workspaces, so every sync reported "0 index lines" instead of failing loudly.
 INDEX_LINE_RE = re.compile(
-    r'^(?P<indent>\s*)-\s+\[(?P<marker>[^\]]*)\]\s+\[(?P<ident>[A-Z]+-\d+)\]\s+(?P<title>.+?)\s+'
+    r'^(?P<indent>\s*)-\s+\[(?P<marker>[^\]]*)\]\s+\[(?P<ident>[A-Z][A-Z0-9]*-\d+)\]\s+(?P<title>.+?)\s+'
     r'(?:→|->)\s+Plane\s+\((?P<url>https://[^\s)]+)\)(?P<rest>.*)$'
 )
 
