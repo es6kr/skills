@@ -93,6 +93,10 @@ import json, os, re, sys
 path = sys.argv[1]
 store_re = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-store$")
 find_re  = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-find$")
+# Vendor script route counts the same as MCP calls (tool-priority rule:
+# skill script -> CLI -> HTTP -> MCP; mirrors edit-guard.sh vendor_pat).
+script_store_re = re.compile(r"qdrant-import\.py")
+script_find_re  = re.compile(r"qdrant-(search|find)\.py")
 audit_re = re.compile(
     os.environ.get("HG_RAG_AUDIT_SIGNAL", r"audit|discovery|decision|deployment|fa-prune|self-improving|retrospect"),
     re.IGNORECASE,
@@ -134,6 +138,12 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
                         store_count += 1
                     elif find_re.match(tname):
                         find_count += 1
+                    elif tname == "Bash":
+                        cmd = tinput.get("command", "") or ""
+                        if script_store_re.search(cmd):
+                            store_count += 1
+                        elif script_find_re.search(cmd):
+                            find_count += 1
                     elif tname == "TaskUpdate" and tinput.get("status") == "completed":
                         task_completed += 1
                     elif tname in {"Edit", "Write"}:
@@ -200,7 +210,7 @@ Signals detected:
   - Audit/discovery prompts: $audit_signal
   - RAG-store calls: $store_count
 
-Per skill-usage.md "session-end RAG store requirement": store key findings to a RAG receiver before ending the session. Use the appropriate <vendor>-store MCP tool (1 call per finding, with metadata keys: type, project, date, category).
+Per skill-usage.md "session-end RAG store requirement": store key findings to a RAG receiver before ending the session. Use the appropriate <vendor>-store MCP tool (1 call per finding, with metadata keys: type, project, date, category). MCP store tool unavailable this session (MCP bindings are fixed at session start)? Use the vendor script route instead — e.g. Skill("es6kr", "qdrant-import") / qdrant-import.py — it counts as a store call here, per the tool-priority rule (skill script -> CLI -> HTTP -> MCP). Do NOT conclude the store is impossible from MCP absence alone.
 
 To skip this check intentionally, the user must explicitly say "no RAG store needed" or "skip qdrant store".
 

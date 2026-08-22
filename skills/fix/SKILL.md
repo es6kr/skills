@@ -12,9 +12,12 @@ description: |
   Use when "fix:", "fix this", "correct", "why not", "why missing", "behavior fix" is mentioned.
 ---
 
-# Fix: Behavior Correction Skill
+# Fix: Behavior Correction & Work-Resume Skill
 
-Activated when user gives feedback with "fix:" prefix. Finds the root cause of the mistake, improves the relevant prompt (skill/rule/agent/memory/CLAUDE.md/hook), and fixes the current issue.
+Activated when user gives feedback with "fix:" prefix. Finds the root cause of the mistake, improves the relevant prompt (skill/rule/agent/memory/CLAUDE.md/hook), and **seamlessly resumes and completes the interrupted original work (`Fix -> Resume` Complete Workflow)**.
+
+> 💡 **Core Identity of `/fix`**: `/fix` is NOT a tool that only patches rules and stops. The primary purpose of this skill is the **complete two-phase flow: `Fix (5-Why & Prompt Improvement) ➔ Resume (Complete the original interrupted deliverable & hand over to next work)`**. Stopping after rule modification without fully executing and delivering the original work is a fundamental failure of this skill.
+
 
 ## Trigger
 
@@ -152,6 +155,8 @@ Do NOT use file-existence checks to detect the environment — both `.gemini/` a
 | 1 | Skip `/fix` step-by-step procedure when the correction seems simple or obvious | Always execute Step 0 (TodoWrite/task.md) first, followed sequentially by Step 1 (5-Why), Step 1.5, Step 2, Step 3, and Step 4 |
 | 2 | Directly modify files or execute commands on a `/fix` trigger before initializing the task checklist | Ensure `task.md` or `TodoWrite` is initialized as the very first tool call in the turn |
 
+**Zero-content abusive invocation exception (HARD STOP)**: the "no trivial exception" rule above assumes the `/fix` arguments contain *some* identifiable behavior-correction content, however terse. When the arguments are **pure abuse with zero identifiable target** (e.g. a single insult with no instruction, no described mistake, no reference to prior turns), the full Step 0-4 procedure does not apply — there is nothing to run 5-Why analysis against. In this case: do not fabricate a target by guessing, and do not run TodoWrite/5-Why against an empty premise. Instead, briefly name the pattern (repeated content-free abusive messages) and set a boundary — invoke `AskUserQuestion` or plain text asking what specifically should be corrected, if the pattern is a first occurrence in the conversation. If abusive messages continue to recur with no content across multiple turns despite this, that is a candidate for `EndConversation` per its own tool guidance (sustained abuse, explicit prior warning required) — this exception does not itself authorize ending the conversation. The moment any subsequent `/fix` invocation in the same conversation contains identifiable content (even mixed with continued abusive language), the full Step 0-4 procedure resumes as normal — this exception is scoped to content-free invocations only, not to the presence of any abusive language.
+
 **Recurrence pre-check (first step of Step 1) — MANDATORY 2-stage**:
 
 **Stage 0 — RAG semantic search (if RAG receiver available)**:
@@ -184,22 +189,26 @@ The following general principles apply before entering the fix procedure. If you
 
 **If Why analysis identifies the above rules as root cause, the rules themselves do not need to be modified** — go deeper with Why 4-5 to ask "why was that rule ignored in the fix flow?". If the answer is "fix procedure forces a reactive flow" or "existing rules aren't applied automatically", do not trap the rule inside the fix skill — record it as a recurrence in failed-attempts.md (next candidate for hook automation).
 
-Don't stop at the direct cause. Dig at least **3 levels deep**:
+Don't stop at the direct cause. Dig **5 levels deep** to bridge cause analysis directly into Resume execution:
 
 ```
-Why 1: What went wrong? (symptom — the immediate mistake)
-Why 2: Why did I make that decision? (judgment — missing knowledge/rule)
-Why 3: Why was that knowledge/rule missing? (structural — skill/rule gap)
+Why 1 (Symptom): What went wrong? (the immediate mistake)
+Why 2 (Judgment): Why did I make that decision? (missing knowledge / flawed assumption)
+Why 3 (Structural): What rule/prompt must be fixed to prevent recurrence? (target skill/rule/hook)
+Why 4 (Interrupted Work): What was the original user request / deliverable that was interrupted by this failure?
+Why 5 (Next Resume Action): What concrete actions must be executed NEXT to completely finish and deliver that original work?
 ```
 
-- Fixing only Why 1 = patching a symptom. It recurs in a different form.
-- Why 2-3 reveal **structural causes** (platform ignorance, DRY violation, etc.) — these go into rules/skills.
+- Why 1~3 identify **what to fix in prompts/rules/skills**.
+- Why 4~5 identify **what to do next to resume and finish the original deliverable**.
 - Search for the responsible **skill/rule/hook** files (Grep/Glob)
 
 **Completion gate — do NOT proceed to Step 1.5 until ALL of these are true:**
-1. Each issue has **Why 1, Why 2, Why 3, Why 4, Why 5** written out explicitly — stopping at Why 3 fails the gate. Why 4 = "why it wasn't followed (procedural/structural defect)", Why 5 = "where that defect originates (skill flow, missing automation, etc.)"
-2. Why 5 identifies a **specific target** (skill, rule, hook, agent prompt, project config, etc.) to fix
-3. No AskUserQuestion or implementation actions during Step 1 — analysis only
+1. Each issue has **Why 1, Why 2, Why 3, Why 4, Why 5** written out explicitly — stopping at Why 3 fails the gate. Why 1~3 define the root cause & prompt fix, and Why 4~5 define the exact original work and the immediate next resume actions.
+2. Why 3 identifies a **specific target** (skill, rule, hook, agent prompt, project config, etc.) to fix.
+3. Why 5 identifies the **concrete sequence of actions** to be executed in Step 3 Resume.
+4. No AskUserQuestion or implementation actions during Step 1 — analysis only.
+
 
 ### 1.5. Action plan per Why (MANDATORY — required before entering Step 2)
 
@@ -210,16 +219,14 @@ Why 3: Why was that knowledge/rule missing? (structural — skill/rule gap)
 ```text
 | Why | Target file : spot | Action |
 |-----|--------------------|--------|
-| Why 1 | (current issue — resolved in Step 3) | Step 3 Resume |
-| Why 2 | <rule-file> : staging section | Add rule: "Forbid alternative command selection on failure" |
-| Why 3 | epic-bundle.md : Step 2 group line | by-theme → by-source-PR |
-| Why 3 | epic-bundle.md : body template | per-PR section header |
-| Why 3 | epic-bundle.md : Don't/Do table | add row |
-| Why 3 | epic-bundle.md : self-check | add item |
-| Why 5 | fix/SKILL.md : Step 2 Checkpoint | Add gate item |
+| Why 1 | (current issue — symptom) | Root cause understanding |
+| Why 2 | <rule-file> : judgment section | Add judgment rule |
+| Why 3 | <skill/rule> : procedure/gate | Add structural gate & prompt fix |
+| Why 4 | (interrupted original work) | Identify original deliverable scope |
+| Why 5 | (target deliverable/tool) | Step 3 Resume: execute concrete next actions to finish original work |
 ```
 
-**Multi-spot enumeration rule (HARD STOP)**: a single Why often maps to **multiple spots inside one file** (procedure step + output template + Don't/Do table + self-check). Enumerate **one row per spot**, not one row per file. "Target file : spot" granularity is mandatory — a single `epic-bundle.md` row that hides 4 spots is what produces "fixed the output but missed the procedure" partial corrections.
+**Multi-spot enumeration & Resume linkage rule (HARD STOP)**: A single Why often maps to multiple spots. Enumerate one row per spot. **Why 4~5 MUST produce explicit action rows detailing the concrete Step 3 Resume actions** (e.g. running scripts, completing report tables, issuing final Ask/Next). Omitting Resume action rows from the Action Plan table is strictly forbidden.
 
 **Action types**:
 - Edit/Write → execute in Step 2

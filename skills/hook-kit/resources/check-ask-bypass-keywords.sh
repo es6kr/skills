@@ -19,6 +19,16 @@
 #             — hook was UNREGISTERED in settings.json + single interrogative escaped the
 #             list>=2 gate. Registered in Stop + INTERROGATIVE_PATTERN added. See failed-hooks.md.
 #
+#             22nd 2026-08-13: a direct-answer response ending on a bare trailing
+#             "?" (a small disambiguation question) did NOT block live, even though
+#             offline replay of the exact transcript state through this script
+#             correctly returned decision:block — matching logic + settings.json
+#             registration both confirmed intact. Root cause of the live miss
+#             unconfirmed (no prior invocation trail to inspect). Added per-invocation
+#             debug logging (check-ask-bypass-keywords.debug.log, mirrors
+#             next-trigger.sh) so the next live miss has direct evidence instead of
+#             requiring offline reconstruction.
+#
 # Cannot block the response itself (Stop hook fires after the response ends).
 # Reminder is injected so the NEXT turn does the AskUserQuestion call.
 
@@ -35,24 +45,43 @@ fi
 HG_BYPASS_KEYWORD_PATTERN="${HG_BYPASS_KEYWORD_PATTERN:-__NEVER_MATCH__}"
 HG_BYPASS_INTERROGATIVE_PATTERN="${HG_BYPASS_INTERROGATIVE_PATTERN:-__NEVER_MATCH__}"
 
+# Debug log of this hook's own invocations — mirrors next-trigger.sh's
+# next-trigger.debug.log. Added after a live-miss (failed-attempts.md
+# "ask-text-question" 22nd recurrence) where the hook, empirically re-run offline
+# against the exact transcript state, correctly returned decision:block —
+# yet no block occurred in the live session. Without a per-invocation trail,
+# that class of miss can only be diagnosed by slow after-the-fact
+# reconstruction. Self-trims at 500 lines, keeps last 200 (same policy as
+# next-trigger.sh).
+DEBUG_LOG="$(dirname "$0")/check-ask-bypass-keywords.debug.log"
+_log() { { printf '%s\t%s\ttranscript=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" >> "$DEBUG_LOG"; } 2>/dev/null || true; }
+
 INPUT=$(cat)
 
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
-[ -f "$TRANSCRIPT" ] || exit 0
+if [ ! -f "$TRANSCRIPT" ]; then
+  _log "early_exit=no_transcript" "$TRANSCRIPT"
+  exit 0
+fi
 
 # Last assistant message (whole JSON entry)
 LAST_MSG=$(jq -s 'map(select(.type == "assistant")) | last // empty' "$TRANSCRIPT" 2>/dev/null)
 if [ -z "$LAST_MSG" ] || [ "$LAST_MSG" = "null" ]; then
+  _log "early_exit=no_last_assistant_msg" "$TRANSCRIPT"
   exit 0
 fi
 
 # Concatenate all text-content from the assistant message
 LAST_TEXT=$(echo "$LAST_MSG" | jq -r '.message.content // [] | map(select(.type == "text") | .text) | join("\n")' 2>/dev/null)
-[ -z "$LAST_TEXT" ] && exit 0
+if [ -z "$LAST_TEXT" ]; then
+  _log "early_exit=no_text_content" "$TRANSCRIPT"
+  exit 0
+fi
 
 # Skip if AskUserQuestion was actually called in this response
 ASK_COUNT=$(echo "$LAST_MSG" | jq -r '.message.content // [] | map(select(.type == "tool_use" and .name == "AskUserQuestion")) | length' 2>/dev/null)
 if [ -n "$ASK_COUNT" ] && [ "$ASK_COUNT" != "0" ]; then
+  _log "early_exit=ask_already_called ask_count=$ASK_COUNT" "$TRANSCRIPT"
   exit 0
 fi
 
@@ -62,20 +91,48 @@ fi
 # When the data file is absent both fall back to __NEVER_MATCH__ so the hook
 # becomes a no-op (intentional — bypass framing is locale-specific).
 
-if echo "$LAST_TEXT" | grep -qE "$HG_BYPASS_INTERROGATIVE_PATTERN"; then
+# Language-agnostic trailing-question-mark check — the response's last
+# non-whitespace character is "?"/"？". Catches any interrogative ending
+# (Korean or English) without relying on an enumerated verb/ending list, which
+# 14 prior recurrences showed always misses the next novel phrasing (see
+# failed-attempts.md "ask-text-question" class). Scoped to the LAST LINE only
+# (not the whole response) to keep the false-positive surface bounded — a
+# question mark earlier in the body (e.g. a quoted question being analyzed)
+# does not trigger this.
+LAST_LINE=$(printf '%s' "$LAST_TEXT" | tail -n 1)
+TRAILING_QUESTION=0
+if printf '%s' "$LAST_LINE" | grep -qE '[?？][[:space:]"'"'"']*$'; then
+  TRAILING_QUESTION=1
+fi
+
+MATCH_REASON=""
+if [ "$TRAILING_QUESTION" = "1" ]; then
+  # Bare trailing "?" on the last line — fire regardless of keyword/list gates.
+  MATCH_REASON="trailing_question_mark"
+elif echo "$LAST_TEXT" | grep -qE "$HG_BYPASS_INTERROGATIVE_PATTERN"; then
   # Direct interrogative offer — fire regardless of list count.
-  :
+  MATCH_REASON="interrogative_offer"
 elif echo "$LAST_TEXT" | grep -qE "$HG_BYPASS_KEYWORD_PATTERN"; then
   # Delegation/next-step framing — require bullet/numbered list >= 2 (cuts FP).
   LIST_COUNT=$(echo "$LAST_TEXT" | grep -cE '^[[:space:]]*([0-9]+\.|[-*])[[:space:]]+')
   if [ "$LIST_COUNT" -lt 2 ]; then
+    _log "pass=keyword_matched_but_list_count_below_2 list_count=$LIST_COUNT" "$TRANSCRIPT"
     exit 0
   fi
+  MATCH_REASON="delegation_keyword_list>=2"
 else
+  _log "pass=no_pattern_matched" "$TRANSCRIPT"
   exit 0
 fi
 
-REMINDER="[hook:check-ask-bypass-keywords] Text-question pattern detected (delegation/next-step framing + list>=2, or direct interrogative offer) + no AskUserQuestion call in the same response.
+_log "BLOCK reason=$MATCH_REASON" "$TRANSCRIPT"
+
+# Trim to last 200 lines once the log exceeds 500 (same policy as next-trigger.sh)
+if [ "$(wc -l < "$DEBUG_LOG" 2>/dev/null || echo 0)" -gt 500 ]; then
+  tail -n 200 "$DEBUG_LOG" > "$DEBUG_LOG.tmp" 2>/dev/null && mv "$DEBUG_LOG.tmp" "$DEBUG_LOG" 2>/dev/null
+fi
+
+REMINDER="[hook:check-ask-bypass-keywords] Text-question pattern detected (last line ends with a bare '?', delegation/next-step framing + list>=2, or direct interrogative offer) + no AskUserQuestion call in the same response.
 
 ask-user-question.md \"Questions must use the AskUserQuestion tool — text questions are forbidden\" rule applies. If a user-decision axis is identified, call AskUserQuestion instead of writing a text prompt.
 

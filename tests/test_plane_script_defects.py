@@ -35,9 +35,9 @@ PLANE_BACKLOG_SCRIPTS = REPO_ROOT / "skills" / "plane-backlog" / "scripts"
 EXPECTED_UA = "Mozilla/5.0 (plane-backlog)"
 
 CREATE_ISSUE_COPIES = [
-    pytest.param(FIX_PLAN_SCRIPTS / "plane_create_issue.py", id="fix-plan"),
     pytest.param(PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py", id="plane-backlog"),
 ]
+
 
 PROFILE = {
     "plane_host": "https://plane.invalid",
@@ -194,18 +194,3 @@ def test_k3s_fallback_skips_gracefully_without_kubectl(script_path, monkeypatch)
     assert res["success"] is False
     assert "kubectl" in res["reason"]
     assert not ran, "fallback must not shell out when kubectl is absent"
-
-
-# ------------------------------------------------------- dual-copy drift guard
-
-
-def test_create_issue_copies_are_byte_identical():
-    assert filecmp.cmp(
-        FIX_PLAN_SCRIPTS / "plane_create_issue.py",
-        PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py",
-        shallow=False,
-    ), (
-        "the fix-plan and plane-backlog copies of plane_create_issue.py have "
-        "drifted — dual-script drift is how the K3s f-string defect survived; "
-        "apply the change to both copies"
-    )

@@ -66,6 +66,21 @@
 - `github-flow/pr.md` lines 13-14, 276-279 (Draft-default HARD STOP at execution time) — this skill mirrors that rule into option-description time.
 - Triggering keyword in option description (any locale): `create PR`, `PR creation`, `register PR`, `worktree+PR`, `cherry-pick + PR`, `gh pr create`, and equivalent localized forms. Any of these without a "draft" qualifier = violation.
 
+## Cross-cutting rule — Antigravity unapproved PR clawo delegation in next-action options (HARD STOP)
+
+**In the Antigravity (Gemini) environment, whenever composing next-action options, proposing unapproved/unmerged PR review, consolidation, or remediation as a direct task for the main Antigravity session is strictly forbidden (`HARD STOP`).**
+
+If an unapproved PR is surfaced as a candidate from open PR discovery (`gh pr list`), it MUST be explicitly framed as delegating to `clawo` (e.g. `[clawo] PR #<N> delegate consolidate review (/clawo consolidate PR #<N>)`), never as direct in-session review. **When dispatching the clawo session, the prompt passed to clawo MUST explicitly execute `/consolidate pr <PR_URL>` (or `/consolidate pr #<N>`) as its entry point.**
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Propose "[repo] PR #<N> review & process" as a direct option in Antigravity | Frame explicitly as "[clawo] PR #<N> delegate consolidate (/clawo consolidate PR #<N>)" |
+| 2 | Start direct code review or consolidate inside the main Antigravity turn | Dispatch the PR workflow to an isolated `clawo` session (`Skill("clawo", "launch")`) |
+| 3 | Surface open PRs without checking if the current environment is Antigravity | When in Antigravity, all unapproved PR candidates must carry the `[clawo]` prefix and delegation command |
+| 4 | Send unstructured instructions ("verify and merge...") in the clawo prompt | Explicitly pass `/consolidate pr <PR_URL>` so the worker runs the standard consolidate workflow |
+
 ## Deferred-status overrides severity + pending-task precedence (HARD STOP)
 
 The severity table above governs findings **inside the current PR's diff**. A finding that is **deferred by status** — outside the PR's diff, explicitly postponed, or parked in a fix_plan hold section — is bundle-and-late **regardless of severity** (even 🟠 Important / 🔴 Critical). It must NOT appear as an individual next-action option while real pending backlog work exists.
@@ -448,7 +463,7 @@ options: [
 A session-cleanup / retrospective / wrap-up option — including as a diversity slot inside a regular next-action ask — may be offered only when at least one of these holds:
 
 1. The user explicitly signaled wrap-up intent (wrap-up keyword, or 2+ consecutive declines of other follow-ups), or
-2. The injected context-usage signal (a `Context usage: ... (NN%)` line in hook additionalContext, when the environment provides one) reports **≥ 45%** — **read from the LATEST injection in the transcript at ask-composition time**. The signal only refreshes on user-prompt events, and a compact/summarization boundary shrinks context, so any reading taken before the most recent injection (or before an intervening compact) is stale and **overstates** usage. A stale reading NEVER satisfies the gate: if the freshest injection is below the threshold — or no post-compact reading exists yet — treat condition 2 as NOT met.
+2. The injected context-usage signal (a `Context usage: ... (NN%)` line in hook additionalContext, when the environment provides one) reports at/above the **session model's live threshold** (Fable/Mythos 55%, Opus 50%, others 45% — 45% is also the generic fallback when the model is unknown; the injection script publishes the live per-model value and emits an explicit `CLEANUP-GATE` directive line when the reading is over it) — **read from the LATEST injection in the transcript at ask-composition time**. **Active trigger**: when this condition holds on a FRESH reading, the cleanup/retrospective option is not merely permitted — it is REQUIRED as the Recommended #1 option of the turn-final ask (or a standalone cleanup ask when no other ask is happening this turn), citing the live percentage. The signal only refreshes on user-prompt events, and a compact/summarization boundary shrinks context, so any reading taken before the most recent injection (or before an intervening compact) is stale and **overstates** usage. A stale reading NEVER satisfies the gate: if the freshest injection is below the threshold — or no post-compact reading exists yet — treat condition 2 as NOT met.
 
 **Post-compact floor (HARD STOP)**: immediately after a compact/summarization boundary — an explicit compact command, an `isCompactSummary` entry, or a session that opened with a "continued from a previous conversation that ran out of context" summary — assume usage is **under 20% until re-measured**, and never quote a percentage that appears in the pre-compact conversation or its summary. The measurement mechanism reads the last assistant-message usage field, which still describes the pre-compact session until a new assistant turn has been generated; a figure read at that moment can overstate reality by tens of percentage points. This is the operator-facing counterpart of the injection script's own first-post-compact suppression — the script suppresses its own output, but nothing stops a composer from quoting a number it read elsewhere.
 

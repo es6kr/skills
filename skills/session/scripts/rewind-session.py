@@ -233,7 +233,10 @@ def list_claude_sessions():
                                         title = data["custom-title"]
                                     elif data.get("type") == "user":
                                         msg = data.get("message", {})
-                                        text = msg.get("content", "") if isinstance(msg, dict) else str(msg)
+                                        content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
+                                        if isinstance(content, list):
+                                            content = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+                                        text = content if isinstance(content, str) else str(content)
                                         if text:
                                             title = text[:60].replace("\n", " ")
                                 except Exception:
@@ -327,8 +330,8 @@ def main():
         db_path = os.path.expanduser(os.path.join(engine_dir, "conversations", f"{args.uuid}.db"))
         summary_db = os.path.expanduser(os.path.join(engine_dir, "conversation_summaries.db"))
         transcript_path = get_transcript_path(engine_dir, args.uuid)
-        rewind_antigravity_db(db_path, args.step, cid=args.uuid, summary_db_path=summary_db, preserve_ask=args.preserve_ask, transcript_path=transcript_path)
-        sys.exit(0)
+        success = rewind_antigravity_db(db_path, args.step, cid=args.uuid, summary_db_path=summary_db, preserve_ask=args.preserve_ask, transcript_path=transcript_path)
+        sys.exit(0 if success else 1)
 
     if args.claude_code:
         if not args.uuid or args.line is None:

@@ -77,6 +77,26 @@ tracked_skills() {
   [[ -z "$result" ]]
 }
 
+@test "no duplicate basenames among hooks.json-registered scripts" {
+  # Scope: only basenames that are actually wired into hooks.json — a same-named
+  # utility script under two skills' scripts/ that neither skill registers as a
+  # hook is a harmless naming coincidence, not a double-fire hazard.
+  local registered
+  registered=$(jq -r '.. | objects | select(.command) | .command' "$REPO_ROOT/hooks/hooks.json" 2>/dev/null \
+    | grep -oE '[^ /]+\.(sh|py|js)' | sort -u)
+  local dupes
+  dupes=$(git -C "$REPO_ROOT" ls-files -- 'skills/*/resources/*.sh' 'skills/*/scripts/*.sh' 'skills/*/resources/*.py' 'skills/*/scripts/*.py' 'skills/*/resources/*.js' 'skills/*/scripts/*.js' \
+    | awk -F/ '{print $NF, $0}' | sort | awk '
+        { if ($1 == prev_name) { print prev_line; print $0; dup=1 }
+          else if (dup) { dup=0 }
+          prev_name=$1; prev_line=$0 }
+      ' | while read -r name path; do
+        printf '%s\n' "$registered" | grep -qx "$name" && echo "$name $path"
+        true
+      done)
+  [[ -z "$dupes" ]] || { echo "Duplicate basenames registered as hooks (both copies fire under the same hooks.json matcher — see hook-kit/audit.md 3-C): $dupes"; return 1; }
+}
+
 @test "no Korean in frontmatter" {
   local bad=()
   for skill in $(tracked_skills); do

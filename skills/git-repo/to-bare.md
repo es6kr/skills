@@ -64,5 +64,5 @@ git -C <target-path> branch -a                  # remote branches reachable via 
 
 ## Notes
 
-- If `<target-path>` is inside another repo's working tree (e.g. `~/.agents/.claude/worktrees/`), confirm that location is gitignored there so the foreign worktree does not pollute that repo's status.
+- If `<target-path>` is inside another repo's working tree (e.g. `~/.agents/.claude/worktrees/` or `<repo>/.worktrees/`), confirm that location is gitignored there (`.worktrees/` in `.gitignore` along with baseline hygiene patterns: `__pycache__/`, `.DS_Store`, `*.bak`, `*.tmp`) so the foreign worktree does not pollute that repo's status.
 - The bare's default branch can be checked out by exactly one worktree; the bare itself has no checkout, so the branch is free.

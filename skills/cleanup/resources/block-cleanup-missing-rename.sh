@@ -33,6 +33,12 @@ fi
 # more likely to be headed "cleanup complete" / "cleanup pass 2 complete" than
 # to repeat the literal invocation "/cleanup run", and those natural headings
 # previously matched nothing here, so the guard never even entered its checks.
+# Additive, not override (`:+…|` rather than `:-`). The locale data file is sourced
+# first, so with `:-` its value REPLACED everything below and the committed markers
+# became dead code on any machine that has the file — `Session Cleanup` here was
+# live in the repo and silently absent in practice. Which set wins should not depend
+# on whether an untracked file happens to exist. Union keeps the committed baseline
+# authoritative and lets the git-ignored file only ADD locale variants.
 HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:+${HG_CLEANUP_MARKERS}|}(^|[[:space:]])/cleanup|cleanup run|cleanup wrap-up|cleanup complete|cleanup pass|cleanup finished|Session Ended|Session Cleanup|session-end report"
 HG_SESSION_ID_MARKERS="${HG_SESSION_ID_MARKERS:+${HG_SESSION_ID_MARKERS}|}Session ID:|session[[:space:]]+id:"
 # Words that, together with a markdown table, mark a response as the completion

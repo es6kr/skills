@@ -132,12 +132,20 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-fabricated-claims.sh"
           }
         ]
       },
       {
         "matcher": "Edit",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/block-direct-checklist-edit.js"
+          },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/complex-logic-guard.sh"
@@ -179,6 +187,10 @@
       {
         "matcher": "Write",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/block-direct-checklist-edit.js"
+          },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/staged-protect.sh"

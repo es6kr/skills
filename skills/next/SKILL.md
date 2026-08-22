@@ -125,7 +125,7 @@ Identify the type of task just completed.
 |--------|------------------|
 | Visible TaskList | All pending/in_progress entries (call `TaskList` per Step 0.5) |
 | Just-completed work | Direct follow-ups (commit / push / verify / test / publish) |
-| Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) |
+| Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) — **In Antigravity, unapproved PRs must ONLY be offered as clawo delegation options (`[clawo] ... (/clawo consolidate PR #N)`), never as direct main-session tasks (HARD STOP)** |
 | Recent commits awaiting CI | `gh run list --limit 5` for pending CI watch |
 | fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) — **mandatory read when a fix_plan / checklist skill is available** (see "Dependency-gated behaviors"); otherwise an ordinary optional source |
 | Plane | Self-hosted project tracker, if this environment has one configured (check local infra docs for connection details) — check open issues/cycles when the project has one wired up |
@@ -199,8 +199,6 @@ AskUserQuestion({
 2. Yes → background it, and actually drive that other work in the same turn — do not idle-wait alone
 
 (See failed-attempts.md "background-agent-without-parallel-work" for recurrence history.)
-
-**Decide foreground vs background BEFORE spawning, not after (HARD STOP)**: idle-waiting on a lone background agent buys zero parallelism and only exposes the turn to prompt-cache-TTL-expiry cost (the 5-minute window — usage-overage state cannot be known in advance, so always plan for the shorter window) once nothing else fills the wait. Before every `Agent` spawn, check: is there other selected/pending work this turn could drive while the agent runs? If yes, background it and drive that other work. If no, spawn it in the foreground (`run_in_background: false`, or the Agent tool's default synchronous behavior) instead of backgrounding it and then idle-waiting alone for its own notification. A single-item follow-up (e.g. "run Internal Review on this PR, then post the Summary") with nothing else queued is a foreground case, not a background-and-wait case. (See failed-attempts.md "background-agent-without-parallel-work".)
 
 ## Suggestion Patterns
 
