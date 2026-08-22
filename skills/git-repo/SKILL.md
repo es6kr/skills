@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), fix-worktree (bare repo recovery), githooks (hook silently never runs — hooksPath precedence, passthrough chain, install trade-off), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, rebase-audit (accidental-revert detection during an active rebase), to-ghq (formerly migrate), to-bare, worktree-register (metadata register/relink), patrol (batch inspect), move-worktree (register/reclaim merged PR), rename-worktree, sourcegit, ssh-key (multi-account SSH map), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely). Use when: "reuse worktree", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), doctor (hook health & compliance audit — Tier 1 Base + Tier 2 Conditional taxonomy), fix-worktree (bare repo recovery), githooks (hook silently never runs — hooksPath precedence, passthrough chain, install trade-off), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, rebase-audit (accidental-revert detection during an active rebase), to-ghq (formerly migrate), to-bare, worktree-register (metadata register/relink), patrol (batch inspect), move-worktree (register/reclaim merged PR), rename-worktree, sourcegit, ssh-key (multi-account SSH map), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely). Use when: "reuse worktree", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing", "repo doctor", "hook health", "diagnose hooks", "check hooks" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -30,6 +30,7 @@ Git repository management and SourceGit GUI client integration.
 | clone | ghq get with automatic SourceGit registration (multi-account support) | [clone.md](./clone.md) |
 | conflict-dry-run | test merge/cherry-pick applicability in an isolated worktree, without touching the main working tree | [conflict-dry-run.md](./conflict-dry-run.md) |
 | credential-helper | pin a per-org GitHub token for HTTPS remotes (fixes recurring `Repository not found` from active-account mismatch); HTTPS counterpart to ssh-key | [credential-helper.md](./credential-helper.md) |
+| doctor | diagnose Git repository hook health, wiring, permissions, and CI compliance (Base universal + Conditional domain/type taxonomy; helper: `scripts/git-repo-doctor.sh`) | [doctor.md](./doctor.md) |
 | fix-worktree | bare repo worktree configuration recovery | [fix-worktree.md](./fix-worktree.md) |
 | githooks | diagnose a `.githooks/` hook that silently never runs (hooksPath precedence, passthrough chains, execute bit) and choose an install method that keeps machine-wide hooks | [githooks.md](./githooks.md) |
 | isolate-hunk | stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing (no working-tree changes) | [isolate-hunk.md](./isolate-hunk.md) |
@@ -225,6 +226,7 @@ Key features:
 1. **Repository migration**: Migrate to ghq structure with `to-ghq` topic (or `to-bare` for the inverse)
 2. **SourceGit update**: Register new paths with `sourcegit` topic
 3. **Batch inspection**: Clean up uncommitted/unpushed changes with `patrol` topic
+4. **Baseline .gitignore hygiene**: Ensure standard ignore rules (`.worktrees/`, `.DS_Store`, `__pycache__/`, `*.bak`, `*.tmp`) in `.gitignore` or `.git/info/exclude` to isolate worktrees and suppress runtime/editor clutter
 
 ## Scripts
 

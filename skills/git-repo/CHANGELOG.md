@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/git-repo-v0.8.1...git-repo-v0.9.0) (2026-08-20)
+
+
+### Features
+
+* promote next-feat staging (lifecycle guards, triage automation, and workflow safety procedures) ([77d58ac](https://github.com/es6kr/skills/commit/77d58ac3a771a4897043c9eea8b149ea1e8ba2ff))
+
+
+### Bug Fixes
+
+* **git-repo:** document conflict root-cause diagnosis (staleness vs divergence) ([f034168](https://github.com/es6kr/skills/commit/f0341685d6bf07c9d16e9375c93c22fea88b454f))
+* **git-repo:** document conflict root-cause diagnosis (staleness vs divergence) ([3f8e492](https://github.com/es6kr/skills/commit/3f8e4924bd8a656ea3fc1eeb573c9a629fea80cd))
+* promote next-fix batch (hook path repair, topic-dispatch scoping, conflict diagnosis) ([eb7ecb6](https://github.com/es6kr/skills/commit/eb7ecb61dda9701d78f12dc810781dc7cb687caa))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/git-repo-v0.8.0...git-repo-v0.8.1) (2026-08-17)
 
 
