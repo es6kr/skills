@@ -127,7 +127,7 @@ if [[ -n "$CLAIMED" ]] && command -v gh >/dev/null 2>&1 && [[ -n "$OWNER_REPO" ]
   PRNUM="$(echo "$COMMAND" | grep -oE '(issues|pulls)/[0-9]+' | grep -oE '[0-9]+' | head -1)"
   [[ -z "$PRNUM" ]] && PRNUM="$(echo "$COMMAND" | grep -oE 'gh[[:space:]]+pr[[:space:]]+(comment|review)[[:space:]]+[0-9]+' | grep -oE '[0-9]+' | head -1)"
   if [[ -n "$PRNUM" ]]; then
-    ACTUAL="$(gh api "repos/$OWNER_REPO/pulls/$PRNUM/comments" --jq '[.[] | select(.user.login=="Copilot")] | length' 2>/dev/null)"
+    ACTUAL="$(gh api "repos/$OWNER_REPO/pulls/$PRNUM/comments" --jq '[.[] | select(.user.login | test("copilot"; "i"))] | length' 2>/dev/null)"
     if [[ "$ACTUAL" =~ ^[0-9]+$ ]] && (( CLAIMED > ACTUAL )); then
       COUNT_MSG="Reviewer Matrix claims Copilot produced ${CLAIMED} findings, but PR #${PRNUM} has only ${ACTUAL} actual Copilot review comment(s). Do not inflate or mis-attribute an external reviewer's findings — set the count to ${ACTUAL} and source the extra items to 'Internal Code Review'."
     fi

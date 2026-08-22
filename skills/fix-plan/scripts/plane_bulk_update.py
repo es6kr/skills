@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Plane Bulk Update Script with Diff-based Conflict Protection & Rate Limit Handling
-Synchronizes Priorities and Dates from fix_plan.md to Plane (plane.dgs.ai.kr)
+Synchronizes Priorities and Dates from fix_plan.md to the workspace's Plane instance
+(host/token/tracker root resolved via workspace_profile.py, like plane_sync.py)
 Features:
 - 3-Way Diff Analysis (FILL, NO-OP, CONFLICT)
 - Strict Overwrite Protection: Never modifies existing non-empty Plane values in safe mode
@@ -22,27 +23,41 @@ import urllib.error
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-DEFAULT_FIX_PLAN = r"C:\Users\DAEGUNSOFT\ghq\github.com\daegunsoftDev\.agents\fix_plan.md"
-BASE_URL = "https://plane.dgs.ai.kr/api/v1/workspaces/daegunsoftdev"
+# Shared single-source config: host/token/tracker root come from the workspace
+# profile (same abstraction plane_sync.py / plane_client.py already use), and
+# the P0-P3 <-> Plane native priority mapping is imported from the sibling
+# plane_sync.py -- plane-backlog/SKILL.md's mapping policy tracks exactly two
+# copies (plane_client.py / plane_sync.py); this script must not add a third.
+from workspace_profile import get_profile
+from plane_sync import MARKER_TO_PRIORITY as PRIORITY_MAP
 
-PRIORITY_MAP = {
-    "P0": "urgent",
-    "P1": "high",
-    "P2": "medium",
-    "P3": "low"
-}
+# Workspace slug source: a fix_plan.md Plane index line carries the full issue
+# URL (https://<host>/<workspace>/projects/<uuid>/issues/<uuid>). The slug is
+# derived from the first such URL in the file unless --workspace-slug is given.
+PLANE_URL_RE = re.compile(
+    r'https://[^/]+/(?P<workspace>[^/]+)/projects/[0-9a-f-]{36}/issues/[0-9a-f-]{36}'
+)
 
-def get_api_key():
-    key = os.environ.get("DGS_PLANE_API_KEY")
+def get_api_key(token_env):
+    key = os.environ.get(token_env)
     if not key:
         try:
             import winreg
             reg = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment")
-            key, _ = winreg.QueryValueEx(reg, "DGS_PLANE_API_KEY")
+            key, _ = winreg.QueryValueEx(reg, token_env)
             winreg.CloseKey(reg)
         except Exception:
             pass
     return key
+
+def derive_workspace_slug(fix_plan_path):
+    """Return the workspace slug from the first Plane issue URL in fix_plan.md."""
+    try:
+        with open(fix_plan_path, 'r', encoding='utf-8') as f:
+            m = PLANE_URL_RE.search(f.read())
+            return m.group('workspace') if m else None
+    except OSError:
+        return None
 
 def parse_fix_plan(fix_plan_path):
     if not os.path.exists(fix_plan_path):
@@ -77,7 +92,10 @@ def parse_fix_plan(fix_plan_path):
 
             is_done = line.strip().startswith("- [x]") or "Completed" in current_section
 
-            if key not in issue_map or (prio and not issue_map[key]["priority"]):
+            # Merge incrementally: the same [IDENT-seq] key can appear on more
+            # than one line (index line with a date, phase line with a priority
+            # tag). Replacing the whole record would drop fields already found.
+            if key not in issue_map:
                 issue_map[key] = {
                     "ident": ident,
                     "seq": seq,
@@ -86,11 +104,18 @@ def parse_fix_plan(fix_plan_path):
                     "date": date_val,
                     "raw_line": line.strip()[:90]
                 }
+            else:
+                entry = issue_map[key]
+                if prio and not entry["priority"]:
+                    entry["priority"] = prio
+                if date_val and not entry["date"]:
+                    entry["date"] = date_val
+                entry["is_done"] = entry["is_done"] or is_done
 
     return issue_map
 
-def fetch_plane_projects_and_issues(headers):
-    req = urllib.request.Request(f"{BASE_URL}/projects/", headers=headers)
+def fetch_plane_projects_and_issues(base_url, headers):
+    req = urllib.request.Request(f"{base_url}/projects/", headers=headers)
     with urllib.request.urlopen(req) as resp:
         data = json.loads(resp.read().decode('utf-8'))
         projects = data.get('results', data if isinstance(data, list) else [])
@@ -99,7 +124,7 @@ def fetch_plane_projects_and_issues(headers):
     for p in projects:
         p_id = p['id']
         p_ident = p['identifier']
-        i_req = urllib.request.Request(f"{BASE_URL}/projects/{p_id}/issues/?limit=100", headers=headers)
+        i_req = urllib.request.Request(f"{base_url}/projects/{p_id}/issues/?limit=100", headers=headers)
         try:
             with urllib.request.urlopen(i_req) as i_resp:
                 i_data = json.loads(i_resp.read().decode('utf-8'))
@@ -122,8 +147,8 @@ def fetch_plane_projects_and_issues(headers):
 
     return plane_issues
 
-def update_plane_issue(project_id, issue_id, payload, headers, max_retries=3):
-    url = f"{BASE_URL}/projects/{project_id}/issues/{issue_id}/"
+def update_plane_issue(base_url, project_id, issue_id, payload, headers, max_retries=3):
+    url = f"{base_url}/projects/{project_id}/issues/{issue_id}/"
     data_bytes = json.dumps(payload).encode('utf-8')
 
     for attempt in range(max_retries):
@@ -149,13 +174,32 @@ def main():
     parser = argparse.ArgumentParser(description="Diff-based & Conflict-Safe Plane Bulk Update")
     parser.add_argument("--dry-run", action="store_true", default=False, help="Preview diff without applying")
     parser.add_argument("--force-conflicts", action="store_true", default=False, help="Force overwrite even if Plane has existing conflicting value")
-    parser.add_argument("--fix-plan", default=DEFAULT_FIX_PLAN, help="Path to fix_plan.md")
-    parser.add_argument("--project", help="Filter to specific project (INFRA, AIAUTO, DTWEB, OPS)")
+    parser.add_argument("--fix-plan", help="Path to fix_plan.md (default: <profile tracker_root>/fix_plan.md)")
+    parser.add_argument("--project", help="Filter to a specific project identifier (e.g. INFRA)")
+    parser.add_argument("--workspace", help="Workspace profile name (default: auto-detect from cwd)")
+    parser.add_argument("--workspace-slug", help="Plane workspace slug (default: derived from the first Plane issue URL in fix_plan.md)")
     args = parser.parse_args()
 
-    api_key = get_api_key()
+    profile = get_profile(workspace_name=args.workspace)
+
+    fix_plan_path = args.fix_plan or os.path.join(profile["tracker_root"], "fix_plan.md")
+
+    plane_host = (profile.get("plane_host") or "").rstrip("/")
+    if not plane_host:
+        print(f"Error: profile '{profile.get('workspace_name')}' has no plane_host configured.")
+        sys.exit(1)
+
+    workspace_slug = args.workspace_slug or derive_workspace_slug(fix_plan_path)
+    if not workspace_slug:
+        print(f"Error: workspace slug not given (--workspace-slug) and no Plane issue URL found in {fix_plan_path} to derive it from.")
+        sys.exit(1)
+
+    base_url = f"{plane_host}/api/v1/workspaces/{workspace_slug}"
+
+    token_env = profile.get("plane_token_env") or "PLANE_API_KEY"
+    api_key = get_api_key(token_env)
     if not api_key:
-        print("Error: DGS_PLANE_API_KEY environment variable not found.")
+        print(f"Error: API token ({token_env}) not set in environment.")
         sys.exit(1)
 
     headers = {
@@ -164,11 +208,11 @@ def main():
     }
 
     print("1. Parsing fix_plan.md metadata...")
-    plan_meta = parse_fix_plan(args.fix_plan)
+    plan_meta = parse_fix_plan(fix_plan_path)
     print(f"   -> Found {len(plan_meta)} Plane issue references in fix_plan.md.")
 
-    print("2. Fetching live state from plane.dgs.ai.kr...")
-    plane_issues = fetch_plane_projects_and_issues(headers)
+    print(f"2. Fetching live state from {plane_host} (workspace: {workspace_slug})...")
+    plane_issues = fetch_plane_projects_and_issues(base_url, headers)
     print(f"   -> Fetched {len(plane_issues)} live issues from Plane.")
 
     safe_fills = []
@@ -279,7 +323,7 @@ def main():
     success = 0
     for s in safe_fills:
         try:
-            ok = update_plane_issue(s["project_id"], s["issue_id"], s["patch"], headers)
+            ok = update_plane_issue(base_url, s["project_id"], s["issue_id"], s["patch"], headers)
             if ok:
                 success += 1
                 print(f"  ✔ [{s['key']}] Applied {s['patch']}")

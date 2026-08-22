@@ -3,7 +3,7 @@ set -euo pipefail
 
 # detect-agent-env.sh — Detect which AI agent environment is currently running
 # Usage: bash detect-agent-env.sh
-# Output line 1: "antigravity" | "claude-code" | "cursor" | "unknown"
+# Output line 1: "claude-code" | "antigravity" | "antigravity-agent" | "antigravity-ide" | "cursor" | "vscode" | "unknown"
 # Output lines 2+: routing table (RULES_FILE, SETTINGS_FILE, SHARED_RULES_DIR)
 
 detect_env() {
