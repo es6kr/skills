@@ -2,7 +2,7 @@
 
 The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](./implement.md).
 
-> **`output-dir`**: All research/plan files are written to the configured `output-dir` (resolved via `WSCFG_ARTIFACTS_PATH`, default: `.agents/docs/generated`; authoritative domain knowledge may be promoted to LLM Wiki via `raw-ingest`). Examples below use `{output-dir}` as placeholder.
+> **`output-dir`**: All research/plan files are written to the configured `output-dir` (resolved via `workspace-config.sh --json` (`.roles.artifacts.path`), default: `.agents/docs/generated`; authoritative domain knowledge may be promoted to LLM Wiki via `raw-ingest`). Examples below use `{output-dir}` as placeholder.
 
 0. **Task Checklist Registration (Tool Call #1 MANDATORY HARD STOP)**: The very first tool call upon entering `/code-workflow` MUST be creating or updating `task.md` (or `TodoWrite`) with the 4 workflow steps (Research, Plan, Review, Implement). No research commands (`run_command`), file viewing (`view_file`), or search (`grep_search`) are allowed before `task.md` is initialized.
 1. Check if **research/plan files** already exist in `{output-dir}` for the target task. **If the project-local `{output-dir}` has nothing for the task, also check the workspace-root Ralph directory** (e.g. `<workspace-root>/.ralph/docs/generated/`, one level above any individual project repo) before concluding no governing plan exists — cross-cutting or organization-level plans (e.g. a release-branch-strategy decision spanning multiple repos) are often written there instead of inside a single project's `docs/generated/`

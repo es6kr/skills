@@ -30,7 +30,7 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `output-dir` | Configured `WSCFG_ARTIFACTS_PATH` (default: `.agents/docs/generated`) | Directory for generated research, plan, and walkthrough files; authoritative domain knowledge may be promoted to LLM Wiki via `raw-ingest` |
+| `output-dir` | Configured artifacts path — `workspace-config.sh --json` → `.roles.artifacts.path` (default: `.agents/docs/generated`) | Directory for generated research, plan, and walkthrough files; authoritative domain knowledge may be promoted to LLM Wiki via `raw-ingest` |
 
 Set via project CLAUDE.md, workspace profile config, or skill invocation argument:
 
