@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.2](https://github.com/es6kr/skills/compare/session-v0.8.1...session-v0.8.2) (2026-08-22)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* **session:** cross-reference cleanup model-topic-sessid8 rename format ([3b4fe82](https://github.com/es6kr/skills/commit/3b4fe82979853a5562cf2aae599b5f237fba76fd))
+* **session:** propagate antigravity rewind failure + handle array-content titles ([#361](https://github.com/es6kr/skills/issues/361)) ([c2e9364](https://github.com/es6kr/skills/commit/c2e9364fdf0aa57d597e8d26fe32fa05803ac81f))
+
 ## 0.8.1 (2026-08-20)
 
 
