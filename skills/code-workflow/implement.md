@@ -6,7 +6,7 @@ After plan approval and branch creation (Steps 0-3 in [steps.md](./steps.md)), i
 
 Before the first Edit/Write/commit in Step 4, verify all 4 items:
 
-1. **Plan exists**: a `plan-*.md` artifact is present in the configured `output-dir` (see [SKILL.md](./SKILL.md) Configuration — default `llm-wiki/outputs/`)
+1. **Plan exists**: a `plan-*.md` artifact is present in the configured `output-dir` (see [SKILL.md](./SKILL.md) Configuration — resolved via `workspace-config.sh --json` (`.roles.artifacts.path`), default `.agents/docs/generated` or workspace-configured path)
 2. **Plan posted (when linked to a GitHub issue/PR)**: the plan body has been posted via `github-flow/plan-to-issue` and the comment URL is recorded
 3. **Explicit user approval recorded**: the user verbally, via AskUserQuestion option, or via a signed-off plan acceptance checklist signaled "approve / proceed / implement". A short prompt such as "keep going" / "continue task" / "next" / "go" does **not** satisfy this item alone — these are ambiguous verbs whose intent could be plan-acceptance, implement-entry, PR-creation, or resuming a pending task. An AskUserQuestion enumerating those branches is required first
 4. **Plan acceptance checklist (when present in plan body)**: every `Plan acceptance checklist` / `Step 3 review items` line in the plan body is reviewed with the user
