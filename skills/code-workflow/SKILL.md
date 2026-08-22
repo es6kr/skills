@@ -48,7 +48,9 @@ TDD is the default implementation discipline. When breaking down tasks in `task.
 
 ### Walkthrough Topic-Based Slug Policy (HARD STOP)
 
-When creating or copying `walkthrough.md` artifacts to `llm-wiki/generated/`, **NEVER use generic date filenames (e.g. `walkthrough-2026-07-22.md`)**. Always name the file using a descriptive topic-based slug matching the core feature, issue, or plan (e.g. `llm-wiki/generated/walkthrough-agent-lifecycle-abstraction.md`).
+Write `walkthrough.md` artifacts to the configured `output-dir` (resolved via `WSCFG_ARTIFACTS_PATH`, default `.agents/docs/generated`) — the same destination the Configuration table above already assigns to research and plan files. Do not hardcode a wiki path: a walkthrough is a tool working note, and promoting one to the LLM Wiki goes through `raw-ingest` after the knowledge-sharing ask in [steps.md](./steps.md), never a direct write.
+
+**NEVER use generic date filenames (e.g. `walkthrough-2026-07-22.md`)**. Always name the file using a descriptive topic-based slug matching the core feature, issue, or plan (e.g. `{output-dir}/walkthrough-agent-lifecycle-abstraction.md`).
 
 ### Trade-off Decision Ask (MANDATORY Plan Post-Write HARD STOP)
 
