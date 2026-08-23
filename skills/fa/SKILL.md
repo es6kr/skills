@@ -6,11 +6,10 @@ name: fa
 depends-on:
   - fix
 description: |
-  FA (failed-attempts) lifecycle owner — record a misbehavior and report its escalation stage
-  WITHOUT running fix's full Step 0-4 procedure (no TodoWrite, no 5-Why, no Resume, no wrap-up).
-  Callable directly, no topic needed, the same way /fix is called. Use directly instead of /fix
-  when the mistake is 1st/2nd occurrence or you just want the count + stage logged. /fix remains
-  the only skill that actually edits a rule or hook file.
+  FA (failed-attempts) lifecycle owner — record a misbehavior, evaluate recurrence risk (procedural
+  gap / script defect), and report its escalation stage. Offers an immediate fix ask via
+  AskUserQuestion when deterministic recurrence is high, WITHOUT running fix's full Step 0-4
+  procedure unless escalated.
   retrospect - mistake analysis + record to feedback memory/failed-attempts [retrospect.md],
   fa-prune - deduplicate failed-attempts rules [fa-prune.md].
   Use when "fa", "record this", "log this mistake", "just record it", "fa prune" is mentioned.
@@ -19,7 +18,8 @@ description: |
 # FA: Failed-Attempts Lifecycle Owner
 
 Callable directly — no topic, no sub-argument — the same way `/fix` is called. Records a
-misbehavior and reports its escalation stage; never edits a rule/hook file itself.
+misbehavior, evaluates the recurrence risk of underlying procedural gaps or script defects,
+and reports its escalation stage (or offers an immediate fix ask).
 
 This skill owns the FA record procedure ([retrospect.md](./retrospect.md)) and the FA store
 hygiene procedure ([fa-prune.md](./fa-prune.md)). Other skills (e.g. `cleanup`'s session-end
@@ -60,15 +60,27 @@ configured run would classify one file while recurrence checks and archive moves
 3. **Read back the Nth-count** and look up the escalation stage from
    [`fix/step2-improvement.md`](../fix/step2-improvement.md)'s "4-stage progressive" matrix
    (single source of truth for the matrix itself).
-4. **Report the stage** — plain text only, no Edit performed by this skill:
+4. **Evaluate Recurrence Risk & Defect Nature (Deterministic Flaw Assessment)**:
+   - Analyze whether the identified root cause exhibits:
+     - **Procedural Absence**: Missing validation step, absent verification gate, or lack of standard workflow phase.
+     - **Script / Tool Defect**: Broken fallback logic, silent payload truncation, API contract mismatch, or variable expansion bugs.
+     - **High Recurrence Probability**: Flaws that will deterministically repeat on subsequent identical triggers.
+   - **Immediate Fix Escalation Ask (Optional Fast-Track)**:
+     - When a deterministic procedural absence or script bug is identified (even on 1st/2nd occurrence), do NOT silently bury it as harmless record-only.
+     - Prompt the user via `AskUserQuestion`:
+       - Question: `High recurrence risk detected due to procedural gap or script defect. Would you like to fix this immediately via /fix or keep it as record-only?`
+       - Options:
+         - `(Recommended) Fix immediately: Launch /fix to patch the rule/script/procedure`
+         - `Keep record-only: Proceed without immediate rule/script patch`
+     - If the user selects **Fix immediately**, immediately handover to `/fix` to execute the full root cause correction and resume workflow.
+5. **Report the stage** — when not fast-tracked to immediate fix:
    - **1st-2nd**: "Recorded. No action needed yet (stage: record-only)."
    - **3rd**: "Recorded — 3rd occurrence. 4-filter gate applies; run `/fix` to evaluate + apply
      a rule edit if it passes." If the pattern looks deterministic (4-filter filter #3
      candidate), mark the FA entry `status=hook-pending`; otherwise `status=watch`.
    - **4th+**: "Recorded — 4th+ occurrence. Hook implementation is mandatory per the matrix;
      run `/fix` to author + register it."
-5. **Stop.** This skill never performs `/fix`'s Step 0 TodoWrite, Step 1 5-Why, Step 2
-   Edit/Write on rule/hook files, Step 3 Resume, or Step 4 wrap-up — those stay `/fix`'s job.
+6. **Stop.** This skill never autonomously edits rule/hook files directly without `/fix` handover — rule edits remain `/fix`'s job.
 
    **Scope of "Stop" (HARD STOP — do not over-read it)**: this clause withholds *authority over
    rule/hook/skill files*, not permission to leave a broken artifact broken. When the violation
@@ -96,6 +108,8 @@ Not opt-out.
 - Improvising the write inline instead of following [retrospect.md](./retrospect.md)'s
   procedure (its recurrence labeling, profanity masking, and RAG-store obligations are the
   contract — an inline paraphrase silently drops them)
-- Performing a rule/hook Edit from inside this skill — that is exclusively `/fix`'s job
+- Performing a rule/hook Edit from inside this skill without escalating to `/fix`
+- Blindly treating deterministic script/procedure bugs with 100% recurrence risk as harmless record-only without offering the immediate fix ask
 - Treating a stage-3/4 report as optional to act on — the caller must actually invoke `/fix`
   once this skill reports that threshold, or the recorded pattern silently never escalates
+
