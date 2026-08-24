@@ -64,7 +64,12 @@ def resolve_script_operand(command):
     resolves to `/path/hook.sh`, not to the interpreter.
     """
     try:
-        tokens = shlex.split(command)
+        # posix=False on Windows: POSIX mode treats backslashes as escape
+        # characters and strips them from `C:\Users\...` paths, so every
+        # Windows-style hook path would resolve to a mangled, never-existing
+        # file (classified MISSING). Non-POSIX mode still groups quoted
+        # tokens; surrounding quotes are stripped on return below.
+        tokens = shlex.split(command, posix=(os.name != "nt"))
     except ValueError:
         tokens = command.split()
     for tok in tokens:
