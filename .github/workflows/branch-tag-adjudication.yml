@@ -10,9 +10,10 @@ name: branch-tag-adjudication
 #   earlier PR, possibly not yet cascaded to main).
 # - next-fix: fix commits allowed. chore commits allowed ONLY when the same PR
 #   also contains a fix commit touching the same skill. feat is always REJECTED.
-# - refactor: allowed as a primary tag on BOTH branches. A refactor is a
-#   behaviour-preserving restructure (e.g. a skill rename) that drives no
-#   release bump, so it needs no same-skill feat/fix rider context.
+# - refactor / test: allowed as a primary tag on BOTH branches. A refactor is a
+#   behaviour-preserving restructure (e.g. a skill rename) and a test is a test suite
+#   addition/update that drives no release bump, so it needs no same-skill feat/fix
+#   rider context.
 # - Any commit touching skills/**/*.md with tag chore or docs is REJECTED —
 #   skill md changes must use fix: (or feat: when accompanied by a new topic
 #   file). Skill md = behaviour surface, not documentation.
@@ -189,9 +190,10 @@ jobs:
                   feat)
                     # Always OK — this is the intended tag for this branch.
                     ;;
-                  refactor)
-                    # Behaviour-preserving restructure — allowed as a primary
-                    # tag on both staging branches (drives no release bump).
+                  refactor|test)
+                    # Behaviour-preserving restructure or test suite update —
+                    # allowed as a primary tag on both staging branches (drives no
+                    # release bump).
                     ;;
                   fix|chore)
                     # Allowed when the same PR contains a feat commit for the
@@ -206,7 +208,7 @@ jobs:
                     fi
                     ;;
                   *)
-                    echo "::error::next-feat branch: unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: feat (primary), refactor, fix/chore (as rider when feat present)."
+                    echo "::error::next-feat branch: unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: feat (primary), refactor, test, fix/chore (as rider when feat present)."
                     FAIL=1
                     ;;
                 esac
@@ -216,9 +218,10 @@ jobs:
                   fix)
                     # Always OK.
                     ;;
-                  refactor)
-                    # Behaviour-preserving restructure — allowed as a primary
-                    # tag on both staging branches (drives no release bump).
+                  refactor|test)
+                    # Behaviour-preserving restructure or test suite update —
+                    # allowed as a primary tag on both staging branches (drives no
+                    # release bump).
                     ;;
                   chore)
                     if [ "${PR_SKILL_HAS[${SKILL}__fix]:-0}" != "1" ]; then
@@ -231,7 +234,7 @@ jobs:
                     FAIL=1
                     ;;
                   *)
-                    echo "::error::next-fix branch: unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: fix (primary), refactor, chore (as rider when fix present)."
+                    echo "::error::next-fix branch: unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: fix (primary), refactor, test, chore (as rider when fix present)."
                     FAIL=1
                     ;;
                 esac
@@ -247,7 +250,7 @@ jobs:
           ::error::One or more commits violate the staging-branch tag policy.
           Policy summary: next-feat accepts feat (fix/chore only as same-skill riders);
           next-fix accepts fix (chore only as a same-skill rider; feat never);
-          refactor is accepted as a primary tag on both branches;
+          refactor and test are accepted as primary tags on both branches;
           skill md changes must be tagged fix: or feat: on either branch.
           EOF
             exit 1
