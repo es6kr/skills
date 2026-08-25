@@ -16,6 +16,7 @@ import sys
 import os
 import re
 import json
+import shlex
 import argparse
 import subprocess
 
@@ -25,6 +26,56 @@ if sys.platform == "win32":
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
         pass
+
+INTERPRETERS = {"bash", "sh", "zsh", "node", "python", "python3"}
+
+def iter_hook_commands(hooks_data):
+    """Yield (event, command) for every command in a hooks.json 'hooks' mapping.
+
+    Handles both the flat schema ({event: [cmd | {command: ...}]}) and the
+    installed nested schema ({event: [{matcher, hooks: [{type, command}]}]}) --
+    the shape ~/.claude/settings.json and plugin hooks.json actually use.
+    """
+    for hook_event, entries in (hooks_data.get("hooks", {}) or {}).items():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, str):
+                if entry:
+                    yield hook_event, entry
+            elif isinstance(entry, dict):
+                nested = entry.get("hooks")
+                if isinstance(nested, list):
+                    for item in nested:
+                        if isinstance(item, dict):
+                            cmd = item.get("command", "") or item.get("script", "")
+                            if cmd:
+                                yield hook_event, cmd
+                else:
+                    cmd = entry.get("command", "") or entry.get("script", "")
+                    if cmd:
+                        yield hook_event, cmd
+
+def resolve_script_operand(command):
+    """Return the hook script path from a command string.
+
+    Skips interpreter tokens (bash/node/python3 ...), env-var assignment
+    prefixes (FOO=bar cmd) and option flags, so `python3 /path/hook.sh`
+    resolves to `/path/hook.sh`, not to the interpreter.
+    """
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    for tok in tokens:
+        if not tok or tok.startswith("-"):
+            continue
+        if "=" in tok and not tok.startswith(("/", ".", "~", "$")):
+            continue  # env-var assignment prefix
+        if os.path.basename(tok) in INTERPRETERS:
+            continue
+        return tok.strip('"').strip("'")
+    return ""
 
 def check_hook_integrity(root):
     results = {
@@ -52,45 +103,40 @@ def check_hook_integrity(root):
         results["MISSING"].append({"file": "hooks.json", "reason": f"Failed to parse hooks.json: {e}"})
         return results
 
-    # Scan hooks in config
-    hooks_list = hooks_data.get("hooks", {})
-    for hook_event, command_list in hooks_list.items():
-        for cmd_entry in command_list:
-            script_path = ""
-            if isinstance(cmd_entry, str):
-                script_path = cmd_entry
-            elif isinstance(cmd_entry, dict):
-                script_path = cmd_entry.get("command", "") or cmd_entry.get("script", "")
+    # Scan hooks in config (both flat and nested matcher/hooks[] schemas)
+    for hook_event, command in iter_hook_commands(hooks_data):
+        clean_path = resolve_script_operand(command)
+        if not clean_path:
+            continue
+        if "${" in clean_path or "$(" in clean_path:
+            # Unresolvable substitution (e.g. ${CLAUDE_PLUGIN_ROOT}) without the
+            # runtime env -- cannot be existence-checked here, skip.
+            continue
 
-            if not script_path:
-                continue
+        expanded_path = os.path.expanduser(os.path.expandvars(clean_path))
 
-            # Clean path
-            clean_path = script_path.split()[0].strip('"').strip("'")
-            expanded_path = os.path.expanduser(clean_path)
+        if not os.path.isabs(expanded_path):
+            expanded_path = os.path.join(root, expanded_path)
 
-            if not os.path.isabs(expanded_path):
-                expanded_path = os.path.join(root, expanded_path)
+        # A1 Check: Existence
+        if not os.path.exists(expanded_path):
+            results["MISSING"].append({"file": clean_path, "reason": f"Hook script does not exist for event {hook_event}"})
+            continue
 
-            # A1 Check: Existence
-            if not os.path.exists(expanded_path):
-                results["MISSING"].append({"file": clean_path, "reason": f"Hook script does not exist for event {hook_event}"})
-                continue
+        # Check execution permissions on POSIX
+        if sys.platform != "win32" and not os.access(expanded_path, os.X_OK):
+            results["STALE-PERM"].append({"file": clean_path, "reason": "Executable bit (+x) missing"})
 
-            # Check execution permissions on POSIX
-            if sys.platform != "win32" and not os.access(expanded_path, os.X_OK):
-                results["STALE-PERM"].append({"file": clean_path, "reason": "Executable bit (+x) missing"})
-
-            # A2 & A4 Check: Compiled / Drift checks
-            try:
-                with open(expanded_path, "r", encoding="utf-8", errors="ignore") as sf:
-                    content = sf.read(1024)
-                    if "# Generated:" in content or "AUTOMATICALLY GENERATED" in content:
-                        results["STALE-COMPILED"].append({"file": clean_path, "reason": "Compiled hook — verify trigger definitions before overwrite"})
-                    else:
-                        results["OK"].append({"file": clean_path, "reason": "Valid hook script"})
-            except Exception:
-                results["OK"].append({"file": clean_path, "reason": "Existing hook script"})
+        # A2 & A4 Check: Compiled / Drift checks
+        try:
+            with open(expanded_path, "r", encoding="utf-8", errors="ignore") as sf:
+                content = sf.read(1024)
+                if "# Generated:" in content or "AUTOMATICALLY GENERATED" in content:
+                    results["STALE-COMPILED"].append({"file": clean_path, "reason": "Compiled hook — verify trigger definitions before overwrite"})
+                else:
+                    results["OK"].append({"file": clean_path, "reason": "Valid hook script"})
+        except Exception:
+            results["OK"].append({"file": clean_path, "reason": "Existing hook script"})
 
     return results
 
