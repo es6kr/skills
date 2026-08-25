@@ -12,6 +12,33 @@ Cross-checks commit-hash and file-path references cited inside `fix_plan.md` / `
 
 [sync.md](./sync.md) polls **external GitHub state** (`gh pr view` / `gh issue view`) — it answers "did the PR/issue change state on GitHub." This topic checks **local git-object and filesystem state** — it answers "does the commit this item cites actually exist, and does the file it points at still show the described problem." A tracker item can cite a commit hash that was never actually created (recorded from a plan that was never executed, or lost when a branch was reset), or point at a file that was since deleted/renamed — `sync` cannot detect either, since neither touches GitHub.
 
+## Canonical-source cross-check for referenced plan/research docs (HARD STOP)
+
+Before building a decision (an `AskUserQuestion`, a priority tag, a resume-trigger) from the **content** of a plan/research `.md` file that a tracker item references, cross-check whether that file's own path is a workspace-local artifacts mirror rather than the corpus that actually owns the topic. A file living under a workspace's `artifacts` role (e.g. `.agents/docs/generated/`) can be a stale, superseded fork of a copy maintained in a different workspace's registered `wiki` corpus — trusting the mirror's content without this check reproduces false claims the corpus's canonical copy already corrected.
+
+### Procedure
+
+1. Resolve the current workspace's artifacts path: `bash <hook-kit>/resources/workspace-config.sh --export` → `WSCFG_ARTIFACTS_PATH`. If the referenced doc lives under this path, treat it as a **candidate mirror**, not automatically canonical.
+2. Enumerate **every** registered `wiki` corpus across **all** profiles in `~/.agents/config.json` — not just the current workspace's own (`WSCFG_WIKI_PATH` only covers the resolved profile; a topic can be authored under a *different* profile's corpus):
+   ```bash
+   jq -r '.profiles | to_entries[] | "\(.key): \(.value.roles.wiki.path // "none")"' ~/.agents/config.json
+   ```
+3. `find` the doc's basename inside each corpus path returned above (`raw/articles/`, `outputs/`, etc.):
+   ```bash
+   find <each-wiki-path> -iname "<basename>" 2>/dev/null
+   ```
+4. If a corpus copy exists, diff it against the mirror copy (mtime + line count, at minimum). A **shorter and/or older** copy is the suspect — read the corpus copy instead, and check whether its frontmatter (`research:`, `relates_to:`) or a changelog line ("Updated ...") points at a companion doc that has since split off the topic you're deciding.
+5. A mirror doc's own `research: none` (or any other "nothing more to see" frontmatter field) is **not evidence** the corpus has no deeper analysis — it only reflects what that fork's author knew at save time. The cross-check in steps 2-4 runs regardless of what the local copy's frontmatter claims.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Trust the first copy found inside the workspace's own `artifacts` mirror path as canonical | Resolve `WSCFG_ARTIFACTS_PATH`, then cross-check the doc's basename against every profile's `wiki.path` in `~/.agents/config.json` before trusting its content |
+| 2 | Read a mirror doc's `research: none` frontmatter as proof no deeper analysis exists | That field reflects the fork's save-time state only — search corpora regardless |
+| 3 | Assume a topic's canonical corpus is the *current* workspace's own registered wiki | A topic can be authored under a different profile's corpus (e.g. a workspace-A tracker item referencing content that actually lives in workspace-B's wiki) — enumerate all profiles, not just the active one |
+| 4 | Treat a doc's "Updated ..." changelog note as self-contained once read | If it describes new axes/analysis, search the corpus for a dedicated companion doc it may be pointing at |
+
 ## Procedure
 
 ### 1. Extract reference tokens
