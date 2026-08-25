@@ -37,7 +37,7 @@ UA = "Mozilla/5.0 (plane-backlog)"
 
 INDEX_LINE_RE = re.compile(
     r'^(?P<indent>\s*)-\s+\[(?P<marker>[^\]]*)\]\s+\[(?P<ident>[A-Z]+-\d+)\]\s+(?P<title>.+?)\s+'
-    r'→\s+Plane\s+\((?P<url>https://[^\s)]+)\)(?P<rest>.*)$'
+    r'(?:→|->)\s+Plane\s+\((?P<url>https://[^\s)]+)\)(?P<rest>.*)$'
 )
 
 PLANE_URL_RE = re.compile(

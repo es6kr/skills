@@ -237,7 +237,7 @@ Full conditions:
 Every verifiable specific written into a Summary or Internal Code Review is an audit-trail claim a merge is read against. Confirm each against a primary source before POST — never invent precise-looking detail:
 
 1. **Cited commit SHAs must exist.** For every `commit <sha>` in the body, run `git cat-file -e <sha>^{commit}` (in a checkout of the target repo) or `gh api repos/<owner>/<repo>/commits/<sha>`. Remove or correct any that 404.
-2. **External-reviewer finding counts must reconcile with the source.** A "Copilot: N findings" claim must equal `gh api repos/<owner>/<repo>/pulls/<PR>/comments --jq '[.[] | select(.user.login=="Copilot")] | length'`. Never label an internal-reviewer finding as `copilot`; internal output is sourced `Internal Code Review`.
+2. **External-reviewer finding counts must reconcile with the source.** A "Copilot: N findings" claim must equal `gh api repos/<owner>/<repo>/pulls/<PR>/comments --jq '[.[] | select(.user.login | test("copilot"; "i"))] | length'` (a case-insensitive contains-match is robust across the inline-comment surface login `Copilot` and the review-author `copilot-pull-request-reviewer[bot]`). Never label an internal-reviewer finding as `copilot`; internal output is sourced `Internal Code Review`.
 3. **Line numbers and test counts come from real output, not memory.** If a count is unconfirmable, write a verifiable level ("CI green") instead of a fabricated number.
 
 | # | Don't | Do |
