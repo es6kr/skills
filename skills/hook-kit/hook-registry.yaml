@@ -799,8 +799,6 @@ hooks:
   marketplace: es6kr-skills
   status: active
   implementations:
-  - runtime: sh
-    file: skills/wip/resources/block-wip-register-before-execute.sh
   - runtime: py
     file: skills/wip/resources/block-wip-register-before-execute.py
   registrations:
