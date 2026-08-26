@@ -95,7 +95,7 @@ store_re = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-store$")
 find_re  = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-find$")
 # Vendor script route counts the same as MCP calls (tool-priority rule:
 # skill script -> CLI -> HTTP -> MCP; mirrors edit-guard.sh vendor_pat).
-script_store_re = re.compile(r"qdrant-import\.py")
+script_store_re = re.compile(r"qdrant-(import|store-chunk)\.py")
 script_find_re  = re.compile(r"qdrant-(search|find)\.py")
 audit_re = re.compile(
     os.environ.get("HG_RAG_AUDIT_SIGNAL", r"audit|discovery|decision|deployment|fa-prune|self-improving|retrospect"),

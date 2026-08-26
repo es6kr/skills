@@ -132,10 +132,29 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
         print(f"Error: DB file not found: {db_path}", file=sys.stderr)
         return False
 
+    effective_cutoff = cutoff_step
+    if not preserve_ask and transcript_path and os.path.exists(transcript_path):
+        try:
+            with open(transcript_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    if data.get("step_index", 0) == cutoff_step:
+                        tool_calls = data.get("tool_calls", [])
+                        for tc in tool_calls:
+                            tname = tc.get("name", "") or tc.get("tool_name", "")
+                            if tname in ("ask_question", "AskUserQuestion"):
+                                effective_cutoff = max(0, cutoff_step - 1)
+                                break
+                        break
+        except Exception:
+            pass
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM steps WHERE idx > ?", (cutoff_step,))
+    cursor.execute("SELECT COUNT(*) FROM steps WHERE idx > ?", (effective_cutoff,))
     delete_count = cursor.fetchone()[0]
 
     # Backup DB
@@ -143,7 +162,7 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
     import shutil
     shutil.copy2(db_path, backup_db)
 
-    cursor.execute("DELETE FROM steps WHERE idx > ?", (cutoff_step,))
+    cursor.execute("DELETE FROM steps WHERE idx > ?", (effective_cutoff,))
     conn.commit()
     conn.close()
 
@@ -158,14 +177,14 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
                     if not line.strip():
                         continue
                     data = json.loads(line)
-                    if data.get("step_index", 0) <= cutoff_step:
+                    if data.get("step_index", 0) <= effective_cutoff:
                         new_lines.append(line.strip())
 
             tf_path = os.path.join(os.path.dirname(transcript_path), "transcript_full.jsonl")
             if os.path.exists(tf_path):
                 shutil.copy2(tf_path, tf_path + ".bak")
                 tf_lines = [l.strip() for l in open(tf_path, encoding="utf-8") if l.strip()]
-                valid_tf = [l for l in tf_lines if json.loads(l).get("step_index", 0) <= cutoff_step]
+                valid_tf = [l for l in tf_lines if json.loads(l).get("step_index", 0) <= effective_cutoff]
                 with open(tf_path + ".tmp", "w", encoding="utf-8") as f_tf:
                     f_tf.write("\n".join(valid_tf) + "\n")
                 os.replace(tf_path + ".tmp", tf_path)
@@ -173,7 +192,7 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
             with open(tmp_t, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(new_lines) + '\n')
             os.replace(tmp_t, transcript_path)
-            print(f"Successfully truncated transcript {transcript_path} and transcript_full.jsonl to step <= {cutoff_step}")
+            print(f"Successfully truncated transcript {transcript_path} and transcript_full.jsonl to step <= {effective_cutoff}")
         except Exception as e:
             print(f"Warning: Failed to truncate transcripts: {e}", file=sys.stderr)
 
