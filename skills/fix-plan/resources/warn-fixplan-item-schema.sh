@@ -13,9 +13,15 @@
 #   bloat hook -> COMPLETED "- [x]" items only
 #   The two never fire on the same item, so no duplicate advisory.
 #
-# Only the EDITED TEXT is inspected (Edit.new_string / Write.content), not the
-# whole file. Pre-existing items that already violate the schema stay silent —
-# the advisory targets what the session just wrote.
+# WHICH items are inspected comes from the EDITED TEXT (Edit.new_string /
+# Write.content): pre-existing items the session did not touch stay silent.
+# WHETHER an item satisfies the schema is judged against the FILE ON DISK. This
+# hook is PostToolUse, so the edit is already applied and the file holds the
+# item's full body — including the sub-bullets that fall outside a narrow edit
+# window. Judging from the edit window alone reports Why/How as missing whenever
+# the session edits only an item's header line, which is the common case when
+# rewording or re-prioritising an existing item. The file is consulted only for
+# headers the edit itself introduced, so the targeting is unchanged.
 #
 # Channel: PostToolUse stderr + exit 2 is LLM-exposed. ADVISORY only — the edit
 # has already been applied; exit 2 surfaces the message so the assistant can
@@ -49,58 +55,91 @@ NEW=$(printf '%s' "$INPUT" | jq -r '
 
 # Anchor/context text carried THROUGH the edit (Edit -> old_string, MultiEdit ->
 # all old_strings; Write has none). An item header that appears here too is a
-# pre-existing anchor whose body may lie OUTSIDE the edit window: inserting a new
-# item BEFORE an existing one leaves that existing item's header as the trailing
-# line of new_string while its Why/How stay below the cut. Flagging it would
-# misfire (the exact false-positive this exemption removes). The advisory targets
-# only items the session actually authored in this edit.
+# pre-existing anchor the session merely wrote around, not an item it authored.
 OLD=$(printf '%s' "$INPUT" | jq -r '
   .tool_input.old_string //
   ([.tool_input.edits[]?.old_string] | join("\n")) //
   empty
 ' 2>/dev/null)
 
-# A top-level item starts at column 0 with "- [". Its span runs until the next
-# top-level "- [" line, a "#"-header line, or EOF. OLD is fed before a separator
-# so awk can collect anchor headers, then the NEW section is inspected.
-FINDINGS=$(printf '%s\n===HOOK_OLD_NEW_SEP===\n%s' "$OLD" "$NEW" | awk -v budget="$BUDGET" -v maxrep="$MAX_REPORT" '
+# Pass 1 — which item headers did this edit introduce? Top-level "- [" lines in
+# the edited text, minus completed items (the bloat hook owns those), minus
+# BLOCKED items (their schema is a "**trigger: ...**" line, not Action/Why/How),
+# minus anchors carried over from old_string.
+CANDIDATES=$(printf '%s\n===HOOK_OLD_NEW_SEP===\n%s' "$OLD" "$NEW" | awk '
   BEGIN { reading_old = 1 }
   reading_old && /^===HOOK_OLD_NEW_SEP===$/ { reading_old = 0; next }
   reading_old { if ($0 ~ /^- \[/) oldhead[$0] = 1; next }
-  function flush(endnr,   span, probs) {
-    # Exempt completed [x] items (bloat hook owns those), [BLOCKED] items, and
-    # anchor items carried from old_string (is_anchor) whose body may be cut off
-    # by the edit boundary. A BLOCKED item is an external-wait entry whose schema
-    # is a trigger line ("**trigger: <condition>**"), not the Action/Why/How of
-    # an act-now item — the whole Hold section uses that form, so requiring
-    # Why/How here misfires.
-    if (!in_item || is_done || is_blocked || is_anchor) { in_item = 0; return }
-    span = endnr - start + 1
-    probs = ""
-    if (!has_why) probs = probs "Why "
-    if (!has_how) probs = probs "How-to-apply "
-    if (span > budget) probs = probs "over-budget(" span " > " budget " lines) "
-    if (probs != "" && n < maxrep) {
-      n++
-      printf "  %s\n      missing/over: %s\n", substr(head, 1, 72), probs
+  /^- \[/ {
+    if ($0 ~ /^- \[x\]/) next
+    if ($0 ~ /\[BLOCKED/) next
+    if ($0 in oldhead) next
+    if (!($0 in seen)) { seen[$0] = 1; print }
+  }
+')
+[ -z "$CANDIDATES" ] && exit 0
+
+FILE_TEXT=""
+[ -r "$FP" ] && FILE_TEXT=$(cat "$FP")
+
+# Pass 2 — judge each candidate. The file section is authoritative; the edited
+# text is the fallback for a header the file no longer holds (unreadable path, or
+# a later write moved it), which keeps the pre-file behaviour as the floor.
+#
+# An item's span runs from its header to its last non-blank line: the blank line
+# separating two items is layout, not body, and counting it would push a
+# budget-sized item over the limit purely because the file has a neighbour.
+FINDINGS=$(printf '%s\n===HOOK_SEC_FILE===\n%s\n===HOOK_SEC_NEW===\n%s' \
+  "$CANDIDATES" "$FILE_TEXT" "$NEW" | awk -v budget="$BUDGET" -v maxrep="$MAX_REPORT" '
+  function flush(   span) {
+    if (!in_item) return
+    span = last_nonblank - start + 1
+    if (span < 1) span = 1
+    if (head in candseen) {
+      if (scope == "f") {
+        f_seen[head] = 1; f_why[head] = has_why; f_how[head] = has_how; f_span[head] = span
+      } else {
+        n_seen[head] = 1; n_why[head] = has_why; n_how[head] = has_how; n_span[head] = span
+      }
     }
     in_item = 0
   }
+  BEGIN { sec = 1 }
+  sec == 1 && /^===HOOK_SEC_FILE===$/ { sec = 2; scope = "f"; next }
+  sec == 2 && /^===HOOK_SEC_NEW===$/  { flush(); sec = 3; scope = "n"; next }
+  sec == 1 {
+    if ($0 ~ /^- \[/ && !($0 in candseen)) { candseen[$0] = 1; ncand++; cand[ncand] = $0 }
+    next
+  }
   /^- \[/ {
-    flush(NR - 1)
-    start = NR; head = $0; in_item = 1
-    is_done = ($0 ~ /^- \[x\]/)
-    is_blocked = ($0 ~ /\[BLOCKED/)
-    is_anchor = ($0 in oldhead)
+    flush()
+    start = NR; head = $0; in_item = 1; last_nonblank = NR
     has_why = 0; has_how = 0
     next
   }
-  /^#/ { flush(NR - 1); next }
+  /^#/ { flush(); next }
   in_item {
     if ($0 ~ /\*\*Why\*\*/)          has_why = 1
     if ($0 ~ /\*\*How to apply\*\*/) has_how = 1
+    if ($0 ~ /[^ \t]/)               last_nonblank = NR
   }
-  END { flush(NR) }
+  END {
+    flush()
+    for (i = 1; i <= ncand; i++) {
+      h = cand[i]
+      if (h in f_seen)      { why = f_why[h]; how = f_how[h]; sp = f_span[h] }
+      else if (h in n_seen) { why = n_why[h]; how = n_how[h]; sp = n_span[h] }
+      else continue
+      probs = ""
+      if (!why) probs = probs "Why "
+      if (!how) probs = probs "How-to-apply "
+      if (sp > budget) probs = probs "over-budget(" sp " > " budget " lines) "
+      if (probs != "" && reported < maxrep) {
+        reported++
+        printf "  %s\n      missing/over: %s\n", substr(h, 1, 72), probs
+      }
+    }
+  }
 ')
 
 [ -z "$FINDINGS" ] && exit 0
