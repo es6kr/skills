@@ -158,7 +158,7 @@ This fast path is scoped narrowly to the **count == 1** case. With 2+ remaining 
 | 3 | Bundle tasks under one ask via `multiSelect` | Each question independently decides the direction of its task |
 | 4 | Mark the first item `in_progress` without the direction ask | Step 3 may only be entered after Step 2 is complete |
 | 5 | Offer only "Hold (keep as task)" for external-wait items (user manual action / merge instruction / reply pending) | Include **Defer to checklist** in the option set — external-wait items belong in the checklist medium per "Medium separation principle" below. Hold keeps them polluting the task list across sessions |
-| 6 | Reference a PR/issue by bare `#N` in the question text or an option's description | Every distinct PR/issue number needs its own clickable full URL (`https://github.com/<owner>/<repo>/pull/<N>`) somewhere in that same ask — this rule is not scoped to any one skill's option-composition path, it applies wherever a PR/issue surfaces in a decision UI. Enforced by `block-pr-url-gate.sh` (PreToolUse:AskUserQuestion) |
+| 6 | Reference a PR/issue by bare `#N` in the question text or an option's description | Every distinct PR/issue number needs its own clickable full URL (`https://github.com/<owner>/<repo>/pull/<N>` for PRs or `https://github.com/<owner>/<repo>/issues/<N>` for issues) somewhere in that same ask — this rule is not scoped to any one skill's option-composition path, it applies wherever a PR/issue surfaces in a decision UI. `block-pr-url-gate.sh` was written to enforce this but is **not registered in any hook config**, so treat it as unenforced — the discipline is yours alone |
 | 7 | Ask direction for a single remaining item whose state is already known and whose direction is not actually in question | Apply the "Single unambiguous item — skip the ask" fast path above: state the inferred direction in one line and proceed to Step 3 directly |
 
 ### Per-environment ask method
@@ -231,7 +231,7 @@ The ask-medium ceiling (Claude `questions` max 4, Antigravity `ask.md` visibilit
 | 2 | Double-register BLOCKED items under the rationale "having it in the task list helps me not forget" | The checklist is reloaded every session, so it won't be forgotten. Duplicating the medium increases sync overhead |
 | 3 | Use `[BLOCKED]` as a task subject prefix | Use the checklist's `## Hold` section: `- [ ] [BLOCKED] <subject> (trigger: ...)` |
 | 4 | Report "BLOCKED still BLOCKED" on every `/wip` for external-wait tasks | If it is not in the task list, it is not a reporting target. When the response arrives, promote it from the checklist to a task |
-| 5 | Write a task subject like "Consolidate PR #184..." with the repo/URL only in the description | `TaskList` displays subject only, never description. A PR/issue reference in the subject needs its own repo qualifier (e.g. "owner/repo PR #N: ...") in the subject itself. Enforced by `block-pr-url-gate.sh` (PreToolUse:TaskCreate) |
+| 5 | Write a task subject like "Consolidate PR #184..." with the repo/URL only in the description | `TaskList` displays subject only, never description. A PR/issue reference in the subject needs its own repo qualifier (e.g. "owner/repo PR #N: ...") in the subject itself. `block-pr-url-gate.sh` was written to enforce this but is **not registered in any hook config** — unenforced, so apply it yourself |
 
 ### Exception — Ralph-autonomous-loop-owned checklist files (large backlog)
 

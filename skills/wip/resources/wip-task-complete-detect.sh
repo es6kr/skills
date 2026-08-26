@@ -4,9 +4,11 @@
 
 USER_MSG="${CLAUDE_USER_PROMPT:-}"
 
-# Locale detection patterns live in git-ignored data/ (Korean + English). The hook
-# carries an English-only fallback so the PUBLIC copy works without the data file.
-HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
+# Locale detection patterns live in git-ignored hook-kit/data/ (Korean + English).
+# The hook carries an English-only fallback so the PUBLIC copy works without the
+# data file. The path stays hook-kit-relative because the regex data did not move
+# when this guard was relocated into the wip skill.
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
 [ -f "$HG_DATA_FILE" ] && . "$HG_DATA_FILE"
 WIP_COMPLETE_KEYWORDS="${WIP_COMPLETE_KEYWORDS:-finished|completed|done in another session|handled it|already (did|handled)}"
 WIP_TASKREF_PATTERN="${WIP_TASKREF_PATTERN:-(#[0-9]+|task [0-9]+)}"

@@ -116,6 +116,65 @@ class TestEndToEndMove(unittest.TestCase):
         self.assertIn("approval report drafted", output)
         self.assertIn("recurrence check done", output)
 
+    def test_completed_section_non_list_lines_survive(self):
+        """A ## Completed line that is not a list item must survive the rebuild.
+
+        The section is regenerated from the collected entries, and only list
+        items become entries — so an HTML comment recording where deleted
+        bodies went had nothing carrying it across and vanished on every run,
+        stranding the records it pointed to.
+        """
+        marker = "<!-- provenance: bodies moved to the knowledge store -->"
+        content = (
+            "# Fix Plan\n\n"
+            "## Progress\n\n"
+            "- [x] 2026-07-07 — domain review\n\n"
+            "## Completed\n\n"
+            f"{marker}\n"
+            "- 2026-07-01 — earlier thing\n\n"
+            "## REPEAT\n"
+        )
+        self._write(content)
+
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "cleanup.py"),
+             "--file", self.fix_plan, "--cutoff", "2020-01-01"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        output = self._read()
+        self.assertIn(marker, output)
+        # the entries around it still move / stay as before
+        self.assertIn("domain review", output)
+        self.assertIn("earlier thing", output)
+
+    def test_trailing_newline_preserved(self):
+        """Rewriting must not strip the file's final newline.
+
+        The output is assembled with a join, which has no terminator after the
+        last line; writing that back drops the newline the source had and every
+        subsequent diff reports the last line as modified.
+        """
+        content = (
+            "# Fix Plan\n\n"
+            "## Progress\n\n"
+            "- [x] 2026-07-07 — domain review\n\n"
+            "## Completed\n\n"
+            "## REPEAT\n"
+        )
+        self._write(content)
+
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_DIR / "cleanup.py"),
+             "--file", self.fix_plan, "--cutoff", "2020-01-01"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self._read().endswith("\n"))
+
 
 class TestAutoDetectTrackerRoot(unittest.TestCase):
     """Issue #262: auto-detect must resolve .agents/fix_plan.md, not just

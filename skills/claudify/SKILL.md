@@ -185,7 +185,7 @@ Skill tool: skill: "project-automation:skill-writer"
    1. Manual sync to cache, OR
    2. New session to reload
 
-**Auto-sync hook**: `plugin-cache-sync.sh` syncs marketplace to cache on Edit/Write
+**No auto-sync hook currently exists** — verified 2026-08-18: no `plugin-cache-sync.sh` is registered in `settings.json`/`settings.local.json`, and no live copy of the script exists outside a Syncthing version-history backup. A marketplace checkout's `installPath` in `~/.claude/plugins/installed_plugins.json` can point at a cache directory that either does not exist on disk (harness apparently falls back to reading the marketplace source directly in that case) or exists but has drifted stale relative to the marketplace checkout — see `hook-kit/audit.md` Step 3-D for the detection procedure. Until that gap is closed, manually verify (`diff` the marketplace source against the cache `installPath`) after editing any plugin's hook scripts, rather than assuming this auto-sync exists.
 
 ## Output Guidelines
 

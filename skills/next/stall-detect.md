@@ -46,7 +46,7 @@ The fix skill will:
 ### Example 1: Deploy without sync
 
 ```
-Completed: clawhub publish claude-session v0.1.2
+Completed: clawhub publish session v0.1.2
 Stall: sync.sh not run, es6kr/skills repo not updated
 → Skill("fix", "stall detected: ClawHub publish completed but es6kr/skills sync not executed")
 ```

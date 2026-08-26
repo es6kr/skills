@@ -37,6 +37,23 @@ Immediately after the Status line output, **ask the user for the PR handling dir
 4. Is the merge question leading (Q1)? → If findings exist, invert: finding-handling leads
 5. Is this a post-hoc review PR? → finding options must NOT include "defer all" (deferring contradicts the PR's purpose). Offer scope choices only (which findings), applied immediately
 
+### Refresh the Summary before the merge ask when findings were fixed this session (HARD STOP)
+
+**When the finding-handling answer applies fixes this session (a fix commit lands + CI re-passes), the AI Review Summary posted at Step 7 is now stale — it still lists the fixed findings as open/Valid.** Before composing the merge ask, **PATCH the existing Summary comment to reflect resolution** (each fixed finding marked Resolved with the fixing commit SHA), per `post.md` "Single Summary preservation guard" PATCH procedure. A merge recommendation sitting on a Summary that still shows the findings as open is self-contradictory: the reader sees unresolved findings while the option says merge, and the merge-attestation URL points at a pre-fix record.
+
+This closes the gap between the finding-first fix and the merge decision: "fix → reflected in branch" (Finding-first ordering above) is not complete until the review record the merge attestation points at also reflects the fix.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Apply the fix, reply only in the bot's inline thread, then compose the merge ask with the Step-7 Summary untouched | PATCH the Summary comment to mark the applied findings Resolved (+ fixing SHA) BEFORE the merge ask. An inline-thread reply is not a substitute — the Summary is the consolidated review record |
+| 2 | Treat "the fix is documented somewhere on the PR (commit / thread reply)" as "the review record reflects resolution" | The AI Review Summary is the canonical record the merge attestation URL points at. It must state the current finding state, not the pre-fix state |
+| 3 | PATCH the Summary only after merging | Refresh precedes the merge ask — the user decides merge against the current review state, not a stale one |
+
+**Self-check (after a finding-handling answer that applied fixes, before the merge ask)**:
+1. Did this session land a fix commit for 1+ findings the Summary lists as open?
+2. If yes, did I PATCH the Summary (per `post.md` procedure) to mark those findings Resolved (+ SHA) BEFORE composing the merge ask?
+3. Does the merge option's Summary-URL attestation point at a Summary that now reflects the applied fixes (not the pre-fix state)?
+
 ### Routing: next vs wip
 
 | Situation | Skill to use | Reason |

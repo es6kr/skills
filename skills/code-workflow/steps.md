@@ -57,6 +57,18 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 
 **Prohibited**: Deciding the next action by only looking at task checklist items without reading the research/plan files. A task list is a summary; the plan file contains detailed sequences and constraints.
 
+## Milestone Checklist Sync Discipline (HARD STOP)
+ 
+When executing multi-phase workflows (`/code-workflow`, `/fix-plan add --deep`), 3 checklist surfaces exist:
+1. `task.md` (active in-session real-time tracker in `brain/<conversation-id>/task.md`): Used by IDE/CLI to show real-time progress steps.
+2. `plan-*.md` (the permanent plan artifact's Layered Roadmap / Progress Checklist): Section 3 of the plan document.
+3. `fix_plan.md` / `checklist.md` (the workspace global backlog under `.agents/fix_plan.md`): Global task tracker.
+ 
+**Compromise Rule (Milestone-Boundary Sync)**:
+- **Micro-steps**: Sub-step execution (tool calls, individual file edits) is tracked solely in `task.md` to prevent tool call churn and token budget waste.
+- **Phase & Milestone Boundaries**: At major boundaries (Phase 2 Plan authoring complete, Phase 3 User Review approved, Phase 4 TDD implementation complete, Phase 5 verification complete), the agent MUST synchronize the progress across `plan-*.md` (marking completed phases/items as `[x]`) and `fix_plan.md` (updating task status and audit/completion metadata).
+- **Phase-Completion Mandatory Commit Gate (HARD STOP)**: At the completion of each implementation Phase (e.g. Phase 1-B) or independent logical unit, the agent MUST review modified files, analyze commit split discipline via `commit-tidy`, and execute the Pre-Commit Verification Ask (`AskUserQuestion`) to secure user approval and commit changes before moving to the next Phase or suggesting `/next`.
+- **Session Wrap-up (`/cleanup`)**: Final reconciliation ensures all 3 surfaces are 100% consistent.
 **Examples**:
 - Even if `[ ] PR #278 merge` is in the task list, if the plan states "Phase 1 Unit Test → Phase 2 Proxy Test → ... → PR merge", start from Phase 1
 - Simple items with no plan file can be proceeded immediately
@@ -71,6 +83,7 @@ Read and understand the relevant code **deeply**, then write findings to `{outpu
 - **Mandatory Corpus & RAG Pre-Lookup (HARD STOP)**: Before writing the research document, check existing project knowledge stores and memory backends (LLM Wiki, Qdrant vector memory, Serena RAG, KI summaries) to prevent duplicate analysis and ground findings in established patterns.
   - **Grounded command (optional, abstract contract — same shape as "Research artifact dispatch" below)**: when the caller supplies `--pre-lookup=<skill>:<topic>`, invoke that skill's topic with the task subject before writing, and embed its output as a `## Prior Knowledge & Context` section at the top of `research-*.md` — the embedded section is the auditable evidence that the pre-lookup actually ran. This generic skill does not name a vendor; the caller wires `<skill>:<topic>` to whichever project skill owns pre-lookup (e.g., a backlog-lifecycle skill's own pre-lookup topic).
   - When no `--pre-lookup` flag is supplied — or the specified receiver is unavailable in the caller's environment — the mandate still applies via direct store queries (RAG semantic find / wiki `index.md` read); fail-non-blocking (warning + continue), same policy as "Research artifact dispatch" below.
+  - **Available-skills domain scan**: also grep the current session's available-skills list for the task's domain keywords (e.g., a task touching hook registration/monitoring should check for skills whose description mentions "trigger", "hook auto-register", etc.), not just recalled-from-memory candidates — a skill that already manages this domain may exist under a name that doesn't obviously match the task.
 - Do not skim a file and move on at the signature level
 - Understand existing layers, ORM relationships, and duplicate API presence
 - **Mandatory exploration of existing test files**: Find related `*.test.*`, `*.spec.*` files and understand what cases are already covered
@@ -274,6 +287,9 @@ After writing or updating `plan-*.md`, **AI must actively scan the plan for unde
 | 4 | Single question with 5+ mixed-axis options | Split into multiple questions (max 4) using `questions` array. Each question = one decision axis |
 | 5 | Ask "Plan OK? proceed?" without enumerating undecided items | Enumerate each undecided item as its own question option |
 | 6 | Use "save plan as file vs print in chat" as one of the options | Forbidden by the always-on rule "target-unspecified document artifacts = file save default". Medium is decided by default rule |
+| 7 | Call this skill's `steps` topic **and** `vibe-coding`'s `plan-guard` on the same plan edit because both PostToolUse triggers fired | The two triggers are redundant on this axis — both demand the same undecided-item scan. **Satisfying either satisfies the axis**; invoking both doubles the skill load per document edit for no extra check. Honour one and state which |
+
+**Redundant-trigger note**: editing a `plan-*.md` / `research-*.md` fires two PostToolUse skill-triggers at once — `code-workflow` (pointing here) and `vibe-coding` (pointing at `plan-guard`). Their undecided-item obligations overlap almost entirely: scan the plan body for unresolved markers, convert each into an `AskUserQuestion` axis, write the answers back. Treat them as one obligation with two entry points. Consolidating the triggers themselves is separate work; until then, honouring one and naming it is correct behaviour, not a skipped step.
 
 #### Self-check (every time after writing/updating plan file)
 

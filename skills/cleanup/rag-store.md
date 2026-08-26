@@ -154,7 +154,11 @@ A generic `mcp__<vendor>__*-store` MCP call (medium 1) writes one arbitrary text
 ### Procedure
 
 1. **Bulk-sync Completed section (script)**: run vendor-provided fix_plan → RAG sync script
-2. After sync success, delete `## Completed` body (keep empty header)
+1.5. **Plane-completion-first gate (HARD STOP — before any deletion)**: this is the *deletion* direction of the same canonical-medium principle that already gates the completion-flip direction (`cleanup/run.md` Step 0 "Plane-indexed item completion order") and the creation direction (`fix-plan/add.md` "Canonical medium gate"). If this workspace has adopted Plane as canonical for the item being deleted (its `fix_plan.md` line carries a `→ Plane (<url>)` index suffix, or the item's project matches a `workspace_profile.py --json` non-empty `plane_host`), do NOT delete the local body yet:
+   - The local `## Completed` text is the only trace that work happened — RAG-syncing it (step 1) preserves it for *search*, but does not make it *canonical-record complete*. Deleting it before Plane reflects completion leaves the canonical backlog silently behind the actual state, with no local record left to reconcile from.
+   - Verify each Plane-indexed item's issue state: already complete → proceed to step 2 for that item. Not yet complete / no Plane issue exists at all → complete it (or register via intake if none exists) **before** deleting that item's local text.
+   - Items with no Plane linkage (this workspace/project doesn't use Plane, or the item was never indexed) skip this gate — proceed directly to step 2.
+2. After sync success (and, for any Plane-indexed items, after the 1.5 gate clears), delete `## Completed` body (keep empty header)
 3. **Other-section body compression (manual RAG store)**: if compression would lose body content, call `mcp__<vendor>__*-store` first. Include 4-6 metadata keys: `{type: troubleshooting|decision|infra-finding, project: <repo/domain>, date: YYYY-MM-DD, category: <area>, source: fix_plan-L<line-num>, status: archived}`. Only after store success, run Edit to compress
 
 ### Don't / Do
@@ -168,12 +172,14 @@ A generic `mcp__<vendor>__*-store` MCP call (medium 1) writes one arbitrary text
 | 14 | Report "RAG obligation done" after 1 script sync then compress other-section `[x]` items | Script parses **Completed section only**. Other-section `[x]` handling + body-loss cases require separate manual RAG store. Report both "script: N + manual: M" counts |
 | 15 | "If user concludes 'no further action needed', the body can be cleaned up too" reasoning | Conclusion and body preservation are separate. User conclusion = **state decision**; body = **troubleshooting steps / primary source / commit history** with future value. Conclusion = `[x]` processing; body = RAG store then compress |
 | 16 | Treat oversized `[x]` items as safe to ignore because they're "not in `## Completed`" | The sync script's Completed-only scope is a tooling gap, not a signal that inline `[x]` bloat is fine. At wrap-up, also scan top-level `- [x]` items outside `## Completed` for size — condense the same way |
+| 17 | Delete a synced `## Completed` body without checking whether any item is Plane-indexed | RAG sync (step 1) is a search-index write, not a canonical-record write. A Plane-indexed item still needs its Plane issue completed (or intake-registered if missing) before its local text — the only remaining trace of the work — is deleted (step 1.5) |
 
 ### Self-Check (every session start / end + every time before fix_plan Edit)
 
 1. Does `fix_plan.md` contain `- [x]` items? — if yes, run sync script
 2. If yes, was the sync executed?
 3. After sync success, were the items removed from `fix_plan.md`?
+3.5. **Before deleting, does any item about to be removed carry a `→ Plane (<url>)` suffix (or match a `plane_host`-configured project)?** — if yes, verify/complete that Plane issue (or register via intake) first; only delete once the 1.5 gate clears for that item
 4. **Are you about to Edit fix_plan to compress/merge/remove items?** — if yes, run self-checks 5-7
 5. Does the body to be compressed contain sub-bullets (options / verification medium / primary source / user-decision commit SHA / hold work / related plan refs) that would be lost?
 6. If yes, did you call `mcp__<vendor>__*-store` **before** the Edit? Include source location (fix_plan-L<num>) + type/project/date/category metadata?

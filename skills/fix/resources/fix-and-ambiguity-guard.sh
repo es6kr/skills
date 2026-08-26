@@ -10,9 +10,11 @@ PROMPT="$(echo "$INPUT" | python3 -c "import sys, json; d = json.load(sys.stdin)
 
 [[ -z "$PROMPT" ]] && exit 0
 
-# Locale detection patterns live in git-ignored data/ (Korean + English). The hook
-# carries English-only fallbacks so the PUBLIC copy works without the data file.
-HG_DATA_FILE="$(dirname "$0")/../data/hangul-patterns.regex"
+# Locale detection patterns live in git-ignored hook-kit/data/ (Korean + English).
+# The hook carries English-only fallbacks so the PUBLIC copy works without the data
+# file. The path stays hook-kit-relative because the regex data did not move when
+# this guard was relocated into the fix skill.
+HG_DATA_FILE="$(dirname "$0")/../../hook-kit/data/hangul-patterns.regex"
 [ -f "$HG_DATA_FILE" ] && . "$HG_DATA_FILE"
 FIX_AMBIGUITY_OPTION_VERB="${FIX_AMBIGUITY_OPTION_VERB:-(handle|process|deal[[:space:]]with|block|hold|defer|address)[[:space:]]+([0-9]+,[0-9]+(,[0-9]+)*|option[[:space:]]*[0-9]+|item[[:space:]]*[0-9]+)}"
 FIX_CLAIM_PHRASING="${FIX_CLAIM_PHRASING:-(did[[:space:]]?n.?t|does[[:space:]]?n.?t|not)[[:space:]]+work|is[[:space:]]?n.?t[[:space:]]+working|why[[:space:]]+(not|again|keep|do you|did)}"

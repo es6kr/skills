@@ -82,16 +82,6 @@
         }
       ]
     },
-    "skills/claude-session": {
-      "package-name": "claude-session",
-      "component": "claude-session",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "SKILL.md"
-        }
-      ]
-    },
     "skills/claudify": {
       "package-name": "claudify",
       "component": "claudify",
@@ -235,6 +225,16 @@
     "skills/repo": {
       "package-name": "repo",
       "component": "repo",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
+    "skills/session": {
+      "package-name": "session",
+      "component": "session",
       "extra-files": [
         {
           "type": "generic",

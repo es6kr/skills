@@ -36,6 +36,19 @@ Analyze the conversation content and generate 2–4 name candidates.
 - **Language**: English preferred; technical terms in English
 - **Avoid**: dates, unnecessary words like "session"/"task", **compound multi-clause names, and `+`-chained enumerations of several tasks**
 
+#### Wrap-up / findability variant (cleanup format)
+
+The bare single-slug rule above is the **default** — optimized for the `agent-name` addressing use case. It is not the only valid format: `cleanup/run.md`'s Session Identity Rule defines an **intentional extension**, `<model>-<topic>-<sessid8>`, for end-of-session findability + greppability (model family token + dominant-topic slug + the session UUID's leading 8 hex). Switch to that extended format instead of the bare slug when either applies:
+
+- the user explicitly asks to match cleanup's rename format ("match cleanup's format", "findable name", etc.), or
+- this suggestion is being composed as part of (or immediately adjacent to) a session wrap-up / `/cleanup` report
+
+Otherwise, default to the bare single-slug rule above.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 4 | Default to the bare single-slug format when the user explicitly asked for the cleanup-style / findable name | Switch to `<model>-<topic>-<sessid8>` — see `cleanup/run.md` "Session Identity Rule" for the exact token derivation |
+
 ### 2. Apply the Name
 
 **Current session** → Output as copyable list only (NO AskUserQuestion):

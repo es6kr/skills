@@ -29,7 +29,7 @@ class Node:
         self.children = []
 
 def parse_line(line):
-    m = re.match(r"^(\s*)(-\s*|[*]\s*|[+]\s*|\d+\.\s+)(.*)$", line)
+    m = re.match(r"^(\s*)(-\s+|[*]\s+|[+]\s+|\d+\.\s+)(.*)$", line)
     if m:
         indent = len(m.group(1))
         marker = m.group(2)
@@ -70,6 +70,12 @@ def build_tree(lines_list):
             forest.append(node)
         stack.append(node)
     return forest
+
+# A section-level line is one that starts at column 0. Anything matching this is
+# an entry the tree walk owns; anything else at column 0 (HTML comment, prose)
+# belongs to the section itself and has no node to carry it through a rebuild.
+LIST_ITEM_RE = re.compile(r"^(?:[-*+]\s|\d+\.\s)")
+
 
 def all_descendants_checked(n):
     for c in n.children:
@@ -244,6 +250,7 @@ def main():
         sections.append((current_sec_header, current_sec_lines))
 
     completed_entries = []
+    completed_preamble = []
     new_sections = []
 
     for header, sec_lines in sections:
@@ -252,6 +259,16 @@ def main():
             continue
         
         if "## Completed" in header:
+            # The section is regenerated wholesale from the entries collected
+            # below, and only list items become entries. A section-level line
+            # that is not a list item therefore has nothing carrying it across
+            # the rebuild and disappears on every run. Provenance comments —
+            # "these bodies were moved to <store>, search there" — live exactly
+            # at this level, and losing one strands the records it points to.
+            completed_preamble.extend(
+                ln for ln in sec_lines
+                if ln.strip() and not ln[:1].isspace() and not LIST_ITEM_RE.match(ln)
+            )
             forest = build_tree(sec_lines)
             for node in forest:
                 if node.is_list_item and node.checked is True:
@@ -347,6 +364,9 @@ def main():
 
     # Generate new ## Completed lines
     completed_lines = [""]
+    if completed_preamble:
+        completed_lines.extend(completed_preamble)
+        completed_lines.append("")
     for entry in stay_completed:
         completed_lines.extend(node_to_completed_block(entry["node"], strip_checkbox=True))
         completed_lines.append("") # blank line between items
@@ -372,7 +392,14 @@ def main():
         output_lines.extend(sec_lines)
 
     output_content = "\n".join(output_lines)
-    
+
+    # join() drops the terminator the last line had. Writing the result back
+    # would strip the file's final newline on every run, which shows up as a
+    # spurious "\ No newline at end of file" in the next diff.
+    if raw.endswith(b"\n") and not output_content.endswith("\n"):
+        output_content += "\n"
+
+
     if args.dry_run:
         print("\n=== DRY RUN MODE: No files will be modified ===")
         print(f"Total completed entries found: {len(completed_entries)}")

@@ -1,4 +1,5 @@
-data/
-*.tmp
 *.bak
 *.bak-*
+*.debug.log
+*.tmp
+data/

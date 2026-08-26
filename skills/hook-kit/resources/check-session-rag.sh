@@ -32,6 +32,22 @@ set -uo pipefail
 # persistence via their own wrapper, so pass unconditionally here.
 if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
 
+# A workspace with no RAG receiver wired up cannot satisfy a store demand,
+# so the demand must not be made. Without consulting the config this guard
+# only pattern-matches tool names, so it cannot tell "receiver absent" from
+# "session was negligent" and blocks on both — observed blocking a session
+# whose workspace had no RAG MCP server connected at all.
+#
+# Degrades toward the previous behaviour: if the resolver is missing or
+# fails, WSCFG_RAG_KIND stays unset and the guard runs as it always did,
+# rather than quietly switching itself off.
+WSCFG_SHIM="$(dirname "$0")/workspace-config.sh"
+if [ -x "$WSCFG_SHIM" ]; then
+  eval "$("$WSCFG_SHIM" --export 2>/dev/null)" || true
+  export WSCFG_RAG_KIND="${WSCFG_RAG_KIND:-}"
+  [ "$WSCFG_RAG_KIND" = "none" ] && exit 0
+fi
+
 # Load locale-specific regex patterns from data/. The file is git-ignored so
 # the public repo never sees Korean characters. When absent, the audit signal
 # pattern falls back to an English-only regex.
@@ -40,13 +56,25 @@ if [ -f "$HG_DATA_FILE" ]; then
   # shellcheck source=/dev/null
   . "$HG_DATA_FILE"
 fi
-HG_RAG_AUDIT_SIGNAL="${HG_RAG_AUDIT_SIGNAL:+${HG_RAG_AUDIT_SIGNAL}|}audit|discovery|decision|deployment|fa-prune|self-improving|retrospect"
+HG_RAG_AUDIT_SIGNAL="${HG_RAG_AUDIT_SIGNAL:-audit|discovery|decision|deployment|fa-prune|self-improving|retrospect}"
 export HG_RAG_AUDIT_SIGNAL
+
+# Probe for a Python that actually runs — the Windows py3 stub exits 49 instead
+# of executing. Match workspace-config.sh's probe so this scan degrades the same
+# way: no usable interpreter -> skip (fail-safe), never a bogus block.
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c 'import json,sys' >/dev/null 2>&1; then
+    PY="$cand"
+    break
+  fi
+done
+[ -z "$PY" ] && exit 0
 
 input="$(cat)"
 [ -z "$input" ] && exit 0
 
-transcript="$(printf '%s' "$input" | python3 -c "
+transcript="$(printf '%s' "$input" | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -59,17 +87,28 @@ except Exception:
 [ ! -f "$transcript" ] && exit 0
 
 # Single transcript scan extracting all metrics for both checks
-metrics="$(python3 - "$transcript" <<'PYEOF'
+metrics="$("$PY" - "$transcript" <<'PYEOF'
 import json, os, re, sys
 
 path = sys.argv[1]
 store_re = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-store$")
 find_re  = re.compile(r"^mcp__[A-Za-z0-9_-]+__.*-find$")
+# Vendor script route counts the same as MCP calls (tool-priority rule:
+# skill script -> CLI -> HTTP -> MCP; mirrors edit-guard.sh vendor_pat).
+script_store_re = re.compile(r"qdrant-(import|store-chunk)\.py")
+script_find_re  = re.compile(r"qdrant-(search|find)\.py")
 audit_re = re.compile(
     os.environ.get("HG_RAG_AUDIT_SIGNAL", r"audit|discovery|decision|deployment|fa-prune|self-improving|retrospect"),
     re.IGNORECASE,
 )
 skill_path_re = re.compile(r"/(skills|rules|hooks)/.*\.(md|sh|py|js|ts)$")
+
+# The literal phrases stay accepted for muscle memory; the config-derived
+# one is added so the escape hatch keeps working after a vendor change.
+store_skip_phrases = ["no RAG store needed", "skip qdrant store"]
+_rag_kind = os.environ.get("WSCFG_RAG_KIND", "")
+if _rag_kind and _rag_kind != "none":
+    store_skip_phrases.append("skip %s store" % _rag_kind)
 
 store_count = 0
 find_count = 0
@@ -99,6 +138,12 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
                         store_count += 1
                     elif find_re.match(tname):
                         find_count += 1
+                    elif tname == "Bash":
+                        cmd = tinput.get("command", "") or ""
+                        if script_store_re.search(cmd):
+                            store_count += 1
+                        elif script_find_re.search(cmd):
+                            find_count += 1
                     elif tname == "TaskUpdate" and tinput.get("status") == "completed":
                         task_completed += 1
                     elif tname in {"Edit", "Write"}:
@@ -116,7 +161,7 @@ with open(path, encoding="utf-8", errors="ignore") as fh:
             if txt:
                 if "skip-find-check" in txt:
                     find_skip = True
-                if "no RAG store needed" in txt or "skip qdrant store" in txt:
+                if any(p in txt for p in store_skip_phrases):
                     store_skip = True
                 if audit_re.search(txt):
                     audit_signal += 1
@@ -165,7 +210,7 @@ Signals detected:
   - Audit/discovery prompts: $audit_signal
   - RAG-store calls: $store_count
 
-Per skill-usage.md "session-end RAG store requirement": store key findings to a RAG receiver before ending the session. Use the appropriate <vendor>-store MCP tool (1 call per finding, with metadata keys: type, project, date, category).
+Per skill-usage.md "session-end RAG store requirement": store key findings to a RAG receiver before ending the session. Use the appropriate <vendor>-store MCP tool (1 call per finding, with metadata keys: type, project, date, category). MCP store tool unavailable this session (MCP bindings are fixed at session start)? Use the vendor script route instead — e.g. Skill("es6kr", "qdrant-import") / qdrant-import.py — it counts as a store call here, per the tool-priority rule (skill script -> CLI -> HTTP -> MCP). Do NOT conclude the store is impossible from MCP absence alone.
 
 To skip this check intentionally, the user must explicitly say "no RAG store needed" or "skip qdrant store".
 
