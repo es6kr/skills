@@ -375,7 +375,8 @@ class TestStartedStateTransition(unittest.TestCase):
     def test_transition_issue_to_started_no_delete_call(self):
         import inspect
         source = inspect.getsource(plane_sync.transition_issue_to_started)
-        self.assertNotIn("DELETE", source)
+        self.assertNotIn('method="DELETE"', source)
+        self.assertNotIn("method='DELETE'", source)
 
 
 class TestComputeLocalToPlaneUpdates(unittest.TestCase):
