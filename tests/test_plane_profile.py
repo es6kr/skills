@@ -212,6 +212,7 @@ def test_k3s_fallback_script_survives_quote_in_workspace_slug(monkeypatch):
         captured_cmd["cmd"] = cmd
         return _FakeCompletedProcess()
 
+    monkeypatch.setattr(plane_create_issue.shutil, "which", lambda _: "/usr/local/bin/kubectl")
     monkeypatch.setattr(plane_create_issue.subprocess, "run", _fake_run)
 
     malicious_slug = "acme'; Workspace.objects.all().delete(); x='"
