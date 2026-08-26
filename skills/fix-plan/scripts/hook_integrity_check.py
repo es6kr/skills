@@ -64,7 +64,12 @@ def resolve_script_operand(command):
     resolves to `/path/hook.sh`, not to the interpreter.
     """
     try:
-        tokens = shlex.split(command)
+        # posix=True (the default) treats backslash as an escape character,
+        # so a Windows path like C:\Users\... loses every backslash
+        # (\U -> U, \A -> A, ...) and the resolved path silently stops
+        # existing. posix=False keeps backslashes literal; the manual
+        # strip('"')/strip("'") calls below still handle quoting.
+        tokens = shlex.split(command, posix=(sys.platform != "win32"))
     except ValueError:
         tokens = command.split()
     for tok in tokens:
