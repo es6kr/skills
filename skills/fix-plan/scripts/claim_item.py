@@ -28,6 +28,10 @@ import re
 import sys
 import tempfile
 from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.resolve()))
+import plane_sync  # noqa: E402 -- needs sys.path adjusted first (sibling script)
 
 DEFAULT_TTL_HOURS = 4
 
@@ -76,10 +80,35 @@ def _write_lines(path, lines: list[str], had_trailing_newline: bool) -> None:
         raise
 
 
-def claim(path, action: str, sid: str, now: str, ttl_hours: int = DEFAULT_TTL_HOURS) -> dict:
+def _push_claim_to_plane(action: str, plane_profile: dict) -> dict | None:
+    """If `action` is also a Plane index line (`[IDENT-N] title -> Plane
+    (url)`), push the claim through by transitioning the linked issue to the
+    started-group state. Returns None when the line isn't a Plane index line
+    (nothing to push); otherwise the transition_issue_to_started() result."""
+    url_match = plane_sync.PLANE_URL_RE.search(action)
+    if not url_match:
+        return None
+    result = plane_sync.transition_issue_to_started(
+        plane_profile, url_match["workspace"], url_match["project"], url_match["issue"]
+    )
+    return {"ok": "error" not in result, **result}
+
+
+def claim(
+    path, action: str, sid: str, now: str, ttl_hours: int = DEFAULT_TTL_HOURS,
+    plane_profile: dict | None = None,
+) -> dict:
     """Stamp, refresh, or take over a [CLAIMED:sid:ts] lease tag on the item
     matching `action`. Only `[ ]` and `[BLOCKED:P*:selfable]` items are
-    claimable (claim.md: "never stamp a claim on [x] ... or [BLOCKED:*:external]")."""
+    claimable (claim.md: "never stamp a claim on [x] ... or [BLOCKED:*:external]").
+
+    When `plane_profile` is supplied and the claimed line is also a Plane
+    index line, the linked Plane issue is transitioned to its started-group
+    state (see plane_sync.transition_issue_to_started()) so the claim is
+    reflected on the Plane side too, not just in the local tracker. A Plane
+    API failure is surfaced via the returned `plane_sync` key but never fails
+    the (already-applied) local claim -- the local write is the source of
+    truth; Plane is a best-effort mirror."""
     if not os.path.exists(path):
         return {"ok": False, "error": f"tracker not found: {path}"}
 
@@ -119,7 +148,13 @@ def claim(path, action: str, sid: str, now: str, ttl_hours: int = DEFAULT_TTL_HO
     )
     lines[idx] = new_line
     _write_lines(path, lines, had_trailing_newline)
-    return {"ok": True, "line": new_line}
+
+    result = {"ok": True, "line": new_line}
+    if plane_profile is not None:
+        plane_result = _push_claim_to_plane(m.group("action"), plane_profile)
+        if plane_result is not None:
+            result["plane_sync"] = plane_result
+    return result
 
 
 def release(path, action: str, sid: str) -> dict:
@@ -188,6 +223,12 @@ def main() -> int:
     claim_p.add_argument("--sid", required=False, help="8-char session id prefix")
     claim_p.add_argument("--now", required=False, help="YYYY-MM-DDTHH:mm (caller-supplied, not read from the clock)")
     claim_p.add_argument("--ttl-hours", type=int, default=DEFAULT_TTL_HOURS)
+    claim_p.add_argument(
+        "--plane-sync", action="store_true",
+        help="also transition the linked Plane issue (if the claimed line is a "
+        "Plane index line) to its started-group state -- opt-in, off by default",
+    )
+    claim_p.add_argument("--plane-workspace", help="workspace profile override for --plane-sync")
 
     release_p = sub.add_parser("release")
     release_p.add_argument("--file", required=False)
@@ -203,7 +244,11 @@ def main() -> int:
         missing = [f for f in ("file", "action", "sid", "now") if not getattr(args, f)]
         if missing:
             p.error("claim: missing required argument(s): " + ", ".join("--" + m for m in missing))
-        result = claim(args.file, args.action, args.sid, args.now, args.ttl_hours)
+        plane_profile = None
+        if args.plane_sync:
+            from workspace_profile import get_profile
+            plane_profile = get_profile(workspace_name=args.plane_workspace, target_path=args.file)
+        result = claim(args.file, args.action, args.sid, args.now, args.ttl_hours, plane_profile)
     elif args.command == "release":
         missing = [f for f in ("file", "action", "sid") if not getattr(args, f)]
         if missing:
@@ -213,11 +258,17 @@ def main() -> int:
         p.error("a command is required: claim | release (or --test)")
         return 2
 
-    if result["ok"]:
-        print(f"OK: {result['line']}")
-        return 0
-    print(f"ERROR: {result['error']}", file=sys.stderr)
-    return 1
+    if not result["ok"]:
+        print(f"ERROR: {result['error']}", file=sys.stderr)
+        return 1
+    print(f"OK: {result['line']}")
+    plane_result = result.get("plane_sync")
+    if plane_result is not None:
+        if plane_result["ok"]:
+            print("[Plane Sync] issue transitioned to started")
+        else:
+            print(f"[Plane Sync] failed (local claim unaffected): {plane_result.get('error')}", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":
