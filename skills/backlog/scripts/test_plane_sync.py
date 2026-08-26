@@ -338,6 +338,46 @@ class TestDoneStateTransition(unittest.TestCase):
         self.assertNotIn("method='DELETE'", source)
 
 
+class TestStartedStateTransition(unittest.TestCase):
+    """Companion to TestDoneStateTransition: when a local item is claimed
+    (fix-plan claim_item.py), its linked Plane issue should move to the
+    project's `started`-group state -- the same DELETE-free PATCH pattern
+    as transition_issue_to_done(), just targeting a different state group."""
+
+    def _profile(self):
+        return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
+
+    def test_transition_issue_to_started_patches_state(self):
+        captured = {}
+
+        def fake_request(profile, path, method="GET", data=None):
+            if path.endswith("states/"):
+                return {"results": [
+                    {"id": "todo-id", "group": "unstarted"},
+                    {"id": "started-id", "group": "started"},
+                ]}
+            captured["path"] = path
+            captured["method"] = method
+            captured["data"] = data
+            return {"id": "issue1", "state": "started-id"}
+
+        with patch.object(plane_sync, "make_plane_request", side_effect=fake_request):
+            result = plane_sync.transition_issue_to_started(self._profile(), "ws", "proj1", "issue1")
+        self.assertEqual(captured["method"], "PATCH")
+        self.assertEqual(captured["data"], {"state": "started-id"})
+        self.assertNotIn("error", result)
+
+    def test_transition_issue_to_started_no_started_state(self):
+        with patch.object(plane_sync, "make_plane_request", return_value={"results": []}):
+            result = plane_sync.transition_issue_to_started(self._profile(), "ws", "proj1", "issue1")
+        self.assertIn("error", result)
+
+    def test_transition_issue_to_started_no_delete_call(self):
+        import inspect
+        source = inspect.getsource(plane_sync.transition_issue_to_started)
+        self.assertNotIn("DELETE", source)
+
+
 class TestComputeLocalToPlaneUpdates(unittest.TestCase):
     def _profile(self):
         return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
