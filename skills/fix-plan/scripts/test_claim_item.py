@@ -12,6 +12,7 @@ This module closes that gap the same way `add_item.py` closed the "add" gap.
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -157,6 +158,82 @@ class TestRelease(unittest.TestCase):
             result = claim_item.release(path, action="do the thing", sid="c305a3d5")
             self.assertFalse(result["ok"])
             self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+
+class TestPlaneSyncWiring(unittest.TestCase):
+    """Companion to plane_sync.transition_issue_to_started(): claiming an
+    item that is also a Plane index line (`[IDENT-N] title -> Plane (url)`)
+    should push the claim through to the linked Plane issue's status --
+    otherwise the [CLAIMED] tag only ever reflects locally."""
+
+    PLANE_ACTION = (
+        "[INFRA-6] title -> Plane (https://plane.example.com/myworkspace/"
+        "projects/11111111-1111-1111-1111-111111111111/issues/"
+        "22222222-2222-2222-2222-222222222222)"
+    )
+
+    def _plane_profile(self):
+        return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
+
+    def test_claim_with_plane_index_line_triggers_started_transition(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_tracker(d, f"- [ ] {self.PLANE_ACTION}\n")
+            calls = []
+
+            def fake_transition(profile, workspace, project, issue):
+                calls.append((workspace, project, issue))
+                return {"id": "issue1"}
+
+            with unittest.mock.patch(
+                "plane_sync.transition_issue_to_started", side_effect=fake_transition
+            ):
+                result = claim_item.claim(
+                    path, action=self.PLANE_ACTION, sid="c305a3d5", now=NOW,
+                    plane_profile=self._plane_profile(),
+                )
+            self.assertTrue(result["ok"])
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0], ("myworkspace", "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"))
+            self.assertTrue(result["plane_sync"]["ok"])
+
+    def test_claim_without_plane_profile_skips_plane_sync(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_tracker(d, f"- [ ] {self.PLANE_ACTION}\n")
+            with unittest.mock.patch("plane_sync.transition_issue_to_started") as mock_fn:
+                result = claim_item.claim(path, action=self.PLANE_ACTION, sid="c305a3d5", now=NOW)
+            mock_fn.assert_not_called()
+            self.assertTrue(result["ok"])
+            self.assertNotIn("plane_sync", result)
+
+    def test_claim_non_plane_line_skips_plane_sync(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_tracker(d, "- [ ] do the thing\n")
+            with unittest.mock.patch("plane_sync.transition_issue_to_started") as mock_fn:
+                result = claim_item.claim(
+                    path, action="do the thing", sid="c305a3d5", now=NOW,
+                    plane_profile=self._plane_profile(),
+                )
+            mock_fn.assert_not_called()
+            self.assertTrue(result["ok"])
+            self.assertNotIn("plane_sync", result)
+
+    def test_plane_sync_failure_does_not_fail_claim(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write_tracker(d, f"- [ ] {self.PLANE_ACTION}\n")
+            with unittest.mock.patch(
+                "plane_sync.transition_issue_to_started",
+                return_value={"error": "no started-group state"},
+            ):
+                result = claim_item.claim(
+                    path, action=self.PLANE_ACTION, sid="c305a3d5", now=NOW,
+                    plane_profile=self._plane_profile(),
+                )
+            # Local claim already succeeded (atomic write happens first) --
+            # a Plane-side failure is surfaced, not treated as a claim failure.
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["plane_sync"]["ok"])
+            content = path.read_text(encoding="utf-8")
+            self.assertIn("[CLAIMED:c305a3d5:2026-08-26T12:34]", content)
 
 
 class TestStaleness(unittest.TestCase):
