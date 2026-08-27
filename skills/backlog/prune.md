@@ -1,14 +1,17 @@
-# Prune — P2/P3 Demotion to TODO Backlog
+# Prune — Dual-Routing Prune for P2/P3 Tasks
 
-Prunes and demotes lower-priority tasks (`P2` and `P3`) from active sections (`## Priority Tasks`, `## Deep Tasks`, `## Fable Target Tasks`) into the `## TODO` backlog, preventing active execution bloat while preserving all task metadata verbatim.
+Prunes and demotes lower-priority tasks (`P2` and `P3`) from active sections (`## Priority Tasks`, `## Deep Tasks`, `## Fable Target Tasks`) using **Dual-Routing**:
+1. **Issue-Tracked Items (Plane / GitHub Issue)** ──→ **Purged from `fix_plan.md` entirely** (Plane is the Single Source of Truth; prevents 300KB+ local markdown bloat).
+2. **Non-Issue Items (Untracked)** ──→ **Demoted to `## TODO` backlog** (retained locally until intaked/registered into Plane).
 
 ## Why
 
 Active execution sections are designed for immediate focus (current cycle/session items). Over multiple iterations:
 
 - `P2` (next session) and `P3` (nice-to-have) items accumulate and dilute attention from true `P0`/`P1` blockers.
-- Without pruning, active sections can bloat to dozens of items, causing cognitive overload and token bloat during pipeline passes.
-- Migrating `P2`/`P3` tasks to `## TODO` preserves full context (Action, Why, How) while keeping active sections lean.
+- Without pruning, active sections and markdown files bloat to hundreds of kilobytes (380KB+), causing severe token bloat and cognitive overload.
+- Items already formally registered in Plane or GitHub Issues do NOT need duplicated multi-line narratives in local markdown files. Offloading them to Plane keeps `fix_plan.md` lean (~15-20KB).
+- Untracked items are safely demoted to `## TODO` so no work is lost.
 
 ## Syntax & Target Marker Schema
 
@@ -71,22 +74,22 @@ Running `--dry-run` is a pre-flight inspection gate, not a passive text printout
 
 ## CLI Usage
 
-The prune workflow is executed via `prune_p2p3.py`:
+The prune workflow is executed via `prune_p2p3.py` in the `backlog` skill:
 
 ```bash
 # Preview candidates across all workspace trackers without modifying files
-python scripts/prune_p2p3.py --all --dry-run
+python skills/backlog/scripts/prune_p2p3.py --all --dry-run
 
 # Limit candidate preview to top 10 items for a specific tracker
-python scripts/prune_p2p3.py --file .agents/fix_plan.md --limit 10 --dry-run
+python skills/backlog/scripts/prune_p2p3.py --file .agents/fix_plan.md --limit 10 --dry-run
 
 # Physically execute migration (moves items to ## TODO and prunes from active sections)
-python scripts/prune_p2p3.py --all
+python skills/backlog/scripts/prune_p2p3.py --all
 ```
 
-Invoked via the fix-plan skill:
+Invoked via skill entry points:
 
 ```bash
+/backlog --prune --dry-run --all
 /fix-plan --prune-p2p3 --dry-run --all
-/fix-plan --prune-p2p3 --limit 10
 ```

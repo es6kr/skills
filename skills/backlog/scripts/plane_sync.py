@@ -27,6 +27,14 @@ import urllib.request
 import urllib.parse
 import argparse
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).parent.resolve()
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+_fix_plan_scripts = SCRIPT_DIR.parent.parent / "fix-plan" / "scripts"
+if _fix_plan_scripts.exists() and str(_fix_plan_scripts) not in sys.path:
+    sys.path.insert(0, str(_fix_plan_scripts))
+
 from workspace_profile import get_profile, resolve_tracker_root
 
 

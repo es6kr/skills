@@ -109,7 +109,7 @@ def test_create_issue_rest_sends_browser_user_agent(script_path, monkeypatch):
 
 
 def test_plane_sync_request_sends_browser_user_agent(monkeypatch):
-    mod = load_module(FIX_PLAN_SCRIPTS / "plane_sync.py", "plane_sync_ua")
+    mod = load_module(TARGET_SCRIPTS / "plane_sync.py", "plane_sync_ua")
     captured = []
 
     def fake_urlopen(req, *args, **kwargs):
