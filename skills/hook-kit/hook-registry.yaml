@@ -993,3 +993,19 @@ hooks:
   - runtime: sh
     file: skills/wip/resources/wip-task-complete-detect.sh
   registrations: []
+- id: block-hook-registration-without-registry-read
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: js
+    file: skills/hook-kit/resources/block-hook-registration-without-registry-read.js
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Edit
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Write
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js
