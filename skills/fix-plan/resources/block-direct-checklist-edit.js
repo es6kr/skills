@@ -43,6 +43,8 @@ if (filePath) {
     process.stderr.write('Required Action: You MUST run fix-plan scripts in terminal via run_command/Bash:\n');
     process.stderr.write('  - ADD a new item:  python <skill-dir>/scripts/add_item.py --file <path> \\\n');
     process.stderr.write('        --action "..." --why "..." --how "..." [--marker "[BLOCKED:P1:external]"] [--dry-run]\n');
+    process.stderr.write('  - UPDATE an existing item (flip marker / append a note): python <skill-dir>/scripts/update_item.py --file <path> \\\n');
+    process.stderr.write('        --match "<substring of the action text>" [--set-marker "[x]"] [--append-note "..."] [--dry-run]\n');
     process.stderr.write('  - python <skill-dir>/scripts/detect_bloated_tasks.py --file <path>\n');
     process.stderr.write('  - python <skill-dir>/scripts/stale_check.py --root <path>\n');
     process.stderr.write('  - python <skill-dir>/scripts/cleanup.py --file <path>\n');

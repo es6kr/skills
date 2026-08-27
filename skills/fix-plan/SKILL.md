@@ -1,7 +1,7 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), update (flip marker / append progress note on an existing item), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
   Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
   Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role".
 metadata:
@@ -40,6 +40,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
+| update | Mutate an EXISTING item in place — flip its marker or append a one-line progress note — via `update_item.py`, without going around `block-direct-checklist-edit.js` | [update.md](./update.md) |
 | verify | Cross-check commit-hash/file-path references cited in tracker items against local git/filesystem state before trusting a "still unresolved" claim (distinct from `sync`'s external GitHub polling) | [verify.md](./verify.md) |
 
 ## Topic Dependencies
