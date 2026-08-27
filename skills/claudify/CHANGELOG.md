@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/claudify-v0.7.0...claudify-v0.7.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* **core:** align workflow steps, next suggestion patterns, and browser topics ([c68d489](https://github.com/es6kr/skills/commit/c68d489d01a79862b8933b4a0542168cf676cd3a))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/claudify-v0.6.1...claudify-v0.7.0) (2026-08-20)
 
 
