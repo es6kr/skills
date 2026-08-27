@@ -39,11 +39,7 @@ Incoming Task / Request
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
-| `triage` | Route incoming tasks to the appropriate persistence layer based on lifespan and collaboration scope | [triage.md](./triage.md) |
-| `priority` | Apply P0–P3 priority tags (`[BLOCKED:P*:reason]`) and separate selfable vs external blockers | [priority.md](./priority.md) |
-| `sync` | Poll remote and external forge states (`gh` CLI / Secondary Trackers) to reconcile completed tasks | [sync.md](./sync.md) |
 | `prune` | Demote lower-priority items (P2/P3) and stale entries to preserve lean active focus sections | [prune.md](./prune.md) |
-| `lifecycle` | Definition of Done (DoD), atomic marker transitions (`[ ]` → `[/]` → `[x]`), and archive rules | [lifecycle.md](./lifecycle.md) |
 | `comment` | Post follow-up notes and nested review findings as comments on parent issues | [comment.md](./comment.md) |
 | `create` | Create issues and intake items via API with fallback mechanisms | [create.md](./create.md) |
 

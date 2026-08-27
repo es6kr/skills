@@ -44,12 +44,11 @@ if (!filePath) {
 
 if (filePath && (filePath.includes('fix_plan.md') || filePath.includes('checklist.md'))) {
   if (fs.existsSync(filePath)) {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const parts = content.split('## Completed');
-    if (parts.length >= 2) {
-      // parts[1] runs to end-of-file; stop at the next top-level "## " heading
+    const headingMatch = content.match(/^## Completed\s*$/m);
+    if (headingMatch) {
+      // slice from end of matched heading; stop at the next top-level "## " heading
       // (e.g. "## REPEAT") so later sections aren't mis-scanned as Completed entries.
-      const rest = parts[1];
+      const rest = content.slice(headingMatch.index + headingMatch[0].length);
       const nextHeadingMatch = rest.match(/\n## /);
       const completedSection = nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest;
       const items = completedSection.split('\n').filter((line) => line.trim().startsWith('-'));

@@ -87,8 +87,10 @@ fi
 
 # BASE-1: core.hooksPath resolution
 if [[ -d ".githooks" ]]; then
-  if [[ -z "$LOCAL_HOOKS_PATH" ]] && [[ "$ACTIVE_HOOKS_DIR" != *".githooks"* ]]; then
-    add_result "BASE-1" "Base" "Hook Wiring" "FAIL" "'.githooks/' directory exists but 'core.hooksPath' is not configured (git reads '$ACTIVE_HOOKS_DIR'). Run 'git config core.hooksPath .githooks'."
+  RESOLVED_GITHOOKS="$(cd .githooks && pwd)"
+  RESOLVED_ACTIVE="$(cd "$ACTIVE_HOOKS_DIR" 2>/dev/null && pwd || echo "$ACTIVE_HOOKS_DIR")"
+  if [[ "$RESOLVED_ACTIVE" != "$RESOLVED_GITHOOKS" ]]; then
+    add_result "BASE-1" "Base" "Hook Wiring" "FAIL" "'.githooks/' directory exists but active hooks directory is '$ACTIVE_HOOKS_DIR' instead of '.githooks'. Run 'git config core.hooksPath .githooks'."
   else
     add_result "BASE-1" "Base" "Hook Wiring" "PASS" "core.hooksPath correctly wired to '$ACTIVE_HOOKS_DIR'."
   fi
@@ -246,24 +248,28 @@ TOTAL_WARNS=0
 TOTAL_PASS=0
 
 if [[ $JSON_MODE -eq 1 ]]; then
-  echo "{"
-  echo "  \"repository\": \"$REPO_ROOT\","
-  echo "  \"results\": ["
-  count=${#RESULTS[@]}
-  idx=0
   for r in "${RESULTS[@]}"; do
-    idx=$((idx + 1))
     IFS='|' read -r id tier cat status msg <<< "$r"
     [[ "$status" == "FAIL" ]] && TOTAL_FAILS=$((TOTAL_FAILS + 1))
     [[ "$status" == "WARN" ]] && TOTAL_WARNS=$((TOTAL_WARNS + 1))
     [[ "$status" == "PASS" ]] && TOTAL_PASS=$((TOTAL_PASS + 1))
-    comma=","
-    [[ $idx -eq $count ]] && comma=""
-    echo "    {\"id\": \"$id\", \"tier\": \"$tier\", \"category\": \"$cat\", \"status\": \"$status\", \"message\": \"$msg\"}$comma"
   done
-  echo "  ],"
-  echo "  \"summary\": {\"pass\": $TOTAL_PASS, \"warn\": $TOTAL_WARNS, \"fail\": $TOTAL_FAILS}"
-  echo "}"
+  printf '%s\n' "${RESULTS[@]}" | jq -R -s \
+    --arg repo "$REPO_ROOT" \
+    --argjson pass "$TOTAL_PASS" \
+    --argjson warn "$TOTAL_WARNS" \
+    --argjson fail "$TOTAL_FAILS" \
+    'split("\n") | map(select(length > 0) | split("|")) | {
+      repository: $repo,
+      results: map({
+        id: .[0],
+        tier: .[1],
+        category: .[2],
+        status: .[3],
+        message: (.[4:] | join("|"))
+      }),
+      summary: {pass: $pass, warn: $warn, fail: $fail}
+    }'
 else
   echo -e "\n${BLUE}========================================================================${NC}"
   echo -e "${BLUE}  Git Repository & Hook Doctor: ${NC}$REPO_ROOT"

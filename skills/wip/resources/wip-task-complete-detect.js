@@ -52,12 +52,22 @@ const WIP_COMPLETE_KEYWORDS =
   'finished|completed|done in another session|handled it|already (did|handled)';
 const WIP_TASKREF_PATTERN = dataVars.WIP_TASKREF_PATTERN || '(#[0-9]+|task [0-9]+)';
 
-const completeRegex = new RegExp(WIP_COMPLETE_KEYWORDS, 'i');
+let completeRegex;
+try {
+  completeRegex = new RegExp(WIP_COMPLETE_KEYWORDS, 'i');
+} catch (e) {
+  process.exit(0);
+}
 
 if (completeRegex.test(USER_MSG)) {
   // No 'i' flag here — matches the original's `grep -oE` (no -i) for task refs.
-  const taskrefRegex = new RegExp(WIP_TASKREF_PATTERN, 'g');
-  const matches = USER_MSG.match(taskrefRegex) || [];
+  let matches = [];
+  try {
+    const taskrefRegex = new RegExp(WIP_TASKREF_PATTERN, 'g');
+    matches = USER_MSG.match(taskrefRegex) || [];
+  } catch (e) {
+    matches = [];
+  }
   const taskRefs = matches.slice(0, 5).join('\n');
 
   if (taskRefs) {

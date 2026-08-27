@@ -22,6 +22,7 @@ import subprocess
 import base64
 import re
 import shutil
+import html
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -98,10 +99,11 @@ def parse_inline_tiptap(text: str) -> list:
 
 
 def inline_to_html(text: str) -> str:
-    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>', text)
-    text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
-    text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
-    return text
+    escaped = html.escape(text)
+    escaped = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>', escaped)
+    escaped = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', escaped)
+    escaped = re.sub(r'`([^`]+)`', r'<code>\1</code>', escaped)
+    return escaped
 
 
 def parse_bullet_tokens(tokens):
@@ -253,7 +255,7 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
 
     try:
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             issue_id = data.get("id")
             seq_id = data.get("sequence_id")
@@ -264,7 +266,7 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
                 intake_url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/intake-issues/"
                 try:
                     intake_req = urllib.request.Request(intake_url, data=json.dumps({"issue": issue_id}).encode("utf-8"), headers=headers, method="POST")
-                    urllib.request.urlopen(intake_req)
+                    urllib.request.urlopen(intake_req, timeout=30)
                     intake_registered = True
                 except Exception as e:
                     sys.stderr.write(f"WARN: Failed to register intake issue: {e}\n")
@@ -497,7 +499,10 @@ print("RESULT_JSON:" + json.dumps(res))
 
 
 def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
-    normalized_priority = normalize_priority(priority) if priority else None
+    try:
+        normalized_priority = normalize_priority(priority) if priority else None
+    except ValueError as e:
+        return {"success": False, "reason": str(e), "method": "K3s"}
     workspace_slug = profile.get("workspace_slug")
     prj_id = project_id or profile.get("default_project")
     plane_host = (profile.get("plane_host") or "").rstrip("/")

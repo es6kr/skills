@@ -117,10 +117,13 @@ def load_user_config():
     """
     explicit = os.environ.get("AGENT_WORKSPACE_CONFIG")
     if explicit:
-        paths = [Path(explicit)]
+        p = Path(explicit)
+        if not p.exists():
+            print(f"Warning: AGENT_WORKSPACE_CONFIG path does not exist: {p}", file=sys.stderr)
+        paths = [p]
     elif CONFIG_FILE != Path.home() / ".config" / "plane-backlog" / "config.json":
         # Test monkeypatching target
-        paths = [CONFIG_FILE, CONFIG_FILE_V2]
+        paths = [CONFIG_FILE_V2, CONFIG_FILE]
     else:
         paths = [CONFIG_FILE_V2, CONFIG_FILE]
 

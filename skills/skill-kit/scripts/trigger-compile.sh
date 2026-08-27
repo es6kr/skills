@@ -303,7 +303,8 @@ process.exit(1);
 {
   const path = require('path');
   const os = require('os');
-  const FIRE_FLAG = path.join(os.homedir(), '.claude', 'data', 'trigger-stop-${skill}');
+  const __sessId = _input.session_id || (_input.transcript_path ? path.basename(_input.transcript_path, '.jsonl') : (process.env.CLAUDE_SESSION_ID || 'global'));
+  const FIRE_FLAG = path.join(os.homedir(), '.claude', 'data', 'trigger-stop-' + __sessId + '-${skill}');
   if (!fs.existsSync(FIRE_FLAG)) {
     fs.mkdirSync(path.dirname(FIRE_FLAG), { recursive: true });
     fs.writeFileSync(FIRE_FLAG, '');

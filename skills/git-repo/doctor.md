@@ -41,7 +41,7 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **`BASE-1`** | **Hook Wiring** | `.githooks` vs `core.hooksPath` | If `.githooks/` directory exists, `core.hooksPath` MUST point to `.githooks`. Otherwise Git reads default `.git/hooks` and `.githooks/` is completely unwired/ignored. |
 | **`BASE-2`** | **Permissions** | Executable bit (`+x`) | Active hook files (`pre-commit`, `pre-push`, `commit-msg`, etc.) must have executable bits (`chmod +x`). |
-| **`BASE-3`** | **Pre-push Deletion** | Zero-SHA early exit | `pre-push` hook must detect remote branch deletion (`0000000000000000000000000000000000000000` or `(delete)`) and exit `0` immediately to avoid running heavy CI tests. |
+| **`BASE-3`** | **Pre-push Deletion** | Zero-SHA early exit | `pre-push` hook must detect remote branch deletion (`local_sha=0000...0000`, `local_ref=(delete)`, or `remote_sha=0000...0000`) and skip heavy CI tests immediately. |
 | **`BASE-4`** | **Local Branch Guard** | `local` branch push guard | `pre-push` hook must contain a guard blocking accidental push of private `refs/heads/local` stage branch to remote. |
 | **`BASE-5`** | **Secret & IP Guard** | Secret / IP scan | `pre-commit` hook must scan staged files for private RFC1918 IPs (`10.x`, `192.168.x`, `172.16-31.x`) and home paths. |
 | **`BASE-6`** | **Push Commit Limit Guard** | Outgoing commit count check | `pre-push` hook must check outgoing commit count (`rev-list --count` / `PUSH_MAX_COMMITS`) and block pushes exceeding the limit (default: 5) to prevent publishing massively diverged commits caused by wrong base branch selection. Override via `PUSH_COMMIT_LIMIT_OVERRIDE=1`. |
@@ -121,7 +121,7 @@ In `.githooks/pre-push`, insert the zero-SHA check at the start of the stdin rea
 ```sh
 while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
   # Skip branch deletions immediately (prevents running heavy CI tests on branch deletion)
-  if [ "$local_sha" = "0000000000000000000000000000000000000000" ] || [ "$local_sha" = "(delete)" ]; then
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ] || [ "$local_sha" = "(delete)" ] || [ "$local_ref" = "(delete)" ]; then
     exit 0
   fi
 

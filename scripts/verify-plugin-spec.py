@@ -50,6 +50,9 @@ def validate_manifest(data: dict, path: str) -> list:
     repo's scripts are stdlib-only, no jsonschema dependency). Returns a list
     of error strings; empty means valid."""
     errors = []
+    if not isinstance(data, dict):
+        return [f"{path}: manifest root must be a JSON object"]
+
     if "$schema" not in data:
         errors.append(f"{path}: missing required field '$schema'")
     elif data["$schema"] != CANONICAL_SCHEMA_URL:
@@ -64,6 +67,41 @@ def validate_manifest(data: dict, path: str) -> list:
                 f"{path}: 'name' {name!r} violates spec pattern "
                 "(1-64 chars, lowercase alphanumeric/./-, no leading/trailing '-', no '--' or '..')"
             )
+
+    for str_field in ("version", "description", "homepage", "repository", "license"):
+        if str_field in data and not isinstance(data[str_field], str):
+            errors.append(f"{path}: field '{str_field}' must be a string, got {type(data[str_field]).__name__}")
+
+    if "author" in data:
+        author = data["author"]
+        if not isinstance(author, dict):
+            errors.append(f"{path}: field 'author' must be an object, got {type(author).__name__}")
+        else:
+            allowed_author_keys = {"name", "email", "url"}
+            extra_author_keys = set(author.keys()) - allowed_author_keys
+            if extra_author_keys:
+                errors.append(f"{path}: 'author' contains unexpected key(s): {sorted(extra_author_keys)}")
+            for key in allowed_author_keys:
+                if key in author and not isinstance(author[key], str):
+                    errors.append(f"{path}: author.{key} must be a string, got {type(author[key]).__name__}")
+
+    if "keywords" in data:
+        keywords = data["keywords"]
+        if not isinstance(keywords, list):
+            errors.append(f"{path}: field 'keywords' must be an array of strings, got {type(keywords).__name__}")
+        else:
+            for idx, item in enumerate(keywords):
+                if not isinstance(item, str):
+                    errors.append(f"{path}: keywords[{idx}] must be a string, got {type(item).__name__}")
+
+    if "extensions" in data:
+        extensions = data["extensions"]
+        if not isinstance(extensions, dict):
+            errors.append(f"{path}: field 'extensions' must be an object, got {type(extensions).__name__}")
+        else:
+            for key, val in extensions.items():
+                if not isinstance(val, dict):
+                    errors.append(f"{path}: extensions.{key} must be an object, got {type(val).__name__}")
 
     extra_keys = set(data.keys()) - ALLOWED_TOP_LEVEL_KEYS
     if extra_keys:

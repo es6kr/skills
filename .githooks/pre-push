@@ -76,12 +76,17 @@ while IFS= read -r line; do
     COMMIT_COUNT=$(git rev-list --count "$DEFAULT_BASE..$local_sha" 2>/dev/null || echo 0)
   fi
 
+  BASE_REF="${DEFAULT_BASE:-origin/main}"
+  if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ -n "$remote_sha" ]; then
+    BASE_REF="$remote_ref"
+  fi
+
   MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
   if [ "$COMMIT_COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ]; then
     cat >&2 <<EOF
 ERROR: Pushing $COMMIT_COUNT commits on '$local_ref' exceeds the limit ($MAX_COMMITS).
 This usually happens when branching off the wrong base branch or accumulating diverged history.
-Inspect commits with: git log --oneline <base>..$local_ref
+Inspect commits with: git log --oneline $BASE_REF..$local_sha
 If this large batch push is intended, override with: PUSH_COMMIT_LIMIT_OVERRIDE=1 git push ...
 EOF
     exit 1

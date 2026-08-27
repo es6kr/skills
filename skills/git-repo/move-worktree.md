@@ -84,8 +84,8 @@ When a worktree has accumulated local commits/changes and needs to be extracted 
 
 2. **Move working tree items directly to target repository** (preserves uncommitted modifications without copying overhead):
    ```bash
-   # Move all files and directories except .git pointer file
-   mv .worktrees/<name>/* /path/to/new-repo/
+   # Move all files and directories except the .git pointer file (includes dotfiles)
+   find .worktrees/<name> -mindepth 1 -maxdepth 1 ! -name .git -exec mv {} /path/to/new-repo/ \;
    ```
 
 3. **Rebuild/synchronize index safely in the new repository**:

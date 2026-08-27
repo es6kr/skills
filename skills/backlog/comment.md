@@ -26,7 +26,7 @@ done
 
 ```bash
 python3 "$BACKLOG_SCRIPTS/plane_create_comment.py" \
-  --issue <issue_uuid> --comment "text with **bold**, `code`, and [link](https://...)" --json
+  --issue <issue_uuid> --comment 'text with **bold**, `code`, and [link](https://...)' --json
 ```
 
 or read the comment body from a file (multi-line):
