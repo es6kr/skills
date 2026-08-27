@@ -13,15 +13,26 @@ PR's individual review findings) under the single parent issue.
 
 ## Execution
 
+Resolve `BACKLOG_SCRIPTS` once per session:
+
 ```bash
-python3 "$FIX_PLAN_SCRIPTS/../../plane-backlog/scripts/plane_create_comment.py" \
+for d in "${BACKLOG_SCRIPTS:-}" \
+         "${CLAUDE_PLUGIN_ROOT:-}/skills/backlog/scripts" \
+         "${AGENT_SKILLS_HOME:-$HOME/.agents}/skills/backlog/scripts" \
+         "${GEMINI_SKILLS_HOME:-$HOME/.gemini/config}/skills/backlog/scripts"; do
+  [ -n "$d" ] && [ -d "$d" ] && BACKLOG_SCRIPTS="$d" && break
+done
+```
+
+```bash
+python3 "$BACKLOG_SCRIPTS/plane_create_comment.py" \
   --issue <issue_uuid> --comment "text with **bold**, `code`, and [link](https://...)" --json
 ```
 
 or read the comment body from a file (multi-line):
 
 ```bash
-python3 plane_create_comment.py --issue <issue_uuid> --comment-file note.md --json
+python3 "$BACKLOG_SCRIPTS/plane_create_comment.py" --issue <issue_uuid> --comment-file note.md --json
 ```
 
 The script resolves the workspace/host/token from the active workspace profile

@@ -2,8 +2,8 @@
 name: backlog
 description: |
   Unified backlog lifecycle management and task tracking. Orchestrates session TODOs, workspace checklists (`fix_plan.md`, `checklist.md`), and issue trackers with vendor-agnostic lifecycle contracts.
-  Topics — triage (classify incoming requests into session/file/issue backlogs), priority (GitHub-aligned P0-P3 urgency tagging and blocker triage), sync (external tracker status polling and resolution), prune (demote lower-priority backlog noise from active focus), and lifecycle (authoring, state transitions, DoD criteria).
-  Use when: "backlog", "backlog triage", "backlog sync", "backlog prune", "task lifecycle", "manage backlog", "backlog priority", "backlog cleanup".
+  Topics — triage (classify incoming requests into session/file/issue backlogs), priority (GitHub-aligned P0-P3 urgency tagging and blocker triage), sync (external tracker status polling and resolution), prune (demote lower-priority backlog noise from active focus), lifecycle (authoring, state transitions, DoD criteria), comment (post follow-up notes/sub-findings to parent issues), create (issue and intake issue creation).
+  Use when: "backlog", "backlog triage", "backlog sync", "backlog prune", "task lifecycle", "manage backlog", "backlog priority", "backlog cleanup", "plane backlog", "issue comment".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -17,6 +17,7 @@ allowed-tools:
   - Write
   - Grep
   - Bash(gh:*)
+  - Bash(python3:*)
 ---
 
 # Backlog
@@ -43,6 +44,8 @@ Incoming Task / Request
 | `sync` | Poll remote and external forge states (`gh` CLI / Secondary Trackers) to reconcile completed tasks | [sync.md](./sync.md) |
 | `prune` | Demote lower-priority items (P2/P3) and stale entries to preserve lean active focus sections | [prune.md](./prune.md) |
 | `lifecycle` | Definition of Done (DoD), atomic marker transitions (`[ ]` → `[/]` → `[x]`), and archive rules | [lifecycle.md](./lifecycle.md) |
+| `comment` | Post follow-up notes and nested review findings as comments on parent issues | [comment.md](./comment.md) |
+| `create` | Create issues and intake items via API with fallback mechanisms | [create.md](./create.md) |
 
 ## Default Invocation (`/backlog`)
 
