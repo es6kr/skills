@@ -596,3 +596,138 @@ def test_the_committed_registry_is_structurally_valid():
     findings = hr.validate(registry, {})
     schema_findings = [f for f in findings if f.code == "SCHEMA"]
     assert schema_findings == [], [str(f) for f in schema_findings]
+
+
+# --- runtime-copy axis (canonical 1 <-> deployed copies N) ------------------
+#
+# `implementations` models the runtimes a hook has *inside the source tree*.
+# It says nothing about the same script existing in a marketplace cache, under
+# ~/.agents/skills, or in a worktree — and those copies are what actually run.
+# Two consequences the source-only view cannot express:
+#
+#   1. deleting the source copy does not make a hook removed. One survivor in a
+#      runtime root keeps the guard live and lets tombstone re-introduction
+#      detection pass while the file is still executing.
+#   2. copies drift. A fix applied to the tracked copy but not the live one
+#      reads as "already fixed" while the live behaviour is unchanged.
+#
+# Roots are declared as a pattern, not a fixed list, because which roots exist
+# differs per machine; a root that simply has no copy is not a defect.
+
+
+def copied_entry(hook_id="guard-copied", **overrides):
+    base = entry(hook_id)
+    base["runtime_copies"] = {
+        "canonical": f"skills/hook-kit/resources/{hook_id}.sh",
+        "expected_roots": [
+            "~/.claude/plugins/marketplaces/es6kr-skills",
+            "~/.agents/skills",
+        ],
+        "sync_medium": "syncthing",
+    }
+    base.update(overrides)
+    return base
+
+
+def copies(file, canonical=None, **roots):
+    """A copy index: file -> {canonical: digest, copies: {root: digest}}."""
+    return {file: {"canonical": canonical, "copies": dict(roots)}}
+
+
+def test_a_removed_hook_gone_from_every_runtime_root_is_the_expected_state():
+    hook = removed_entry("guard-gone")
+    hook["runtime_copies"] = {
+        "canonical": "skills/hook-kit/resources/guard-gone.sh",
+        "expected_roots": ["~/.agents/skills"],
+    }
+    registry = {"schema_version": 1, "hooks": [hook]}
+    index = copies("skills/hook-kit/resources/guard-gone.sh", canonical=None)
+    assert hr.validate(registry, disk(), copy_index=index) == []
+
+
+def test_a_removed_hook_surviving_in_one_runtime_root_is_partially_removed():
+    hook = removed_entry("guard-gone")
+    hook["runtime_copies"] = {
+        "canonical": "skills/hook-kit/resources/guard-gone.sh",
+        "expected_roots": ["~/.agents/skills"],
+    }
+    registry = {"schema_version": 1, "hooks": [hook]}
+    index = copies(
+        "skills/hook-kit/resources/guard-gone.sh",
+        canonical=None,
+        **{"~/.agents/skills": "d1"},
+    )
+    assert "PARTIALLY_REMOVED" in codes(hr.validate(registry, disk(), copy_index=index))
+
+
+def test_partially_removed_names_every_surviving_root():
+    hook = removed_entry("guard-gone")
+    hook["runtime_copies"] = {
+        "canonical": "skills/hook-kit/resources/guard-gone.sh",
+        "expected_roots": ["~/.agents/skills", "~/.claude/skills"],
+    }
+    registry = {"schema_version": 1, "hooks": [hook]}
+    index = copies(
+        "skills/hook-kit/resources/guard-gone.sh",
+        canonical=None,
+        **{"~/.agents/skills": "d1", "~/.claude/skills": "d1"},
+    )
+    detail = " ".join(
+        f.detail
+        for f in hr.validate(registry, disk(), copy_index=index)
+        if f.code == "PARTIALLY_REMOVED"
+    )
+    assert "~/.agents/skills" in detail and "~/.claude/skills" in detail
+
+
+def test_an_active_hook_whose_copies_all_match_canonical_is_clean():
+    registry = {"schema_version": 1, "hooks": [copied_entry()]}
+    index = copies(
+        "skills/hook-kit/resources/guard-copied.sh",
+        canonical="same",
+        **{"~/.agents/skills": "same"},
+    )
+    disk_index = disk("skills/hook-kit/resources/guard-copied.sh")
+    assert hr.validate(registry, disk_index, copy_index=index) == []
+
+
+def test_an_active_hook_whose_copy_diverges_from_canonical_fails():
+    registry = {"schema_version": 1, "hooks": [copied_entry()]}
+    index = copies(
+        "skills/hook-kit/resources/guard-copied.sh",
+        canonical="tracked",
+        **{"~/.agents/skills": "live-and-different"},
+    )
+    disk_index = disk("skills/hook-kit/resources/guard-copied.sh")
+    assert "COPY_DRIFT" in codes(hr.validate(registry, disk_index, copy_index=index))
+
+
+def test_a_root_that_simply_holds_no_copy_is_not_a_defect():
+    """Which roots exist is per-machine — absence is not drift."""
+    registry = {"schema_version": 1, "hooks": [copied_entry()]}
+    index = copies("skills/hook-kit/resources/guard-copied.sh", canonical="tracked")
+    disk_index = disk("skills/hook-kit/resources/guard-copied.sh")
+    assert hr.validate(registry, disk_index, copy_index=index) == []
+
+
+def test_runtime_copies_canonical_must_be_one_of_the_implementations():
+    hook = copied_entry()
+    hook["runtime_copies"]["canonical"] = "skills/hook-kit/resources/somewhere-else.sh"
+    registry = {"schema_version": 1, "hooks": [hook]}
+    disk_index = disk("skills/hook-kit/resources/guard-copied.sh")
+    assert "SCHEMA" in codes(hr.validate(registry, disk_index))
+
+
+def test_runtime_copies_expected_roots_must_be_a_non_empty_list():
+    hook = copied_entry()
+    hook["runtime_copies"]["expected_roots"] = []
+    registry = {"schema_version": 1, "hooks": [hook]}
+    disk_index = disk("skills/hook-kit/resources/guard-copied.sh")
+    assert "SCHEMA" in codes(hr.validate(registry, disk_index))
+
+
+def test_copy_checks_are_skipped_when_no_copy_index_is_supplied():
+    """Existing two-argument callers keep working and gain no new findings."""
+    registry = {"schema_version": 1, "hooks": [copied_entry()]}
+    disk_index = disk("skills/hook-kit/resources/guard-copied.sh")
+    assert hr.validate(registry, disk_index) == []

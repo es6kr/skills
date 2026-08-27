@@ -188,6 +188,14 @@ hooks:
   implementations:
   - runtime: py
     file: skills/hook-kit/resources/bash-guard.py
+  runtime_copies:
+    canonical: skills/hook-kit/resources/bash-guard.py
+    expected_roots:
+    - ~/.claude/plugins/cache/es6kr-skills
+    - ~/.claude/plugins/marketplaces/es6kr-skills
+    - ~/.claude/skills
+    - ~/.agents/skills
+    sync_medium: syncthing
   registrations:
   - surface: hooks.json
     event: PreToolUse
