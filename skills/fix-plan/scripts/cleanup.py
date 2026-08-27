@@ -29,7 +29,7 @@ class Node:
         self.children = []
 
 def parse_line(line):
-    m = re.match(r"^(\s*)(-\s*|[*]\s*|[+]\s*|\d+\.\s+)(.*)$", line)
+    m = re.match(r"^(\s*)(-\s+|[*]\s+|[+]\s+|\d+\.\s+)(.*)$", line)
     if m:
         indent = len(m.group(1))
         marker = m.group(2)

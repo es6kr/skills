@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.1](https://github.com/es6kr/skills/compare/next-v0.9.0...next-v0.9.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* **core:** align workflow steps, next suggestion patterns, and browser topics ([c68d489](https://github.com/es6kr/skills/commit/c68d489d01a79862b8933b4a0542168cf676cd3a))
+* **next:** remove duplicated foreground-vs-background spawn block ([e837bd5](https://github.com/es6kr/skills/commit/e837bd56bf06176dc035150d5935cab6fd1ea980))
+* **next:** require ask on every next-trigger re-fire, not just once after cleanup ([388aa3e](https://github.com/es6kr/skills/commit/388aa3e89139e7b501dbc31a244996cba8325e29))
+* **next:** require PR-URL rule even on Stop-hook-forced direct asks ([#364](https://github.com/es6kr/skills/issues/364)) ([1c37e30](https://github.com/es6kr/skills/commit/1c37e300c24f933abc520722c1787ee98b15b285))
+* promote accumulated skill fixes from the working checkout ([770bed2](https://github.com/es6kr/skills/commit/770bed2386266fc13f7d605505c2996037d4c371))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* resolve PR [#363](https://github.com/es6kr/skills/issues/363) audit Pending findings (plane_bulk_update profile, hook checker schema, regex, dedup) ([19ffc83](https://github.com/es6kr/skills/commit/19ffc83f296ad5568b82a85b104fcf419580c102))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/next-v0.8.1...next-v0.9.0) (2026-08-20)
 
 

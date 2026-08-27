@@ -36,7 +36,7 @@
         "./skills/hook-kit",
         "./skills/mcp-config",
         "./skills/omz",
-        "./skills/plane-backlog",
+        "./skills/backlog",
         "./skills/repo",
         "./skills/session",
         "./skills/skill-kit",
@@ -61,7 +61,7 @@
         "./skills/fix"
       ],
       "strict": true,
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

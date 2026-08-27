@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/wip-v0.5.0...wip-v0.5.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* accumulate 16 patch-level bug fixes and guard enhancements across skills ([d214e5d](https://github.com/es6kr/skills/commit/d214e5dcc7fac1bc07baf3b6cec62999aea732f0))
+* promote accumulated skill fixes from the working checkout ([770bed2](https://github.com/es6kr/skills/commit/770bed2386266fc13f7d605505c2996037d4c371))
+* promote next-fix batch (consolidate fabrication guard, session rewind, config-driven PR base) ([7ca0ccb](https://github.com/es6kr/skills/commit/7ca0ccbf13cefafedc33a16a7361756c95f8b8f6))
+* **review-feedback:** apply review feedback for session rewind, cleanup regex, rag test, and resume urls ([543d88f](https://github.com/es6kr/skills/commit/543d88f189c415c5f7a911aa861cde9b382016bd))
+* **wip,hook-kit:** enhance register-before-execute and block-axis-merged-ask ([ee95d6f](https://github.com/es6kr/skills/commit/ee95d6f2df4f40a22b48b807b443185828422bc2))
+* **wip:** mark the PR-URL gate unenforced in both resume Don't/Do rows ([dd7b0c0](https://github.com/es6kr/skills/commit/dd7b0c0f1d069643187b15319516a29993824648))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/wip-v0.4.5...wip-v0.5.0) (2026-08-20)
 
 

@@ -63,16 +63,19 @@ Before triggering a native UI or CLI rewind command that reverts files:
 
 ```bash
 # 1. Stash all uncommitted local code changes & untracked files
-git stash save -u "agy-soft-rewind-keep-code-$(date +%Y%m%d_%H%M%S)"
+git stash push -u -m "agy-soft-rewind-keep-code-$(date +%Y%m%d_%H%M%S)"
 
 # 2. Perform native conversation rewind in agy CLI / IDE to the desired checkpoint step
 # (e.g. agy --conversation=<uuid> or UI rewind)
 
-# 3. Restore all local code changes without conflict
+# 3. Restore all local code changes (resolve merge conflicts if modified during native rewind)
 git stash pop
 ```
 
-## Method 3: Manual SQLite Step Truncation (Fallback)
+## Method 3: Manual SQLite Step Truncation (Database-Only Fallback)
+
+> [!NOTE]
+> This manual SQL fallback truncates step rows in `SESSION_DB` and updates step counts. For full session consistency (including `transcript.jsonl` and `transcript_full.jsonl` truncation), use `Method 1: Direct Truncation Engine` (`scripts/rewind-session.py`).
 
 ```bash
 SESSION_DB="$HOME/.gemini/antigravity-cli/conversations/<conversation_id>.db"

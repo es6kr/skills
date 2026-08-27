@@ -70,6 +70,7 @@ git -C "$WT" reset HEAD -- .
 git -C "$GITDIR" worktree list        # the worktree now appears
 git -C "$WT" status --short           # shows only real uncommitted changes
 git -C "$WT" log --oneline -1         # correct HEAD
+sourcegit "$WT"                       # launch GUI to inspect recovered worktree
 ```
 
 ## Key Principles

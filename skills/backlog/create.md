@@ -8,27 +8,27 @@ When creating a Plane issue or registering a PlaneBacklog intake item, do not re
 
 ## Execution Procedure
 
-Resolve `FIX_PLAN_SCRIPTS` once per session:
+Resolve `BACKLOG_SCRIPTS` once per session:
 
 ```bash
-for d in "${FIX_PLAN_SCRIPTS:-}" \
-         "${CLAUDE_PLUGIN_ROOT:-}/skills/fix-plan/scripts" \
-         "${AGENT_SKILLS_HOME:-$HOME/.agents}/skills/fix-plan/scripts" \
-         "${GEMINI_SKILLS_HOME:-$HOME/.gemini/config}/skills/fix-plan/scripts"; do
-  [ -n "$d" ] && [ -d "$d" ] && FIX_PLAN_SCRIPTS="$d" && break
+for d in "${BACKLOG_SCRIPTS:-}" \
+         "${CLAUDE_PLUGIN_ROOT:-}/skills/backlog/scripts" \
+         "${AGENT_SKILLS_HOME:-$HOME/.agents}/skills/backlog/scripts" \
+         "${GEMINI_SKILLS_HOME:-$HOME/.gemini/config}/skills/backlog/scripts"; do
+  [ -n "$d" ] && [ -d "$d" ] && BACKLOG_SCRIPTS="$d" && break
 done
 ```
 
 ### 1. Create Intake Issue (Default)
 
 ```bash
-python3 "$FIX_PLAN_SCRIPTS/plane_create_issue.py" --title "[component] Issue title" --description "Detailed description text" --json
+python3 "$BACKLOG_SCRIPTS/plane_create_issue.py" --title "[component] Issue title" --description "Detailed description text" --json
 ```
 
 ### 2. Create Regular Issue (Non-Intake)
 
 ```bash
-python3 "$FIX_PLAN_SCRIPTS/plane_create_issue.py" --title "[component] Issue title" --description "Detailed description text" --no-intake --json
+python3 "$BACKLOG_SCRIPTS/plane_create_issue.py" --title "[component] Issue title" --description "Detailed description text" --no-intake --json
 ```
 
 ## Resilience & Fallback Hierarchy

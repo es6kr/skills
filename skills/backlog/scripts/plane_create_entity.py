@@ -1,15 +1,28 @@
 #!/usr/bin/env python3
 """
-plane_create_issue.py — Create Plane Issues / Intake Issues via REST API or K3s Pod Fallback
+plane_create_entity.py — Create Plane Issues / Pages via REST API or K3s Pod Fallback
 
 Supports:
   - Markdown nested bullet tree parsing into TipTap ProseMirror JSON (nested bulletList & listItem)
   - Rich HTML structure (<ul><li><ul><li>...</li></ul></li></ul>)
   - Plain text description_stripped for search indexing
-  - Idempotency guard (prevents duplicate issue creation)
+  - Idempotency guard (prevents duplicate issue/page creation)
+  - --type page: Page (wiki-style doc) creation, K3s Django-shell only (no REST
+    attempt — that endpoint's behavior on this workspace hasn't been verified)
+
+K3s fallback target (namespace/kubeconfig) comes from the resolved workspace
+profile (workspace_profile.py's k3s_namespace/k3s_kubeconfig, propagated by
+plane_client.resolve_profile) — set these per-workspace rather than assuming
+a single kubectl context. Getting this wrong silently creates the
+issue/page on the wrong Plane instance.
+
+Windows note: pass PYTHONUTF8=1 (or PYTHONIOENCODING=utf-8) when the title/
+description contains non-ASCII characters — the default Windows console
+codepage (cp949) cannot encode arbitrary Unicode in --json output.
 
 Usage:
-  python3 plane_create_issue.py --title "Issue title" [--description "Description text"] [--project "project_id"] [--no-intake] [--json]
+  python3 plane_create_issue.py --title "Issue title" [--description "..."] [--project "project_id"] [--no-intake] [--json]
+  python3 plane_create_issue.py --type page --title "Page title" [--description "..."] [--project "project_id"] [--json]
 """
 
 import sys
@@ -55,7 +68,7 @@ for _shared_dir in _shared_script_dirs():
 # Single source of truth for profile resolution. Importing it eagerly is
 # deliberate: a missing resolver must fail loudly rather than silently degrade
 # into a run that targets whichever workspace the environment happens to name.
-from plane_client import resolve_profile, normalize_priority  # noqa: E402
+from plane_client import resolve_profile, normalize_priority, convert_document  # noqa: E402
 
 
 def parse_inline_tiptap(text: str) -> list:
@@ -496,6 +509,124 @@ print("RESULT_JSON:" + json.dumps(res))
 """
 
 
+def create_via_k3s_page_fallback(profile: dict, title: str, description: str = "", project_id: str = None) -> dict:
+    """Create a Plane Page (wiki-style doc, not an Issue) via Django shell.
+
+    No REST attempt here — unlike issues, this workspace's Page create
+    endpoint has not been verified to exist/behave the same as Issues, so we
+    go straight to the proven K3s path rather than guess at an untested
+    REST contract.
+    """
+    workspace_slug = profile.get("workspace_slug")
+    prj_id = project_id or profile.get("default_project")
+    plane_host = (profile.get("plane_host") or "").rstrip("/")
+
+    missing = [
+        name
+        for name, value in (
+            ("workspace_slug", workspace_slug),
+            ("project_id", prj_id),
+            ("plane_host", plane_host),
+        )
+        if not value
+    ]
+    if missing:
+        return {
+            "success": False,
+            "reason": (
+                f"Unresolved workspace profile fields: {', '.join(missing)}. "
+                "Refusing to fall back to an arbitrary workspace or project."
+            ),
+        }
+
+    tiptap_doc, html_desc, plain_desc = markdown_to_tiptap_and_html(description)
+
+    # Populate every representation a Page carries. Creating one with only
+    # description_html leaves description / description_stripped / and above all
+    # description_binary (the Yjs CRDT state the editor treats as authoritative)
+    # empty, so the first person to open the page sees a blank body and search
+    # cannot find it. Plane's own converter derives the JSON and the binary from
+    # the same HTML, which keeps the four representations consistent.
+    canonical_tiptap, binary_b64 = convert_document(plane_host, html_desc)
+    if canonical_tiptap is not None:
+        tiptap_doc = canonical_tiptap
+
+    py_script = f"""import base64, json
+from plane.db.models import Page, ProjectPage, Workspace, Project, User
+
+ws = Workspace.objects.filter(slug={json.dumps(workspace_slug)}).first()
+prj = Project.objects.filter(id={json.dumps(prj_id)}).first()
+if prj is None:
+    print(json.dumps({{"success": False, "reason": {json.dumps(f"project {prj_id} not found")}}}))
+    raise SystemExit(0)
+u = User.objects.filter(is_superuser=True).first() or User.objects.first()
+
+# Idempotency check: existing page with the same title already linked to this project
+existing = Page.objects.filter(name={json.dumps(title)}, projects__id=prj.id).first()
+if existing:
+    res = {{
+        "success": True,
+        "method": "Existing (Idempotency Guard)",
+        "id": str(existing.id),
+        "title": existing.name,
+        "url": f"{plane_host}/{workspace_slug}/projects/{{prj.id}}/pages/{{existing.id}}/",
+    }}
+    print("RESULT_JSON:" + json.dumps(res))
+    exit(0)
+
+binary_b64 = {json.dumps(binary_b64)}
+page = Page.objects.create(
+    workspace=ws,
+    name={json.dumps(title)},
+    description_html={json.dumps(html_desc)},
+    description={json.dumps(tiptap_doc)},
+    description_stripped={json.dumps(plain_desc)},
+    description_binary=base64.b64decode(binary_b64) if binary_b64 else None,
+    owned_by=u,
+    created_by=u,
+    access=0,
+)
+ProjectPage.objects.create(workspace=ws, project=prj, page=page, created_by=u)
+
+res = {{
+    "success": True,
+    "method": "K3s Django Shell",
+    "id": str(page.id),
+    "title": page.name,
+    "url": f"{plane_host}/{workspace_slug}/projects/{{prj.id}}/pages/{{page.id}}/",
+    "binary_written": bool(binary_b64),
+}}
+print("RESULT_JSON:" + json.dumps(res))
+"""
+
+    b64_script = base64.b64encode(py_script.encode('utf-8')).decode('utf-8')
+    namespace = profile.get("k3s_namespace") or "plane"
+    kubeconfig = profile.get("k3s_kubeconfig")
+    cmd = ["kubectl"]
+    if kubeconfig:
+        cmd += ["--kubeconfig", kubeconfig]
+    cmd += [
+        "exec", "-n", namespace, "deploy/plane-api-wl", "--",
+        "python3", "manage.py", "shell", "-c",
+        f"import base64; exec(base64.b64decode('{b64_script}').decode('utf-8'))"
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        for line in res.stdout.splitlines():
+            if line.startswith("RESULT_JSON:"):
+                return json.loads(line[len("RESULT_JSON:"):])
+        return {"success": False, "reason": f"No RESULT_JSON line output. Stdout: {res.stdout}, Stderr: {res.stderr}"}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "reason": f"K3s execution failed: {e.stderr or e.stdout or str(e)}"}
+    except Exception as e:
+        return {"success": False, "reason": f"K3s execution failed: {str(e)}"}
+
+
+def create_plane_page(title: str, description: str = "", project_id: str = None, cwd: str = None) -> dict:
+    profile = resolve_profile(cwd or os.getcwd())
+    return create_via_k3s_page_fallback(profile, title, description, project_id)
+
+
 def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
     normalized_priority = normalize_priority(priority) if priority else None
     workspace_slug = profile.get("workspace_slug")
@@ -534,11 +665,19 @@ def create_via_k3s_fallback(profile: dict, title: str, description: str = "", pr
 
     py_script = build_k3s_py_script(workspace_slug, prj_id, plane_host, title, description, is_intake, normalized_priority)
     b64_script = base64.b64encode(py_script.encode('utf-8')).decode('utf-8')
-    cmd = [
-        "kubectl", "exec", "-n", k3s_namespace, k3s_workload, "--",
-        "python3", "manage.py", "shell", "-c",
-        f"import base64; exec(base64.b64decode('{b64_script}').decode('utf-8'))"
-    ]
+    k3s_ssh_host = profile.get("k3s_ssh_host")
+    if k3s_ssh_host:
+        cmd = [
+            "ssh",
+            k3s_ssh_host,
+            f"kubectl exec -n {k3s_namespace} {k3s_workload} -- python3 manage.py shell -c \"import base64; exec(base64.b64decode('{b64_script}').decode('utf-8'))\"",
+        ]
+    else:
+        cmd = [
+            "kubectl", "exec", "-n", k3s_namespace, k3s_workload, "--",
+            "python3", "manage.py", "shell", "-c",
+            f"import base64; exec(base64.b64decode('{b64_script}').decode('utf-8'))"
+        ]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         for line in res.stdout.splitlines():
@@ -566,11 +705,12 @@ def create_plane_issue(title: str, description: str = "", project_id: str = None
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Create Plane Issue / Intake Issue")
-    parser.add_argument("--title", required=True, help="Issue title")
-    parser.add_argument("--description", default="", help="Issue description")
+    parser = argparse.ArgumentParser(description="Create Plane Issue / Intake Issue / Page")
+    parser.add_argument("--type", choices=["issue", "page"], default="issue", help="What to create (default: issue)")
+    parser.add_argument("--title", required=True, help="Title")
+    parser.add_argument("--description", default="", help="Description (markdown)")
     parser.add_argument("--project", default=None, help="Project ID or slug")
-    parser.add_argument("--no-intake", action="store_true", help="Do not mark as intake issue")
+    parser.add_argument("--no-intake", action="store_true", help="Issues only: do not mark as intake issue")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     parser.add_argument(
         "-p", "--priority", default=None,
@@ -578,17 +718,22 @@ def main():
     )
 
     args = parser.parse_args()
-    res = create_plane_issue(args.title, args.description, args.project, is_intake=not args.no_intake, priority=args.priority)
+
+    if args.type == "page":
+        res = create_plane_page(args.title, args.description, args.project)
+    else:
+        res = create_plane_issue(args.title, args.description, args.project, is_intake=not args.no_intake, priority=args.priority)
 
     if args.json:
         print(json.dumps(res, indent=2, ensure_ascii=False))
     else:
         if res.get("success"):
-            print(f"✅ Created Plane Issue [{res.get('sequence_id')}] via {res.get('method')}")
+            label = f"[{res.get('sequence_id')}]" if res.get("sequence_id") is not None else ""
+            print(f"✅ Created Plane {args.type.capitalize()} {label} via {res.get('method')}")
             print(f"   Title: {res.get('title')}")
             print(f"   URL:   {res.get('url')}")
         else:
-            print(f"❌ Failed to create issue: {res.get('reason')}")
+            print(f"❌ Failed to create {args.type}: {res.get('reason')}")
             sys.exit(1)
 
 
