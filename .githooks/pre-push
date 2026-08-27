@@ -48,10 +48,30 @@ while IFS= read -r line; do
     COMMIT_COUNT=$(git rev-list --count "$remote_sha..$local_sha" 2>/dev/null || echo 0)
   else
     DEFAULT_BASE="origin/main"
-    if git rev-parse --verify origin/next-fix >/dev/null 2>&1; then
-      DEFAULT_BASE="origin/next-fix"
-    elif git rev-parse --verify origin/master >/dev/null 2>&1; then
-      DEFAULT_BASE="origin/master"
+    case "$local_ref" in
+      refs/heads/feat/*|feat/*)
+        if git rev-parse --verify origin/next-feat >/dev/null 2>&1; then
+          DEFAULT_BASE="origin/next-feat"
+        fi
+        ;;
+      refs/heads/fix/*|fix/*)
+        if git rev-parse --verify origin/next-fix >/dev/null 2>&1; then
+          DEFAULT_BASE="origin/next-fix"
+        fi
+        ;;
+    esac
+
+    if [ "$DEFAULT_BASE" = "origin/main" ]; then
+      MIN_COUNT=999999
+      for cand in origin/next-feat origin/next-fix origin/main origin/master; do
+        if git rev-parse --verify "$cand" >/dev/null 2>&1; then
+          cnt=$(git rev-list --count "$cand..$local_sha" 2>/dev/null || echo 999999)
+          if [ "$cnt" -lt "$MIN_COUNT" ]; then
+            MIN_COUNT="$cnt"
+            DEFAULT_BASE="$cand"
+          fi
+        fi
+      done
     fi
     COMMIT_COUNT=$(git rev-list --count "$DEFAULT_BASE..$local_sha" 2>/dev/null || echo 0)
   fi
