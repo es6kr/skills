@@ -165,6 +165,17 @@ else
   add_result "BASE-5" "Base" "Secret & IP Guard" "WARN" "No pre-commit hook found."
 fi
 
+# BASE-6: pre-push commit count limit guard (prevents pushing massive commits from wrong base)
+if [[ -n "$PRE_PUSH_CONTENT" ]]; then
+  if echo "$PRE_PUSH_CONTENT" | grep -qE '(PUSH_MAX_COMMITS|PUSH_COMMIT_LIMIT_OVERRIDE|rev-list.*--count|MAX_COMMITS)'; then
+    add_result "BASE-6" "Base" "Push Commit Limit" "PASS" "pre-push hook contains commit count limit guard against wrong-base divergence."
+  else
+    add_result "BASE-6" "Base" "Push Commit Limit" "FAIL" "pre-push hook lacks commit count limit guard (prevents pushing diverged commits from wrong base branch)."
+  fi
+else
+  add_result "BASE-6" "Base" "Push Commit Limit" "WARN" "No pre-push hook found."
+fi
+
 # -----------------------------------------------------------------------------
 # Tier 2: Conditional Checks
 # -----------------------------------------------------------------------------

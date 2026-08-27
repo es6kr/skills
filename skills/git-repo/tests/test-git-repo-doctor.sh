@@ -196,6 +196,13 @@ while read lref lsha rref rsha; do
   if [ "$lref" = "refs/heads/local" ]; then
     exit 1
   fi
+  # Push commit count limit guard
+  MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
+  COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
+  if [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ]; then
+    exit 1
+  fi
+
 done
 # Skill frontmatter & language lint
 bash scripts/lint-frontmatter.sh
@@ -206,6 +213,25 @@ out_6=$(bash "$SCRIPT" "$REPO_6" 2>&1)
 exit_6=$?
 check "Fully compliant repository passes all checks" 0 "$exit_6"
 rm -rf "$REPO_6"
+
+# -----------------------------------------------------------------------------
+# Test 7: Base - Missing pre-push commit count limit guard (BASE-6)
+# -----------------------------------------------------------------------------
+REPO_7="$(make_temp_repo)"
+mkdir -p "$REPO_7/.githooks"
+git_in "$REPO_7" config core.hooksPath .githooks
+cat > "$REPO_7/.githooks/pre-push" << 'EOF'
+#!/bin/sh
+while read lref lsha rref rsha; do
+  [ "$lsha" = "0000000000000000000000000000000000000000" ] && exit 0
+  if [ "$lref" = "refs/heads/local" ]; then exit 1; fi
+done
+EOF
+chmod +x "$REPO_7/.githooks/pre-push"
+out_7=$(bash "$SCRIPT" "$REPO_7" 2>&1)
+exit_7=$?
+check "Base: pre-push missing commit count limit guard (BASE-6)" 1 "$exit_7"
+rm -rf "$REPO_7"
 
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
