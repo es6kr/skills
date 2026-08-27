@@ -14,6 +14,13 @@ GitHub PR/Issue state polling. Reads `[ ]` items in fix_plan, finds PR/Issue num
 
 Grep fix_plan for `PR #N`, `Issue #N`, or bare `#N` near a known issue/PR keyword. For each match, capture the number. When rewriting or updating the state of these items, ensure bare references (or raw `PR #N`) are rewritten to clickable Markdown links `[PR #N](URL)`.
 
+**List-item block boundary (HARD STOP)**: before toggling any marker, read the item's full list block — its own line plus every directly-nested `  - ` sub-bullet immediately below it. A nested sub-bullet is an **independent completion unit**: it can carry its own `[ ]`/`[x]`/`[BLOCKED]` marker and its own PR/Issue reference, unrelated to the parent's. Toggling the parent to `[x]` because the parent's own reference resolved does not resolve a nested sub-bullet's reference — that sub-bullet needs its own state check against its own number.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Locate an item by grepping a unique substring in its top-level line, edit only that line | Read the matched line plus any `  - ` lines directly beneath it before editing — a nested sub-bullet with its own marker is a separate unit |
+| 2 | Extract one number per grep match and stop there | Extract every PR/Issue number in the block, including ones that only appear in a nested sub-bullet |
+
 ### 2. Query GitHub state
 
 **Batch per repo (default — avoids the N-call loop)**: when a tracker references many numbers (≥3) in the same repo, query them in one call per artifact type instead of looping `gh pr view` per number. This respects the external-API repeat-call limit (3+ identical calls need justification) and is dramatically faster on large trackers:
@@ -96,6 +103,7 @@ Degrade cleanly when the profile exists but its token env resolves empty (`plane
 | 2 | On GitHub API error, mark the item BLOCKED | Do not change the item's state on uncertain input; include the API error as a separate line in the sync report so the user can see what failed |
 | 3 | Run sync without reporting how many items changed | Report changed-item count to the user. Zero changes → "no changes" |
 | 4 | Re-sync items already `[x]` | Sync only operates on `[ ]` entries |
+| 5 | Apply the batch query result to only a hand-picked high-signal subset of the extracted numbers (e.g. just the P0/P1 items) | Apply the rules table (step 3) to **every** number the batch query returned, one tracker line at a time — batching is an API-call-count optimization (step 2), not a license to skip applying results to lower-priority lines |
 
 ## Report format
 
