@@ -41,7 +41,6 @@ CREATE_ISSUE_COPIES = [
     pytest.param(TARGET_SCRIPTS / "plane_create_issue.py", id="backlog"),
 ]
 
-
 PROFILE = {
     "plane_host": "https://plane.invalid",
     "token": "test-token",
@@ -197,3 +196,20 @@ def test_k3s_fallback_skips_gracefully_without_kubectl(script_path, monkeypatch)
     assert res["success"] is False
     assert "kubectl" in res["reason"]
     assert not ran, "fallback must not shell out when kubectl is absent"
+
+
+# ------------------------------------------------------- dual-copy drift guard
+
+
+def test_create_issue_copies_are_byte_identical():
+    target = FIX_PLAN_SCRIPTS / "plane_create_issue.py"
+    canonical = TARGET_SCRIPTS / "plane_create_issue.py"
+    if target.exists() and canonical.exists():
+        assert filecmp.cmp(
+            target,
+            canonical,
+            shallow=False,
+        ), (
+            "the fix-plan and backlog copies of plane_create_issue.py have "
+            "drifted — apply the change to both copies"
+        )

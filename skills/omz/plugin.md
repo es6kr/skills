@@ -46,12 +46,17 @@ plugins=(... {plugin})
 
 ### 3. chezmoi Integration
 
-If dotfiles are managed with chezmoi:
+If dotfiles are managed with chezmoi, check how `.zshrc` is tracked before assuming an edit needs to be re-added:
 
 ```bash
-# After modifying .zshrc
-chezmoi re-add ~/.zshrc
+chezmoi managed | grep -Fxq '.zshrc' && chezmoi source-path ~/.zshrc
+```
 
+If the source entry is a `modify_` script (e.g. `modify_dot_zshrc.sh.tmpl`), **`chezmoi re-add ~/.zshrc` is a no-op** — chezmoi's `re-add` command explicitly skips `modify_`-type source entries, so a live `.zshrc` edit (like adding a plugin to `plugins=()`) never reaches the source repo this way. **Never run `chezmoi add ~/.zshrc` either** — `add` replaces a `modify_` script with a static file, destroying whatever logic the script injects (e.g. wrapper function re-insertion).
+
+To make a plugin change survive a fresh `chezmoi apply` on a new machine, edit the `modify_` script's own baseline content directly (e.g. its `REQUIRED` array) instead of trying to sync the live file back.
+
+```bash
 # Register external plugins in .chezmoiexternal.toml
 # (see chezmoi skill)
 ```

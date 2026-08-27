@@ -88,6 +88,24 @@ def test_resolve_plain_path_unchanged():
     assert mod.resolve_script_operand('"/p/with space/hook.sh"') == "/p/with space/hook.sh"
 
 
+def test_resolve_preserves_windows_backslashes(monkeypatch):
+    # posix=True shlex.split treats backslash as an escape character, so a
+    # Windows path silently loses every backslash (\U -> U, \A -> A, ...)
+    # and the resolved path stops existing. Guards the fix for that.
+    # Force the win32 branch explicitly so this test is deterministic
+    # regardless of the platform actually running it (CI runs on Linux).
+    monkeypatch.setattr(mod.sys, "platform", "win32")
+    assert mod.resolve_script_operand(r"python3 C:\Users\me\hook.sh") == r"C:\Users\me\hook.sh"
+
+
+def test_resolve_posix_path_unaffected_by_win32_branch(monkeypatch):
+    # On win32, posix=False is used -- confirm ordinary POSIX paths and
+    # interpreter/flag skipping still resolve correctly under that mode.
+    monkeypatch.setattr(mod.sys, "platform", "win32")
+    assert mod.resolve_script_operand("python3 /p/hook.sh") == "/p/hook.sh"
+    assert mod.resolve_script_operand('"/p/with space/hook.sh"') == "/p/with space/hook.sh"
+
+
 # --- check_hook_integrity: end-to-end on the installed schema ---
 
 def test_installed_schema_is_audited(tmp_path, monkeypatch):

@@ -47,21 +47,16 @@ Top-level sections:
 | `- [REPEAT]` | Persistent recurring item (Ralph-specific — see ralph/periodic.md) | `## REPEAT` section only (out of scope for this skill) |
 | `[CLAIMED:<sid>:<ts>]` | Multi-session in-progress lease (suffix **annotation**, not a checkbox state) — see [claim.md](./claim.md) | appended after `- [ ]` / `- [BLOCKED:*:selfable]` |
 
-When an item completes, change `- [ ]` → `- [x]` and preserve discovery metadata while appending Model, Session ID (8 chars), and timestamp to the title line.
+When an item completes, change `- [ ]` → `- [x]` and append session ID + timestamp to the title line.
 
-Format: `(YYYY-MM-DD, <Model> <SessionID8>)` (e.g., `(2026-08-18, Gemini Flash 934c5d4b)`) or `(YYYY-MM-DD HH:mm completed: <Model> <SessionID8>, commit <hash>)` or for merged PRs: `(YYYY-MM-DD HH:mm completed: <Model> <SessionID8>, [PR #N](https://github.com/<owner>/<repo>/pull/N))`. If the item had existing discovery metadata, preserve it using the model name: `(2026-08-17, Gemini Flash b43980f2; completed 2026-08-18, Gemini Flash 934c5d4b)`. Never use bare `session <id>` without the model name. All PR/Issue references in the tracker must be clickable Markdown links (`[PR #N](URL)` or `[Issue #N](URL)`).
+Format: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, commit <hash>)` or for merged PRs: `(YYYY-MM-DD HH:mm completed: Session xxxxxxxx, [PR #N](https://github.com/<owner>/<repo>/pull/N))`. All PR/Issue references in the tracker must be clickable Markdown links (`[PR #N](URL)` or `[Issue #N](URL)`).
 
-- Model: executor model identifier (e.g. `Gemini Flash`, `Claude Sonnet`, `Claude Opus`)
-- Session ID: first 8 chars from `.ralph/.claude_session_id` (Ralph environment) or current session UUID prefix (e.g. `934c5d4b`)
-- Timestamp: `YYYY-MM-DD` or 24-hour `YYYY-MM-DD HH:mm` of the completion moment
+- Session ID: first 8 chars from `.ralph/.claude_session_id` (Ralph environment) or current session ID
+- Timestamp: 24-hour `YYYY-MM-DD HH:mm` of the completion moment
 - Add `**complete**` markers to inner sub-steps where useful
 
 **Completion Migration Rule (HARD STOP)**: When the user explicitly instructs to "mark this as completed" or its locale equivalent (a completion-marking instruction in the user's language), you must **not** just change `- [ ]` (or `- [BLOCKED]`) to `- [x]` in place. You must change the state **AND** move the item to the `## Completed` section (as a summarized one-line entry with the timestamp and session ID) in the **very same edit/turn**. Do not split completion marking and completed section migration into separate turns.
 
-**Backlog Execution Log Separation & Plane Comment Storage Rule (HARD STOP)**: When recording sub-step completions, audit triage results, or intermediate execution history (e.g. `✅ classification complete`, `✅ execution complete`, detailed analytical breakdown tables), dumping multi-paragraph raw execution narratives directly into active `fix_plan.md` / `checklist.md` backlog items is strictly forbidden (`HARD STOP`).
-`fix_plan.md` backlog items must remain strictly lean and uncluttered (Scope / Why / How / Status pointer). All detailed execution narratives, triage logs, and audit dumps must be:
-1. Posted as an issue comment on the corresponding Plane issue using `plane_create_comment.py` (or recorded in RAG / session walkthroughs).
-2. Referenced in `fix_plan.md` with only a concise 1-line pointer link (e.g. `- **Progress**: Triage complete (details in Plane issue comment / walkthrough-<id>.md)`).
 
 ## Section-consistency check (HARD STOP)
 
