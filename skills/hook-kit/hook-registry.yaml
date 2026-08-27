@@ -470,17 +470,29 @@ hooks:
     matcher: ''
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-manual-handoff-web-task.sh
 - id: block-new-skill-ready-without-ask
-  owner_skill: hook-kit
+  owner_skill: skill-kit
   marketplace: es6kr-skills
   status: active
   implementations:
   - runtime: sh
-    file: skills/hook-kit/resources/block-new-skill-ready-without-ask.sh
+    file: skills/skill-kit/resources/block-new-skill-ready-without-ask.sh
   registrations:
   - surface: hooks.json
     event: PreToolUse
     matcher: Bash
-    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-new-skill-ready-without-ask.sh
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh
+- id: block-squash-recommend-multi-commit
+  owner_skill: github-flow
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/github-flow/resources/block-squash-recommend-multi-commit.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: AskUserQuestion
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-squash-recommend-multi-commit.sh
 - id: block-noncompliant-review-comment
   owner_skill: consolidate
   marketplace: es6kr-skills

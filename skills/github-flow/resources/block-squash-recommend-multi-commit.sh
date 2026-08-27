@@ -30,7 +30,8 @@ if [[ -z "$OPTION_TEXTS" ]]; then
   exit 0
 fi
 
-if ! echo "$OPTION_TEXTS" | grep -qiE 'squash'; then
+ACTIVE_SQUASH_TEXT=$(echo "$OPTION_TEXTS" | grep -iE 'squash' | grep -viE '(no squash|never squash|do not squash|without squash|don'\''t squash)')
+if [[ -z "$ACTIVE_SQUASH_TEXT" ]]; then
   exit 0
 fi
 

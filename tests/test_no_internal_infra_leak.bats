@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
   local pat hits all=""
   while IFS= read -r pat || [[ -n "$pat" ]]; do
     [[ -z "$pat" || "$pat" == \#* ]] && continue
-    hits=$(git -C "$REPO_ROOT" grep -nE "$pat" -- skills/ 2>/dev/null || true)
+    hits=$(git -C "$REPO_ROOT" grep -nE -e "$pat" -- skills/ 2>/dev/null || true)
     [[ -n "$hits" ]] && all+="$hits"$'\n'
   done < "$denylist"
   [[ -z "$all" ]] || { echo "Denylisted internal value in skill content:"; echo "$all"; return 1; }
