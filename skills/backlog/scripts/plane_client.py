@@ -141,7 +141,7 @@ def resolve_profile(cwd=None):
     return {
         "plane_host": (profile.get("plane_host") or os.environ.get("PLANE_HOST", "")).rstrip("/"),
         "token": token,
-        "workspace_slug": profile.get("workspace_name") or os.environ.get("PLANE_WORKSPACE", ""),
+        "workspace_slug": profile.get("workspace_slug") or os.environ.get("PLANE_WORKSPACE") or profile.get("workspace_name", ""),
         "default_project": profile.get("default_project") or os.environ.get("PLANE_PROJECT"),
     }
 

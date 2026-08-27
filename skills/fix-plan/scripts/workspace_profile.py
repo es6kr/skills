@@ -51,7 +51,8 @@ DEFAULT_PROFILE = {
     "qdrant_task_collection": "fix-plan",
     "llm_wiki_path": "",
     "default_project": "default",
-    "tracker_root": ".ralph"
+    "tracker_root": ".ralph",
+    "artifacts_path": ".agents/docs/generated"
 }
 
 
@@ -99,6 +100,12 @@ def v2_profile_to_flat(profile: dict, defaults: dict) -> dict:
         if parent not in ("", "."):
             flat["tracker_root"] = parent
 
+    artifacts = roles.get("artifacts") or {}
+    if artifacts.get("kind") in ("dir", "file") and artifacts.get("path"):
+        flat["artifacts_path"] = artifacts["path"]
+    elif artifacts.get("kind") == "none":
+        flat["artifacts_path"] = ""
+
     return flat
 
 
@@ -108,7 +115,19 @@ def load_user_config():
     v2 wins when present; v1 stays readable for the migration window so a
     machine that has not been migrated keeps working unchanged.
     """
-    for path in (CONFIG_FILE_V2, CONFIG_FILE):
+    explicit = os.environ.get("AGENT_WORKSPACE_CONFIG")
+    if explicit:
+        p = Path(explicit)
+        if not p.exists():
+            print(f"Warning: AGENT_WORKSPACE_CONFIG path does not exist: {p}", file=sys.stderr)
+        paths = [p]
+    elif CONFIG_FILE != Path.home() / ".config" / "plane-backlog" / "config.json":
+        # Test monkeypatching target
+        paths = [CONFIG_FILE_V2, CONFIG_FILE]
+    else:
+        paths = [CONFIG_FILE_V2, CONFIG_FILE]
+
+    for path in paths:
         if not path.exists():
             continue
         try:
@@ -259,3 +278,4 @@ if __name__ == "__main__":
         print(f"  Wiki Collection: {profile['qdrant_wiki_collection']}")
         print(f"  LLM Wiki Path: {profile['llm_wiki_path']}")
         print(f"  Tracker Root: {profile['tracker_root']}")
+        print(f"  Artifacts Path: {profile['artifacts_path']}")

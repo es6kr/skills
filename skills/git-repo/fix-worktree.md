@@ -27,8 +27,9 @@ scripts/git-fix-worktree.sh /path/to/repo.git
 
 1. **When worktree exists**: Register in bare repo's `worktrees/` directory
 2. **Worktree's `.git` file**: Fix to point to subdirectory under `worktrees/`
-3. **Index regeneration**: If missing, regenerate with `git read-tree HEAD` (preserves uncommitted changes)
+3. **Index regeneration**: If missing, regenerate with `git reset HEAD -- .` or `git read-tree HEAD` (preserves uncommitted changes)
 4. **Config restoration**: Remove `core.worktree`, set `core.bare = true`
+5. **SourceGit auto-launch**: Launch SourceGit GUI on the target worktree path (`sourcegit <worktree_path>`) so the user can inspect the recovered worktree immediately.
 
 ## Example Output
 

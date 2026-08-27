@@ -19,16 +19,19 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLANE_BACKLOG_SCRIPTS = REPO_ROOT / "skills" / "plane-backlog" / "scripts"
+BACKLOG_SCRIPTS = REPO_ROOT / "skills" / "backlog" / "scripts"
 FIX_PLAN_SCRIPTS = REPO_ROOT / "skills" / "fix-plan" / "scripts"
 
 # Scripts that must never carry a concrete workspace identifier as a fallback.
 #
-# Both skill directories are listed because the docs reference the create
+# All skill directories are listed because the docs reference the create
 # scripts under either root, and a copy may exist in one, the other, or both.
 # Only the paths that actually resolve are asserted on — a missing candidate is
 # a documentation drift to fix in the docs, not a reason to fail this guard with
 # a FileNotFoundError that says nothing about workspace identifiers.
 _CREATE_SCRIPT_CANDIDATES = [
+    BACKLOG_SCRIPTS / "plane_create_issue.py",
+    BACKLOG_SCRIPTS / "plane_create_comment.py",
     PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py",
     PLANE_BACKLOG_SCRIPTS / "plane_create_comment.py",
     FIX_PLAN_SCRIPTS / "plane_create_issue.py",
@@ -41,7 +44,7 @@ CREATE_SCRIPTS = [p for p in _CREATE_SCRIPT_CANDIDATES if p.is_file()]
 # vacuously and the workspace-identifier check would silently stop running.
 assert CREATE_SCRIPTS, (
     "no create script resolved under "
-    f"{PLANE_BACKLOG_SCRIPTS} or {FIX_PLAN_SCRIPTS} — "
+    f"{BACKLOG_SCRIPTS}, {PLANE_BACKLOG_SCRIPTS} or {FIX_PLAN_SCRIPTS} — "
     "the scripts moved and this test's candidate list needs updating"
 )
 
@@ -53,8 +56,9 @@ PLANE_HOST_LITERAL = re.compile(r"['\"]https?://[^'\"]*plane[^'\"]*['\"]")
 
 @pytest.fixture
 def scripts_on_path(monkeypatch):
-    for d in (PLANE_BACKLOG_SCRIPTS, FIX_PLAN_SCRIPTS):
-        monkeypatch.syspath_prepend(str(d))
+    for d in (BACKLOG_SCRIPTS, PLANE_BACKLOG_SCRIPTS, FIX_PLAN_SCRIPTS):
+        if d.is_dir():
+            monkeypatch.syspath_prepend(str(d))
     # Drop cached imports so each test gets a clean module state.
     for name in ("plane_client", "workspace_profile"):
         sys.modules.pop(name, None)
@@ -129,9 +133,10 @@ def test_workspace_profile_exposes_the_symbol_the_scripts_import(scripts_on_path
     """The delegation target must actually exist in workspace_profile."""
     import workspace_profile
 
+    client_scripts = [p for p in (BACKLOG_SCRIPTS / "plane_client.py", PLANE_BACKLOG_SCRIPTS / "plane_client.py") if p.is_file()]
     source = "\n".join(
         p.read_text(encoding="utf-8")
-        for p in list(CREATE_SCRIPTS) + [PLANE_BACKLOG_SCRIPTS / "plane_client.py"]
+        for p in list(CREATE_SCRIPTS) + client_scripts
     )
     for symbol in re.findall(r"from workspace_profile import (\w+)", source):
         assert hasattr(workspace_profile, symbol), (
@@ -195,9 +200,14 @@ def test_k3s_fallback_script_survives_quote_in_workspace_slug(monkeypatch):
     """
     import importlib.util
 
+    target_script = (
+        BACKLOG_SCRIPTS / "plane_create_issue.py"
+        if (BACKLOG_SCRIPTS / "plane_create_issue.py").is_file()
+        else PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py"
+    )
     spec = importlib.util.spec_from_file_location(
         "plane_create_issue_under_test",
-        PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py",
+        target_script,
     )
     plane_create_issue = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(plane_create_issue)
