@@ -25,6 +25,7 @@ graph TD
     B --> B3[BASE-3: Zero-SHA Pre-push Exit]
     B --> B4[BASE-4: Local Branch Guard]
     B --> B5[BASE-5: Secret & IP Guard]
+    B --> B6[BASE-6: Push Commit Limit Guard]
     
     C --> C1[COND-MD: Markdown Lint]
     C --> C2[COND-SKILL: Skill Frontmatter]
@@ -43,6 +44,7 @@ graph TD
 | **`BASE-3`** | **Pre-push Deletion** | Zero-SHA early exit | `pre-push` hook must detect remote branch deletion (`0000000000000000000000000000000000000000` or `(delete)`) and exit `0` immediately to avoid running heavy CI tests. |
 | **`BASE-4`** | **Local Branch Guard** | `local` branch push guard | `pre-push` hook must contain a guard blocking accidental push of private `refs/heads/local` stage branch to remote. |
 | **`BASE-5`** | **Secret & IP Guard** | Secret / IP scan | `pre-commit` hook must scan staged files for private RFC1918 IPs (`10.x`, `192.168.x`, `172.16-31.x`) and home paths. |
+| **`BASE-6`** | **Push Commit Limit Guard** | Outgoing commit count check | `pre-push` hook must check outgoing commit count (`rev-list --count` / `PUSH_MAX_COMMITS`) and block pushes exceeding the limit (default: 5) to prevent publishing massively diverged commits caused by wrong base branch selection. Override via `PUSH_COMMIT_LIMIT_OVERRIDE=1`. |
 
 ### Tier 2: Conditional Checks
 
@@ -151,3 +153,32 @@ if [ -f "scripts/lint-frontmatter.sh" ]; then
   bash scripts/lint-frontmatter.sh
 fi
 ```
+
+### 6. Adding Push Commit Limit Guard (`BASE-6`)
+
+In `.githooks/pre-push`:
+
+```sh
+# Commit count limit guard — prevent pushing massive commits from wrong base branch
+if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ -n "$remote_sha" ]; then
+  COMMIT_COUNT=$(git rev-list --count "$remote_sha..$local_sha" 2>/dev/null || echo 0)
+else
+  DEFAULT_BASE="origin/main"
+  if git rev-parse --verify origin/next-fix >/dev/null 2>&1; then
+    DEFAULT_BASE="origin/next-fix"
+  elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+    DEFAULT_BASE="origin/master"
+  fi
+  COMMIT_COUNT=$(git rev-list --count "$DEFAULT_BASE..$local_sha" 2>/dev/null || echo 0)
+fi
+
+MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
+if [ "$COMMIT_COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ]; then
+  echo "❌ ERROR: Pushing $COMMIT_COUNT commits on '$local_ref' exceeds the limit ($MAX_COMMITS)." >&2
+  echo "   This usually indicates a wrong base branch or diverged history." >&2
+  echo "   To override: PUSH_COMMIT_LIMIT_OVERRIDE=1 git push ..." >&2
+  exit 1
+fi
+```
+
+
