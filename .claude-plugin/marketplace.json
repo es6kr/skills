@@ -14,6 +14,53 @@
       "description": "A collection of AI coding skills including TDD, commit management, dotfile sync, and more",
       "name": "es6kr",
       "source": "./",
+      "skills": [
+        "./skills/brief",
+        "./skills/cc-plugin",
+        "./skills/chezmoi",
+        "./skills/choco",
+        "./skills/claudify",
+        "./skills/cleanup",
+        "./skills/code-workflow",
+        "./skills/commit-tidy",
+        "./skills/consolidate",
+        "./skills/docxport",
+        "./skills/dotfile",
+        "./skills/fa",
+        "./skills/fix-plan",
+        "./skills/forge",
+        "./skills/git-repo",
+        "./skills/github-flow",
+        "./skills/github-repo",
+        "./skills/harness",
+        "./skills/hook-kit",
+        "./skills/mcp-config",
+        "./skills/omz",
+        "./skills/backlog",
+        "./skills/repo",
+        "./skills/session",
+        "./skills/skill-kit",
+        "./skills/tdd",
+        "./skills/todowrite",
+        "./skills/web-browser"
+      ],
+      "strict": true,
+      "version": "0.1.1"
+    },
+    {
+      "author": {
+        "email": "drumrobot43@gmail.com",
+        "name": "es6.kr"
+      },
+      "description": "Session/task lifecycle bundle: next (next-action suggester), wip (in-session progress tracking), fix (behavior-correction 5-Why loop)",
+      "name": "task",
+      "source": "./",
+      "skills": [
+        "./skills/next",
+        "./skills/wip",
+        "./skills/fix"
+      ],
+      "strict": true,
       "version": "0.1.1"
     }
   ]

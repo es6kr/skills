@@ -8,6 +8,18 @@
 #     eval "$(workspace-config.sh --export)"
 #     [ "${WSCFG_RAG_KIND:-none}" = "none" ] && exit 0   # receiver absent -> skip
 #
+# Two output modes, one per consumer tier:
+#   --export  shell variables (WSCFG_<ROLE>_<FIELD>) for HOOK SCRIPTS —
+#             one parse, many reads within a single shell process. The
+#             WSCFG_* namespace is a hook-internal contract; do not
+#             reference it outside hook scripts.
+#   --json    structured {profile, roles} JSON for everything else
+#             (skills, python scripts, LLM instructions). Exported env
+#             vars do not survive across harness Bash tool calls, so
+#             non-hook consumers read fields directly instead:
+#
+#     workspace-config.sh --json | jq -r '.roles.artifacts.path'
+#
 # Roles carry a `kind` discriminator so the vendor can change without any
 # consumer edit, and `kind: "none"` makes "not configured" a first-class
 # state. That distinction is the point: without it a guard cannot tell an
@@ -36,7 +48,7 @@ for arg in "$@"; do
   case "$arg" in
     --export|--json) MODE="$arg" ;;
     -h|--help)
-      sed -n '2,32p' "$0"
+      sed -n '2,41p' "$0"
       exit 0
       ;;
     *) TARGET="$arg" ;;

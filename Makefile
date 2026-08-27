@@ -1,9 +1,10 @@
-.PHONY: help lint test install-hooks
+.PHONY: help lint test verify-spec install-hooks
 
 help:
 	@echo "Usage:"
 	@echo "  make test    Run all tests (bats + pytest)"
 	@echo "  make lint    Quick frontmatter check"
+	@echo "  make verify-spec  Agent Plugins v1.0.0 manifest conformance check"
 	@echo "  make install-hooks  Configure git to use .githooks/"
 
 lint:
@@ -13,11 +14,16 @@ lint:
 	  head -10 "$$skill" | grep -q '^description:' || echo "FAIL: $$skill missing description"; \
 	done
 
+verify-spec:
+	@python3 scripts/verify-plugin-spec.py
+
 test:
 	@echo "Running bats tests..."
 	@bats tests/test_structure.bats
 	@echo "Running pytest..."
 	@uvx --from pytest pytest tests/test_deploy.py -v
+	@echo "Checking Agent Plugins v1.0.0 manifest conformance..."
+	@python3 scripts/verify-plugin-spec.py
 
 install-hooks:
 	@echo "Configuring git hooks path to .githooks"

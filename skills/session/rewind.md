@@ -1,8 +1,16 @@
-# Session Rewind (Direct JSONL / DB Truncation)
+# Session Rewind (Direct Truncation & Soft Rewind)
 
-Provides direct truncation of conversation context (JSONL for Claude Code, SQLite DB for Antigravity) without reverting working directory source code files.
+Provides direct truncation and soft-rewind of conversation context (JSONL for Claude Code, SQLite DB for Antigravity) without reverting working directory source code modifications.
 
-## Workflow & Interactive Flags
+## Rewind Modes
+
+| Rewind Type | Conversation Context | Local Code Files | Method / Command |
+|-------------|----------------------|------------------|------------------|
+| **Direct Truncation Engine** (Recommended) | Truncated to step N / line M | **Preserved 100% (Untouched)** | `python3 scripts/rewind-session.py` |
+| **Git Stash Bridge** (Native UI/CLI) | Native rollback to step N | **Preserved 100% (Stash/Pop)** | `git stash` → Native Rollback → `git stash pop` |
+| **Hard Rewind** (Default UI/CLI) | Rollback to step N | Reverted to step N state | Native Checkpoint Rollback / UI Rewind |
+
+## Method 1: Direct Truncation Engine (`scripts/rewind-session.py`)
 
 ### 1. Engine Selection (`/session rewind`)
 
@@ -40,13 +48,41 @@ python3 scripts/rewind-session.py --list-checkpoints <antigravity-ide|antigravit
 python3 scripts/rewind-session.py \
   --antigravity-ide \
   --uuid <uuid> \
-  --step <cutoff_step_index>
+  --step <cutoff_step_index> [--preserve-ask]
 
 # Claude Code JSONL direct truncation
 python3 scripts/rewind-session.py \
   --claude-code \
   --uuid <uuid> \
   --line <keep_line_count>
+```
+
+## Method 2: Git Stash Bridge (For Native UI/CLI Rewinds)
+
+Before triggering a native UI or CLI rewind command that reverts files:
+
+```bash
+# 1. Stash all uncommitted local code changes & untracked files
+git stash push -u -m "agy-soft-rewind-keep-code-$(date +%Y%m%d_%H%M%S)"
+
+# 2. Perform native conversation rewind in agy CLI / IDE to the desired checkpoint step
+# (e.g. agy --conversation=<uuid> or UI rewind)
+
+# 3. Restore all local code changes (resolve merge conflicts if modified during native rewind)
+git stash pop
+```
+
+## Method 3: Manual SQLite Step Truncation (Database-Only Fallback)
+
+> [!NOTE]
+> This manual SQL fallback truncates step rows in `SESSION_DB` and updates step counts. For full session consistency (including `transcript.jsonl` and `transcript_full.jsonl` truncation), use `Method 1: Direct Truncation Engine` (`scripts/rewind-session.py`).
+
+```bash
+SESSION_DB="$HOME/.gemini/antigravity-cli/conversations/<conversation_id>.db"
+cp "$SESSION_DB" "${SESSION_DB}.bak"
+sqlite3 "$SESSION_DB" "DELETE FROM steps WHERE idx > 150;"
+sqlite3 "$HOME/.gemini/antigravity-cli/conversation_summaries.db" \
+  "UPDATE conversation_summaries SET step_count=(SELECT COUNT(*) FROM steps WHERE conversation_id='<conversation_id>') WHERE conversation_id='<conversation_id>';"
 ```
 
 ## Safety & Backups

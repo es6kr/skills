@@ -168,10 +168,16 @@ hooks:
 - id: ask-guard
   owner_skill: hook-kit
   marketplace: es6kr-skills
-  status: dormant
-  implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/ask-guard.sh
+  status: removed
+  tombstone:
+    date: '2026-08-23'
+    reason: >-
+      Duplicate of the ask-user plugin's registered hook. This copy was never
+      registered in any hooks config, so commits landing here never executed —
+      while it kept diverging from the copy that did. Both lines were merged
+      before removal, so no behaviour is lost.
+    relocated_to: 'daegunsoftDev/skills plugins/ask-user/hooks/ask-guard.sh'
+  implementations: []
   registrations: []
 - id: auto-agentify-detector
   owner_skill: claudify
@@ -242,10 +248,16 @@ hooks:
 - id: block-axis-merged-ask
   owner_skill: hook-kit
   marketplace: es6kr-skills
-  status: dormant
-  implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/block-axis-merged-ask.sh
+  status: removed
+  tombstone:
+    date: '2026-08-23'
+    reason: >-
+      Duplicate of the ask-user plugin's registered hook. This copy was never
+      registered in any hooks config, so commits landing here never executed —
+      while it kept diverging from the copy that did. Both lines were merged
+      before removal, so no behaviour is lost.
+    relocated_to: 'daegunsoftDev/skills plugins/ask-user/hooks/block-axis-merged-ask.sh'
+  implementations: []
   registrations: []
 - id: block-bot-re-trigger
   owner_skill: hook-kit
@@ -466,17 +478,29 @@ hooks:
     matcher: ''
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-manual-handoff-web-task.sh
 - id: block-new-skill-ready-without-ask
-  owner_skill: hook-kit
+  owner_skill: skill-kit
   marketplace: es6kr-skills
   status: active
   implementations:
   - runtime: sh
-    file: skills/hook-kit/resources/block-new-skill-ready-without-ask.sh
+    file: skills/skill-kit/resources/block-new-skill-ready-without-ask.sh
   registrations:
   - surface: hooks.json
     event: PreToolUse
     matcher: Bash
-    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-new-skill-ready-without-ask.sh
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh
+- id: block-squash-recommend-multi-commit
+  owner_skill: github-flow
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/github-flow/resources/block-squash-recommend-multi-commit.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: AskUserQuestion
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-squash-recommend-multi-commit.sh
 - id: block-noncompliant-review-comment
   owner_skill: consolidate
   marketplace: es6kr-skills

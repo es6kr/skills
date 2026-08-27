@@ -73,7 +73,7 @@ def normalize(text):
     """Lowercased, boilerplate-free, whitespace-collapsed form used for matching."""
     text = BOILERPLATE_RE.sub("", text or "")
     text = re.sub(r"\*\([^)]*\)\*", " ", text)          # trailing italic annotations
-    text = re.sub(r"\[[^\]]*\]\([^)]*\)", " ", text)    # markdown links
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r" \1 ", text)  # retain link label
     text = re.sub(r"[`*_~]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip().lower()
@@ -174,10 +174,12 @@ def apply_patches(tracker, patches):
         applied.append(patch["ident"])
 
     if applied:
-        tmp = tracker + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
+        import tempfile
+        tracker_dir = os.path.dirname(os.path.abspath(tracker))
+        with tempfile.NamedTemporaryFile(mode="w", dir=tracker_dir, delete=False, encoding="utf-8") as fh:
             fh.write("\n".join(current))
-        os.replace(tmp, tracker)
+            tmp_path = fh.name
+        os.replace(tmp_path, tracker)
     return applied, conflicts
 
 

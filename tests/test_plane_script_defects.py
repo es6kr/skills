@@ -31,13 +31,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIX_PLAN_SCRIPTS = REPO_ROOT / "skills" / "fix-plan" / "scripts"
 PLANE_BACKLOG_SCRIPTS = REPO_ROOT / "skills" / "plane-backlog" / "scripts"
+BACKLOG_SCRIPTS = REPO_ROOT / "skills" / "backlog" / "scripts"
+
+TARGET_SCRIPTS = BACKLOG_SCRIPTS if BACKLOG_SCRIPTS.is_dir() else PLANE_BACKLOG_SCRIPTS
 
 EXPECTED_UA = "Mozilla/5.0 (plane-backlog)"
 
 CREATE_ISSUE_COPIES = [
-    pytest.param(PLANE_BACKLOG_SCRIPTS / "plane_create_issue.py", id="plane-backlog"),
+    pytest.param(TARGET_SCRIPTS / "plane_create_issue.py", id="backlog"),
 ]
-
 
 PROFILE = {
     "plane_host": "https://plane.invalid",
@@ -60,8 +62,8 @@ def load_module(path: Path, name: str):
     the module-level `from plane_client import ...` / `from workspace_profile
     import ...` lines execute.
     """
-    for d in (str(PLANE_BACKLOG_SCRIPTS), str(FIX_PLAN_SCRIPTS)):
-        if d not in sys.path:
+    for d in (str(BACKLOG_SCRIPTS), str(PLANE_BACKLOG_SCRIPTS), str(FIX_PLAN_SCRIPTS)):
+        if d not in sys.path and Path(d).is_dir():
             sys.path.insert(0, d)
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -106,7 +108,7 @@ def test_create_issue_rest_sends_browser_user_agent(script_path, monkeypatch):
 
 
 def test_plane_sync_request_sends_browser_user_agent(monkeypatch):
-    mod = load_module(FIX_PLAN_SCRIPTS / "plane_sync.py", "plane_sync_ua")
+    mod = load_module(TARGET_SCRIPTS / "plane_sync.py", "plane_sync_ua")
     captured = []
 
     def fake_urlopen(req, *args, **kwargs):
@@ -124,7 +126,7 @@ def test_plane_sync_request_sends_browser_user_agent(monkeypatch):
 
 
 def test_plane_client_request_sends_browser_user_agent(monkeypatch):
-    pc = load_module(PLANE_BACKLOG_SCRIPTS / "plane_client.py", "plane_client_ua")
+    pc = load_module(TARGET_SCRIPTS / "plane_client.py", "plane_client_ua")
     captured = []
 
     def fake_urlopen(req, *args, **kwargs):
@@ -194,3 +196,20 @@ def test_k3s_fallback_skips_gracefully_without_kubectl(script_path, monkeypatch)
     assert res["success"] is False
     assert "kubectl" in res["reason"]
     assert not ran, "fallback must not shell out when kubectl is absent"
+
+
+# ------------------------------------------------------- dual-copy drift guard
+
+
+def test_create_issue_copies_are_byte_identical():
+    target = FIX_PLAN_SCRIPTS / "plane_create_issue.py"
+    canonical = TARGET_SCRIPTS / "plane_create_issue.py"
+    if target.exists() and canonical.exists():
+        assert filecmp.cmp(
+            target,
+            canonical,
+            shallow=False,
+        ), (
+            "the fix-plan and backlog copies of plane_create_issue.py have "
+            "drifted — apply the change to both copies"
+        )

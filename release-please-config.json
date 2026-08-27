@@ -52,6 +52,16 @@
     }
   ],
   "packages": {
+    "skills/backlog": {
+      "package-name": "backlog",
+      "component": "backlog",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/cc-plugin": {
       "package-name": "cc-plugin",
       "component": "cc-plugin",
@@ -92,6 +102,16 @@
         }
       ]
     },
+    "skills/cleanup": {
+      "package-name": "cleanup",
+      "component": "cleanup",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/code-workflow": {
       "package-name": "code-workflow",
       "component": "code-workflow",
@@ -122,9 +142,29 @@
         }
       ]
     },
+    "skills/docxport": {
+      "package-name": "docxport",
+      "component": "docxport",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/dotfile": {
       "package-name": "dotfile",
       "component": "dotfile",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
+    "skills/fa": {
+      "package-name": "fa",
+      "component": "fa",
       "extra-files": [
         {
           "type": "generic",
@@ -175,6 +215,16 @@
     "skills/github-flow": {
       "package-name": "github-flow",
       "component": "github-flow",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
+    "skills/github-repo": {
+      "package-name": "github-repo",
+      "component": "github-repo",
       "extra-files": [
         {
           "type": "generic",

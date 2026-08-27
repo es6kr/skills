@@ -48,15 +48,15 @@ Confirm the following with the user:
 
 ### 4. chezmoi Integration
 
-If dotfiles are managed with chezmoi:
+`$ZSH_CUSTOM` is frequently synced by a mechanism other than chezmoi (e.g. a dedicated Syncthing folder covering `$ZSH_CUSTOM` directly) rather than being chezmoi-managed at all. Check ownership before running any chezmoi command on a file here — adding it to chezmoi on top of an existing sync mechanism creates two competing owners for the same file:
 
 ```bash
-# Add a new file
-chezmoi add $ZSH_CUSTOM/{filename}.zsh
-
-# After modifying an existing file
-chezmoi re-add $ZSH_CUSTOM/{filename}.zsh
+chezmoi managed | grep -qF "custom/{filename}.zsh" \
+  && echo "chezmoi-managed — safe to: chezmoi re-add \$ZSH_CUSTOM/{filename}.zsh" \
+  || echo "NOT chezmoi-managed — do not chezmoi add; another sync mechanism owns this file"
 ```
+
+If the grep is empty, leave the file to whatever already syncs it (do not `chezmoi add`). Only run `chezmoi re-add` when the file is confirmed chezmoi-managed.
 
 ## Notes
 

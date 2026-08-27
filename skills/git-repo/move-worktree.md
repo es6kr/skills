@@ -73,8 +73,36 @@ When a worktree was used for a now-merged PR and you want to reuse it:
    ```bash
    # Prune stale worktree entries
    git worktree prune
-   # Create new worktree
-   git worktree add .worktrees/<new-name> <new-branch>
+### Scenario D: Promote a worktree to a standalone git repository (`--no-checkout` + `mv`)
+
+When a worktree has accumulated local commits/changes and needs to be extracted into a separate, independent repository under `~/ghq/...`:
+
+1. **Clone `.git` metadata only (no checkout)**:
+   ```bash
+   git clone --no-checkout --branch <branch> --single-branch /path/to/main-repo /path/to/new-repo
+   ```
+
+2. **Move working tree items directly to target repository** (preserves uncommitted modifications without copying overhead):
+   ```bash
+   # Move all files and directories except the .git pointer file (includes dotfiles)
+   find .worktrees/<name> -mindepth 1 -maxdepth 1 ! -name .git -exec mv {} /path/to/new-repo/ \;
+   ```
+
+3. **Rebuild/synchronize index safely in the new repository**:
+   ```bash
+   git -C /path/to/new-repo reset HEAD -- .
+   ```
+
+4. **Prune the old worktree from the main repository**:
+   ```bash
+   rm .worktrees/<name>/.git
+   rmdir .worktrees/<name>
+   git -C /path/to/main-repo worktree prune
+   ```
+
+5. **Launch GUI on the new standalone repository**:
+   ```bash
+   sourcegit /path/to/new-repo
    ```
 
 ### Post-move verification

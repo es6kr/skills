@@ -193,7 +193,7 @@ fi
 NEW_DIRS="${RESULT#DENY:}"
 
 cat >&2 <<MSG
-[~/.agents/skills/hook-kit/resources/block-new-skill-ready-without-ask.sh]: DENIED: gh pr ready introduces new skill dir(s) without explicit approval.
+[~/.agents/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh]: DENIED: gh pr ready introduces new skill dir(s) without explicit approval.
 
 Why blocked:
   - Detected new top-level skill dir(s) not on es6kr/skills main: ${NEW_DIRS}

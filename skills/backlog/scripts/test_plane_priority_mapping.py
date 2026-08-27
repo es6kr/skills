@@ -19,16 +19,18 @@ sys.path.insert(0, str(SCRIPT_DIR.parent.parent / "plane-backlog" / "scripts"))
 
 import importlib.util
 
-_client_spec = importlib.util.spec_from_file_location(
-    "plane_client", str(SCRIPT_DIR.parent.parent / "plane-backlog" / "scripts" / "plane_client.py")
-)
+_client_path = SCRIPT_DIR / "plane_client.py"
+if not _client_path.exists():
+    _client_path = SCRIPT_DIR.parent.parent / "backlog" / "scripts" / "plane_client.py"
+_client_spec = importlib.util.spec_from_file_location("plane_client", str(_client_path))
 plane_client = importlib.util.module_from_spec(_client_spec)
 sys.modules["plane_client"] = plane_client
 _client_spec.loader.exec_module(plane_client)
 
-_issue_spec = importlib.util.spec_from_file_location(
-    "plane_create_issue", str(SCRIPT_DIR.parent.parent / "plane-backlog" / "scripts" / "plane_create_issue.py")
-)
+_issue_path = SCRIPT_DIR / "plane_create_issue.py"
+if not _issue_path.exists():
+    _issue_path = SCRIPT_DIR.parent.parent / "backlog" / "scripts" / "plane_create_issue.py"
+_issue_spec = importlib.util.spec_from_file_location("plane_create_issue", str(_issue_path))
 plane_create_issue = importlib.util.module_from_spec(_issue_spec)
 sys.modules["plane_create_issue"] = plane_create_issue
 _issue_spec.loader.exec_module(plane_create_issue)
@@ -123,12 +125,6 @@ class TestRestApiPriorityInjection(unittest.TestCase):
             self._captured_payload("P9")
 
 
-@unittest.skip(
-    "blocked on https://github.com/es6kr/skills/pull/349 (f-string brace "
-    "escaping fix) promoting from next-fix to main — the K3s fallback "
-    "template on main still crashes on ANY generation, independent of this "
-    "priority-injection change. Un-skip once #349 lands on main."
-)
 class TestK3sFallbackPriorityInjection(unittest.TestCase):
     def _generated_script(self, priority):
         captured_cmd = {}

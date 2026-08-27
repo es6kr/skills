@@ -216,7 +216,7 @@ See [format.md](./format.md) for full schema.
 - **selfable**: progressable now (P-rank for immediate action)
 - **Triage Step 0 — sync external state first (HARD STOP)**: `/fix-plan priority` invokes `sync` topic before classifying — `gh pr view <N>` + `gh issue view <N>` on every referenced PR/Issue. Auto-resolves merged/closed entries to `[x]` so stale items don't get sorted as live BLOCKERs
 
-See [priority.md](./priority.md) for full convention. When a workspace mirrors backlog into Plane, `P0`-`P3` maps 1:1 onto Plane's native `urgent`/`high`/`medium`/`low` priority (`scripts/plane_sync.py`'s `normalize_priority()`; see [sync.md](./sync.md) "Secondary-tracker sync cadence" and `plane-backlog/SKILL.md` "Plane Issue DELETE Prohibition & Priority Mapping (HARD STOP)").
+See [priority.md](./priority.md) for full convention. When a workspace mirrors backlog into Plane, `P0`-`P3` maps 1:1 onto Plane's native `urgent`/`high`/`medium`/`low` priority (`../backlog/scripts/plane_sync.py`'s `normalize_priority()`; see [sync.md](./sync.md) "Secondary-tracker sync cadence" and `backlog/SKILL.md` "Plane Issue DELETE Prohibition & Priority Mapping (HARD STOP)").
 
 ### Add new item
 
@@ -282,12 +282,7 @@ MERGED PR or CLOSED issue → auto `[x]`. PR CLOSED-without-merge → `[BLOCKED:
 
 `issue-drafts/<slug>.md` → `gh issue create` → archive to `.bak/` → delete from fix_plan. See [issue-drafts.md](./issue-drafts.md).
 
-### Plane Intake Ingestion Gate for PR & Completed Items (HARD STOP)
-
-Work items backed by GitHub PRs or completed during sessions without a Plane identifier (`[ES6KR-<N>]`, `[INFRA-<N>]`, etc.) MUST be ingested into Plane via Intake (`plane_create_issue.py`) to preserve historical audit logs and decisions. See `plane-backlog` skill.
-
 ## See Also
 
 - `github-flow` (depends-on) — `gh` CLI conventions for sync + register
-- `plane-backlog` (depends-on) — Plane issue/intake lifecycle and sync engine
 - Ralph integration is a separate workstream maintained outside this published skill. A Ralph wrapper, when present, owns Ralph-specific concerns: the `## REPEAT` persistent-item section, autonomous-loop `[BLOCKED]` skip semantics, and the caller-side `--rag=<skill>:<topic>` dispatch (this skill exposes only the abstract flag contract). See the Ralph project's documentation for wrapper details
