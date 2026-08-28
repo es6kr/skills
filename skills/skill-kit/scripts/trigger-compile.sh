@@ -3,13 +3,20 @@
 # Usage: bash trigger-compile.sh [--dry-run] [--list]
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+RESOURCES_DIR="$(cd "$SCRIPT_DIR/../resources" && pwd)"
+
 HOOKS_DIR="$HOME/.claude/hooks"
 SETTINGS="$HOME/.claude/settings.json"
 # NOTE: ~/.claude/skills/<name>/ is often a personal-overlay symlink (data/ only,
 # no SKILL.md) in this environment — the skill body lives in a marketplace instead.
-# Scan both, or a marketplace-owned skill's `triggers:` (e.g. cleanup's Stop inject)
-# silently disappears from the compiled dispatcher.
-SKILLS_DIRS=("$HOME/.claude/skills")
+# Scan repo skills first, then ~/.claude/skills, then marketplaces.
+SKILLS_DIRS=()
+if [[ -d "$REPO_ROOT/skills" ]]; then
+  SKILLS_DIRS+=("$REPO_ROOT/skills")
+fi
+SKILLS_DIRS+=("$HOME/.claude/skills")
 for _mp in "$HOME/.claude/plugins/marketplaces"/*/skills; do
   [[ -d "$_mp" ]] && SKILLS_DIRS+=("$_mp")
 done
@@ -70,7 +77,7 @@ scan_skills() {
       # Extract triggers block from frontmatter
       local in_frontmatter=false
       local in_triggers=false
-      local current_event="" current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code="" current_script=""
+      local current_event="" current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code="" current_script="" current_exclude_content=""
 
       while IFS= read -r line; do
         # frontmatter boundary
@@ -79,7 +86,7 @@ scan_skills() {
             # end of frontmatter — save last trigger
             if [[ -n "$current_event" ]]; then
               validate_trigger "$skill_dir" "$skill_name" "$current_action" "$current_script"
-              save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script" "$skill_abs_dir"
+              save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script" "$skill_abs_dir" "$current_exclude_content"
             fi
             break
           fi
@@ -102,10 +109,10 @@ scan_skills() {
           # save previous trigger
           if [[ -n "$current_event" ]]; then
             validate_trigger "$skill_dir" "$skill_name" "$current_action" "$current_script"
-            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script" "$skill_abs_dir"
+            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script" "$skill_abs_dir" "$current_exclude_content"
           fi
           current_event="${BASH_REMATCH[1]}"
-          current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code="" current_script=""
+          current_action="" current_matcher="" current_pattern="" current_message="" current_exit_code="" current_script="" current_exclude_content=""
           continue
         fi
 
@@ -114,7 +121,7 @@ scan_skills() {
           # save last trigger
           if [[ -n "$current_event" ]]; then
             validate_trigger "$skill_dir" "$skill_name" "$current_action" "$current_script"
-            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script" "$skill_abs_dir"
+            save_trigger "$skill_name" "$current_event" "$current_action" "$current_matcher" "$current_pattern" "$current_message" "$current_exit_code" "$current_script" "$skill_abs_dir" "$current_exclude_content"
           fi
           in_triggers=false
           continue
@@ -131,6 +138,22 @@ scan_skills() {
           current_pattern="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^[[:space:]]+pattern:[[:space:]]*(.*) ]]; then
           current_pattern="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+exclude_content:[[:space:]]*\"(.*)\" ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+exclude_content:[[:space:]]*(.*) ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+exclude-content:[[:space:]]*\"(.*)\" ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+exclude-content:[[:space:]]*(.*) ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+content_exclude:[[:space:]]*\"(.*)\" ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+content_exclude:[[:space:]]*(.*) ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+content-exclude:[[:space:]]*\"(.*)\" ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^[[:space:]]+content-exclude:[[:space:]]*(.*) ]]; then
+          current_exclude_content="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^[[:space:]]+message:[[:space:]]*\"(.*)\" ]]; then
           current_message="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ ^[[:space:]]+message:[[:space:]]*(.*) ]]; then
@@ -149,7 +172,7 @@ scan_skills() {
 }
 
 save_trigger() {
-  local skill="$1" event="$2" action="$3" matcher="$4" pattern="$5" message="$6" exit_code="$7" script="${8:-}" skilldir="${9:-}"
+  local skill="$1" event="$2" action="$3" matcher="$4" pattern="$5" message="$6" exit_code="$7" script="${8:-}" skilldir="${9:-}" exclude_content="${10:-}"
 
   # Cross-location dedup (2026-08-18, drift investigation): this environment
   # commonly has the same skill name shipped from 2+ independent sources —
@@ -170,7 +193,7 @@ save_trigger() {
   fi
   SEEN_SKILL_DIR[$skill]="$skilldir"
 
-  local entry="${skill}${SEP}${action}${SEP}${matcher}${SEP}${pattern}${SEP}${message}${SEP}${exit_code}${SEP}${script}${SEP}${skilldir}"
+  local entry="${skill}${SEP}${action}${SEP}${matcher}${SEP}${pattern}${SEP}${message}${SEP}${exit_code}${SEP}${script}${SEP}${skilldir}${SEP}${exclude_content}"
   # prevent exact-duplicate re-declaration within the same skilldir
   local existing="${TRIGGERS_BY_EVENT[$event]:-}"
   if [[ "$existing" == *"$entry"* ]]; then
@@ -185,12 +208,13 @@ list_triggers() {
   echo ""
   for event in "${!TRIGGERS_BY_EVENT[@]}"; do
     echo "[$event]"
-    while IFS="$SEP" read -r skill action matcher pattern message exit_code script _skilldir; do
+    while IFS="$SEP" read -r skill action matcher pattern message exit_code script _skilldir exclude_content; do
       [[ -z "$skill" ]] && continue
       printf "  %-20s action=%-8s" "$skill" "$action"
       [[ -n "$script" ]] && printf " script=%s" "$script"
       [[ -n "$matcher" ]] && printf " matcher=%s" "$matcher"
       [[ -n "$pattern" ]] && printf " pattern=\"%s\"" "$pattern"
+      [[ -n "$exclude_content" ]] && printf " exclude_content=\"%s\"" "$exclude_content"
       echo ""
     done <<< "${TRIGGERS_BY_EVENT[$event]}"
     echo ""
@@ -254,21 +278,29 @@ const INPUT = readStdin();
 const _input = safeParse(INPUT);
 const TOOL_NAME = _input.tool_name || '';
 const COMMAND = (_input.tool_input && _input.tool_input.command) || '';
-const FILE_PATH = (_input.tool_input && _input.tool_input.file_path) || '';
+const FILE_PATH = (_input.tool_input && (_input.tool_input.file_path || _input.tool_input.TargetFile)) || '';
+const NEW_CONTENT = (_input.tool_input && (_input.tool_input.new_string || _input.tool_input.content || _input.tool_input.ReplacementContent || _input.tool_input.CodeContent)) || '';
 const EXIT_CODE = process.env.EXIT_CODE || '0';
 "
 
-  while IFS="$SEP" read -r skill action matcher pattern message exit_code_filter scriptpath skilldir; do
+  while IFS="$SEP" read -r skill action matcher pattern message exit_code_filter scriptpath skilldir exclude_content; do
     [[ -z "$skill" ]] && continue
 
     local condition_start="" condition_end=""
 
     # build matcher/pattern condition (JS regex test — matcher may be an alternation e.g. "Edit|Write")
-    if [[ -n "$matcher" ]] || [[ -n "$pattern" ]] || [[ -n "$exit_code_filter" ]]; then
+    if [[ -n "$matcher" ]] || [[ -n "$pattern" ]] || [[ -n "$exit_code_filter" ]] || [[ -n "$exclude_content" ]]; then
       local conditions=()
       [[ -n "$matcher" ]] && conditions+=("new RegExp($(js_str "^($matcher)\$")).test(TOOL_NAME)")
       # pattern regex covers both Bash command and Edit/Write file_path
-      [[ -n "$pattern" ]] && conditions+=("new RegExp($(js_str "$pattern")).test(COMMAND + ' ' + FILE_PATH)")
+      if [[ -n "$pattern" ]]; then
+        local _pat_norm="${pattern//\\\\/\\}"
+        conditions+=("new RegExp($(js_str "$_pat_norm")).test(COMMAND + ' ' + FILE_PATH)")
+      fi
+      if [[ -n "$exclude_content" ]]; then
+        local _exc_norm="${exclude_content//\\\\/\\}"
+        conditions+=("!new RegExp($(js_str "$_exc_norm")).test(NEW_CONTENT)")
+      fi
       [[ -n "$exit_code_filter" ]] && conditions+=("EXIT_CODE === $(js_str "$exit_code_filter")")
 
       condition_start="if (${conditions[0]}"
@@ -362,6 +394,12 @@ process.exit(0);
     echo "$script" > "$output_file"
     chmod +x "$output_file"
     echo "Generated: $output_file"
+    if [[ -d "$RESOURCES_DIR" ]]; then
+      local in_repo_file="$RESOURCES_DIR/trigger-${event}.js"
+      echo "$script" > "$in_repo_file"
+      chmod +x "$in_repo_file"
+      echo "Updated in-repo: $in_repo_file"
+    fi
   fi
 }
 
@@ -388,7 +426,7 @@ register_hooks() {
 
       # unique matchers
       if [[ ${#matchers[@]} -gt 0 ]]; then
-        matcher=$(printf '%s\n' "${matchers[@]}" | sort -u | paste -sd '|')
+        matcher=$(printf '%s\n' "${matchers[@]}" | sort -u | paste -sd '|' -)
       fi
     fi
 
