@@ -169,8 +169,8 @@ mcp__serena__write_memory({
 })
 ```
 
-3. If `--rag` and a RAG MCP is detected (see Section 8), store the distilled knowledge
-   to RAG before archiving.
+3. If `--rag` is passed and the workspace config binds a receiver (see Section 8), store the
+   distilled knowledge to that receiver before archiving.
 
 4. Archive via the [`archive`](./archive.md) topic (same `archive-session.sh` as A — not hard delete)
 
@@ -191,21 +191,22 @@ mcp__claude-sessions-mcp__clear_sessions({
 **archived** via the `mv` procedure in §6-A, not bulk-deleted — they may still hold
 recoverable context.
 
-### 8. RAG Save Recommendation (when a RAG / vector store MCP is available)
+### 8. RAG Save Recommendation (when the workspace binds a RAG receiver)
 
-**Trigger detection** — Skip this entire section if no RAG / vector store MCP is registered in the current context. Do not hard-wire to a specific vendor.
+**Trigger detection** — resolve the receiver from the workspace bindings config rather than probing the environment for vendor tool names:
 
-Detection patterns (any match qualifies — scan deferred tool list or system reminders):
+```text
+bash <hook-kit-skill>/resources/workspace-config.sh --export   # exports WSCFG_RAG_*
+```
 
-| Vendor | Tool name pattern |
-|--------|-------------------|
-| Qdrant | `mcp__qdrant__qdrant-store`, `mcp__qdrant__qdrant-find` |
-| Chroma | `mcp__chroma__*-add`, `mcp__chroma__*-query` |
-| Weaviate | `mcp__weaviate__*-store`, `mcp__weaviate__*-search` |
-| Pinecone | `mcp__pinecone__*-upsert`, `mcp__pinecone__*-query` |
-| Generic | Any MCP tool whose name matches `*-(store|add|upsert|index)` paired with `*-(find|query|search)` against a vector index |
+| Resolved state | Behavior |
+|---|---|
+| `WSCFG_RAG_KIND` unset / `none` / resolver unavailable | Skip this entire section quietly |
+| `WSCFG_RAG_KIND` set | Proceed, using `WSCFG_RAG_ENDPOINT` + the matching `WSCFG_RAG_COLLECTION_*` |
 
-If at least one RAG MCP is detected, evaluate every session classified as **B (Keep)** or **C (Extract then Delete)** for semantic-search value and emit an additional table. Sessions in category A (Delete Recommended) are excluded.
+Scanning the deferred-tool list for vendor-specific tool names is not a substitute: a receiver can be reachable over HTTP with no MCP binding at all, and naming vendors inside a generic skill is exactly what the portability rule forbids. The config is the single source of truth, so swapping vendors stays a one-line config edit.
+
+When a receiver resolves, evaluate every session classified as **B (Keep)** or **C (Extract then Delete)** for semantic-search value and emit an additional table. Sessions in category A (Delete Recommended) are excluded.
 
 #### Criteria — sessions worth saving to RAG
 
