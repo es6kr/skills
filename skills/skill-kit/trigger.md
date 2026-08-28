@@ -1,4 +1,4 @@
-﻿# Trigger
+# Trigger
 
 Declaring a `triggers` field in a skill's SKILL.md automates hook script and settings.json registration.
 
@@ -36,6 +36,7 @@ triggers:
 | `action` | Y | `suggest` (output marker, exit 0), `block` (block execution, exit 1), `inject` (systemMessage JSON, Stop only) |
 | `matcher` | optional | Tool name filter. Used only with PreToolUse/PostToolUse. Omit to match all tools |
 | `pattern` | optional | Matching pattern in command (regex). Used only with PostToolUse/PreToolUse |
+| `exclude_content` | optional | Regex pattern to exclude tool content/replacement text in Edit/Write/Bash (e.g. audit sections). If matched, trigger is skipped |
 | `message` | Y (except `action: script`) | Message to pass to Claude. May include skill/topic invocation instructions. Not used by `action: script` (the resource script emits its own output) |
 | `exit_code_filter` | optional | Filter by success (0) / failure (non-0) in PostToolUse. Omit to match all exit codes |
 | `script` | Y for `action: script` | Path (relative to the skill directory) of a resource script that receives the hook's stdin and emits the decision, e.g. `resources/next-trigger.sh` |
