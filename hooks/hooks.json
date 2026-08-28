@@ -127,10 +127,6 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
           },
           {
@@ -262,11 +258,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-squash-recommend-multi-commit.sh",
-            "timeout": 15
           }
         ]
       },
