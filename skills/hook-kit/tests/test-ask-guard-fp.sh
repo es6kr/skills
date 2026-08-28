@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# FP-regression tests for ask-guard.sh retrospective/deferred guards.
+#
+# Covers two false-positive classes that were over-blocking real sessions:
+#   1. check_merge_without_review() flagging retrospective "post-merge" /
+#      "validation" text (and the snake_case function name "check_merge_without_review"
+#      itself) as an active merge proposal.
+#   2. check_release_please_close() flagging deferred / negated close text
+#      ("publish/close deferred", "cannot close ... without a merged PR") as an
+#      active close proposal.
+#
+# Fixtures are English-only so the PUBLIC repo hangul-check never trips. The
+# locale-specific equivalents (the discard-changes and merge-complete keywords)
+# are exercised only through data/hangul-patterns.regex at runtime, not here.
+#
+# gh is neutralized via PATH so tests are deterministic/offline. FP cases return
+# 0 before any gh lookup; TP cases block on missing attestation (gh-absent =
+# allowlist skipped = fail-closed, the intended behavior).
+#
+# Run:  bash skills/hook-kit/tests/test-ask-guard-fp.sh
+# Exit: 0 = all pass, 1 = any fail.
+
+set -u
+GUARD="$(cd "$(dirname "$0")/.." && pwd)/resources/ask-guard.sh"
+[[ -f "$GUARD" ]] || { echo "guard not found: $GUARD" >&2; exit 1; }
+
+TMPERR="$(mktemp)"
+# gh stubs for the CI-gate-only base exemption cases (deterministic/offline):
+#   GH_STUB_DIR   — `pr checks` emits the "reviews are disabled for this base
+#                   branch" signal (exemption should fire)
+#   GH_STUB_NOSIG — `pr checks` emits a normal "Review completed" line (no exemption)
+# Both return empty for `pr view` so the bot-PR and solo-infra allowlists ahead of
+# the new block fail closed, isolating the CI-gate-only path under test.
+GH_STUB_DIR="$(mktemp -d)"
+GH_STUB_NOSIG="$(mktemp -d)"
+cat > "$GH_STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"repo view"*) echo "es6kr/skills" ;;
+  *"pr checks"*) printf 'CodeRabbit\tpass\t0\t\tReview skipped: reviews are disabled for this base branch\n' ;;
+  *) exit 0 ;;
+esac
+STUB
+cat > "$GH_STUB_NOSIG/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"repo view"*) echo "es6kr/skills" ;;
+  *"pr checks"*) printf 'CodeRabbit\tpass\t0\t\tReview completed\n' ;;
+  *) exit 0 ;;
+esac
+STUB
+# gh that always fails -> every allowlist lookup fails closed (deterministic block
+# for the TP cases). Replaces the earlier `PATH=/nonexistent:$PATH`, which did NOT
+# hide a real gh on PATH and left the TP cases dependent on live PR state (e.g. a
+# real PR whose base is CI-gate-only would now hit the new exemption).
+GH_STUB_FAIL="$(mktemp -d)"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$GH_STUB_FAIL/gh"
+chmod +x "$GH_STUB_DIR/gh" "$GH_STUB_NOSIG/gh" "$GH_STUB_FAIL/gh"
+trap 'rm -f "$TMPERR"; rm -rf "$GH_STUB_DIR" "$GH_STUB_NOSIG" "$GH_STUB_FAIL"' EXIT
+FAIL=0
+
+# Build an AskUserQuestion payload from "label::description" option pairs.
+mk() {
+  local opts="" pair label desc
+  for pair in "$@"; do
+    label="${pair%%::*}"; desc="${pair#*::}"
+    label=$(printf '%s' "$label" | sed 's/"/\\"/g')
+    desc=$(printf '%s' "$desc" | sed 's/"/\\"/g')
+    opts="${opts:+$opts,}{\"label\":\"$label\",\"description\":\"$desc\"}"
+  done
+  printf '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"options":[%s]}]}}' "$opts"
+}
+run() { printf '%s' "$1" | PATH="$GH_STUB_FAIL:$PATH" bash "$GUARD" >/dev/null 2>"$TMPERR"; echo $?; }
+check() { # name want_rc got_rc
+  local name="$1" want="$2" got="$3"
+  if [[ "$got" == "$want" ]]; then
+    echo "PASS  $name (exit=$got)"
+  else
+    echo "FAIL  $name (exit=$got want=$want)"; echo "      stderr: $(head -1 "$TMPERR")"; FAIL=1
+  fi
+}
+
+# ---- FP cases: must ALLOW (exit 0) ----
+
+# 1. snake_case function name "_merge_" + retrospective post-merge verification.
+check "fp1 fn-name + post-merge verify" 0 "$(run "$(mk \
+  'Issue #36 hook allowlist::ask-guard.sh check_merge_without_review() adds release-please bot allowlist + 4 smoke tests' \
+  'PR #51 post-merge Skill dispatch verification::Fresh session for dispatch behavior verification. No code change; validation only')")"
+
+# 2. post-merge carryover follow-up work, not a merge proposal.
+check "fp2 post-merge carryover" 0 "$(run "$(mk \
+  'PR #47 post-merge follow-up::register fix-plan in release-please-config after merge. validation only, PR #47')")"
+
+# 3. release-please + "publish/close deferred" — deferral, not close.
+check "fp3 release-please close deferred" 0 "$(run "$(mk \
+  'Implement allowlist now::add release-please allowlist to hook-kit. publish/close deferred to a separate decision (issue #36)')")"
+
+# 4. release-please + "cannot close ... without a merged PR" — negated close.
+check "fp4 release-please cannot close" 0 "$(run "$(mk \
+  'Publish hook-kit first::register in release-please-config, then PR #36. cannot close the issue without a merged PR')")"
+
+# 5. "merge --abort" — abort/cancel, never a merge proposal.
+check "fp5 merge --abort" 0 "$(run "$(mk \
+  'Abort and adopt main::merge --abort then adopt main b735f41 (drop a433db6). PR #79')")"
+
+# 6. plain merge keyword only inside a retrospective validation line.
+check "fp6 retrospective validation only" 0 "$(run "$(mk \
+  'PR #63 post-merge validation::verification only, no code change. Squash type was already chosen')")"
+
+# 7. task-clustering "merge/split" (non-PR merge noun) co-present with a real PR #.
+check "fp7 clustering merge/split" 0 "$(run "$(mk \
+  'Start FA corpus clustering::review the 200-class merge/split candidates in a dedicated session' \
+  'Hold::leave for later; PR #255 unrelated')")"
+
+# 8. PR-state "await-merge" description (not a merge proposal) + real PR #s.
+check "fp8 await-merge PR state" 0 "$(run "$(mk \
+  'Ready drafts, hold for review::transition PR #258 to ready; all three await-merge until your go-ahead' \
+  'Leave as draft::no change; PR #255 stays open')")"
+
+# 9. meta-discussion of this very guard ("ask-guard merge-keyword false positive").
+check "fp9 ask-guard merge-keyword meta" 0 "$(run "$(mk \
+  'Proceed now::fix ask-guard.sh merge-keyword false-positive and run regression tests, relates to finding #3' \
+  'Hold::start another guard first')")"
+
+# 10. meta-discussion of check_push_without_details() itself — fixing/describing
+#     the push-detail gate, not proposing an actual push (2026-08-09 live repro:
+#     this exact option text collaterally blocked an unrelated co-occurring
+#     option in the same AskUserQuestion call). Second option deliberately has
+#     no push/no-push/negation wording of its own, isolating the new
+#     meta-discussion exemption from the pre-existing "no push" negation one.
+check "fp10 push-gate meta discussion" 0 "$(run "$(mk \
+  'Fix ask-guard.sh Git Push gate false positive::the hooks Git Push detail-requirement gate blocks pure-commit option text with no push token present' \
+  'Apply pending review findings::PR seven and PR two-thirteen, both self-authored')")"
+
+# ---- TP cases: must BLOCK (exit 2) — attestation/verification genuinely absent ----
+
+# 7. active "Squash and merge PR #N" without AI Review Summary attestation.
+check "tp1 active merge no attestation" 2 "$(run "$(mk \
+  'Squash and merge PR #34::merge the feature PR now')")"
+
+# 8. active close of a release-please PR without verification attestation.
+check "tp2 active release-please close no verify" 2 "$(run "$(mk \
+  'Close release-please PR #55::close the release-please PR #55 directly, then re-cascade')")"
+
+# 9. plain (non-strong) merge proposal for a real PR, no attestation — the new
+#    retrospect exclusions must NOT let this slip through.
+check "tp3 plain merge proposal no attestation" 2 "$(run "$(mk \
+  'Land it::merge PR #90 into next-fix now')")"
+
+# 10. genuine active push proposal with no remote/branch or commit detail —
+#     the new push-gate-meta exemption (fp10) must NOT let this slip through.
+check "tp4 active push no detail" 2 "$(run "$(mk \
+  'Push it::just push the changes now, no further detail')")"
+# ---- CI-gate-only base exemption (new allowlist) ----
+# Must ALLOW when the referenced PR's base has reviews disabled; must still BLOCK
+# when the base is a normal (reviewed) branch. gh is stubbed per-case.
+run_stub() { printf '%s' "$2" | PATH="$1:$PATH" GH_REPO=es6kr/skills bash "$GUARD" >/dev/null 2>"$TMPERR"; echo $?; }
+
+# cg1: base reports "reviews are disabled" -> active merge option bypasses attestation.
+check "cg1 CI-gate-only base bypass" 0 "$(run_stub "$GH_STUB_DIR" "$(mk \
+  'Squash and merge PR #267::merge the CI-gate-only next-fix PR now')")"
+
+# cg2: base does NOT report the signal -> attestation still required (fail-closed block).
+check "cg2 reviewed base still blocks" 2 "$(run_stub "$GH_STUB_NOSIG" "$(mk \
+  'Squash and merge PR #267::merge the PR now')")"
+
+echo ""
+if [[ "$FAIL" -eq 0 ]]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
+exit "$FAIL"
