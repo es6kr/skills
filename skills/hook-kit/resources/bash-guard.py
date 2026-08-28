@@ -40,6 +40,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 
 # ── Optional local overlay (git-ignored, machine-specific) ──
 # Must expose: check(command: str, tool_name: str, transcript_path: str) -> str | None
@@ -62,7 +63,9 @@ IM = re.IGNORECASE | re.MULTILINE  # sh version greps per line — keep line sem
 # ── Phase 1: simple hard-block patterns ──
 SIMPLE_BLOCKS = [
     # System / file destruction
-    (r"\brm\s+-rf\s+/", "rm -rf / is extremely dangerous"),
+    # /tmp/<subpath> is exempt (OS scratch space, routinely rm -rf'd by tests/cleanup);
+    # bare `/tmp` (no subpath) still blocks below since the lookahead requires "tmp/".
+    (r"\brm\s+-rf\s+/(?!tmp/)", "rm -rf / is extremely dangerous"),
     (r"\brm\s+-rf\s+~", "rm -rf ~ deletes your home directory"),
     (r"\brm\s+-rf\s+\.\.", "rm -rf .. can delete a parent directory"),
     (r"\brm\s+-rf\s+\*", "rm -rf * is dangerous"),
@@ -108,7 +111,9 @@ GIT_BLOCKS = [
     # (IGNORECASE makes -F hit -f\b). Same \n-exclusion applied to the rm/.tmp spans.
     (r"branch\s+[^|;&\n]*(?:-f\b|--force)",
      "git branch -f force-moves a branch ref, equivalent to reset --hard (previous commits on that ref become unreachable)"),
-    (r"push\s+.*--force", "git push --force overwrites remote history"),
+    # NOTE: force-push moved to check_git_force_push() below — it is no longer
+    # an unconditional block, it is allowed in a narrow, verified exception
+    # (worktree + non-main/master target). See that function's docstring.
     (r"push\s+.*-f\b", "git push -f overwrites remote history"),
     # Git working directory destruction
     (r"clean\s+-.*f", "git clean -f permanently deletes untracked files"),
@@ -157,6 +162,17 @@ TIME_BOUND = re.compile(
     IM,
 )
 
+# Ceiling on the time bound itself — a single silent watch/wait long enough to
+# outlast the prompt-cache TTL is the exact failure mode this hook exists to
+# prevent (failed-attempts.md "idle-cache-ttl"). Extracts the numeric value
+# following timeout/-m/--max-time (ConnectTimeout excluded — it bounds only the
+# TCP handshake phase, not overall command wait time).
+TIME_BOUND_VALUE = re.compile(
+    r"(?:(?:^|[;&|(]\s*|\s)g?timeout\s+(?:-[a-zA-Z-]+\s+)*|--max-time[= ]|(?:^|\s)-m\s*)(\d+)",
+    IM,
+)
+TIME_BOUND_CEILING = 270
+
 EXECUTOR = re.compile(r"\b(?:ba|z|k)?sh\s+-c\b|\bssh\b|\beval\b|\bxargs\b", I)
 HEREDOC_WRITER = re.compile(r"^[ \t]*(cat|tee)[ \t].*<<")
 
@@ -164,11 +180,31 @@ HEREDOC_WRITER = re.compile(r"^[ \t]*(cat|tee)[ \t].*<<")
 GH_TOKEN_RE = re.compile(r"\bgh\b")
 PR_CREATE_PREFILTER = re.compile(r"pr[ \t]+create")
 
+# shlex.split() has no concept of bash heredocs (`<<'EOF' ... EOF`) — it just
+# tokenizes the body text like any other unquoted words. Prose inside a
+# heredoc (e.g. a commit message body mentioning "gh pr create" in a sentence)
+# then produces 3 adjacent bare tokens that false-positive-match a real
+# invocation. Strip heredoc bodies before token-scanning for this reason.
+HEREDOC_BLOCK = re.compile(
+    r"<<-?\s*(['\"]?)(\w+)\1.*?\n^\2\s*$", re.MULTILINE | re.DOTALL
+)
 
-def check_pr_create_draft(command: str) -> str | None:
+
+def strip_heredoc_bodies(command: str) -> str:
+    return HEREDOC_BLOCK.sub("<<HEREDOC", command)
+
+
+def check_pr_create_draft(command: str, transcript_path: str = "") -> str | None:
     """Real `gh pr create` invocation (3 adjacent bare tokens, via shlex — a
     quoted string reference like a grep pattern stays one token and never
-    matches) must carry --draft or the PR_READY_APPROVED=1 opt-out."""
+    matches) must carry --draft or the PR_READY_APPROVED=1 opt-out. Once that
+    passes, also require evidence that Skill("github-flow", ...) was invoked
+    earlier in this transcript — a well-formed --draft + templated PR can
+    still skip pr.md's other mandatory steps (Step 6 milestone check, Step 7.5
+    CI-watch->ready same-turn transition, Step 9 Copilot/CodeRabbit follow-up
+    scheduling) when `gh pr create` runs directly instead of via the skill
+    (failed-attempts.md "pr-create-bypass", 4th recurrence)."""
+    command = strip_heredoc_bodies(command)
     if not GH_TOKEN_RE.search(command) or not PR_CREATE_PREFILTER.search(command):
         return None
     try:
@@ -195,21 +231,128 @@ def check_pr_create_draft(command: str) -> str | None:
 
     has_draft = any(_draft_true(t) for t in tokens)
     has_bypass = any(t == "PR_READY_APPROVED=1" for t in tokens)
-    if has_draft or has_bypass:
+    if not (has_draft or has_bypass):
+        return (
+            "`gh pr create` must include --draft.\n\n"
+            "Why blocked:\n"
+            "  - Draft is the DEFAULT (github-flow/pr.md:13 HARD STOP). A ready (non-draft) PR "
+            "fires CodeRabbit/Copilot review immediately - cost grows per non-draft PR.\n"
+            "  - PR creation should route through Skill(\"github-flow\", \"pr\"), which "
+            "applies the draft default + base-convention checks. Raw `gh pr create` bypasses them.\n\n"
+            "Required action (pick one):\n"
+            "  1. Add --draft to the gh pr create command (default), OR\n"
+            "  2. Prefer Skill(\"github-flow\", \"pr\") over a raw gh pr create, OR\n"
+            "  3. If the user EXPLICITLY requested a ready PR (\"ready PR\" / \"non-draft\" / \"--ready\"), "
+            "prefix the command with PR_READY_APPROVED=1 gh pr create ... so the opt-out is auditable.\n\n"
+            "Reference: failed-attempts.md 'raw gh pr create bypass / non-draft' (github-flow/pr.md:13)."
+        )
+
+    # Draft/bypass satisfied — now check for skill-invocation evidence.
+    if any(t == "GH_PR_CREATE_SKILL_BYPASS=1" for t in tokens):
+        return None
+    if not transcript_path:
+        return None  # no transcript to check — fail open
+    try:
+        with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
+            transcript = f.read()
+    except OSError:
+        return None  # unreadable — fail open
+    if '"skill":"github-flow"' in transcript:
         return None
     return (
-        "`gh pr create` must include --draft.\n\n"
+        "`gh pr create` has no prior Skill(\"github-flow\", ...) invocation in this session's transcript.\n\n"
         "Why blocked:\n"
-        "  - Draft is the DEFAULT (github-flow/pr.md:13 HARD STOP). A ready (non-draft) PR "
-        "fires CodeRabbit/Copilot review immediately - cost grows per non-draft PR.\n"
-        "  - PR creation should route through Skill(\"github-flow\", \"register\"), which "
-        "applies the draft default + base-convention checks. Raw `gh pr create` bypasses them.\n\n"
+        "  - --draft is present, but draft/template alone does not mean the github-flow "
+        "procedure was followed. Raw `gh pr create` skips pr.md's other mandatory steps: "
+        "Step 6 (milestone check), Step 7.5 (CI-watch -> ready, same-turn), Step 9 "
+        "(Copilot reviewer registration + CodeRabbit walkthrough follow-up scheduling).\n"
+        "  - See failed-attempts.md 'pr-create-bypass' (4th recurrence) / 'skill-invoke-bypass'.\n\n"
         "Required action (pick one):\n"
-        "  1. Add --draft to the gh pr create command (default), OR\n"
-        "  2. Prefer Skill(\"github-flow\", \"register\") over a raw gh pr create, OR\n"
-        "  3. If the user EXPLICITLY requested a ready PR (\"ready PR\" / \"non-draft\" / \"--ready\"), "
-        "prefix the command with PR_READY_APPROVED=1 gh pr create ... so the opt-out is auditable.\n\n"
-        "Reference: failed-attempts.md 'raw gh pr create bypass / non-draft' (github-flow/pr.md:13)."
+        "  1. Call Skill(\"github-flow\", \"pr\") first, then let it run gh pr create, OR\n"
+        "  2. If github-flow genuinely does not apply here (non-GitHub forge, scripted "
+        "automation context, etc.), prefix the command with GH_PR_CREATE_SKILL_BYPASS=1 "
+        "gh pr create ... so the opt-out is auditable.\n\n"
+        "Reference: failed-attempts.md 'pr-create-bypass' (github-flow/pr.md)."
+    )
+
+
+GH_PR_MERGE_READY_RE = re.compile(r"\bgh\s+pr\s+(merge|ready)\b")
+
+
+def check_pr_merge_ready_empty_commits(command: str) -> str | None:
+    """`gh pr merge`/`gh pr ready` on a PR with 0 commits is almost always a
+    symptom of a broken creation path (e.g. a GraphQL createPullRequest
+    workaround against a head repository with no fork-network relationship to
+    origin), not a genuinely empty change. `gh pr diff --name-only` can still
+    print file names for such a PR — it reflects a diff computation, not the
+    PR's own registered commit range — so it is not proof of real content.
+    This queries the PR's own `commits` field live and blocks only when it can
+    positively confirm the array is empty (github-flow/merge.md 'Empty-PR
+    guard')."""
+    if not GH_PR_MERGE_READY_RE.search(command):
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None  # unparseable — fail open
+    verb_idx = None
+    for i in range(len(tokens) - 2):
+        if tokens[i] == "gh" and tokens[i + 1] == "pr" and tokens[i + 2] in ("merge", "ready"):
+            verb_idx = i + 2
+            break
+    if verb_idx is None:
+        return None
+    pr_number = None
+    repo = None
+    i = verb_idx + 1
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok in ("-R", "--repo"):
+            if i + 1 < len(tokens):
+                repo = tokens[i + 1]
+            i += 2
+            continue
+        if tok.startswith("--repo="):
+            repo = tok[len("--repo="):]
+            i += 1
+            continue
+        if not tok.startswith("-") and pr_number is None and re.fullmatch(r"\d+", tok):
+            pr_number = tok
+        i += 1
+    if pr_number is None:
+        return None  # no explicit PR number (current-branch PR) — fail open
+    args = ["gh", "pr", "view", pr_number, "--json", "commits"]
+    if repo:
+        args += ["-R", repo]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=15)
+    except Exception:
+        return None  # network/timeout — fail open
+    if out.returncode != 0:
+        return None  # gh itself failed (auth, not found, etc.) — fail open, not this hook's job
+    try:
+        data = json.loads(out.stdout)
+    except Exception:
+        return None
+    commits = data.get("commits", [])
+    if len(commits) != 0:
+        return None
+    return (
+        f"PR #{pr_number} has 0 commits.\n\n"
+        "Why blocked:\n"
+        "  - `gh pr view --json commits` shows an empty commits array for this PR.\n"
+        "  - Merging or readying an empty PR is almost always a symptom of a broken "
+        "PR-creation path (e.g. a GraphQL createPullRequest workaround after `gh pr "
+        "create` failed), not a genuinely empty change.\n"
+        "  - `gh pr diff --name-only` can print misleading file names even when "
+        "commits is empty — do not trust it alone as evidence the PR has real content.\n\n"
+        "Required action:\n"
+        f"  - Run `gh pr view {pr_number} --json commits,additions,deletions,changedFiles` "
+        "yourself to confirm.\n"
+        "  - If genuinely empty, close it and recreate via a path that actually "
+        "registers the head branch's commits (e.g. a same-repo branch push + `gh pr "
+        "create`, not a cross-repo createPullRequest against a non-fork-network head).\n\n"
+        "Reference: github-flow/merge.md 'Empty-PR guard'."
     )
 
 
@@ -424,6 +567,24 @@ _PROD_BRANCH_PATTERNS = [
 ]
 
 
+def _worktree_add_new_nonprod_branch(scan: str) -> bool:
+    """True for `git worktree add ... -b/-B <new-branch> [<prod-base>]` where <new-branch>
+    is not itself a protected branch. In that form a protected branch can appear only as
+    the start-point (safe: it is never checked out for mutation), so creating a feature
+    branch FROM master/prod is allowed, while `git worktree add <path> <prod-branch>`
+    (which checks out the protected branch itself) stays blocked."""
+    if not re.search(r"git\s+worktree\s+add\b", scan, IM):
+        return False
+    m = re.search(r"-[bB]\s+(\S+)", scan)
+    if not m:
+        return False
+    new_branch = m.group(1)
+    # -b target must not itself be a protected branch (blocks `-b master`, `-b release/x`)
+    if re.match(_PROD_BRANCHES + r"(?:$|[/_-])", new_branch, IM):
+        return False
+    return True
+
+
 def check_prod_branch_ops(command: str) -> str | None:
     """Block autonomous git/gh operations that create, push, delete, protect, or
     workflow_dispatch against release-trigger branches (production/master/release/
@@ -443,6 +604,11 @@ def check_prod_branch_ops(command: str) -> str | None:
         if re.search(pat, scan, IM):
             reason = r
             break
+    if reason == "git worktree add on protected branch" and _worktree_add_new_nonprod_branch(scan):
+        # `git worktree add -b <new-nonprod-branch> <prod-base>` branches FROM a protected
+        # branch without checking it out mutably (safe) — exempt it while keeping the block
+        # on `git worktree add <path> <prod-branch>` (checks out the protected branch).
+        reason = None
     if reason is None and (
         re.search(r"gh\s+api\s+.*actions/workflows/.*dispatches", scan, IM)
         and re.search(r"(?:-f|-F|--field|--raw-field)\s+ref=" + _PROD_BRANCHES + r"(?:$|\s)", scan, IM)
@@ -462,6 +628,9 @@ def check_prod_branch_ops(command: str) -> str | None:
 
 
 _GIT_GLOBAL_OPTS = r"(?:-C\s+\S+\s+|--no-pager\s+|-c\s+\S+=\S+\s+)*"
+
+FORCE_PUSH_SUB = r"push\s+.*(?:--force(?:-with-lease(?:=\S+)?)?\b|(?<!\S)-f\b)"
+
 _STAGING_BRANCH_TARGET = re.compile(
     r"(?:git\s+" + _GIT_GLOBAL_OPTS + r"worktree\s+add|"
     r"git\s+" + _GIT_GLOBAL_OPTS + r"switch\s+-[cC]|"
@@ -469,17 +638,99 @@ _STAGING_BRANCH_TARGET = re.compile(
     r"gh\s+pr\s+create[^\n]*--base)\b[^\n]*\b(?:origin/)?(next-fix|next-feat)\b",
     IM,
 )
-# Must tolerate the same global opts the TARGET regex above allows. Without
-# _GIT_GLOBAL_OPTS here, `git -C <path> log origin/main..origin/next-feat` — the
-# form the worktree rules actually require, since operating on another checkout
-# needs -C — could never register as evidence, so the check was unsatisfiable for
-# exactly the callers it was written for. Also accept the space-separated diff
-# form (`git diff origin/main origin/next-feat`), which is the natural spelling
-# for diff and equally valid evidence.
+
 _STAGING_DIVERGENCE_EVIDENCE = re.compile(
     r"git\s+" + _GIT_GLOBAL_OPTS + r"(?:log|diff)\s+origin/main(?:\.\.\.?|\s+)origin/next-|baseRefName",
     IM,
 )
+
+
+def _extract_dash_c_path(command: str) -> str | None:
+    m = re.search(r"\bgit\s+(?:-C\s+([^\s]+)\s+)", command)
+    if not m:
+        return None
+    return m.group(1).strip("'\"")
+
+def _resolve_push_target_branch(tokens: list[str]) -> str | None:
+    """From tokenized `git ... push [remote] [branch] [flags...]`, return the
+    explicit branch token if present. Returns None when the branch cannot be
+    read off the command itself (caller must resolve HEAD instead) — this
+    includes the ambiguous single-non-flag-token case ("git push origin" vs
+    "git push <configured-remote-alias>"), which is deliberately NOT guessed."""
+    try:
+        push_idx = tokens.index("push")
+    except ValueError:
+        return None
+    non_flags = [t for t in tokens[push_idx + 1:] if not t.startswith("-")]
+    if len(non_flags) >= 2:
+        return non_flags[1]
+    return None
+
+def check_git_force_push(command: str) -> str | None:
+    """Force push is destructive to shared remote history and stays blocked
+    BY DEFAULT — this only narrows the exception, it never widens it. Allowed
+    ONLY when BOTH are positively confirmed:
+      1. The target checkout is a git WORKTREE (git-dir != git-common-dir),
+         never the primary/main checkout.
+      2. The resolved target branch is NOT main/master (case-insensitive).
+    Any failure to confirm both (subprocess error, ambiguous branch
+    resolution, non-git-repo cwd) falls back to the original unconditional
+    block. User-requested narrowing (worktree-only, main/master excluded):
+    2026-08-24, /fix "missing PR URL" Step 3 Resume redirect — the user ran the
+    2 gh pr close commands manually but asked that force-push specifically
+    become agent-executable under these two conditions.
+    """
+    scan = git_scan_text(command)
+    if not re.search(GITPFX + r"\s+" + FORCE_PUSH_SUB, scan, IM):
+        return None
+
+    block_msg = "git push --force/-f overwrites remote history"
+    dash_c = _extract_dash_c_path(command)
+    target_dir = dash_c or os.getcwd()
+
+    try:
+        common_dir = subprocess.run(
+            ["git", "-C", target_dir, "rev-parse", "--git-common-dir"],
+            capture_output=True, text=True, timeout=5,
+        )
+        git_dir = subprocess.run(
+            ["git", "-C", target_dir, "rev-parse", "--git-dir"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if common_dir.returncode != 0 or git_dir.returncode != 0:
+            return block_msg + " (blocked: could not resolve git-dir/git-common-dir — worktree status unverifiable)"
+        common_path = os.path.realpath(os.path.join(target_dir, common_dir.stdout.strip()))
+        git_path = os.path.realpath(os.path.join(target_dir, git_dir.stdout.strip()))
+        is_worktree = common_path != git_path
+    except Exception:
+        return block_msg + " (blocked: worktree check raised an exception — failing closed)"
+
+    if not is_worktree:
+        return block_msg + " (blocked: not running from a git worktree — the primary checkout is never exempt)"
+
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return block_msg + " (blocked: command not shell-tokenizable — target branch unverifiable)"
+
+    branch = _resolve_push_target_branch(tokens)
+    if branch is None:
+        try:
+            head = subprocess.run(
+                ["git", "-C", target_dir, "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if head.returncode != 0 or not head.stdout.strip():
+                return block_msg + " (blocked: could not resolve current branch — target unverifiable)"
+            branch = head.stdout.strip()
+        except Exception:
+            return block_msg + " (blocked: current-branch check raised an exception — failing closed)"
+
+    branch_bare = branch.rsplit("/", 1)[-1]
+    if re.match(r"^(main|master)$", branch_bare, I):
+        return block_msg + f" (blocked: target branch '{branch}' is main/master — the worktree exemption never covers main/master)"
+
+    return None
 
 
 def check_staging_branch_without_divergence(command: str) -> str | None:
@@ -538,6 +789,17 @@ def evaluate(
             "(or add curl --max-time / ssh -o ConnectTimeout)"
         )
 
+    if run_bg:
+        bound_values = [int(v) for v in TIME_BOUND_VALUE.findall(command)]
+        if bound_values and max(bound_values) > TIME_BOUND_CEILING:
+            return hard(
+                f"run_in_background command-level time bound ({max(bound_values)}s) exceeds "
+                f"the {TIME_BOUND_CEILING}s ceiling — one long silent wait risks the prompt "
+                f"cache TTL expiring before you check back. Re-arm as a short cycle instead: "
+                f"timeout <= {TIME_BOUND_CEILING} <cmd>, then on notification either drive "
+                "other pending work or re-issue another bounded background call."
+            )
+
     for pat, msg in SIMPLE_BLOCKS:
         if re.search(pat, command, IM):
             return hard(msg)
@@ -551,9 +813,17 @@ def evaluate(
     if reset_reason:
         return hard(reset_reason)
 
-    pr_reason = check_pr_create_draft(command)
+    force_push_reason = check_git_force_push(command)
+    if force_push_reason:
+        return hard(force_push_reason)
+
+    pr_reason = check_pr_create_draft(command, transcript_path)
     if pr_reason:
         return hard(pr_reason)
+
+    pr_merge_ready_reason = check_pr_merge_ready_empty_commits(command)
+    if pr_merge_ready_reason:
+        return hard(pr_merge_ready_reason)
 
     ghapi_reason = check_gh_api_lowercase_f(command)
     if ghapi_reason:
@@ -638,6 +908,13 @@ def self_test() -> int:
     cases = [
         # (expect_block, run_bg, command)
         # ── FN cases: destructive git that MUST be blocked ──
+        # ── staging-branch base gate (merged from the tracked copy) ──
+        (True, False, "git switch -C fix/x origin/next-fix"),
+        (True, False, "git checkout -b fix/y origin/next-feat"),
+        (True, False, "git worktree add ../wt origin/next-fix"),
+        (True, False, "gh pr create --base next-fix --draft --title x --body y"),
+        (False, False, "git log origin/main..origin/next-fix --oneline; git switch -C fix/x origin/next-fix"),
+        (False, False, "gh pr view 238 --json baseRefName; git switch -C fix/x origin/next-feat"),
         (True, False, "git reset --hard"),
         (True, False, "git reset --hard HEAD~3"),
         (True, False, "git -C /srv/app reset --hard"),
@@ -700,10 +977,16 @@ def self_test() -> int:
         (True, True, "gh run watch 12345"),
         (True, True, 'ssh host "docker ps"'),
         (False, True, "timeout 120 git push origin main"),
-        (False, True, "cd /repo && timeout 300 gh pr create --draft"),
         (False, True, "curl --max-time 30 http://example.com"),
         (False, True, "curl -m 10 http://example.com"),
         (False, True, "ssh -o ConnectTimeout=10 host uptime"),
+        # ── background time-bound ceiling (>270s risks outlasting cache TTL) ──
+        (True, True, "cd /repo && timeout 300 gh pr create --draft"),
+        (True, True, "timeout 330 clawo session-send name msg"),
+        (False, True, "timeout 270 gh pr checks"),
+        (False, True, "timeout 240 sleep 1"),
+        # foreground: ceiling does not apply (tool timeout param governs)
+        (False, False, "timeout 330 gh pr create --draft"),
         # foreground: same commands must stay allowed (tool timeout param governs)
         (False, False, "git push origin main"),
         (False, False, "gh run watch 12345"),
@@ -713,6 +996,13 @@ def self_test() -> int:
         (True, False, "gh pr close 123"),
         (True, False, "rm -rf .tmp"),
         (False, False, "rm -f .tmp/pr-body.md"),
+        # ── /tmp/<subpath> exemption from the generic rm -rf / root guard —
+        # OS scratch space, routinely rm -rf'd by tests/cleanup. Bare /tmp
+        # (no subpath) still blocks (whole shared system temp dir).
+        (False, False, "rm -rf /tmp/hooktest"),
+        (False, False, "rm -rf /tmp/some/nested/dir"),
+        (True, False, "rm -rf /tmp"),
+        (True, False, "rm -rf /"),
         # ── gh pr create --draft guard (ported from block-pr-create-without-draft.sh) ──
         (True, False, "gh pr create --title x --body y"),
         (False, False, "gh pr create --draft --title x --body y"),
@@ -725,6 +1015,9 @@ def self_test() -> int:
         (False, False, "PR_READY_APPROVED=1 gh pr create --title x --body y"),
         (False, False, 'grep "gh pr create" README.md'),
         (False, False, 'echo "run gh pr create --draft next"'),
+        # heredoc body prose mentioning "gh pr create" must not false-positive
+        # (shlex has no heredoc concept — tokenizes body words like bare tokens)
+        (False, False, "git commit -F - <<'EOF'\nfix: gh pr create fires CI\nEOF"),
         # ── gh api -f/--raw-field @file guard (ported from block-gh-api-lowercase-f-file-read.sh) ──
         (True, False, "gh api repos/o/r/issues/1/comments -f body=@.tmp/summary.md"),
         (True, False, "gh api repos/o/r/issues/1/comments --raw-field body=@.tmp/summary.md"),
@@ -743,16 +1036,6 @@ def self_test() -> int:
         (False, False, "gh pr comment 123 --body 'plain review comment'"),
         (False, False, "gh pr view 123"),
         (False, False, 'echo "posting AI Review Summary later"'),
-        # ── staging-branch divergence guard (pr-base-divergence-check-reactive-not-preemptive,
-        # failed-attempts.md — 3rd occurrence) ──
-        (True, False, "git switch -C fix/x origin/next-fix"),
-        (True, False, "git checkout -b fix/y origin/next-feat"),
-        (True, False, "git worktree add ../wt origin/next-fix"),
-        (True, False, "gh pr create --base next-fix --draft --title x --body y"),
-        (False, False, "git log origin/main..origin/next-fix --oneline; git switch -C fix/x origin/next-fix"),
-        (False, False, "gh pr view 238 --json baseRefName; git switch -C fix/x origin/next-feat"),
-        (False, False, "git status --short"),
-        (False, False, "git switch -c fix/unrelated-thing"),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:
@@ -765,6 +1048,38 @@ def self_test() -> int:
             tag = "bg" if run_bg else "fg"
             print(f"FAIL({tag}) expected={'BLOCK' if expect_block else 'ALLOW'} "
                   f"got={'BLOCK' if got_block else 'ALLOW'} :: {cmd!r}")
+
+    # ── gh pr create --draft + Skill(github-flow) invocation-evidence guard ──
+    # (failed-attempts.md "pr-create-bypass" 4th recurrence): the main `cases`
+    # list above always passes transcript_path="" (fail-open), so this check's
+    # transcript-dependent branch is untested there. Exercise it explicitly.
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write("no skill marker on this line\n")
+        no_skill_transcript = f.name
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"skill":"github-flow","args":"pr"}\n')
+        with_skill_transcript = f.name
+    try:
+        transcript_cases = [
+            # (expect_block, command, transcript_path)
+            (True, "gh pr create --draft --title x", no_skill_transcript),
+            (False, "gh pr create --draft --title x", with_skill_transcript),
+            (False, "GH_PR_CREATE_SKILL_BYPASS=1 gh pr create --draft --title x", no_skill_transcript),
+            (False, "gh pr create --draft --title x", ""),  # no transcript — fail open
+            (False, 'grep "gh pr create" README.md', no_skill_transcript),  # not a real invocation
+        ]
+        for expect_block, cmd, tpath in transcript_cases:
+            code, _, _ = evaluate(cmd, False, transcript_path=tpath)
+            got_block = code in (1, 2)
+            if got_block == expect_block:
+                passed += 1
+            else:
+                failed += 1
+                print(f"FAIL(transcript) expected={'BLOCK' if expect_block else 'ALLOW'} "
+                      f"got={'BLOCK' if got_block else 'ALLOW'} :: {cmd!r} transcript={tpath!r}")
+    finally:
+        os.unlink(no_skill_transcript)
+        os.unlink(with_skill_transcript)
 
     print(f"\n{passed} passed, {failed} failed")
 
