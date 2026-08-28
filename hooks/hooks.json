@@ -276,10 +276,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/remind-rag-flag-on-skill.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-supervisor-loop-work.sh"
           }
         ]

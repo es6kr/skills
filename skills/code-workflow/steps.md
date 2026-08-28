@@ -10,9 +10,9 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 3. If the plan has a Phase order, check **up to which Phase has been completed currently**
 4. If there is an incomplete Phase, **proceed from that Phase** — do not skip to subsequent Phases (merge, deploy, etc.)
 
-4.5. **Resume RAG re-dispatch (optional, abstract contract)**: When the caller supplied a `--rag=<skill>:<topic>` flag (see "Research/plan artifact dispatch" below), re-invoke the receiver on every existing `research-*.md` / `plan-*.md` found in Step 0 (item 1). This refreshes any indexed content that may have drifted out of sync with the file. Idempotency is the receiver's responsibility.
+4.5. **Resume RAG re-dispatch (optional, abstract contract)**: When the workspace config resolves a RAG receiver (see "Research/plan artifact dispatch" below), re-invoke the receiver on every existing `research-*.md` / `plan-*.md` found in Step 0 (item 1). This refreshes any indexed content that may have drifted out of sync with the file. Idempotency is the receiver's responsibility.
 
-   When no `--rag` flag is supplied — or no compatible receiver is available in the caller's environment — skip this step. Research/plan files in `{output-dir}` remain the primary deliverable; recall is via direct `Read` / `Grep`.
+   When the config resolves no receiver (`kind: none`) — or the resolved receiver is unreachable — skip this step. Research/plan files in `{output-dir}` remain the primary deliverable; recall is via direct `Read` / `Grep`.
 
    Failure policy: receiver unreachable → warning + Step 0 continues. The file artifact preservation is primary.
 
@@ -94,16 +94,15 @@ Read and understand the relevant code **deeply**, then write findings to `{outpu
 
 The `research-*.md` file is the **primary deliverable**. After every Write/Edit, the caller may optionally dispatch the artifact to a registered receiver (any RAG index, semantic store, memory service, doc cache, etc.) for cross-session discoverability — but this generic skill does not name a vendor.
 
-#### Flag
+#### Receiver resolution
 
 ```text
-/code-workflow ... --rag=<skill>:<topic>
+bash <hook-kit-skill>/resources/workspace-config.sh --export   # exports WSCFG_RAG_*
 ```
 
-- `<skill>` — name of a registered skill that owns a research-dispatch topic
-- `<topic>` — topic within that skill responsible for accepting the artifact
-- When the flag is omitted, the file write is the only deliverable. No vendor is assumed
-- When the flag is supplied, dispatch fires **after every Write/Edit** completion (not at Step 1 end). Receiver handles idempotency
+- `WSCFG_RAG_KIND` unset / `none` / resolver unavailable — the file write is the only deliverable. No vendor is assumed, and nothing warns or blocks
+- `WSCFG_RAG_KIND` set — dispatch fires **after every Write/Edit** completion (not at Step 1 end), using `WSCFG_RAG_ENDPOINT` plus the matching `WSCFG_RAG_COLLECTION_*`. Receiver handles idempotency
+- `--rag=<skill>:<topic>` stays available as an explicit per-call override. It is never required, and its absence is never an error
 
 #### Contract for receivers (vendor skills implement this)
 
@@ -118,15 +117,15 @@ Receivers consult vendor-side documentation for accepted metadata keys, chunking
 
 #### Skip conditions
 
-- No `--rag` flag supplied by caller
-- Caller-specified `<skill>:<topic>` not available in the current environment — fail-non-blocking: warning + Step 1 continues
+- The workspace config resolves no receiver (`kind: none`)
+- The resolved receiver is unreachable in the current environment — fail-non-blocking: warning + Step 1 continues
 - File content unchanged (receiver decides via its own idempotency)
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Hardcode a specific RAG vendor (URL, skill name, MCP tool name) in this generic skill | Use `--rag=<skill>:<topic>` flag at the call site; vendor skill implements the receiver protocol |
+| 1 | Hardcode a specific RAG vendor (URL, skill name, MCP tool name) in this generic skill | Resolve the receiver from the workspace config; the vendor skill implements the receiver protocol |
 | 2 | Block Step 1 on dispatch failure | Warning + continue. Artifact preservation is primary |
-| 3 | Defer dispatch to Step 1 completion when the flag is supplied | When `--rag` is set, dispatch after every Write/Edit. Receiver's idempotency keeps it cheap |
+| 3 | Defer dispatch to Step 1 completion when a receiver is configured | When a receiver resolves, dispatch after every Write/Edit. Receiver's idempotency keeps it cheap |
 | 4 | Enumerate compatible receivers inside this skill | Caller knows which receivers are available; this skill declares only the abstract surface |
 
 **Why abstract**: research recall paths vary by environment (different RAG vendors, context7 cache, project memory, etc.). Hardcoding a vendor in this generic skill couples it to one stack. The flag keeps coupling at the call site — the caller specifies the receiver vendor at invocation time, and the receiver skill implements the actual storage / index protocol.
@@ -233,23 +232,23 @@ The plan body starts after the frontmatter with `# Plan: [Title]` heading. The h
 
 ### Plan artifact dispatch (optional, abstract contract)
 
-The `plan-*.md` file is the **primary deliverable**. Same abstract contract as research dispatch above — caller supplies `--rag=<skill>:<topic>` flag, this skill stays vendor-agnostic. Receiver consumes via `CODEWORKFLOW_RAG_FILE` / `CODEWORKFLOW_RAG_METADATA_JSON` env vars or `CODEWORKFLOW_RAG_INPUT_JSON` file mode.
+The `plan-*.md` file is the **primary deliverable**. Same abstract contract as research dispatch above — the receiver is resolved from the workspace config, so this skill stays vendor-agnostic. Receiver consumes via `CODEWORKFLOW_RAG_FILE` / `CODEWORKFLOW_RAG_METADATA_JSON` env vars or `CODEWORKFLOW_RAG_INPUT_JSON` file mode.
 
 **Order relative to "Plan post-write ask"**: **ask first → dispatch**.
 
 1. Plan Write/Edit complete (initial `plan-*.md` write OR revision update)
 2. Run Plan post-write ask (below) — resolve undecided items
 3. After ask answers received, apply decisions → Edit `plan-*.md`
-4. If `--rag` flag is supplied, dispatch the post-ask plan version to the receiver
+4. If the config resolves a receiver, dispatch the post-ask plan version to it
 5. (If subsequent Edits occur, repeat from step 2 — receiver handles idempotency)
 
 Rationale: ask-driven Edits typically resolve the largest unresolved decisions. Dispatching after ask captures the "settled" plan rather than an in-flight state.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Skip dispatch for in-flight plan revisions (only dispatch "final") | When `--rag` is supplied, every Write/Edit dispatches. Receiver's idempotency handles unchanged sections |
+| 1 | Skip dispatch for in-flight plan revisions (only dispatch "final") | When a receiver resolves, every Write/Edit dispatches. Receiver's idempotency handles unchanged sections |
 | 2 | Block the ask on dispatch success | Dispatch happens after ask. ask is the synchronous user-blocking step; dispatch is async-safe |
-| 3 | Pick a default vendor when `--rag` is omitted | Omitted flag = file write only. No vendor is assumed |
+| 3 | Pick a default vendor when the config resolves none | `kind: none` = file write only. No vendor is assumed |
 
 ### Plan post-write ask (HARD STOP — required immediately after writing/updating the plan file)
 

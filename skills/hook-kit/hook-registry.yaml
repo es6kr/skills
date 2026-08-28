@@ -893,18 +893,6 @@ hooks:
     event: Stop
     matcher: ''
     command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/reap-stale-wrapper-shells.sh
-- id: remind-rag-flag-on-skill
-  owner_skill: hook-kit
-  marketplace: es6kr-skills
-  status: active
-  implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/remind-rag-flag-on-skill.sh
-  registrations:
-  - surface: hooks.json
-    event: PreToolUse
-    matcher: Skill
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/remind-rag-flag-on-skill.sh
 - id: session-id-inject
   owner_skill: claude-session
   marketplace: es6kr-skills

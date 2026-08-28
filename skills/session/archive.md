@@ -54,27 +54,21 @@ If the session is the **currently active** session (Claude Code has it open), th
 
 Archive moves the JSONL out of the active project, so post-archive recall depends on whatever external index the caller wants populated (semantic index, full-text store, summary cache, etc.). This skill stays **vendor-agnostic** — it only declares the dispatch surface; implementations live in vendor skills.
 
-#### Auto-supply is the default (HARD STOP)
+#### The receiver comes from the workspace config
 
-`--rag` is **not** an opt-in extra. When a RAG receiver is available in the environment, the caller **must auto-supply** `--rag=<skill>:<topic>`. File-move-only is correct **only** when no receiver is available **or** the user passed `--no-rag`. This mirrors the always-on caller-side dispatch rule (`skill-usage.md` caller-side "auto-supply available vendor dispatch" rule); archive executes it as a **procedure step**, not as caller discretion.
+Resolve it with `bash <hook-kit-skill>/resources/workspace-config.sh --export`, then read the exported `WSCFG_RAG_*` values **before reporting the archive result**:
 
-Run the 3-axis receiver scan **before reporting the archive result**:
-
-1. **MCP server** — is a vector-store tool registered (`mcp__<vendor>__*-store` / `*-find`)? → candidate vendor skill
-2. **Skill registry** — does a skill expose a RAG-store topic (e.g. `es6kr:qdrant-import`)? (MCP absent does not mean receiver absent)
-3. **Reachability** — does the receiver endpoint answer (`curl -m 8 <endpoint>/healthz`)?
-
-Branch:
-- 0 receivers → file move only
-- 1 receiver reachable → **auto-supply `--rag=<skill>:<topic>`** (do not ask, do not present it as optional)
-- 2+ → AskUserQuestion to pick
-- Uncertain → ask; do not silently skip
+- `WSCFG_RAG_KIND` unset / `none` / resolver unavailable → **file move only, quietly**. An unconfigured role is a valid state, not a missing step
+- `WSCFG_RAG_KIND` set → dispatch using `WSCFG_RAG_ENDPOINT` plus the matching `WSCFG_RAG_COLLECTION_*`
+- `--no-rag` → skip regardless of the resolved binding
+- `--rag=<skill>:<topic>` → explicit per-call override, wins over the resolved binding
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Finish with file-move-only + "run with `--rag` if you want" while a receiver is available | Auto-supply `--rag` as the default. Offering it as optional = regression |
-| 2 | Read the "abstract contract" framing and treat dispatch as skippable | "optional" describes the flag's omittability at the contract layer, not the caller's choice. With a receiver present, supply is mandatory |
-| 3 | Skip the 3-axis scan because the archive script has no `--rag` flag | Script lacking the flag → do the dispatch manually after the move (see the qdrant-import receiver). The scan + dispatch is still mandatory |
+| 1 | Finish with file-move-only while the config binds a receiver | A resolved binding means dispatch is part of the procedure, not caller discretion |
+| 2 | Probe MCP tool lists or healthcheck endpoints to decide whether a receiver exists | Read the resolved binding. Guessing is what the config replaced |
+| 3 | Skip dispatch because the archive script has no `--rag` flag | Script lacking the flag → dispatch manually after the move, using the resolved `WSCFG_RAG_*` values |
+| 4 | Warn or block because no flag was passed | No flag is required. Absence of a binding is a quiet skip |
 
 #### Flag
 
@@ -84,7 +78,7 @@ Branch:
 
 - `<skill>` — name of a registered skill that owns a RAG-store topic
 - `<topic>` — topic within that skill responsible for accepting archived content
-- When the flag is omitted, archive performs file move only — but **callers are expected to auto-supply the flag** when a receiver is available in the environment (see `skill-usage.md` caller-side dispatch rule)
+- The flag is an optional override. When it is omitted the receiver is resolved from the workspace config, and archive performs a file move only if that config binds none
 
 #### Contract for receivers (vendor skills implement this)
 

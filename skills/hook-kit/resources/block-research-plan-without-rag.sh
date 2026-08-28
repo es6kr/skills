@@ -8,8 +8,11 @@
 #   - .omc/plans/*.md (plan or research patterns)
 # Action: Inject a stderr reminder to dispatch the artifact via RAG receiver.
 #
-# Background: skill-usage.md "Generic skill invocation must auto-supply available
-# vendor dispatch" (HARD STOP) recurred 3 times:
+# Receiver binding comes from the workspace bindings config, not from a caller
+# flag: when the `rag` role resolves to `kind: none` this hook stays silent, per
+# that config's contract that consumers skip rather than block.
+#
+# Background: the caller-side dispatch rule recurred 3 times:
 #   1. /session archive — qdrant receiver available, --rag not supplied
 #   2. /session archive — MCP-only detection, missed network receiver
 #   3. /code-workflow — research/plan written, no qdrant-store call, archived
@@ -46,6 +49,16 @@ case "$FILE_PATH" in
   *.bak/*|*/.bak/*|*~|*.archived) exit 0 ;;
 esac
 
+# Receiver gate: only warn when this workspace actually binds a RAG receiver.
+# An unconfigured role (`kind: none`) or an unresolvable config is a valid state,
+# so the hook exits quietly instead of nagging for a flag that is not required.
+WSCFG_SHIM="$(dirname "$0")/workspace-config.sh"
+RAG_KIND=""
+if [[ -x "$WSCFG_SHIM" ]]; then
+  RAG_KIND=$(bash "$WSCFG_SHIM" --export 2>/dev/null | sed -n 's/^WSCFG_RAG_KIND=//p' | head -1)
+fi
+[[ -z "$RAG_KIND" || "$RAG_KIND" == "none" ]] && exit 0
+
 # Best-effort: check session transcript for prior qdrant-store invocation.
 TRANSCRIPT="${CLAUDE_TRANSCRIPT_PATH:-}"
 if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
@@ -66,15 +79,14 @@ fi
 cat >&2 <<EOF
 [block-research-plan-without-rag] $FILE_PATH
 
-RAG dispatch missing. skill-usage.md "Generic skill invocation must auto-supply
-available vendor dispatch" rule applies (caller responsibility).
+RAG dispatch missing. This workspace binds a RAG receiver (WSCFG_RAG_KIND=$RAG_KIND),
+so the artifact should reach it before the file is archived away.
 
 Required action (pick one):
-  1. Call mcp__qdrant__qdrant-store to store body + metadata
-  2. When invoking code-workflow/fix, explicitly supply --rag=<skill>:<topic> flag
-  3. Skipping is only allowed when receiver candidates = 0 (MCP unavailable + skill registry
-     receiver topics = 0) — silent skip is forbidden otherwise
+  1. Dispatch to the receiver resolved by workspace-config.sh (WSCFG_RAG_* values)
+  2. Pass --no-rag when this artifact is deliberately not indexed
 
-RAG store is mandatory before archiving to .bak/ (prevents permanent data loss).
+No flag is required to dispatch — the binding is resolved from the workspace config.
+Storing before archiving to .bak/ is what prevents permanent data loss.
 EOF
 exit 2
