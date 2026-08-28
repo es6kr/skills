@@ -18,6 +18,7 @@ triggers:
   - event: PostToolUse
     matcher: "Edit|Write"
     pattern: "plan-.*\\.md|research-.*\\.md"
+    exclude_content: "## .*(Audit|\\uAC10\\uC0AC)|audit_status:"
     action: suggest
     message: "plan-*.md or research-*.md file modification detected. Follow the code-workflow steps to author them, and call Skill(\"code-workflow\", \"steps\") for open decisions / trade-off verification."
 ---
