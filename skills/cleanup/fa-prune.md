@@ -218,14 +218,19 @@ The receiver uses an idempotent id (e.g., sha1(`fa-archive:<file>:<title>`)) for
 
 #### Self-check (right before running fa-prune)
 
-1. Resolve the receiver via `workspace-config.sh --export` — do not require a caller flag
-2. `WSCFG_RAG_KIND` unset or `none` → skip quietly and continue; this is not an error
-3. On COLD demote, call the receiver for each section, then write to the archive file
+1. Resolve the receiver via `workspace-config.sh --export` (or `--json`) — do not require a caller flag
+2. If `WSCFG_RAG_KIND` is unset or `none` (and no `--rag` override):
+   - Archive COLD-demoted sections to disk
+   - Skip receiver call and skip count-equality requirements
+   - Report 0 chunks stored (`receiver: none (unconfigured)`)
+3. When a receiver is resolved or explicitly overridden:
+   - Call the receiver for each COLD section
+   - Stored chunk count must equal demoted section count
 4. Backfill mode: bulk-store existing archive files to the receiver via `--backfill`
 
 #### RAG store quantity reporting obligation (HARD STOP)
 
-After fa-prune completes, **state the number of chunks added quantitatively at the end of the response**. If N sections were demoted to COLD + N were stored to the RAG receiver, state that number exactly.
+After fa-prune completes, **state the number of chunks added quantitatively at the end of the response**. When a receiver is active, if N sections were demoted to COLD + N were stored to the RAG receiver, state that number exactly. When no receiver is configured (`kind: none`), state 0 chunks stored with N sections demoted.
 
 ```
 RAG store summary: N chunks added (receiver: <skill>:<topic>)
@@ -239,7 +244,7 @@ COLD demoted sections: N
 |---|-------|----|
 | 1 | Status-only "RAG store per section complete" | Quantitative "RAG store summary: 3 chunks added (receiver: <skill>:<topic>)" |
 | 2 | Report only mid-response, omit from the end | Show the RAG summary block **again** at the end of the response |
-| 3 | Mismatch between demote count and store count (e.g., 3 demoted but only 2 stored) | demote count = store count = reported count to the user. Verify all 3 match |
+| 3 | Mismatch between demote count and store count when a receiver is active (e.g., 3 demoted but only 2 stored) | demote count = store count = reported count to the user (when receiver is active). Verify all 3 match |
 
 Detailed format rule: see `~/.agents/rules/skill-usage.md` "RAG store report format obligation" section.
 

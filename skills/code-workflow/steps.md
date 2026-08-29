@@ -10,9 +10,9 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 3. If the plan has a Phase order, check **up to which Phase has been completed currently**
 4. If there is an incomplete Phase, **proceed from that Phase** — do not skip to subsequent Phases (merge, deploy, etc.)
 
-4.5. **Resume RAG re-dispatch (optional, abstract contract)**: When the workspace config resolves a RAG receiver (see "Research/plan artifact dispatch" below), re-invoke the receiver on every existing `research-*.md` / `plan-*.md` found in Step 0 (item 1). This refreshes any indexed content that may have drifted out of sync with the file. Idempotency is the receiver's responsibility.
+4.5. **Resume RAG re-dispatch (optional, abstract contract)**: When an explicit `--rag=<skill>:<topic>` receiver is supplied, dispatch to that receiver first. Otherwise, when the workspace config resolves a RAG receiver (see "Research/plan artifact dispatch" below), re-invoke the receiver on every existing `research-*.md` / `plan-*.md` found in Step 0 (item 1). This refreshes any indexed content that may have drifted out of sync with the file. Idempotency is the receiver's responsibility.
 
-   When the config resolves no receiver (`kind: none`) — or the resolved receiver is unreachable — skip this step. Research/plan files in `{output-dir}` remain the primary deliverable; recall is via direct `Read` / `Grep`.
+   When no override is provided and the config resolves no receiver (`kind: none`) — or the resolved receiver is unreachable — skip this step quietly. Research/plan files in `{output-dir}` remain the primary deliverable; recall is via direct `Read` / `Grep`.
 
    Failure policy: receiver unreachable → warning + Step 0 continues. The file artifact preservation is primary.
 
@@ -92,16 +92,18 @@ Read and understand the relevant code **deeply**, then write findings to `{outpu
 
 ### Research artifact dispatch (optional, abstract contract)
 
-The `research-*.md` file is the **primary deliverable**. After every Write/Edit, the caller may optionally dispatch the artifact to a registered receiver (any RAG index, semantic store, memory service, doc cache, etc.) for cross-session discoverability — but this generic skill does not name a vendor.
+The `research-*.md` file is the **primary deliverable**. After every Write/Edit, the caller may optionally dispatch the artifact to a registered receiver (any RAG index, semantic store, memory service, doc cache, etc.) for cross-session discoverability.
 
 #### Receiver resolution
-
+ 
 ```text
-bash <hook-kit-skill>/resources/workspace-config.sh --export   # exports WSCFG_RAG_*
+bash <hook-kit-skill>/resources/workspace-config.sh --json   # read .roles.rag fields
 ```
 
-- `WSCFG_RAG_KIND` unset / `none` / resolver unavailable — the file write is the only deliverable. No vendor is assumed, and nothing warns or blocks
-- `WSCFG_RAG_KIND` set — dispatch fires **after every Write/Edit** completion (not at Step 1 end), using `WSCFG_RAG_ENDPOINT` plus the matching `WSCFG_RAG_COLLECTION_*`. Receiver handles idempotency
+- Explicit `--rag=<skill>:<topic>` override always takes precedence when provided
+- When no override is given:
+  - `roles.rag.kind` unset / `"none"` / resolver unavailable — the file write is the only deliverable. No vendor is assumed, and nothing warns or blocks
+  - `roles.rag.kind` set — dispatch fires **after each Write/Edit** completion, using `roles.rag.endpoint` plus the matching `roles.rag.collections.*`. Receiver handles idempotency
 - `--rag=<skill>:<topic>` stays available as an explicit per-call override. It is never required, and its absence is never an error
 
 #### Contract for receivers (vendor skills implement this)
@@ -246,7 +248,7 @@ Rationale: ask-driven Edits typically resolve the largest unresolved decisions. 
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Skip dispatch for in-flight plan revisions (only dispatch "final") | When a receiver resolves, every Write/Edit dispatches. Receiver's idempotency handles unchanged sections |
+| 1 | Dispatch in-flight plan drafts before the user post-write ask | Dispatch after the ask decisions are applied (and on subsequent post-ask Edits). Receiver's idempotency handles unchanged sections |
 | 2 | Block the ask on dispatch success | Dispatch happens after ask. ask is the synchronous user-blocking step; dispatch is async-safe |
 | 3 | Pick a default vendor when the config resolves none | `kind: none` = file write only. No vendor is assumed |
 

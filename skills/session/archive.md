@@ -92,9 +92,9 @@ Caller (this skill) passes payload via environment variables; receiver skill cho
 Receivers consult vendor-side documentation for their accepted metadata keys, chunking strategy, and idempotency rules. This skill does **not** define those — see the targeted skill's docs.
 
 #### Skip conditions
-
+ 
 - Session is dead (< 10 lines, no assistant response) — use `purge`, no archival value
-- User explicitly omits `--rag` — file move only
+- User explicitly passes `--no-rag` — file move only (omitted `--rag` resolves to workspace binding, which skips quietly if `kind: none`)
 - Caller-specified `<skill>:<topic>` not available in this environment — abort with a clear error; do not silently skip the move
 
 **Why abstract**: archived sessions stay readable via `Read`, but discoverability collapses (outside Claude Code's session list, no `/session search` reach). External indexing is the only content-level recall path. Naming a specific index vendor here would couple this generic skill to one environment's stack; the flag keeps the coupling at the call site.
@@ -178,4 +178,4 @@ After restore, Claude Code's session list will pick it up on next refresh.
 3. Has the destination path been previewed and confirmed not to already exist?
 4. Did you preserve the UUID filename (no rename)?
 5. Is the destination under `~/.claude/projects/.bak/` using the flat `<project-key>_<uuid>.jsonl` naming?
-6. Is a RAG receiver available in this environment (3-axis scan: MCP store tool / skill RAG-store topic / endpoint reachable)? If yes, did you **auto-supply** `--rag=<skill>:<topic>`? File-move-only is correct only with no receiver or an explicit `--no-rag`. (This skill does not pick a default vendor, but auto-supply is mandatory when a receiver exists — see §2.5 "Auto-supply is the default".)
+6. Is a RAG receiver configured in the workspace config (`WSCFG_RAG_KIND` set)? If yes, did you dispatch to the resolved receiver (or explicit `--rag` override)? File-move-only is correct only with `kind: none` or an explicit `--no-rag`.

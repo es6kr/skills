@@ -49,6 +49,11 @@ case "$FILE_PATH" in
   *.bak/*|*/.bak/*|*~|*.archived) exit 0 ;;
 esac
 
+# Check if opt-out --no-rag is present in tool input, frontmatter, or transcript
+if echo "$INPUT" | grep -qE -- '--no-rag|rag:[[:space:]]*false|no_rag:[[:space:]]*true' 2>/dev/null; then
+  exit 0
+fi
+
 # Receiver gate: only warn when this workspace actually binds a RAG receiver.
 # An unconfigured role (`kind: none`) or an unresolvable config is a valid state,
 # so the hook exits quietly instead of nagging for a flag that is not required.
@@ -59,9 +64,14 @@ if [[ -x "$WSCFG_SHIM" ]]; then
 fi
 [[ -z "$RAG_KIND" || "$RAG_KIND" == "none" ]] && exit 0
 
-# Best-effort: check session transcript for prior qdrant-store invocation.
+# Best-effort: check session transcript for prior qdrant-store invocation or --no-rag opt-out.
 TRANSCRIPT="${CLAUDE_TRANSCRIPT_PATH:-}"
 if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
+  # Detect opt-out flag in transcript
+  if grep -qE -- '--no-rag' "$TRANSCRIPT" 2>/dev/null; then
+    exit 0
+  fi
+
   # Detect BOTH dispatch surfaces:
   #   (a) MCP tool call  — mcp__<vendor>__*-store
   #   (b) CLI dispatch   — the receiver topic's own documented script path, which is
@@ -83,7 +93,7 @@ RAG dispatch missing. This workspace binds a RAG receiver (WSCFG_RAG_KIND=$RAG_K
 so the artifact should reach it before the file is archived away.
 
 Required action (pick one):
-  1. Dispatch to the receiver resolved by workspace-config.sh (WSCFG_RAG_* values)
+  1. Dispatch to the receiver resolved by workspace-config.sh (or explicit --rag=<skill>:<topic>)
   2. Pass --no-rag when this artifact is deliberately not indexed
 
 No flag is required to dispatch — the binding is resolved from the workspace config.
