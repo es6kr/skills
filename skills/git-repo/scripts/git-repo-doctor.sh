@@ -178,6 +178,18 @@ else
   add_result "BASE-6" "Base" "Push Commit Limit" "WARN" "No pre-push hook found."
 fi
 
+# BASE-7: pre-push merge-conflict-marker guard (blocks pushing commits whose message
+# still carries the auto-generated "Conflicts:" residue from a non-interactive merge commit)
+if [[ -n "$PRE_PUSH_CONTENT" ]]; then
+  if echo "$PRE_PUSH_CONTENT" | grep -qE '(Conflicts:|CONFLICT_COMMITS|PUSH_CONFLICT_MSG_OVERRIDE)'; then
+    add_result "BASE-7" "Base" "Conflict Marker Guard" "PASS" "pre-push hook scans outgoing commit messages for leftover '# Conflicts:' residue."
+  else
+    add_result "BASE-7" "Base" "Conflict Marker Guard" "FAIL" "pre-push hook lacks a guard blocking commits whose message still contains a literal '# Conflicts:' section (leftover from a non-interactively committed merge)."
+  fi
+else
+  add_result "BASE-7" "Base" "Conflict Marker Guard" "WARN" "No pre-push hook found."
+fi
+
 # -----------------------------------------------------------------------------
 # Tier 2: Conditional Checks
 # -----------------------------------------------------------------------------

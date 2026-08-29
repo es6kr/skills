@@ -9,7 +9,8 @@ Comprehensive health check and diagnosis for Git repository hooks across univers
 - Branch deletion wastes heavy CI resources in `pre-push`
 - Staging and pushing private branches (e.g. `refs/heads/local`) needs protection
 - Audit public repositories for secret/Korean text leakage or corporate repositories for direct `main` push protection
-- User mentions: "repo doctor", "hook health", "diagnose hooks", "check hooks", "hook wiring", "zero-SHA pre-push", "doctor"
+- A merge commit's message still shows a leftover `# Conflicts:` block (produced by `git merge --no-edit` or another non-interactive commit path after resolving conflicts)
+- User mentions: "repo doctor", "hook health", "diagnose hooks", "check hooks", "hook wiring", "zero-SHA pre-push", "doctor", "Conflicts:", "conflict marker in commit message"
 
 ---
 
@@ -26,6 +27,7 @@ graph TD
     B --> B4[BASE-4: Local Branch Guard]
     B --> B5[BASE-5: Secret & IP Guard]
     B --> B6[BASE-6: Push Commit Limit Guard]
+    B --> B7[BASE-7: Conflict Marker Guard]
     
     C --> C1[COND-MD: Markdown Lint]
     C --> C2[COND-SKILL: Skill Frontmatter]
@@ -45,6 +47,7 @@ graph TD
 | **`BASE-4`** | **Local Branch Guard** | `local` branch push guard | `pre-push` hook must contain a guard blocking accidental push of private `refs/heads/local` stage branch to remote. |
 | **`BASE-5`** | **Secret & IP Guard** | Secret / IP scan | `pre-commit` hook must scan staged files for private RFC1918 IPs (`10.x`, `192.168.x`, `172.16-31.x`) and home paths. |
 | **`BASE-6`** | **Push Commit Limit Guard** | Outgoing commit count check | `pre-push` hook must check outgoing commit count (`rev-list --count` / `PUSH_MAX_COMMITS`) and block pushes exceeding the limit (default: 5) to prevent publishing massively diverged commits caused by wrong base branch selection. Override via `PUSH_COMMIT_LIMIT_OVERRIDE=1`. |
+| **`BASE-7`** | **Conflict Marker Guard** | Outgoing commit message scan | `pre-push` hook must scan each outgoing commit's message for a literal `Conflicts:` section (the auto-generated merge-conflict listing that `git merge --no-edit`, or any non-interactive commit path, leaves un-stripped) and block the push. Override via `PUSH_CONFLICT_MSG_OVERRIDE=1`. |
 
 ### Tier 2: Conditional Checks
 
@@ -201,4 +204,34 @@ if [ "$COMMIT_COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}
 fi
 ```
 
+### 7. Adding Merge Conflict Marker Guard (`BASE-7`)
+
+**Why this happens**: `git merge --continue` (or any other non-interactive commit path, e.g. `git merge --no-edit` after resolving conflicts) commits the raw `MERGE_MSG` file verbatim. That file's `# Conflicts:` section is only stripped by Git's "strip" cleanup mode, which applies solely to editor-invoked commits — a non-interactive commit skips it, so the literal `# Conflicts:\n#\t<path>` lines end up permanently in the commit message.
+
+In `.githooks/pre-push`, insert a scan over the outgoing commit range (reuse the `$DEFAULT_BASE`/range logic from `BASE-6` if already present):
+
+```sh
+# Conflict marker guard — block push of a commit whose message still carries
+# the auto-generated "Conflicts:" residue (unresolved non-interactive merge commit)
+if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ -n "$remote_sha" ]; then
+  CONFLICT_RANGE="$remote_sha..$local_sha"
+else
+  CONFLICT_RANGE="${DEFAULT_BASE:-origin/main}..$local_sha"
+fi
+
+CONFLICT_COMMITS=$(git rev-list "$CONFLICT_RANGE" 2>/dev/null | while read -r sha; do
+  git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:' && echo "$sha"
+done)
+
+if [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ]; then
+  echo "❌ ERROR: The following commit(s) still contain a leftover '# Conflicts:' section:" >&2
+  echo "$CONFLICT_COMMITS" | sed 's/^/   /' >&2
+  echo "   This happens when a merge is committed non-interactively (--no-edit) after resolving conflicts." >&2
+  echo "   Clean the message before pushing:" >&2
+  echo "     - Tip commit:      git commit --amend  (drop the '# Conflicts:' lines, then save)" >&2
+  echo "     - Older commit:    git rebase -i <parent-sha>  -> mark it 'reword', drop the lines" >&2
+  echo "   To override: PUSH_CONFLICT_MSG_OVERRIDE=1 git push ..." >&2
+  exit 1
+fi
+```
 
