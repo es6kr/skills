@@ -32,6 +32,59 @@ def git_sha_exists(sha: str) -> bool:
     return res.returncode == 0
 
 
+# A consolidate artifact is identified by its TITLE LINE, not by the presence of a
+# skill name anywhere in the body.
+#
+# Substring-over-whole-body matching cannot separate "this comment IS the Internal
+# Review" from "this comment TALKS ABOUT the Internal Review". Any Summary that
+# explains the requesting/receiving pairing -- including one honestly documenting why
+# a previous review was inadequate -- matches both filters and is classified as both
+# artifacts. The consequences are silent: `internal_reviews[-1]` and `summaries[-1]`
+# resolve to the same comment, the chronological check compares a timestamp with
+# itself and passes, the internal finding count reads 0 against a Summary body, and
+# "Missing Internal Code Review comment" never fires even when no such comment exists.
+# That is how a PR carrying a single fabricated Summary and no Internal Review at all
+# could still have satisfied the existence gate.
+#
+# post.md makes the title line mandatory and self-identifying, so keying off it is
+# both stricter and cheaper: the link lives in the heading or the artifact is
+# malformed and should be reported as such.
+HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+\S")
+INTERNAL_SLUG = "requesting-code-review"
+SUMMARY_SLUG = "receiving-code-review"
+
+
+def title_line(body: str) -> str:
+    """First non-empty line of a comment body."""
+    for line in (body or "").splitlines():
+        if line.strip():
+            return line
+    return ""
+
+
+def titled_as(body: str, slug: str) -> bool:
+    """True when the body's title line is a heading carrying a link to `slug`.
+
+    Requires all three: a heading, a markdown link, and the slug inside that link.
+    A heading that merely mentions the slug in prose does not qualify -- the
+    template is `## <Title> - [<slug>](https://.../<slug>)`.
+    """
+    line = title_line(body)
+    if not HEADING_RE.match(line):
+        return False
+    for link in re.finditer(r"\[([^\]]*)\]\(([^)]*)\)", line):
+        if slug in link.group(1) or slug in link.group(2):
+            return True
+    return False
+
+
+def looks_like(body: str, *keywords: str) -> bool:
+    """Heuristic used only to explain a miss: the title line reads like the artifact
+    but carries no link, so the author almost certainly meant it as one."""
+    line = title_line(body)
+    return bool(HEADING_RE.match(line)) and all(k.lower() in line.lower() for k in keywords)
+
+
 class ConsolidateValidator:
     def __init__(self, pr_num: int, repo: Optional[str] = None) -> None:
         self.pr_num = pr_num
@@ -59,13 +112,35 @@ class ConsolidateValidator:
             return False
 
         # 2. Extract Internal Code Review and AI Review Summary comments
-        internal_reviews = [c for c in issue_comments if "requesting-code-review" in c.get("body", "")]
-        summaries = [c for c in issue_comments if "receiving-code-review" in c.get("body", "")]
+        internal_reviews = [c for c in issue_comments if titled_as(c.get("body", ""), INTERNAL_SLUG)]
+        summaries = [c for c in issue_comments if titled_as(c.get("body", ""), SUMMARY_SLUG)]
 
         if not internal_reviews:
-            self.errors.append("Missing Internal Code Review comment (must link to requesting-code-review).")
+            near_miss = [c for c in issue_comments
+                         if looks_like(c.get("body", ""), "code review")
+                         and not titled_as(c.get("body", ""), SUMMARY_SLUG)]
+            hint = (f" (comment {near_miss[-1].get('id')} has a Code Review heading but no "
+                    f"[{INTERNAL_SLUG}](...) link in it)") if near_miss else ""
+            self.errors.append(
+                f"Missing Internal Code Review comment -- its title line must carry a "
+                f"[{INTERNAL_SLUG}](...) link{hint}.")
         if not summaries:
-            self.errors.append("Missing AI Review Summary comment (must link to receiving-code-review).")
+            near_miss = [c for c in issue_comments if looks_like(c.get("body", ""), "summary")]
+            hint = (f" (comment {near_miss[-1].get('id')} has a Summary heading but no "
+                    f"[{SUMMARY_SLUG}](...) link in it)") if near_miss else ""
+            self.errors.append(
+                f"Missing AI Review Summary comment -- its title line must carry a "
+                f"[{SUMMARY_SLUG}](...) link{hint}.")
+
+        # A single comment titled as both artifacts collapses the pair the whole
+        # workflow rests on; without this the two lists below would resolve to it twice.
+        both = [c for c in issue_comments
+                if titled_as(c.get("body", ""), INTERNAL_SLUG)
+                and titled_as(c.get("body", ""), SUMMARY_SLUG)]
+        if both:
+            self.errors.append(
+                f"Comment {both[-1].get('id')} is titled as BOTH the Internal Code Review and "
+                f"the AI Review Summary. They must be two separate comments.")
 
         if not internal_reviews or not summaries:
             return False
