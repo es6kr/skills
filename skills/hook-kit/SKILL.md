@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - archive
   - safe-delete
-description: "Hook management. audit - reference/permission/orphan checks (stale references + chmod +x missing + unowned hook detection) [audit.md]. edit - hook script modification + dual-sync [edit.md]. install - install from resources/ to hooks/ + settings.json registration [install.md]. move - move hooks from scripts/ to hooks/ + update settings.json paths [move.md]. remove - remove hook entries from settings.json [remove.md]. Use when: \"hook cleanup\", \"hook audit\", \"hook edit\", \"hook install\", \"hook move\", \"hook remove\", \"install hook\", \"edit hook\", \"edit guard\", \"bash-guard\", \"hook sync\", \"hook permission\", \"orphan hook\", \"chmod +x hook\", \"exit 126\""
+description: "Hook management. audit - reference/permission/orphan checks (stale references + chmod +x missing + unowned hook detection) [audit.md]. edit - hook script modification + dual-sync [edit.md]. install - install from resources/ to hooks/ + settings.json registration [install.md]. move - move hooks from scripts/ to hooks/ + update settings.json paths [move.md]. remove - remove hook entries from settings.json [remove.md]. registry - canonical hook inventory hook-registry.yaml: consult before any registration change, owner/marketplace/status/tombstone rows, verify script, registry-read guard [registry.md]. Use when: \"hook cleanup\", \"hook audit\", \"hook edit\", \"hook install\", \"hook move\", \"hook remove\", \"install hook\", \"edit hook\", \"edit guard\", \"bash-guard\", \"hook sync\", \"hook permission\", \"orphan hook\", \"chmod +x hook\", \"exit 126\", \"hook registry\", \"hook-registry.yaml\", \"phantom hook\", \"ghost hook\", \"hook registration\", \"hooks.json\", \"settings.json hooks\""
 allowed-tools:
   - Read
   - Edit
@@ -37,6 +37,7 @@ Manage hooks and script files in `~/.claude/settings.json`. Includes resource (s
 | install | resources → hooks/ installation + settings.json registration | [install.md](./install.md) |
 | move | scripts/ → hooks/ migration + path update | [move.md](./move.md) |
 | remove | remove hook entries from settings.json | [remove.md](./remove.md) |
+| registry | canonical inventory `hook-registry.yaml` — consult before any registration change (owner/marketplace/status/tombstone), verify with `hook_registry_verify.py`; enforced by `block-hook-registration-without-registry-read.js` | [registry.md](./registry.md) |
 
 ## Quick Reference
 

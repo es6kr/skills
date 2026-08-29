@@ -127,10 +127,6 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
           },
           {
@@ -181,6 +177,10 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
           }
         ]
       },
@@ -218,6 +218,10 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
           }
         ]
       },
@@ -254,11 +258,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-squash-recommend-multi-commit.sh",
-            "timeout": 15
           }
         ]
       },
@@ -309,6 +308,10 @@
       {
         "matcher": "",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/session/resources/session-id-inject.js SessionStart"
+          },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"

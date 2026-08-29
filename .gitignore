@@ -1,11 +1,13 @@
 __pycache__/
 .agent/
 .DS_Store
+.githooks/private-refs.regex
 .omc/
 .playwright-mcp/
 .pytest_cache/
 .stfolder/
 .stversions/
+.superpowers
 .tmp/
 .worktrees/
 *.bak

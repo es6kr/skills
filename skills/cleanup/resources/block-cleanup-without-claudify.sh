@@ -32,13 +32,6 @@
 #         slash-command line and scope all checks AFTER it. Anchor excludes
 #         tool_result user-lines (RAG results quoting other sessions' /cleanup)
 #         and assistant lines (escaped quotes never match the structural pattern).
-#   7th (2026-08-26): plugin-marketplace-qualified invocations (`Skill("es6kr:claudify",
-#     "improve")`) always carry a `"<marketplace>:claudify"` prefix in the tool_use
-#     input, but check_claudify_calls()'s grep anchored on the bare `"skill":"claudify"`
-#     key-value pair — every plugin-routed call was invisible to the check, so a
-#     completed cleanup was reported as missing every time. Fixed by allowing an
-#     optional `<prefix>:` before the skill name in both the claudify and the
-#     Gate B cleanup-anchor grep.
 #   6th (2026-07-27): Gate B's anchor matched a `<command-name>/cleanup</command-name>`
 #     substring embedded as narrative text INSIDE a compact-summary message
 #     (`"isCompactSummary":true`) — the summary quotes prior turns verbatim while
@@ -90,15 +83,14 @@ if [[ -z "$RESPONSE" ]] && [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PAT
 fi
 
 # Helper: extract claudify call flags from a stream on stdin.
-# STRUCTURAL match only: `"skill":"claudify"` (optionally plugin-marketplace-qualified,
-# e.g. `"skill":"es6kr:claudify"`) appears ONLY inside a real Skill tool_use `input`
-# object. Free-text mentions are JSON-escaped (\") and never match.
+# STRUCTURAL match only: `"skill":"claudify"` appears ONLY inside a real Skill
+# tool_use `input` object. Free-text mentions are JSON-escaped (\") and never match.
 check_claudify_calls() {
   local segment="$1"
   HAS_CLAUDIFY_IMPROVE=0
   HAS_CLAUDIFY_PERSIST=0
   local calls
-  calls=$(echo "$segment" | grep -oE '"skill":"([a-zA-Z0-9_-]+:)?claudify"[^}]*}' 2>/dev/null)
+  calls=$(echo "$segment" | grep -oE '"skill":"([^"]*:)?claudify"[^}]*}' 2>/dev/null)
   if echo "$calls" | grep -qE '"args":"[^"]*improve'; then HAS_CLAUDIFY_IMPROVE=1; fi
   if echo "$calls" | grep -qE '"args":"[^"]*persist'; then HAS_CLAUDIFY_PERSIST=1; fi
 }
@@ -139,7 +131,7 @@ if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
     if (( TOTAL_LINES - CLEANUP_CMD_LINE <= GATEB_WINDOW )); then
       SCOPED=$(tail -n +"$CLEANUP_CMD_LINE" "$TRANSCRIPT_PATH")
       MISSING=""
-      if ! echo "$SCOPED" | grep -qE '"skill":"([a-zA-Z0-9_-]+:)?cleanup"'; then
+      if ! echo "$SCOPED" | grep -qE '"skill":"([^"]*:)?cleanup"'; then
         MISSING="${MISSING}Skill(\"cleanup\"), "
       fi
       check_claudify_calls "$SCOPED"

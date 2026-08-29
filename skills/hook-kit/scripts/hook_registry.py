@@ -24,6 +24,7 @@ Schema (see plan-hook-registry-schema.md §2):
         status: active | dormant | orphan | removed
         implementations: [{runtime, file, since?, until?, note?}]
         registrations:   [{surface, event, matcher, command, timeout?}]
+        runtime_copies:  {canonical, expected_roots[], sync_medium?}
         description: <str>
         tombstone: {removed_at, reason, detail, replacement?}   # status: removed
 """
@@ -398,12 +399,129 @@ def _check_dual_marketplace(hooks: list, findings: list) -> None:
             )
 
 
-def validate(registry: dict, disk_index: dict) -> list[Finding]:
+def _check_runtime_copies_schema(hook: dict, findings: list) -> None:
+    """Shape of the optional `runtime_copies` block.
+
+    `canonical` has to name one of the hook's own implementation files —
+    otherwise the copy checks compare a path this entry never claimed, and a
+    typo silently disables them instead of failing.
+    """
+    block = hook.get("runtime_copies")
+    if block is None:
+        return
+    hook_id = hook["id"]
+    if not isinstance(block, dict):
+        findings.append(
+            Finding("SCHEMA", hook_id, "runtime_copies must be a mapping")
+        )
+        return
+
+    canonical = block.get("canonical")
+    files = _files_of(hook)
+    if not canonical or canonical not in files:
+        findings.append(
+            Finding(
+                "SCHEMA",
+                hook_id,
+                f"runtime_copies.canonical {canonical!r} is not one of this "
+                f"hook's implementation files ({sorted(files)})",
+            )
+        )
+
+    roots = block.get("expected_roots")
+    if not isinstance(roots, list) or not roots:
+        findings.append(
+            Finding(
+                "SCHEMA",
+                hook_id,
+                "runtime_copies.expected_roots must be a non-empty list — "
+                "with no roots to scan the copy checks pass vacuously",
+            )
+        )
+    elif any(not isinstance(r, str) or not r for r in roots):
+        findings.append(
+            Finding(
+                "SCHEMA",
+                hook_id,
+                "runtime_copies.expected_roots entries must be non-empty strings",
+            )
+        )
+
+
+def _copy_record(hook: dict, copy_index: dict) -> dict | None:
+    block = hook.get("runtime_copies")
+    if not isinstance(block, dict):
+        return None
+    canonical = block.get("canonical")
+    if not canonical:
+        return None
+    record = copy_index.get(canonical)
+    return record if isinstance(record, dict) else None
+
+
+def _check_partially_removed(hook: dict, copy_index: dict, findings: list) -> None:
+    """`removed` means gone from every root, not just from the source tree.
+
+    One survivor keeps executing, so re-introduction detection reads clean
+    while the guard is still live — which is exactly how a deletion gets
+    believed without having happened.
+    """
+    record = _copy_record(hook, copy_index)
+    if record is None:
+        return
+    survivors = sorted(record.get("copies") or {})
+    if survivors:
+        findings.append(
+            Finding(
+                "PARTIALLY_REMOVED",
+                hook["id"],
+                "removed hook still present in " + ", ".join(survivors),
+            )
+        )
+
+
+def _check_copy_drift(hook: dict, copy_index: dict, findings: list) -> None:
+    """Copies that disagree with the canonical file.
+
+    A root holding no copy is not a defect — which roots exist differs per
+    machine, so the registry declares roots to scan, not copies to expect.
+    """
+    record = _copy_record(hook, copy_index)
+    if record is None:
+        return
+    canonical_digest = record.get("canonical")
+    if canonical_digest is None:
+        return
+    diverged = sorted(
+        root
+        for root, digest in (record.get("copies") or {}).items()
+        if digest is not None and digest != canonical_digest
+    )
+    if diverged:
+        findings.append(
+            Finding(
+                "COPY_DRIFT",
+                hook["id"],
+                "copies differ from the canonical file in " + ", ".join(diverged),
+            )
+        )
+
+
+def validate(
+    registry: dict, disk_index: dict, copy_index: dict | None = None
+) -> list[Finding]:
     """Cross-check a registry against what is actually on disk.
 
     `disk_index` maps a marketplace name to the set of repo-relative script
     paths present in it.
+
+    `copy_index` is optional and covers the runtime roots outside the source
+    tree, mapping a repo-relative file to
+    ``{"canonical": <digest|None>, "copies": {<root>: <digest|None>}}``.
+    Omitting it leaves the copy checks off, so existing two-argument callers
+    are unaffected.
     """
+    copy_index = copy_index or {}
     findings: list[Finding] = []
     hooks = registry.get("hooks") or []
     seen: dict = {}
@@ -416,13 +534,16 @@ def validate(registry: dict, disk_index: dict) -> list[Finding]:
             continue
 
         present = set(disk_index.get(hook.get("marketplace"), ()) or ())
+        _check_runtime_copies_schema(hook, findings)
 
         if hook.get("status") == "removed":
             _check_tombstone(hook, present, findings)
+            _check_partially_removed(hook, copy_index, findings)
             continue
 
         _check_registrations(hook, present, findings)
         _check_wrapper_pairing(hook, findings)
+        _check_copy_drift(hook, copy_index, findings)
 
     _check_dual_marketplace(
         [h for h in hooks if isinstance(h, dict)],

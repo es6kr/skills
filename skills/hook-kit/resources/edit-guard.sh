@@ -217,6 +217,41 @@ check_skill_language_mismatch() {
   exit 2
 }
 
+resolve_guards_config() {
+  if [[ -n "${GUARDS_CONFIG:-}" && -f "${GUARDS_CONFIG}" ]]; then
+    echo "$GUARDS_CONFIG"
+    return 0
+  fi
+  local target_dir="${1:-$PWD}"
+  local repo_root
+  repo_root=$(git -C "$target_dir" rev-parse --show-toplevel 2>/dev/null || echo "$target_dir")
+  for candidate in "$repo_root/.agents/guards-config.json" "$repo_root/.claude/guards-config.json" "$target_dir/.agents/guards-config.json"; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  if [[ -f "$HOME/.config/agent-workspace/guards-config.json" ]]; then
+    echo "$HOME/.config/agent-workspace/guards-config.json"
+    return 0
+  fi
+  if [[ -f "$HOME/.config/plane-backlog/guards-config.json" ]]; then
+    echo "$HOME/.config/plane-backlog/guards-config.json"
+    return 0
+  fi
+  local plugin_data="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
+  if [[ -n "$plugin_data" && -f "$plugin_data/guards-config.json" ]]; then
+    echo "$plugin_data/guards-config.json"
+    return 0
+  fi
+  local default_data="$(dirname "$0")/../data/guards-config.json"
+  if [[ -f "$default_data" ]]; then
+    echo "$default_data"
+    return 0
+  fi
+  return 1
+}
+
 # ============================================================================
 # Check 3: Vendor refs in generic skill files (Edit/Write branch)
 # ============================================================================
@@ -241,15 +276,36 @@ check_vendor_in_generic_skill() {
   local skill_name
   skill_name="$(basename "$SKILL_ROOT")"
 
+  local guards_cfg
+  guards_cfg="$(resolve_guards_config "$SKILL_ROOT" 2>/dev/null || true)"
+  local exempt_skills="es6kr dgs daegun semaphore argocd hook deps-project deps-wbs-sync k3s gitops-expert cert-reflector-setup hedgedoc oci-resource rclone launchd-manager win macos asdf-dev-env package-manager"
+  local exempt_prefixes="omc- deps-"
+  local vendor_skill_tokens="es6kr|dgs|daegun|semaphore|argocd|omc-[^\"]+|deps-[^\"]+"
+  local vendor_mcp_tokens="qdrant|chroma|weaviate|pinecone|milvus"
+
+  if [[ -n "$guards_cfg" && -f "$guards_cfg" ]] && command -v jq >/dev/null 2>&1; then
+    local loaded_exempt loaded_prefixes loaded_vskills loaded_vendors
+    loaded_exempt=$(jq -r '.lists.generic_skills_exempt[]? // empty' "$guards_cfg" 2>/dev/null | tr '\n' ' ')
+    [[ -n "$loaded_exempt" ]] && exempt_skills="$loaded_exempt"
+    loaded_prefixes=$(jq -r '.lists.generic_skills_exempt_prefix[]? // empty' "$guards_cfg" 2>/dev/null | tr '\n' ' ')
+    [[ -n "$loaded_prefixes" ]] && exempt_prefixes="$loaded_prefixes"
+    loaded_vskills=$(jq -r '.lists.vendor_skill_invocation_block[]? // empty' "$guards_cfg" 2>/dev/null | tr '\n' '|' | sed 's/|$//')
+    [[ -n "$loaded_vskills" ]] && vendor_skill_tokens="${loaded_vskills}|omc-[^\"]+|deps-[^\"]+"
+    loaded_vendors=$(jq -r '.lists.vendors[]? // empty' "$guards_cfg" 2>/dev/null | tr '\n' '|' | sed 's/|$//')
+    [[ -n "$loaded_vendors" ]] && vendor_mcp_tokens="$loaded_vendors"
+  fi
+
   # Skip vendor / infra-host skills (they ARE the receivers)
-  case "$skill_name" in
-    es6kr|dgs|daegun|semaphore|argocd|hook|deps-project|deps-wbs-sync|k3s|gitops-expert|cert-reflector-setup|hedgedoc|oci-resource|rclone|launchd-manager|win|macos|asdf-dev-env|package-manager)
+  for exempt in $exempt_skills; do
+    if [[ "$skill_name" == "$exempt" ]]; then
       return 0
-      ;;
-    omc-*|deps-*)
+    fi
+  done
+  for pfx in $exempt_prefixes; do
+    if [[ "$skill_name" == "$pfx"* ]]; then
       return 0
-      ;;
-  esac
+    fi
+  done
 
   [[ -z "$NEW_CONTENT" ]] && return 0
 
@@ -257,7 +313,7 @@ check_vendor_in_generic_skill() {
 
   # Pattern 1: Vendor Skill() invocation
   local p1
-  p1=$(echo "$NEW_CONTENT" | grep -nE 'Skill\("(es6kr|dgs|daegun|semaphore|argocd|omc-[^"]+|deps-[^"]+)"' | head -3)
+  p1=$(echo "$NEW_CONTENT" | grep -nE "Skill\(\"(${vendor_skill_tokens})\"" | head -3)
   [[ -n "$p1" ]] && violations="${violations}[vendor Skill() invocation]\n${p1}\n"
 
   # Pattern 2: Private network IPs (RFC1918)
@@ -272,7 +328,7 @@ check_vendor_in_generic_skill() {
 
   # Pattern 4: Vendor MCP servers
   local p4
-  p4=$(echo "$NEW_CONTENT" | grep -nE 'mcp__(qdrant|chroma|weaviate|pinecone|milvus)([_-]|$)' | head -3)
+  p4=$(echo "$NEW_CONTENT" | grep -nE "mcp__(${vendor_mcp_tokens})([_-]|$)" | head -3)
   [[ -n "$p4" ]] && violations="${violations}[vendor MCP server]\n${p4}\n"
 
   # Pattern 5: Agent-specific slash commands without agent label

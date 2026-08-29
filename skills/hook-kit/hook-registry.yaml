@@ -31,6 +31,14 @@ hooks:
     event: PostToolUse
     matcher: Grep
     command: node "${CLAUDE_PLUGIN_ROOT}/skills/auto-agentify/resources/auto-agentify-detector.js" Grep
+- id: bash-guard
+  owner_skill: es6p-hooks
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: py
+    file: skills/es6p-hooks/resources/bash-guard.py
+  registrations: []
 - id: block-credential-reissue-without-vault-check
   owner_skill: es6p-hooks
   marketplace: es6kr-plugins
@@ -59,6 +67,14 @@ hooks:
     event: PreToolUse
     matcher: Write
     command: bash "${CLAUDE_PLUGIN_ROOT}/skills/es6p-hooks/resources/block-direct-settings-edit.sh"
+- id: block-plan-artifact-no-plane-link
+  owner_skill: es6p-hooks
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/es6p-hooks/resources/block-plan-artifact-no-plane-link.sh
+  registrations: []
 - id: block-qdrant-import-without-topic-read
   owner_skill: es6p-hooks
   marketplace: es6kr-plugins
@@ -66,6 +82,30 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/es6p-hooks/resources/block-qdrant-import-without-topic-read.sh
+  registrations: []
+- id: block-semaphore-cmd-without-skill
+  owner_skill: semaphore
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/semaphore/resources/block-semaphore-cmd-without-skill.sh
+  registrations: []
+- id: block-server-cmd-without-skill
+  owner_skill: dgs
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/dgs/resources/block-server-cmd-without-skill.sh
+  registrations: []
+- id: block-tasklist-id-in-conversation
+  owner_skill: es6p-hooks
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/es6p-hooks/resources/block-tasklist-id-in-conversation.sh
   registrations: []
 - id: build-confirm
   owner_skill: build-confirm
@@ -79,6 +119,14 @@ hooks:
     event: PostToolUse
     matcher: Bash
     command: bash "${CLAUDE_PLUGIN_ROOT}/skills/build-confirm/resources/build-confirm.sh"
+- id: check-cache-drift
+  owner_skill: hook-kit
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/check-cache-drift.sh
+  registrations: []
 - id: check-session-import-gap
   owner_skill: es6kr
   marketplace: es6kr-plugins
@@ -93,6 +141,14 @@ hooks:
     event: Stop
     matcher: ''
     command: node "${CLAUDE_PLUGIN_ROOT}/skills/es6kr/resources/check-session-import-gap.js"
+- id: check-session-rag
+  owner_skill: es6p-hooks
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/es6p-hooks/resources/check-session-rag.sh
+  registrations: []
 - id: context-usage-inject
   owner_skill: context-measure
   marketplace: es6kr-plugins
@@ -100,6 +156,22 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/context-measure/resources/context-usage-inject.sh
+  registrations: []
+- id: context-usage-now
+  owner_skill: context-measure
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/context-measure/resources/context-usage-now.sh
+  registrations: []
+- id: context_measure
+  owner_skill: context-measure
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: py
+    file: skills/context-measure/resources/context_measure.py
   registrations: []
 - id: experience-logger-session-end
   owner_skill: experience-logger
@@ -153,6 +225,14 @@ hooks:
   - runtime: sh
     file: skills/es6p-hooks/resources/warn-conversation-language-scope.sh
   registrations: []
+- id: workspace-config
+  owner_skill: es6p-hooks
+  marketplace: es6kr-plugins
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/es6p-hooks/resources/workspace-config.sh
+  registrations: []
 - id: z-path-resolver
   owner_skill: shell-env
   marketplace: es6kr-plugins
@@ -165,6 +245,14 @@ hooks:
     event: UserPromptSubmit
     matcher: ''
     command: bash "${CLAUDE_PLUGIN_ROOT}/skills/shell-env/resources/z-path-resolver.sh"
+- id: analyze-hook-failures
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: py
+    file: skills/hook-kit/resources/analyze-hook-failures.py
+  registrations: []
 - id: ask-guard
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -194,6 +282,8 @@ hooks:
   implementations:
   - runtime: py
     file: skills/hook-kit/resources/bash-guard.py
+  - runtime: sh
+    file: skills/hook-kit/resources/bash-guard.sh
   registrations:
   - surface: hooks.json
     event: PreToolUse
@@ -251,6 +341,14 @@ hooks:
     relocated_to: 'daegunsoftDev/skills plugins/ask-user/hooks/block-axis-merged-ask.sh'
   implementations: []
   registrations: []
+- id: block-bare-kubectl
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/block-bare-kubectl.sh
+  registrations: []
 - id: block-bot-re-trigger
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -286,13 +384,11 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/cleanup/resources/block-cleanup-missing-rename.sh
-  - runtime: sh
-    file: skills/hook-kit/resources/block-cleanup-missing-rename.sh
   registrations:
   - surface: hooks.json
     event: Stop
     matcher: ''
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-missing-rename.sh
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-rename.sh
 - id: block-cleanup-option-below-context-gate
   owner_skill: cleanup
   marketplace: es6kr-skills
@@ -300,13 +396,11 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/cleanup/resources/block-cleanup-option-below-context-gate.sh
-  - runtime: sh
-    file: skills/hook-kit/resources/block-cleanup-option-below-context-gate.sh
   registrations:
   - surface: hooks.json
     event: PreToolUse
     matcher: AskUserQuestion
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-option-below-context-gate.sh
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-option-below-context-gate.sh
     timeout: 10
 - id: block-cleanup-without-claudify
   owner_skill: cleanup
@@ -315,13 +409,11 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/cleanup/resources/block-cleanup-without-claudify.sh
-  - runtime: sh
-    file: skills/hook-kit/resources/block-cleanup-without-claudify.sh
   registrations:
   - surface: hooks.json
     event: Stop
     matcher: ''
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-without-claudify.sh
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-claudify.sh
 - id: block-cleanup-without-rag
   owner_skill: cleanup
   marketplace: es6kr-skills
@@ -329,13 +421,11 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/cleanup/resources/block-cleanup-without-rag.sh
-  - runtime: sh
-    file: skills/hook-kit/resources/block-cleanup-without-rag.sh
   registrations:
   - surface: hooks.json
     event: Stop
     matcher: ''
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-cleanup-without-rag.sh
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-rag.sh
 - id: block-compound-commands
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -387,11 +477,19 @@ hooks:
 - id: block-direct-checklist-edit
   owner_skill: fix-plan
   marketplace: es6kr-skills
-  status: dormant
+  status: active
   implementations:
   - runtime: js
     file: skills/fix-plan/resources/block-direct-checklist-edit.js
-  registrations: []
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Edit
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/block-direct-checklist-edit.js
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Write
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/block-direct-checklist-edit.js
 - id: block-fixplan-completed-bloat
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -472,27 +570,21 @@ hooks:
 - id: block-new-skill-ready-without-ask
   owner_skill: skill-kit
   marketplace: es6kr-skills
-  status: active
-  implementations:
-  - runtime: sh
-    file: skills/skill-kit/resources/block-new-skill-ready-without-ask.sh
-  registrations:
-  - surface: hooks.json
-    event: PreToolUse
-    matcher: Bash
-    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/skill-kit/resources/block-new-skill-ready-without-ask.sh
+  status: removed
+  tombstone:
+    removed_at: '2026-08-28'
+    reason: Retired in favor of unified skill writer workflow
+  implementations: []
+  registrations: []
 - id: block-squash-recommend-multi-commit
   owner_skill: github-flow
   marketplace: es6kr-skills
-  status: active
-  implementations:
-  - runtime: sh
-    file: skills/github-flow/resources/block-squash-recommend-multi-commit.sh
-  registrations:
-  - surface: hooks.json
-    event: PreToolUse
-    matcher: AskUserQuestion
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-squash-recommend-multi-commit.sh
+  status: removed
+  tombstone:
+    removed_at: '2026-08-28'
+    reason: Retired in favor of commit-tidy and github-flow rules
+  implementations: []
+  registrations: []
 - id: block-noncompliant-review-comment
   owner_skill: consolidate
   marketplace: es6kr-skills
@@ -505,6 +597,22 @@ hooks:
     event: PreToolUse
     matcher: Bash
     command: bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh
+- id: block-plan-artifact-no-plane-link
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Edit
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Write
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh
 - id: block-pr-create-without-draft
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -512,6 +620,14 @@ hooks:
   implementations:
   - runtime: sh
     file: skills/hook-kit/resources/block-pr-create-without-draft.sh
+  registrations: []
+- id: block-pr-url-gate
+  owner_skill: github-flow
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/github-flow/resources/block-pr-url-gate.sh
   registrations: []
 - id: block-prod-branch-autonomous-ops
   owner_skill: hook-kit
@@ -585,6 +701,26 @@ hooks:
     event: PreToolUse
     matcher: Bash
     command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-squash-subject-without-pr.sh
+- id: block-summary-fabricated-claims
+  owner_skill: consolidate
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/consolidate/resources/block-summary-fabricated-claims.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Bash
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-fabricated-claims.sh
+- id: block-summary-without-internal-review
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/block-summary-without-internal-review.sh
+  registrations: []
 - id: block-supervisor-loop-work
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -649,23 +785,23 @@ hooks:
     matcher: TaskOutput
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskoutput-long-block.sh
 - id: block-wip-register-before-execute
-  owner_skill: hook-kit
+  owner_skill: wip
   marketplace: es6kr-skills
   status: active
   implementations:
   - runtime: sh
-    file: skills/hook-kit/resources/block-wip-register-before-execute.sh
+    file: skills/wip/resources/block-wip-register-before-execute.sh
   - runtime: py
     file: skills/wip/resources/block-wip-register-before-execute.py
   registrations:
   - surface: hooks.json
     event: PreToolUse
     matcher: Edit
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wip-register-before-execute.sh
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh
   - surface: hooks.json
     event: PreToolUse
     matcher: Write
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wip-register-before-execute.sh
+    command: ${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh
 - id: block-workflow-without-cost-gate
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -716,10 +852,18 @@ hooks:
   marketplace: es6kr-skills
   status: dormant
   implementations:
-  - runtime: sh
-    file: skills/fix-plan/resources/check-completed-bloat.sh
+  - runtime: js
+    file: skills/fix-plan/resources/check-completed-bloat.js
   - runtime: js
     file: skills/hook-kit/resources/check-completed-bloat.js
+  registrations: []
+- id: check-hook-failure-gap
+  owner_skill: cleanup
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: js
+    file: skills/cleanup/resources/check-hook-failure-gap.js
   registrations: []
 - id: check-session-rag
   owner_skill: hook-kit
@@ -865,6 +1009,22 @@ hooks:
     event: UserPromptSubmit
     matcher: ''
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/idle-wait-reactive-guard.sh
+- id: next-reactive-guard
+  owner_skill: next
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/next/resources/next-reactive-guard.sh
+  registrations: []
+- id: next-trigger
+  owner_skill: next
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/next/resources/next-trigger.sh
+  registrations: []
 - id: plan-undecided-guard
   owner_skill: code-workflow
   marketplace: es6kr-skills
@@ -881,6 +1041,14 @@ hooks:
     event: PostToolUse
     matcher: Write
     command: ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/plan-undecided-guard.sh
+- id: reap-orphaned-helper-procs
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/reap-orphaned-helper-procs.sh
+  registrations: []
 - id: reap-stale-wrapper-shells
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -906,12 +1074,26 @@ hooks:
     matcher: Skill
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/remind-rag-flag-on-skill.sh
 - id: session-id-inject
-  owner_skill: claude-session
+  owner_skill: session
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: js
+    file: skills/session/resources/session-id-inject.js
+  - runtime: sh
+    file: skills/session/resources/session-id-inject.sh
+  registrations:
+  - surface: hooks.json
+    event: SessionStart
+    matcher: ''
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/session/resources/session-id-inject.js SessionStart
+- id: skill-yaml-validate
+  owner_skill: skill-kit
   marketplace: es6kr-skills
   status: dormant
   implementations:
   - runtime: sh
-    file: skills/claude-session/resources/session-id-inject.sh
+    file: skills/skill-kit/resources/skill-yaml-validate.sh
   registrations: []
 - id: ssh-config-ip-check
   owner_skill: hook-kit
@@ -969,6 +1151,30 @@ hooks:
   - runtime: py
     file: skills/cleanup/resources/triage-fixplan-completed.py
   registrations: []
+- id: trigger-PostToolUse
+  owner_skill: skill-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: js
+    file: skills/skill-kit/resources/trigger-PostToolUse.js
+  registrations: []
+- id: trigger-PreToolUse
+  owner_skill: skill-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: js
+    file: skills/skill-kit/resources/trigger-PreToolUse.js
+  registrations: []
+- id: trigger-Stop
+  owner_skill: skill-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: js
+    file: skills/skill-kit/resources/trigger-Stop.js
+  registrations: []
 - id: ui-change-notify
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -1002,6 +1208,30 @@ hooks:
   marketplace: es6kr-skills
   status: dormant
   implementations:
-  - runtime: sh
-    file: skills/wip/resources/wip-task-complete-detect.sh
+  - runtime: js
+    file: skills/wip/resources/wip-task-complete-detect.js
   registrations: []
+- id: workspace-config
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: dormant
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/workspace-config.sh
+  registrations: []
+- id: block-hook-registration-without-registry-read
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: js
+    file: skills/hook-kit/resources/block-hook-registration-without-registry-read.js
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Edit
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Write
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js
