@@ -92,6 +92,24 @@ EOF
     exit 1
   fi
 
+  # Conflict marker guard — block push of a commit whose message still carries
+  # the auto-generated "Conflicts:" residue (unresolved non-interactive merge commit)
+  CONFLICT_COMMITS=$(git rev-list "$BASE_REF..$local_sha" 2>/dev/null | while read -r sha; do
+    git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:' && echo "$sha"
+  done)
+  if [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ]; then
+    cat >&2 <<EOF
+ERROR: The following commit(s) still contain a leftover '# Conflicts:' section:
+$(echo "$CONFLICT_COMMITS" | sed 's/^/   /')
+This happens when a merge is committed non-interactively (--no-edit) after resolving conflicts.
+Clean the message before pushing:
+  - Tip commit:      git commit --amend  (drop the '# Conflicts:' lines, then save)
+  - Older commit:    git rebase -i <parent-sha>  -> mark it 'reword', drop the lines
+To override: PUSH_CONFLICT_MSG_OVERRIDE=1 git push ...
+EOF
+    exit 1
+  fi
+
 done
 if [ "$LOCAL_PUSH_ATTEMPTED" = "1" ] && [ "${PUSH_LOCAL_OVERRIDE:-}" != "1" ]; then
   cat >&2 <<'GUARD_MSG'
