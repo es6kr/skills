@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/github-flow-v0.9.1...github-flow-v0.10.0) (2026-08-29)
+
+
+### Features
+
+* **works-config:** implement v0.2.0 role-based resolution & neutral SSOT guards config ([e22e117](https://github.com/es6kr/skills/commit/e22e117371370c59b18b77c72bdb926dcb1897cb))
+
+
+### Bug Fixes
+
+* address CodeRabbit and Copilot review feedback on PR [#389](https://github.com/es6kr/skills/issues/389) ([db4dfff](https://github.com/es6kr/skills/commit/db4dfff2829632bf263d93e0bbfdd1244772a5b2))
+* **github-flow:** require a fresh PR-state recheck immediately before gh pr merge ([#381](https://github.com/es6kr/skills/issues/381)) ([b0ba553](https://github.com/es6kr/skills/commit/b0ba553db9fc9139d44e64dcd37e2d563c1fe622))
+* **github-flow:** sync block-pr-url-gate.sh from the diverged downstream copy ([5cc5e14](https://github.com/es6kr/skills/commit/5cc5e140271a98adb2af53dbe5d58c38007b0c43))
+* **hook-kit:** document --json mode and scope WSCFG_* to hook scripts ([373634c](https://github.com/es6kr/skills/commit/373634c022b0e2b114a3bbb799bb9a8934c9fbb2))
+* **hook-kit:** scope PR-URL bare-ref check to per-number match, allow force-push in worktrees ([dd50dce](https://github.com/es6kr/skills/commit/dd50dced989eed4847daaf9a0cd4be12a04426e1))
+* promote next-fix batch (task plugin split, claudify matcher, pr recheck, omz chezmoi fix) ([3e90fd5](https://github.com/es6kr/skills/commit/3e90fd56ade0522d6773eb03f38760a317dd5180))
+* **review:** apply copilot review feedback on hooks and test suites ([cba86f4](https://github.com/es6kr/skills/commit/cba86f4ebbf274a0c979ab21aeea6d483f8cb8f3))
+
+
+### Refactor
+
+* **hooks:** sync hook registry, enhance bash-guard, and retire obsolete guards ([15d4a58](https://github.com/es6kr/skills/commit/15d4a58752d0d458f88c86cb41c537f90e3ca4dd))
+
 ## [0.9.1](https://github.com/es6kr/skills/compare/github-flow-v0.9.0...github-flow-v0.9.1) (2026-08-26)
 
 

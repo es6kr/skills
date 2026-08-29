@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/wip-v0.5.1...wip-v0.6.0) (2026-08-29)
+
+
+### Features
+
+* promote next-feat batch (backlog skill, hooks JS port, git-repo doctor, pre-push guard) ([0d76a4c](https://github.com/es6kr/skills/commit/0d76a4c01180fbdc78bfeec8dea91373b4912470))
+
+
+### Bug Fixes
+
+* address CodeRabbit and Copilot review feedback on PR [#385](https://github.com/es6kr/skills/issues/385) ([e94de34](https://github.com/es6kr/skills/commit/e94de34ce5e075c79b7edc5d672813cea94a0acc))
+* **hook-kit:** document --json mode and scope WSCFG_* to hook scripts ([373634c](https://github.com/es6kr/skills/commit/373634c022b0e2b114a3bbb799bb9a8934c9fbb2))
+
+
+### Refactor
+
+* **hooks:** port check-completed-bloat and wip-task-complete-detect to Node.js ([7097526](https://github.com/es6kr/skills/commit/7097526ca208c3106b38a3ac5c317d0eb49eff30))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/wip-v0.5.0...wip-v0.5.1) (2026-08-26)
 
 

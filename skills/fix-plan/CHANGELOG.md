@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/fix-plan-v0.9.1...fix-plan-v0.10.0) (2026-08-29)
+
+
+### Features
+
+* **backlog:** migrate prune_p2p3.py to backlog and implement Option A+B (anchored regex & anomaly gate) ([7bc4fd1](https://github.com/es6kr/skills/commit/7bc4fd197fb5f9cc8bb2b662a8f72f02ed827b9b))
+* promote next-feat batch (backlog skill, hooks JS port, git-repo doctor, pre-push guard) ([0d76a4c](https://github.com/es6kr/skills/commit/0d76a4c01180fbdc78bfeec8dea91373b4912470))
+* **works-config:** implement v0.2.0 role-based resolution & neutral SSOT guards config ([e22e117](https://github.com/es6kr/skills/commit/e22e117371370c59b18b77c72bdb926dcb1897cb))
+
+
+### Bug Fixes
+
+* address CodeRabbit and Copilot review feedback on PR [#385](https://github.com/es6kr/skills/issues/385) ([e94de34](https://github.com/es6kr/skills/commit/e94de34ce5e075c79b7edc5d672813cea94a0acc))
+* address CodeRabbit and Copilot review feedback on PR [#389](https://github.com/es6kr/skills/issues/389) ([db4dfff](https://github.com/es6kr/skills/commit/db4dfff2829632bf263d93e0bbfdd1244772a5b2))
+* **fix-plan:** resolve full list-item block before toggling a sync marker ([#378](https://github.com/es6kr/skills/issues/378)) ([342d414](https://github.com/es6kr/skills/commit/342d4146b919c64ddf3d89c211e3e3e44bce2477))
+* **hook-kit:** add conditional-deferral gate to check-ask-bypass-keywords.sh ([1a32fe0](https://github.com/es6kr/skills/commit/1a32fe0c716ec4583a09a54004fb9fb86191ea1c))
+* **hook-kit:** add conditional-deferral gate to check-ask-bypass-keywords.sh ([49cae3f](https://github.com/es6kr/skills/commit/49cae3f96f08cc54c6dadf4eaf99369e0e9750ef))
+* **hook-kit:** document --json mode and scope WSCFG_* to hook scripts ([373634c](https://github.com/es6kr/skills/commit/373634c022b0e2b114a3bbb799bb9a8934c9fbb2))
+* **hook-kit:** scope PR-URL bare-ref check to per-number match, allow force-push in worktrees ([dd50dce](https://github.com/es6kr/skills/commit/dd50dced989eed4847daaf9a0cd4be12a04426e1))
+* promote next-fix batch (task plugin split, claudify matcher, pr recheck, omz chezmoi fix) ([3e90fd5](https://github.com/es6kr/skills/commit/3e90fd56ade0522d6773eb03f38760a317dd5180))
+* **review:** apply copilot review feedback on hooks and test suites ([cba86f4](https://github.com/es6kr/skills/commit/cba86f4ebbf274a0c979ab21aeea6d483f8cb8f3))
+
+
+### Refactor
+
+* **hooks:** port check-completed-bloat and wip-task-complete-detect to Node.js ([7097526](https://github.com/es6kr/skills/commit/7097526ca208c3106b38a3ac5c317d0eb49eff30))
+
 ## [0.9.1](https://github.com/es6kr/skills/compare/fix-plan-v0.9.0...fix-plan-v0.9.1) (2026-08-26)
 
 

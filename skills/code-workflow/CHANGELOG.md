@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/code-workflow-v0.7.1...code-workflow-v0.8.0) (2026-08-29)
+
+
+### Features
+
+* **skill-kit:** support exclude_content in trigger-compile and add unit tests ([f4400ef](https://github.com/es6kr/skills/commit/f4400ef586a666d9e16e001e84011bf1ec675425))
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit review feedback on PR [#392](https://github.com/es6kr/skills/issues/392) ([3b50e26](https://github.com/es6kr/skills/commit/3b50e26d53666f069eb489211cc67a2820a7cd8a))
+* **hook-kit:** document --json mode and scope WSCFG_* to hook scripts ([373634c](https://github.com/es6kr/skills/commit/373634c022b0e2b114a3bbb799bb9a8934c9fbb2))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([58e85ec](https://github.com/es6kr/skills/commit/58e85ecbb437557544cd528281aa30b804bd2532))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([1412773](https://github.com/es6kr/skills/commit/1412773466d11354eca7521e4351faa5a78d9081))
+* **hook-kit:** scope PR-URL bare-ref check to per-number match, allow force-push in worktrees ([dd50dce](https://github.com/es6kr/skills/commit/dd50dced989eed4847daaf9a0cd4be12a04426e1))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/code-workflow-v0.7.0...code-workflow-v0.7.1) (2026-08-26)
 
 

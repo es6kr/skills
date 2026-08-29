@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/skill-kit-v0.7.1...skill-kit-v0.8.0) (2026-08-29)
+
+
+### Features
+
+* promote next-feat batch (backlog skill, hooks JS port, git-repo doctor, pre-push guard) ([0d76a4c](https://github.com/es6kr/skills/commit/0d76a4c01180fbdc78bfeec8dea91373b4912470))
+* **skill-kit:** support exclude_content in trigger-compile and add unit tests ([f4400ef](https://github.com/es6kr/skills/commit/f4400ef586a666d9e16e001e84011bf1ec675425))
+
+
+### Bug Fixes
+
+* address CodeRabbit and Copilot review feedback on PR [#385](https://github.com/es6kr/skills/issues/385) ([e94de34](https://github.com/es6kr/skills/commit/e94de34ce5e075c79b7edc5d672813cea94a0acc))
+* address CodeRabbit and Copilot review feedback on PR [#389](https://github.com/es6kr/skills/issues/389) ([db4dfff](https://github.com/es6kr/skills/commit/db4dfff2829632bf263d93e0bbfdd1244772a5b2))
+* **hook-kit:** document --json mode and scope WSCFG_* to hook scripts ([373634c](https://github.com/es6kr/skills/commit/373634c022b0e2b114a3bbb799bb9a8934c9fbb2))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([58e85ec](https://github.com/es6kr/skills/commit/58e85ecbb437557544cd528281aa30b804bd2532))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([1412773](https://github.com/es6kr/skills/commit/1412773466d11354eca7521e4351faa5a78d9081))
+* **hook-kit:** scope PR-URL bare-ref check to per-number match, allow force-push in worktrees ([dd50dce](https://github.com/es6kr/skills/commit/dd50dced989eed4847daaf9a0cd4be12a04426e1))
+* promote next-fix batch (task plugin split, claudify matcher, pr recheck, omz chezmoi fix) ([3e90fd5](https://github.com/es6kr/skills/commit/3e90fd56ade0522d6773eb03f38760a317dd5180))
+* **review:** apply copilot review feedback on hooks and test suites ([cba86f4](https://github.com/es6kr/skills/commit/cba86f4ebbf274a0c979ab21aeea6d483f8cb8f3))
+* **skills:** finish the config-resolution sweep for receiver dispatch ([c188d44](https://github.com/es6kr/skills/commit/c188d44de268ef169070dedee525b2a483e57b40))
+
+
+### Refactor
+
+* **hooks:** port check-completed-bloat and wip-task-complete-detect to Node.js ([7097526](https://github.com/es6kr/skills/commit/7097526ca208c3106b38a3ac5c317d0eb49eff30))
+* **hooks:** sync hook registry, enhance bash-guard, and retire obsolete guards ([15d4a58](https://github.com/es6kr/skills/commit/15d4a58752d0d458f88c86cb41c537f90e3ca4dd))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/skill-kit-v0.7.0...skill-kit-v0.7.1) (2026-08-26)
 
 
