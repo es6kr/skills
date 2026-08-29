@@ -8,6 +8,11 @@
     # cross-check the committed registry against hooks.json + disk
     uv run --with pyyaml python skills/hook-kit/scripts/hook_registry_verify.py --check
 
+    # additionally scan the runtime roots each entry declares, for copies that
+    # survived a deletion or drifted from the tracked file
+    uv run --with pyyaml python skills/hook-kit/scripts/hook_registry_verify.py \
+        --check --check-copies
+
 `--bootstrap` derives each entry's status from observation rather than trusting
 a declaration:
 
@@ -27,6 +32,7 @@ and only here.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -135,6 +141,104 @@ def build_entries(roots: dict[str, str]) -> tuple[list[dict], dict[str, set[str]
     return entries, disk_index
 
 
+COPY_SCAN_MAX_DEPTH = 6
+# `.worktrees` is skipped for a different reason than the rest: a worktree is
+# another branch of this same repo, not a deployed copy, and git already tracks
+# its divergence. Counting them would make the finding grow with every worktree.
+COPY_SCAN_SKIP_DIRS = frozenset(
+    {".git", ".worktrees", "node_modules", ".venv", "__pycache__"}
+)
+
+
+def _digest(path: str) -> str | None:
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def _find_by_name(base: str, name: str, max_depth: int) -> list[str]:
+    """Every file called `name` under `base`, bounded by depth.
+
+    Matching by basename rather than by the canonical relative path is
+    deliberate: the copy that caused the incident this check exists for lived
+    under a *different* skill directory than the source, so a path-shaped
+    lookup would have reported it absent.
+    """
+    hits: list[str] = []
+    base = os.path.abspath(base)
+    for dirpath, dirnames, filenames in os.walk(base):
+        depth = dirpath[len(base) :].count(os.sep)
+        if depth >= max_depth:
+            dirnames[:] = []
+        else:
+            dirnames[:] = [d for d in dirnames if d not in COPY_SCAN_SKIP_DIRS]
+        if name in filenames:
+            hits.append(os.path.join(dirpath, name))
+    return sorted(hits)
+
+
+def scan_copies(registry: dict, repo_root: str) -> dict:
+    """Build the copy index `hook_registry.validate` consumes.
+
+    Filesystem access stays here, at the CLI edge, so the validation core keeps
+    operating on plain dicts. A hit whose realpath is the canonical file itself
+    is skipped — a root that is a symlink into this checkout is the same file,
+    not a second copy.
+    """
+    index: dict[str, dict] = {}
+    for hook in registry.get("hooks") or []:
+        if not isinstance(hook, dict):
+            continue
+        block = hook.get("runtime_copies")
+        if not isinstance(block, dict):
+            continue
+        canonical = block.get("canonical")
+        if not canonical or canonical in index:
+            continue
+        source = os.path.join(repo_root, canonical)
+        record: dict = {
+            "canonical": _digest(source) if os.path.isfile(source) else None,
+            "copies": {},
+        }
+        source_real = os.path.realpath(source)
+        target = os.path.basename(canonical)
+        for root in block.get("expected_roots") or []:
+            expanded = os.path.expanduser(root)
+            if not os.path.isdir(expanded):
+                continue
+            for hit in _find_by_name(expanded, target, COPY_SCAN_MAX_DEPTH):
+                if os.path.realpath(hit) == source_real:
+                    continue
+                label = f"{root}/{os.path.relpath(hit, os.path.abspath(expanded))}"
+                record["copies"][label] = _digest(hit)
+        index[canonical] = record
+    return index
+
+
+def carry_declarations(entries: list[dict], existing: dict) -> list[dict]:
+    """Preserve hand-written declarations that a rescan cannot observe.
+
+    `runtime_copies` states which roots to scan; nothing on disk implies it, so
+    regenerating an entry from observation alone would silently drop it and the
+    copy checks would pass vacuously from then on.
+    """
+    prior = {
+        (h.get("id"), h.get("marketplace")): h
+        for h in existing.get("hooks") or []
+        if isinstance(h, dict)
+    }
+    for hook in entries:
+        old = prior.get((hook.get("id"), hook.get("marketplace")))
+        if old and old.get("runtime_copies") and "runtime_copies" not in hook:
+            hook["runtime_copies"] = old["runtime_copies"]
+    return entries
+
+
 def merge_tombstones(entries: list[dict], existing: dict) -> list[dict]:
     """Carry `status: removed` entries forward; a rescan must not erase them."""
     keep = [
@@ -207,6 +311,12 @@ def main(argv=None) -> int:
     parser.add_argument("--bootstrap", action="store_true")
     parser.add_argument("--check", action="store_true")
     parser.add_argument(
+        "--check-copies",
+        action="store_true",
+        help="also scan each entry's declared runtime roots for surviving or "
+        "drifted copies (implies --check)",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="with --bootstrap, print instead of write"
     )
     parser.add_argument(
@@ -215,6 +325,9 @@ def main(argv=None) -> int:
         help="with --bootstrap, allow writing partial registry when a marketplace root is missing",
     )
     args = parser.parse_args(argv)
+
+    if args.check_copies:
+        args.check = True
 
     if not (args.bootstrap or args.check):
         parser.error("pass --bootstrap, --check, or both")
@@ -241,7 +354,8 @@ def main(argv=None) -> int:
 
     if args.bootstrap:
         entries, disk_index = build_entries(roots)
-        merged = merge_tombstones(entries, load_registry(registry_path))
+        prior = load_registry(registry_path)
+        merged = merge_tombstones(carry_declarations(entries, prior), prior)
         registry = {"schema_version": SCHEMA_VERSION, "hooks": merged}
         counts: dict[str, int] = {}
         for hook in merged:
@@ -256,7 +370,10 @@ def main(argv=None) -> int:
             write_registry(registry_path, registry)
             print(f"wrote {registry_path}")
         if args.check:
-            exit_code = report(hr.validate(registry, disk_index))
+            copy_index = (
+                scan_copies(registry, args.repo_root) if args.check_copies else None
+            )
+            exit_code = report(hr.validate(registry, disk_index, copy_index))
         return exit_code
 
     registry = load_registry(registry_path)
@@ -269,7 +386,10 @@ def main(argv=None) -> int:
         registry_to_validate = dict(registry, hooks=active_hooks)
     else:
         registry_to_validate = registry
-    return report(hr.validate(registry_to_validate, disk_index))
+    copy_index = (
+        scan_copies(registry_to_validate, args.repo_root) if args.check_copies else None
+    )
+    return report(hr.validate(registry_to_validate, disk_index, copy_index))
 
 
 

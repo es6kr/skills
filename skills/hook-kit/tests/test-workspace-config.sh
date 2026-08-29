@@ -64,7 +64,9 @@ cat > "$FIXTURE/config.json" <<'JSON'
           "mcp_prefix": "mcp__qdrant__",
           "collections": { "wiki": "a-wiki", "task": "a-task" }
         },
-        "wiki": { "kind": "skill", "skill": "x:wiki", "topic": "query" }
+        "wiki": { "kind": "skill", "skill": "x:wiki", "topic": "query" },
+        "artifacts": { "kind": "dir", "path": "docs/plans" },
+        "staging": { "kind": "branch", "next_fix": "next-fix", "next_feat": "next-feat", "main": "main" }
       }
     },
     "wsB": {
@@ -181,5 +183,35 @@ check "T20 no-roles v2 profile resolves"        "wsBare"                 "${WSCF
 check "T21 no-roles v2 keeps default checklist" ".custom/tracker.md"     "${WSCFG_CHECKLIST_PATH:-}"
 check "T22 no-roles v2 keeps default rag kind"  "qdrant"                 "${WSCFG_RAG_KIND:-}"
 
+# --- artifacts role: where generated research/plan documents land -------
+# The authoring skill used to hardcode one repository's outputs directory, so
+# every workspace was dragged through that repository's commit conventions.
+# Which directory receives generated documents is a per-workspace setting, so
+# it belongs in the schema alongside the other receivers — and replacing one
+# hardcoded path with a different hardcoded path would not have fixed that.
+export AGENT_WORKSPACE_CONFIG="$FIXTURE/config.json"
+load "/tmp/wsA/repo"
+check "T23 artifacts kind from profile"         "dir"                    "${WSCFG_ARTIFACTS_KIND:-}"
+check "T24 artifacts path from profile"         "docs/plans"             "${WSCFG_ARTIFACTS_PATH:-}"
+
+# A workspace that says nothing about artifacts still needs a destination,
+# otherwise the consumer is back to inventing one.
+load "/tmp/wsB/repo"
+check "T25 unset artifacts inherits default"    ".agents/docs/generated" "${WSCFG_ARTIFACTS_PATH:-}"
+
+export AGENT_WORKSPACE_CONFIG="$FIXTURE/v1.json"
+load "/tmp/ghq/github.com/wsLegacy/repo"
+check "T26 v1 profile also gets a default"      ".agents/docs/generated" "${WSCFG_ARTIFACTS_PATH:-}"
+
+# --- staging role: release branch staging routing ----------------------
+export AGENT_WORKSPACE_CONFIG="$FIXTURE/config.json"
+load "/tmp/wsA/repo"
+check "T27 staging kind from profile"           "branch"                 "${WSCFG_STAGING_KIND:-}"
+check "T28 staging next_fix from profile"       "next-fix"               "${WSCFG_STAGING_NEXT_FIX:-}"
+check "T29 staging next_feat from profile"      "next-feat"              "${WSCFG_STAGING_NEXT_FEAT:-}"
+check "T30 staging main from profile"           "main"                   "${WSCFG_STAGING_MAIN:-}"
+
+load "/tmp/wsB/repo"
+check "T31 unset staging degrades to none"      "none"                   "${WSCFG_STAGING_KIND:-}"
 printf -- '---\npass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

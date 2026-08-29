@@ -44,6 +44,8 @@ if [ -f "$HG_DATA_FILE" ]; then
 fi
 HG_BYPASS_KEYWORD_PATTERN="${HG_BYPASS_KEYWORD_PATTERN:-__NEVER_MATCH__}"
 HG_BYPASS_INTERROGATIVE_PATTERN="${HG_BYPASS_INTERROGATIVE_PATTERN:-__NEVER_MATCH__}"
+HG_BYPASS_CONDITIONAL_DEFERRAL_PATTERN="${HG_BYPASS_CONDITIONAL_DEFERRAL_PATTERN:-__NEVER_MATCH__}"
+ENGLISH_CONDITIONAL_DEFERRAL_PATTERN='(let me know|if you('\''d like| want| prefer)|on your instruction|whenever you('\''re| are) ready|if needed).*(I will|we can|I'\''ll|proceed)'
 
 # Debug log of this hook's own invocations — mirrors next-trigger.sh's
 # next-trigger.debug.log. Added after a live-miss (failed-attempts.md
@@ -86,9 +88,10 @@ if [ -n "$ASK_COUNT" ] && [ "$ASK_COUNT" != "0" ]; then
 fi
 
 # Keyword patterns sourced from data/hangul-patterns.regex
-#   HG_BYPASS_KEYWORD_PATTERN     — delegation / next-step framing
-#   HG_BYPASS_INTERROGATIVE_PATTERN — direct action-offer interrogative
-# When the data file is absent both fall back to __NEVER_MATCH__ so the hook
+#   HG_BYPASS_KEYWORD_PATTERN              — delegation / next-step framing
+#   HG_BYPASS_INTERROGATIVE_PATTERN        — direct action-offer interrogative
+#   HG_BYPASS_CONDITIONAL_DEFERRAL_PATTERN — conditional deferral in prose endings
+# When the data file is absent they fall back to __NEVER_MATCH__ so the hook
 # becomes a no-op (intentional — bypass framing is locale-specific).
 
 # Language-agnostic trailing-question-mark check — the response's last
@@ -112,6 +115,9 @@ if [ "$TRAILING_QUESTION" = "1" ]; then
 elif echo "$LAST_TEXT" | grep -qE "$HG_BYPASS_INTERROGATIVE_PATTERN"; then
   # Direct interrogative offer — fire regardless of list count.
   MATCH_REASON="interrogative_offer"
+elif echo "$LAST_TEXT" | grep -qE "$HG_BYPASS_CONDITIONAL_DEFERRAL_PATTERN" || echo "$LAST_TEXT" | grep -iqE "$ENGLISH_CONDITIONAL_DEFERRAL_PATTERN"; then
+  # Conditional deferral without list count requirement — catches prose endings.
+  MATCH_REASON="conditional_deferral"
 elif echo "$LAST_TEXT" | grep -qE "$HG_BYPASS_KEYWORD_PATTERN"; then
   # Delegation/next-step framing — require bullet/numbered list >= 2 (cuts FP).
   LIST_COUNT=$(echo "$LAST_TEXT" | grep -cE '^[[:space:]]*([0-9]+\.|[-*])[[:space:]]+')
@@ -132,7 +138,7 @@ if [ "$(wc -l < "$DEBUG_LOG" 2>/dev/null || echo 0)" -gt 500 ]; then
   tail -n 200 "$DEBUG_LOG" > "$DEBUG_LOG.tmp" 2>/dev/null && mv "$DEBUG_LOG.tmp" "$DEBUG_LOG" 2>/dev/null
 fi
 
-REMINDER="[hook:check-ask-bypass-keywords] Text-question pattern detected (last line ends with a bare '?', delegation/next-step framing + list>=2, or direct interrogative offer) + no AskUserQuestion call in the same response.
+REMINDER="[hook:check-ask-bypass-keywords] Text-question pattern detected (last line ends with a bare '?', conditional deferral in prose, delegation/next-step framing + list>=2, or direct interrogative offer) + no AskUserQuestion call in the same response.
 
 ask-user-question.md \"Questions must use the AskUserQuestion tool — text questions are forbidden\" rule applies. If a user-decision axis is identified, call AskUserQuestion instead of writing a text prompt.
 

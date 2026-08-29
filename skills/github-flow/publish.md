@@ -10,7 +10,9 @@ Package a working-tree change (in-place edit or uncommitted diff) into its own b
 
 ## Procedure
 
-1. **Branch from the staging base** (not from a possibly-stale local branch): `git fetch origin <staging-base>` → `git branch <topic-branch> origin/<staging-base>`
+1. **Resolve staging base & branch from base** (not from a possibly-stale local branch):
+   - Check `WSCFG_STAGING_*` (e.g. `WSCFG_STAGING_NEXT_FIX` for patch fixes, `WSCFG_STAGING_NEXT_FEAT` for features) if `roles.staging` is configured.
+   - Run `git fetch origin <staging-base>` → `git branch <topic-branch> origin/<staging-base>`
 2. **Isolate the change into its own worktree** — avoids disturbing the main working tree's other in-progress edits: `git worktree add .worktrees/<topic-branch> <topic-branch>` (per `git-repo/worktree.md` — check for a reusable existing worktree first)
 3. **Bring the change into the worktree**: if it's an existing commit, cherry-pick it; if it's an uncommitted working-tree diff, copy the exact files (`cp <path-in-main-tree> <path-in-worktree>`), verify with `git diff --stat` before committing
 4. **Commit** (Conventional Commit tag, see `commit-message-discipline.md`)
