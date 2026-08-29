@@ -54,7 +54,7 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step | Invocation obligation (automatic) | Ask (user decision) | Auto-invocation condition |
 |------|------------------|------------------|---------------|
 | Step 0 | Call `TaskList` | — | Clean up when TaskList has completed tasks |
-| Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (`--rag=<skill>:<topic>`) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
+| Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (receiver resolved from the workspace config) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
 | Step 1 | `Skill("commit-tidy")` or `/commit-tidy` | Decide split strategy (internal ask inside the skill) | When there is 1+ uncommitted change |
 | Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
 | Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) | **Always** + auto-import when the RAG receiver readyz responds |
