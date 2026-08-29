@@ -123,15 +123,27 @@ function emitSessionOnly(extra) {
 function resolveMessageUuid() {
   if (PROMPT_ID) return PROMPT_ID;
   if (!TRANSCRIPT || !fs.existsSync(TRANSCRIPT)) return '';
-  let uuid = '';
-  const lines = fs.readFileSync(TRANSCRIPT, 'utf8').split('\n').filter(Boolean);
-  for (const line of lines) {
-    const obj = safeParse(line);
-    if (obj.type === 'user' && typeof (obj.message && obj.message.content) === 'string') {
-      uuid = obj.uuid;
+  try {
+    const stat = fs.statSync(TRANSCRIPT);
+    const bufferSize = Math.min(stat.size, 65536); // read up to last 64KB
+    if (bufferSize <= 0) return '';
+    const buffer = Buffer.alloc(bufferSize);
+    const fd = fs.openSync(TRANSCRIPT, 'r');
+    try {
+      fs.readSync(fd, buffer, 0, bufferSize, stat.size - bufferSize);
+    } finally {
+      fs.closeSync(fd);
     }
-  }
-  return uuid;
+    const tailStr = buffer.toString('utf8');
+    const lines = tailStr.split('\n').filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const obj = safeParse(lines[i]);
+      if (obj && obj.type === 'user' && typeof (obj.message && obj.message.content) === 'string') {
+        if (obj.uuid) return obj.uuid;
+      }
+    }
+  } catch (_) {}
+  return '';
 }
 
 // Guard: bail if we don't even have a session id

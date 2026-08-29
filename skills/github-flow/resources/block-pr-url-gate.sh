@@ -145,7 +145,7 @@ check_ask_tracker_ref() {
   ' 2>/dev/null)
 
   [[ -z "$ask_text" ]] && return 0
-  echo "$ask_text" | grep -qE "\b($TRACKER_KEYS)-[0-9]+\b" || return 0
+  echo "$ask_text" | grep -qE "(^|[^a-zA-Z0-9_])($TRACKER_KEYS)-[0-9]+([^a-zA-Z0-9_]|$)" || return 0
   echo "$ask_text" | grep -qE "$ANY_URL_PATTERN" && return 0
 
   cat >&2 <<MSG

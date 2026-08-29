@@ -10,9 +10,6 @@ description: |
   Use on "wrap up", "session cleanup", "end session", "cleanup", "record mistake", "save feedback", "improve", "retrospect", "hook error", "next action", "RAG store", "qdrant store", "fix_plan sync".
 triggers:
   - event: Stop
-    action: script
-    script: resources/check-hook-failure-gap.js
-  - event: Stop
     action: inject
     message: "Run /cleanup run. This is the pre-session-end cleanup task."
 metadata:

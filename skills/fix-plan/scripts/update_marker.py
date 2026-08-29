@@ -3,7 +3,7 @@
 update_marker.py - Update an item's status marker in fix_plan.md / checklist.md.
 
 Usage:
-  python update_marker.py --file <path> --query <pattern> --replacement-prefix <prefix>
+  python update_marker.py --file <path> --query <pattern> --prefix <prefix>
 """
 
 import re
@@ -18,7 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Update task marker in fix_plan.md")
     parser.add_argument("--file", required=True, help="Path to fix_plan.md")
     parser.add_argument("--query", required=True, help="Query substring to identify the task item")
-    parser.add_argument("--prefix", required=True, help="Complete prefix to replace up to the main title text")
+    parser.add_argument("--prefix", "--replacement-prefix", dest="prefix", required=True, help="Complete prefix to replace up to the main title text")
     return parser.parse_args()
 
 
