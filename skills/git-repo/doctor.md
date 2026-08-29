@@ -45,7 +45,7 @@ graph TD
 | **`BASE-1`** | **Hook Wiring** | `.githooks` vs `core.hooksPath` | If `.githooks/` directory exists, `core.hooksPath` MUST point to `.githooks`. Otherwise Git reads default `.git/hooks` and `.githooks/` is completely unwired/ignored. |
 | **`BASE-2`** | **Permissions** | Executable bit (`+x`) | Active hook files (`pre-commit`, `pre-push`, `commit-msg`, etc.) must have executable bits (`chmod +x`). |
 | **`BASE-3`** | **Pre-push Deletion** | Zero-SHA early exit | `pre-push` hook must detect remote branch deletion (`local_sha=0000...0000`, `local_ref=(delete)`, or `remote_sha=0000...0000`) and skip heavy CI tests immediately. |
-| **`BASE-4`** | **Local Branch Guard** | `local` branch push guard | `pre-push` hook must contain a guard blocking accidental push of private `refs/heads/local` stage branch to remote. |
+| **`BASE-4`** | **Local Branch Guard** | `local` / private branch guard | `pre-push` hook must contain a guard blocking accidental push of private staging branches (`refs/heads/local*`, `wip*`, `scratch*`) to remote. |
 | **`BASE-5`** | **Secret & IP Guard** | Secret / IP scan | `pre-commit` hook must scan staged files for private RFC1918 IPs (`10.x`, `192.168.x`, `172.16-31.x`) and home paths. |
 | **`BASE-6`** | **Push Commit Limit Guard** | Outgoing commit count check | `pre-push` hook must check outgoing commit count (`rev-list --count` / `PUSH_MAX_COMMITS`) and block pushes exceeding the limit (default: 5) to prevent publishing massively diverged commits caused by wrong base branch selection. Override via `PUSH_COMMIT_LIMIT_OVERRIDE=1`. |
 | **`BASE-7`** | **Conflict Marker Guard** | Outgoing commit message scan | `pre-push` hook must scan each outgoing commit's message for a literal `Conflicts:` section (the auto-generated merge-conflict listing that `git merge --no-edit`, or any non-interactive commit path, leaves un-stripped) and block the push. Override via `PUSH_CONFLICT_MSG_OVERRIDE=1`. |
@@ -134,17 +134,28 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
 done
 ```
 
-### 4. Adding `local` Branch Push Guard (`BASE-4`)
+### 4. Adding Private / Staging Branch Push Guard (`BASE-4`)
 
 In `.githooks/pre-push`:
 
 ```sh
-if [ "$local_ref" = "refs/heads/local" ] || [ "$remote_ref" = "refs/heads/local" ]; then
-  if [ "${PUSH_LOCAL_OVERRIDE:-}" != "1" ]; then
-    echo "❌ ERROR: Pushing 'local' stage branch to remote is blocked." >&2
-    exit 1
-  fi
-fi
+# Block accidental push of private staging branches to remote (local*, wip*, scratch*)
+case "${local_ref#refs/heads/}" in
+  local|local-*|local/*|wip|wip-*|wip/*|scratch|scratch-*|scratch/*)
+    if [ "${PUSH_LOCAL_OVERRIDE:-}" != "1" ]; then
+      echo "❌ ERROR: Pushing private staging branch '$local_ref' to remote is blocked." >&2
+      exit 1
+    fi
+    ;;
+esac
+case "${remote_ref#refs/heads/}" in
+  local|local-*|local/*|wip|wip-*|wip/*|scratch|scratch-*|scratch/*)
+    if [ "${PUSH_LOCAL_OVERRIDE:-}" != "1" ]; then
+      echo "❌ ERROR: Pushing to remote private staging branch '$remote_ref' is blocked." >&2
+      exit 1
+    fi
+    ;;
+esac
 ```
 
 ### 5. Adding Skill Frontmatter & Language Lint (`COND-SKILL`, `COND-PUBLIC`)
