@@ -135,3 +135,4 @@ fix_plan item body content = Action + Why + How (summary) + artefact reference +
 - [format.md](./format.md) — section structure and markers
 - [priority.md](./priority.md) — `[BLOCKED:P0-P3:reason]` annotation when an item is blocked
 - [move.md](./move.md) — how `[x]` entries get summarised into Completed
+- [upsert.md](./upsert.md) — dup-check the tracker before running this topic's schema; this file is upsert's fallback path for genuinely new items
