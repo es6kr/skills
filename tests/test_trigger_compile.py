@@ -8,12 +8,14 @@ Tests:
 """
 import json
 import os
+import shutil
 import subprocess
 import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRIGGER_COMPILE = os.path.join(REPO_ROOT, "skills", "skill-kit", "scripts", "trigger-compile.sh")
 POST_TRIGGER_JS = os.path.join(REPO_ROOT, "skills", "skill-kit", "resources", "trigger-PostToolUse.js")
+NODE_AVAILABLE = shutil.which("node") is not None
 
 
 def test_code_workflow_trigger_has_exclude_content():
@@ -50,6 +52,7 @@ def _run_post_trigger(tool_input):
     return proc.stdout
 
 
+@pytest.mark.skipif(not NODE_AVAILABLE, reason="Node.js runtime not found")
 def test_post_tool_use_suppresses_fable_audit_edit():
     """Fable or review agent appending audit comments must not fire code-workflow trigger."""
     out = _run_post_trigger({
@@ -59,6 +62,7 @@ def test_post_tool_use_suppresses_fable_audit_edit():
     assert '<skill-trigger name="code-workflow">' not in out
 
 
+@pytest.mark.skipif(not NODE_AVAILABLE, reason="Node.js runtime not found")
 def test_post_tool_use_suppresses_audit_status_edit():
     """Edits containing audit_status: must not fire code-workflow trigger."""
     out = _run_post_trigger({
@@ -68,6 +72,7 @@ def test_post_tool_use_suppresses_audit_status_edit():
     assert '<skill-trigger name="code-workflow">' not in out
 
 
+@pytest.mark.skipif(not NODE_AVAILABLE, reason="Node.js runtime not found")
 def test_post_tool_use_suppresses_korean_audit_edit():
     """Edits containing Korean audit header must not fire code-workflow trigger."""
     out = _run_post_trigger({
@@ -77,6 +82,7 @@ def test_post_tool_use_suppresses_korean_audit_edit():
     assert '<skill-trigger name="code-workflow">' not in out
 
 
+@pytest.mark.skipif(not NODE_AVAILABLE, reason="Node.js runtime not found")
 def test_post_tool_use_fires_on_normal_plan_edit():
     """Normal plan creation/edit must still fire code-workflow trigger."""
     out = _run_post_trigger({

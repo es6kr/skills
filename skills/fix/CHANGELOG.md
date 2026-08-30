@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.2](https://github.com/es6kr/skills/compare/fix-v0.4.1...fix-v0.4.2) (2026-08-29)
+
+
+### Bug Fixes
+
+* **fix:** add current-workspace tracker grep to recurrence pre-check ([1b5ef18](https://github.com/es6kr/skills/commit/1b5ef18c0c52fafbb856de2bd534733f0664002c))
+* promote next-fix batch (task plugin split, claudify matcher, pr recheck, omz chezmoi fix) ([3e90fd5](https://github.com/es6kr/skills/commit/3e90fd56ade0522d6773eb03f38760a317dd5180))
+
 ## [0.4.1](https://github.com/es6kr/skills/compare/fix-v0.4.0...fix-v0.4.1) (2026-08-26)
 
 

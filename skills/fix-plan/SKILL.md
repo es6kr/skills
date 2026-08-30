@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), upsert (dup-check → update in place or fall back to add), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
   Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role".
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role", "orca session launch", "fix-plan upsert", "dup check tracker".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -40,6 +40,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
+| upsert | Dup-check the tracker before authoring — match on Action semantics across all sections, update in place (preserve `Why`, state priority reclassification) when found, fall back to `add`'s schema otherwise | [upsert.md](./upsert.md) |
 | verify | Cross-check commit-hash/file-path references cited in tracker items against local git/filesystem state before trusting a "still unresolved" claim (distinct from `sync`'s external GitHub polling) | [verify.md](./verify.md) |
 
 ## Topic Dependencies
@@ -51,6 +52,8 @@ fix-plan (schema + lifecycle)
   ├─→ priority (new convention — BLOCKED P0-P3 + reason)
   │     └─→ depends on sync (Step 0: refresh external state before classifying)
   ├─→ add (authoring act-now items)
+  ├─→ upsert (dup-check → update-in-place OR fall back to add's schema for a genuinely new item)
+  │     └─→ add (fallback path)
   ├─→ claim (multi-session lease) — annotates format's markers; move drops the tag on completion; priority triage excludes fresh-claimed items
   ├─→ model-triage (cross-section discovery → dedicated section; items authored via add's schema)
   ├─→ draft (deferred plan stub → `## Plan Drafts`)
@@ -70,6 +73,7 @@ fix-plan (schema + lifecycle)
 - `move` topic optionally dispatches to a RAG receiver if the caller supplies `--rag=<skill>:<topic>` — generic skill stays vendor-agnostic; receiver implementation lives in the caller (e.g., ralph wrapper)
 - `sync` topic optionally dispatches to a secondary-tracker receiver if the caller supplies `--secondary-sync=<skill>:<topic>` — see [sync.md](./sync.md) "Secondary-tracker sync cadence"
 - `draft` topic dispatches to `code-workflow` (`steps`) on promote — turns a deferred stub into a real research → plan
+- `upsert` topic falls back to `add`'s schema when the dup-check finds no matching item — not a separate authoring flow, just the entry point that checks first
 
 ## Configuration
 
@@ -136,6 +140,27 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 - Model names never appear in this skill. The caller-side mapping translates concrete models to `pm` / `deep` / `impl` — the same supply pattern as the `--archive` / `--rag` receiver contracts.
 
 **pm-profile completion handoff**: when a `pm` role-profile default-invocation pipeline finishes (through the REPEAT cadence check), do not close the turn with an open-ended "what's next" prompt. Reuse the `sync`/`priority` state this same run already computed and surface exactly one simple `selfable` candidate from what the `impl` row's own candidate-surfacing step would otherwise report — then confirm it via `AskUserQuestion` (proceed with it / pick something else / skip for now) instead of a generic next-step prompt. This draws from a single already-known role profile's own candidate set computed in this same run, not a speculative multi-source scan — it is a narrower, cheaper handoff than general next-action option construction. If no `selfable` candidate exists this run, skip this step and close normally.
+
+**Orca session-launch recommendation (conditional on Orca detection)**: when the `pm-profile completion handoff` above identifies a candidate that is not a simple in-session `selfable` item but genuinely needs a `deep` or `impl` role session, check whether the Orca IDE runtime (`stablyai/orca` — see the `orca` skill) is available: attempt `<orca> status --json`, resolving the CLI per the `orca` skill's "Resolve the CLI" convention (`ORCA_CLI_COMMAND` → `orca-dev` in a dev checkout → `orca-ide` outside a managed terminal on Linux → `orca`).
+
+If Orca is available, add a "launch via Orca" option to the `pm-profile completion handoff` `AskUserQuestion` for that candidate — the `orca` skill's `launch` topic (`worktree create --agent claude --prompt "<candidate + tracker path>"`) — instead of only surfacing it for later manual pickup.
+
+**If the call errors or `result.app.running` is `false`, do NOT silently skip — ask direction.** Extend the same `pm-profile completion handoff` `AskUserQuestion` with these additional options for this state (still one decision, not a second ask):
+
+- **Diagnose/install Orca, then retry** — point at the `orca` skill's own troubleshooting ("Resolve the CLI" errors are reported verbatim, never silently swallowed); if a dedicated `orca doctor` diagnostic topic exists by the time this runs, prefer it
+- **Use an alternative session-launcher skill already available** (e.g. `clawo`, `openclaw`) — fix-plan stays abstract here: it names the alternative skill and defers to *that* skill's own launch/send convention, the same way it already defers to caller-supplied `--archive`/`--rag` receivers rather than hardcoding their internals
+- **Dispatch as a subagent** (`Agent` tool, in-process) — a valid option, but never the Recommended one; session isolation and independent context are worth more than the convenience for `deep`/`impl`-tier work
+- **Fall back to today's surface-only behavior** (no session action, just report the candidate) — always available regardless of detected state
+
+**Duplicate-check is mandatory before recommending a NEW `deep`-role launch (HARD STOP)** — concurrent `deep`-role sessions duplicate the same large-scale classification/audit work, which is wasteful (unlike `impl`, where independent parallel implementation on different candidates is normal and this check does not apply). Before offering "launch a new deep session," list running terminals (`<orca> terminal list --json`) and filter for one already working this tracker's deep-tier candidates (title/preview matching the tracker path or a `deep`-role marker — reuse the `orca` skill's `send` topic filtering convention, but skip its `ORCA_PANE_KEY` self-exclusion requirement here, since this is a check, not a delivery). A match found → offer "send to the existing session" (`orca` skill's `send` topic) instead of "launch a new one." 2+ matches found → do not auto-pick — list every match as a separate option (same disambiguation rule as `orca/send.md`).
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Recommend `orca launch` for every deep/impl candidate regardless of environment | Detect Orca first (`status --json`); skip the option entirely if unavailable |
+| 2 | Launch a new `deep` session without checking for one already running | `orca terminal list --json` + title/preview filter first; route to an existing match instead of duplicating |
+| 3 | Auto-select among 2+ matching running sessions | List every match as a separate `AskUserQuestion` option — never guess |
+| 4 | Apply the same duplicate-check requirement to `impl` launches | `impl` sessions may run concurrently on independent items — duplicate-check is `deep`-only |
+| 5 | Silently skip the recommendation when Orca detection fails | Ask direction instead — diagnose/install Orca / use an alternative launcher (`clawo`, `openclaw`) / subagent (not recommended) / surface-only |
 
 **Mandatory Output Reporting Contract (HARD STOP)**: The agent must physically emit the Step 4 Priority Triage candidate list (P0–P3 sorted by `:selfable` vs `:external`) in the visible response text BEFORE marking the task as completed (`[x]`) or invoking `AskUserQuestion`. Suppressing Step 4's summary table output or marking tasks completed prior to physical output emission is strictly forbidden.
 
@@ -228,6 +253,16 @@ See [priority.md](./priority.md) for full convention. When a workspace mirrors b
 
 See [add.md](./add.md) for length budget + deliverable separation.
 
+### Upsert (dup-check before authoring)
+
+Before writing a new item, grep the whole tracker for its core keywords:
+
+```bash
+grep -n "<2-3 core keywords>" <tracker-path>
+```
+
+No hit → fall back to `add`'s schema above. Hit on the same Action → update that item in place (preserve `Why`, add a delta, state any priority reclassification as `old → new` + reason). See [upsert.md](./upsert.md).
+
 ### Claim an item in progress (multi-session)
 
 Re-read the tracker, then stamp a lease tag before starting work so a concurrent session does not duplicate it:
@@ -285,4 +320,6 @@ MERGED PR or CLOSED issue → auto `[x]`. PR CLOSED-without-merge → `[BLOCKED:
 ## See Also
 
 - `github-flow` (depends-on) — `gh` CLI conventions for sync + register
+- `backlog` (depends-on) — Plane issue/intake lifecycle and sync engine
+- `orca` (optional, conditional) — session-launch recommendation for deep/impl role candidates when the Orca IDE runtime is detected; see "Orca session-launch recommendation" above
 - Ralph integration is a separate workstream maintained outside this published skill. A Ralph wrapper, when present, owns Ralph-specific concerns: the `## REPEAT` persistent-item section, autonomous-loop `[BLOCKED]` skip semantics, and the caller-side `--rag=<skill>:<topic>` dispatch (this skill exposes only the abstract flag contract). See the Ralph project's documentation for wrapper details

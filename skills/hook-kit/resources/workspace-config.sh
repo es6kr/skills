@@ -2,8 +2,8 @@
 # workspace-config.sh — shared workspace config resolver.
 #
 # Single entry point for every hook/script that needs to know which
-# receivers (checklist / backlog / rag / wiki) the current workspace is
-# wired to. Consumers do not parse the config themselves:
+# receivers (checklist / backlog / rag / wiki / artifacts) the current
+# workspace is wired to. Consumers do not parse the config themselves:
 #
 #     eval "$(workspace-config.sh --export)"
 #     [ "${WSCFG_RAG_KIND:-none}" = "none" ] && exit 0   # receiver absent -> skip
@@ -59,7 +59,7 @@ done
 # Roles a consumer may rely on existing, whatever the config says.
 emit_safe_defaults() {
   echo "WSCFG_PROFILE=default"
-  for role in CHECKLIST BACKLOG RAG WIKI; do
+  for role in ARTIFACTS CHECKLIST BACKLOG RAG WIKI STAGING; do
     echo "WSCFG_${role}_KIND=none"
   done
 }
@@ -91,17 +91,24 @@ from pathlib import Path
 
 cfg_path, target, mode = sys.argv[1], sys.argv[2], sys.argv[3]
 
-ROLES = ("checklist", "backlog", "rag", "wiki")
+ROLES = ("artifacts", "checklist", "backlog", "rag", "wiki", "staging")
 BUILTIN_DEFAULTS = {
+    # Where generated research/plan/walkthrough documents land. Unlike the
+    # other receivers this one has no meaningful "none" state — something is
+    # always written somewhere — so the default is a real path rather than an
+    # absence, and a workspace overrides it like any other setting.
+    "artifacts": {"kind": "dir", "path": ".agents/docs/generated"},
     "checklist": {"kind": "file", "path": ".agents/fix_plan.md"},
     "backlog": {"kind": "none"},
     "rag": {"kind": "none"},
     "wiki": {"kind": "none"},
+    "staging": {"kind": "none"},
 }
 # Scalar fields promoted to WSCFG_<ROLE>_<FIELD>. Anything else in a role
 # spec is ignored rather than guessed at.
 FIELDS = ("endpoint", "path", "token_env", "project",
-          "mcp_prefix", "skill", "topic", "tool_prefix")
+          "mcp_prefix", "skill", "topic", "tool_prefix",
+          "next_fix", "next_feat", "main")
 
 
 def bail():
@@ -236,6 +243,21 @@ for role, spec in roles.items():
             emit("%s_%s" % (role, field), spec[field])
     for cname, cval in (spec.get("collections") or {}).items():
         emit("%s_COLLECTION_%s" % (role, cname), cval)
+
+# Top-level `global` block: receivers identical across workspaces (session
+# transcripts, failed-attempts, shared/personal knowledge). Emitted under
+# WSCFG_<ROLE>_GLOBAL_* so a consumer names the tier it means. Kept separate
+# from `defaults` on purpose — `defaults` feeds unconfigured workspaces, and a
+# live endpoint there would break the `kind: none` quiet-pass contract.
+for role, spec in (cfg.get("global") or {}).items():
+    if not isinstance(spec, dict):
+        continue
+    emit("%s_GLOBAL_KIND" % role, spec.get("kind", "none"))
+    for field in FIELDS:
+        if spec.get(field):
+            emit("%s_GLOBAL_%s" % (role, field), spec[field])
+    for cname, cval in (spec.get("collections") or {}).items():
+        emit("%s_GLOBAL_COLLECTION_%s" % (role, cname), cval)
 PYEOF
 )"
 

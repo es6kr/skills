@@ -114,7 +114,6 @@ GIT_BLOCKS = [
     # NOTE: force-push moved to check_git_force_push() below — it is no longer
     # an unconditional block, it is allowed in a narrow, verified exception
     # (worktree + non-main/master target). See that function's docstring.
-    (r"push\s+.*-f\b", "git push -f overwrites remote history"),
     # Git working directory destruction
     (r"clean\s+-.*f", "git clean -f permanently deletes untracked files"),
     (r"checkout\s+\.\s*$", "git checkout . discards all changes"),
@@ -147,6 +146,170 @@ def check_git_reset(scan: str) -> str | None:
             continue  # small-N soft/mixed reset — allowed, no confirmation needed per git.md
         return ("git reset (hard/soft/mixed/ref) beyond a small --soft/--mixed HEAD~1 or "
                 "HEAD~2 is ABSOLUTELY PROHIBITED for agents. Never execute under any circumstances.")
+    return None
+
+
+FORCE_PUSH_SUB = r"push\s+.*(?:--force(?:-with-lease(?:=\S+)?)?\b|(?<!\S)-f\b)"
+
+
+def _extract_dash_c_path(command: str) -> str | None:
+    m = re.search(r"\bgit\s+(?:-C\s+([^\s]+)\s+)", command)
+    if not m:
+        return None
+    return m.group(1).strip("'\"")
+
+
+def _resolve_push_target_branch(tokens: list[str]) -> str | None:
+    """From tokenized `git ... push [remote] [branch] [flags...]`, return the
+    explicit branch token if present. Returns None when the branch cannot be
+    read off the command itself (caller must resolve HEAD instead) — this
+    includes the ambiguous single-non-flag-token case ("git push origin" vs
+    "git push <configured-remote-alias>"), which is deliberately NOT guessed."""
+    try:
+        push_idx = tokens.index("push")
+    except ValueError:
+        return None
+    non_flags = [t for t in tokens[push_idx + 1:] if not t.startswith("-")]
+    if len(non_flags) >= 2:
+        return non_flags[1]
+    return None
+
+
+def _resolve_push_destination(branch: str) -> str:
+    """Strip a refspec source before taking the leaf branch name, so
+    `feature:main` (push refspec `src:dst`) resolves to `main` rather than
+    the literal `feature:main` (which matches neither `main` nor `master`).
+    A bare target (no `:`) is unaffected."""
+    dst = branch.rsplit(":", 1)[-1] if ":" in branch else branch
+    return dst.rsplit("/", 1)[-1]
+
+
+def _split_git_invocations(command: str) -> list[str]:
+    """Split a (possibly compound) command into per-invocation segments, each
+    starting at a `git` word boundary and running up to (not including) the
+    next one. Scoping -C/push/branch resolution to a single segment prevents
+    an unrelated git invocation elsewhere in the same command (a decoy
+    `git -C <worktree> status &&`, or an earlier non-force `git push`) from
+    supplying the path/branch actually used to evaluate a LATER force push.
+
+    A `git` token that falls inside a quoted literal (e.g. a commit message
+    or `echo`/`printf` argument mentioning "git push --force") must NOT start
+    a segment — it is text, not an invocation. Quote spans are computed on
+    this same unstripped `command` (not git_scan_text's output) so a segment
+    boundary is never chosen from inside a quote that the segment itself
+    would go on to correctly strip via git_scan_text."""
+    quoted_spans = []
+    for pat in (r"'[^']*'", r'"[^"]*"'):
+        quoted_spans.extend((m.start(), m.end()) for m in re.finditer(pat, command))
+
+    def _in_quotes(pos: int) -> bool:
+        return any(start <= pos < end for start, end in quoted_spans)
+
+    starts = [m.start() for m in re.finditer(r"\bgit\b", command) if not _in_quotes(m.start())]
+    if not starts:
+        return []
+    starts.append(len(command))
+    return [command[starts[i]:starts[i + 1]] for i in range(len(starts) - 1)]
+
+
+_GIT_REPO_ENV_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+
+
+def _subprocess_git_env() -> dict:
+    """`-C <path>` is meaningless if GIT_DIR/GIT_WORK_TREE/etc. are already
+    set in the environment — git honors those over -C's repository
+    discovery, so an ambient GIT_DIR (this hook process itself running
+    inside another git hook, for example) would silently redirect every
+    `git -C <target_dir> ...` call below onto a DIFFERENT repository than
+    the one -C names. Strip them so -C is authoritative."""
+    return {k: v for k, v in os.environ.items() if k not in _GIT_REPO_ENV_VARS}
+
+
+def check_git_force_push(command: str) -> str | None:
+    """Force push is destructive to shared remote history and stays blocked
+    BY DEFAULT — this only narrows the exception, it never widens it. Allowed
+    ONLY when BOTH are positively confirmed, using the SAME single git
+    invocation that carries the force flag (never a different `-C`/push
+    elsewhere in a compound command):
+      1. The target checkout is a git WORKTREE (git-dir != git-common-dir),
+         never the primary/main checkout.
+      2. The resolved target branch is NOT main/master (case-insensitive).
+    Any failure to confirm both (subprocess error, ambiguous branch
+    resolution, non-git-repo cwd, un-isolatable invocation) falls back to the
+    original unconditional block. User-requested narrowing (worktree-only,
+    main/master excluded):
+    2026-08-24, /fix "PR URL 누락" Step 3 Resume redirect — the user ran the
+    2 gh pr close commands manually but asked that force-push specifically
+    become agent-executable under these two conditions.
+    """
+    block_msg = "git push --force/-f overwrites remote history"
+
+    scan = re.sub(r"\\[ \t]*\n", " ", git_scan_text(command))
+    if not re.search(GITPFX + r"\s+" + FORCE_PUSH_SUB, scan, IM):
+        return None
+
+    # Isolate the ONE git invocation that actually carries the force flag —
+    # a backslash-newline continuation before --force must still be detected
+    # (`.` does not cross a newline; PR #374 CodeRabbit finding), and -C/push
+    # must come from THIS invocation, not from any other `git` text sharing
+    # the same compound command (PR #374 CodeRabbit finding).
+    invocation = None
+    for seg in _split_git_invocations(command):
+        seg_scan = re.sub(r"\\[ \t]*\n", " ", git_scan_text(seg))
+        if re.search(GITPFX + r"\s+" + FORCE_PUSH_SUB, seg_scan, IM):
+            invocation = re.sub(r"\\[ \t]*\n", " ", seg)
+            break
+    if invocation is None:
+        return None
+
+    dash_c = _extract_dash_c_path(invocation)
+    target_dir = dash_c or os.getcwd()
+
+    git_env = _subprocess_git_env()
+    try:
+        common_dir = subprocess.run(
+            ["git", "-C", target_dir, "rev-parse", "--git-common-dir"],
+            capture_output=True, text=True, timeout=5, env=git_env,
+        )
+        git_dir = subprocess.run(
+            ["git", "-C", target_dir, "rev-parse", "--git-dir"],
+            capture_output=True, text=True, timeout=5, env=git_env,
+        )
+        if common_dir.returncode != 0 or git_dir.returncode != 0:
+            return block_msg + " (blocked: could not resolve git-dir/git-common-dir — worktree status unverifiable)"
+        common_path = os.path.realpath(os.path.join(target_dir, common_dir.stdout.strip()))
+        git_path = os.path.realpath(os.path.join(target_dir, git_dir.stdout.strip()))
+        is_worktree = common_path != git_path
+    except Exception:
+        return block_msg + " (blocked: worktree check raised an exception — failing closed)"
+
+    if not is_worktree:
+        return block_msg + " (blocked: not running from a git worktree — the primary checkout is never exempt)"
+
+    try:
+        tokens = shlex.split(invocation)
+    except ValueError:
+        return block_msg + " (blocked: command not shell-tokenizable — target branch unverifiable)"
+
+    branch = _resolve_push_target_branch(tokens)
+    if branch is None:
+        try:
+            head = subprocess.run(
+                ["git", "-C", target_dir, "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, timeout=5, env=git_env,
+            )
+            if head.returncode != 0 or not head.stdout.strip():
+                return block_msg + " (blocked: could not resolve current branch — target unverifiable)"
+            branch = head.stdout.strip()
+        except Exception:
+            return block_msg + " (blocked: current-branch check raised an exception — failing closed)"
+
+    branch_bare = _resolve_push_destination(branch)
+    if not branch_bare:
+        return block_msg + f" (blocked: target branch '{branch}' has no resolvable destination — failing closed)"
+    if re.match(r"^(main|master)$", branch_bare, I):
+        return block_msg + f" (blocked: target branch '{branch}' is main/master — the worktree exemption never covers main/master)"
+
     return None
 
 
@@ -629,8 +792,6 @@ def check_prod_branch_ops(command: str) -> str | None:
 
 _GIT_GLOBAL_OPTS = r"(?:-C\s+\S+\s+|--no-pager\s+|-c\s+\S+=\S+\s+)*"
 
-FORCE_PUSH_SUB = r"push\s+.*(?:--force(?:-with-lease(?:=\S+)?)?\b|(?<!\S)-f\b)"
-
 _STAGING_BRANCH_TARGET = re.compile(
     r"(?:git\s+" + _GIT_GLOBAL_OPTS + r"worktree\s+add|"
     r"git\s+" + _GIT_GLOBAL_OPTS + r"switch\s+-[cC]|"
@@ -643,94 +804,6 @@ _STAGING_DIVERGENCE_EVIDENCE = re.compile(
     r"git\s+" + _GIT_GLOBAL_OPTS + r"(?:log|diff)\s+origin/main(?:\.\.\.?|\s+)origin/next-|baseRefName",
     IM,
 )
-
-
-def _extract_dash_c_path(command: str) -> str | None:
-    m = re.search(r"\bgit\s+(?:-C\s+([^\s]+)\s+)", command)
-    if not m:
-        return None
-    return m.group(1).strip("'\"")
-
-def _resolve_push_target_branch(tokens: list[str]) -> str | None:
-    """From tokenized `git ... push [remote] [branch] [flags...]`, return the
-    explicit branch token if present. Returns None when the branch cannot be
-    read off the command itself (caller must resolve HEAD instead) — this
-    includes the ambiguous single-non-flag-token case ("git push origin" vs
-    "git push <configured-remote-alias>"), which is deliberately NOT guessed."""
-    try:
-        push_idx = tokens.index("push")
-    except ValueError:
-        return None
-    non_flags = [t for t in tokens[push_idx + 1:] if not t.startswith("-")]
-    if len(non_flags) >= 2:
-        return non_flags[1]
-    return None
-
-def check_git_force_push(command: str) -> str | None:
-    """Force push is destructive to shared remote history and stays blocked
-    BY DEFAULT — this only narrows the exception, it never widens it. Allowed
-    ONLY when BOTH are positively confirmed:
-      1. The target checkout is a git WORKTREE (git-dir != git-common-dir),
-         never the primary/main checkout.
-      2. The resolved target branch is NOT main/master (case-insensitive).
-    Any failure to confirm both (subprocess error, ambiguous branch
-    resolution, non-git-repo cwd) falls back to the original unconditional
-    block. User-requested narrowing (worktree-only, main/master excluded):
-    2026-08-24, /fix "missing PR URL" Step 3 Resume redirect — the user ran the
-    2 gh pr close commands manually but asked that force-push specifically
-    become agent-executable under these two conditions.
-    """
-    scan = git_scan_text(command)
-    if not re.search(GITPFX + r"\s+" + FORCE_PUSH_SUB, scan, IM):
-        return None
-
-    block_msg = "git push --force/-f overwrites remote history"
-    dash_c = _extract_dash_c_path(command)
-    target_dir = dash_c or os.getcwd()
-
-    try:
-        common_dir = subprocess.run(
-            ["git", "-C", target_dir, "rev-parse", "--git-common-dir"],
-            capture_output=True, text=True, timeout=5,
-        )
-        git_dir = subprocess.run(
-            ["git", "-C", target_dir, "rev-parse", "--git-dir"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if common_dir.returncode != 0 or git_dir.returncode != 0:
-            return block_msg + " (blocked: could not resolve git-dir/git-common-dir — worktree status unverifiable)"
-        common_path = os.path.realpath(os.path.join(target_dir, common_dir.stdout.strip()))
-        git_path = os.path.realpath(os.path.join(target_dir, git_dir.stdout.strip()))
-        is_worktree = common_path != git_path
-    except Exception:
-        return block_msg + " (blocked: worktree check raised an exception — failing closed)"
-
-    if not is_worktree:
-        return block_msg + " (blocked: not running from a git worktree — the primary checkout is never exempt)"
-
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return block_msg + " (blocked: command not shell-tokenizable — target branch unverifiable)"
-
-    branch = _resolve_push_target_branch(tokens)
-    if branch is None:
-        try:
-            head = subprocess.run(
-                ["git", "-C", target_dir, "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if head.returncode != 0 or not head.stdout.strip():
-                return block_msg + " (blocked: could not resolve current branch — target unverifiable)"
-            branch = head.stdout.strip()
-        except Exception:
-            return block_msg + " (blocked: current-branch check raised an exception — failing closed)"
-
-    branch_bare = branch.rsplit("/", 1)[-1]
-    if re.match(r"^(main|master)$", branch_bare, I):
-        return block_msg + f" (blocked: target branch '{branch}' is main/master — the worktree exemption never covers main/master)"
-
-    return None
 
 
 def check_staging_branch_without_divergence(command: str) -> str | None:
@@ -833,10 +906,6 @@ def evaluate(
     if pm2_reason:
         return hard(pm2_reason)
 
-    staging_branch_reason = check_staging_branch_without_divergence(command)
-    if staging_branch_reason:
-        return hard(staging_branch_reason)
-
     summary_reason = check_summary_without_internal_review(command)
     if summary_reason:
         return hard(summary_reason)
@@ -930,6 +999,16 @@ def self_test() -> int:
         (True, False, "git -C /p push origin main --force"),
         (True, False, "git -C /p push --force-with-lease"),
         (True, False, "git -C /p push -f"),
+        # ── PR #374 CodeRabbit findings: force-push detection must survive a
+        # backslash-newline continuation before --force, and must resolve -C
+        # from the SAME invocation that carries the flag (not a decoy git -C
+        # earlier in the same command). Both use an unresolvable fake path so
+        # the exception's own "unverifiable -> fail closed" path still blocks
+        # (see tests/test_bash_guard_force_push.py for the full ALLOW-path
+        # coverage against real worktrees). ──
+        (True, False, "git -C /p push \\\n  --force origin main"),
+        (True, False, "git push \\\n  --force origin main"),
+        (True, False, "git -C /wt status && git -C /p push --force origin topic"),
         (True, False, "git -C /p clean -fd"),
         (True, False, "git -C /p branch -f main deadbeef"),
         (True, False, "git -C /p branch --force main deadbeef"),

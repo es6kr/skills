@@ -165,7 +165,7 @@ Add a section to `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT). This 
 
 **A HOT entry must also reach the RAG receiver at write time, not only when `fa-prune` later demotes it to COLD.** `fa-prune.md` Section 8 only dispatches archive-bound (COLD) sections — a freshly-written HOT entry stays invisible to semantic search until it goes stale enough to be archived (often weeks/months later). This defeats the "Recurrence pre-check" Stage 0 RAG search that `fix.md`/this file's own Step 1.5 mandate: it can only ever find *old* patterns, never a paraphrased recurrence of something recorded last week.
 
-Immediately after 4-2's file write, store a structured chunk to the same abstract RAG receiver contract fa-prune.md Section 8 uses (`--rag=<skill>:<topic>`, or whichever RAG-store tool is registered in the environment):
+Immediately after 4-2's file write, store a structured chunk to the same abstract RAG receiver contract fa-prune.md Section 8 uses (receiver resolved from the workspace bindings config; skip quietly when none is configured):
 
 | Field | Value |
 |-------|-------|

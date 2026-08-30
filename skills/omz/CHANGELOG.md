@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.3](https://github.com/es6kr/skills/compare/omz-v0.3.2...omz-v0.3.3) (2026-08-29)
+
+
+### Bug Fixes
+
+* address CodeRabbit and Copilot review feedback on PR [#389](https://github.com/es6kr/skills/issues/389) ([db4dfff](https://github.com/es6kr/skills/commit/db4dfff2829632bf263d93e0bbfdd1244772a5b2))
+* **omz:** correct broken chezmoi re-add/add guidance in plugin/custom topics ([#375](https://github.com/es6kr/skills/issues/375)) ([447161e](https://github.com/es6kr/skills/commit/447161eeb7b642c902edc2dec1809087745aac06))
+* promote next-fix batch (task plugin split, claudify matcher, pr recheck, omz chezmoi fix) ([3e90fd5](https://github.com/es6kr/skills/commit/3e90fd56ade0522d6773eb03f38760a317dd5180))
+
 ## [0.3.2](https://github.com/es6kr/skills/compare/omz-v0.3.1...omz-v0.3.2) (2026-08-17)
 
 

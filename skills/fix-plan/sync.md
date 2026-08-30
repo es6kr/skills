@@ -94,6 +94,7 @@ Degrade cleanly when the profile exists but its token env resolves empty (`plane
 | 3 | Run sync without reporting how many items changed | Report changed-item count to the user. Zero changes → "no changes" |
 | 4 | Re-sync items already `[x]` | Sync only operates on `[ ]` entries |
 | 5 | Apply the batch query result to only a hand-picked high-signal subset of the extracted numbers (e.g. just the P0/P1 items) | Apply the rules table (step 3) to **every** number the batch query returned, one tracker line at a time — batching is an API-call-count optimization (step 2), not a license to skip applying results to lower-priority lines |
+| 6 | Conclude "AI Review Summary / Formal Review not posted" from `gh api repos/{o}/{r}/issues/{N}/comments` alone | A Formal Review (`gh pr review` / consolidate's Step 7 post) is a **review object**, not an issue comment — it only shows up under `gh api repos/{o}/{r}/pulls/{N}/reviews`. Query both endpoints before recording an item as "Summary missing"; see `consolidate/internal.md` "Verify posted-artifact URL" for the per-medium check |
 
 ## Report format
 

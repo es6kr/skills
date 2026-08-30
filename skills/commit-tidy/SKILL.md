@@ -8,16 +8,18 @@ depends-on:
   - git-repo
 description: |
   Analyze staged/committed changes and recommend split, squash, or commit-message strategy.
-  Topics — hunk-split (non-interactive single-hunk staging via git apply --cached when git add -p isn't usable),
+  Topics — conflict-commit-review (per-chunk review gate for conflict-residue commit messages),
+  hunk-split (single-hunk staging via git apply --cached),
   interactive-amend (worktree-based amend+rebase loop),
   soft-reset-amend (soft-reset top N + selective re-commit),
-  staging-discipline (`git diff --cached --name-only` audit + sensitive-dir gate for rules/agents/docs),
-  security-scan (PUBLIC repo 4-grep secret pattern check before commit),
-  message-discipline (Conventional Commit tags, PUBLIC English enforcement, operation-type continuity, --amend refresh, source-code .md behavior verbs).
+  staging-discipline (staged-set audit + sensitive-dir gate),
+  security-scan (PUBLIC repo secret pattern check),
+  message-discipline (Conventional Commit tags, PUBLIC English, --amend refresh).
   Use when: "commit split", "squash commits", "tidy commits", "amend earlier", "interactive amend",
   "soft reset", "rewrite commits", "PUBLIC repo commit", "secret in commit", "commit message",
   "commit author identity", "commit message English", "staging discipline", "hunk split",
-  "stage one hunk", "git apply --cached", "non-interactive git add -p".
+  "stage one hunk", "git apply --cached", "non-interactive git add -p",
+  "conflict commit", "Conflicts message", "review conflict resolution", "bad merge resolution".
 ---
 
 # Commit Tidy
@@ -26,6 +28,7 @@ description: |
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| conflict-commit-review | Per-chunk review gate for commits whose message carries conflict residue — scope, decide by evidence, group by trade-off, ask per group | [conflict-commit-review.md](./conflict-commit-review.md) |
 | hunk-split | Non-interactive single-hunk staging via `git apply --cached` when `git add -p` isn't usable | [hunk-split.md](./hunk-split.md) |
 | interactive-amend | Worktree-based amend+rebase loop for earlier/multiple commits | [interactive-amend.md](./interactive-amend.md) |
 | message-discipline | Commit message conventions — Conventional Commit tags, PUBLIC English enforcement, --amend refresh, source-code .md behavior verbs, operation-type continuity | [message-discipline.md](./message-discipline.md) |
@@ -49,6 +52,10 @@ Analyze staged/unstaged changes and recommend whether to split into multiple com
 ## Squash-scan scope (HARD STOP)
 
 **A user-named commit range is the minimum scope, never the maximum.** The moment any squash candidate is found — whether self-discovered or pointed at by the user — scan the *entire* unpushed range (`git log --name-only @{u}..HEAD`) grouped by file for the same repeated-single-file pattern before proposing a squash plan. See `staging-discipline.md` "Full-range squash-candidate scan" for the procedure. Presenting a squash plan for only the range the user mentioned, while an identical streak sits elsewhere in the same unpushed history, is a violation — the assistant surfaces the full picture, not just the part the user already knew about.
+
+## Conflict-residue commits (HARD STOP)
+
+**Before proposing any squash, reword, reorder, or push plan, grep the range's commit *messages* for conflict residue** (`git log --oneline <base>..<branch> | grep -iE 'conflict'`). Any hit is disqualified from every fast path in this skill until its diff has been reviewed hunk by hunk, with an ask per trade-off group. A clean `git status` and a marker scan that finds no `<<<<<<<` prove nothing here — they detect *abandoned* resolutions, while the dangerous case is one that was completed with the wrong side kept. See [conflict-commit-review.md](./conflict-commit-review.md) for the scoping, evidence, grouping, and verification procedure.
 
 ## Split Decision Criteria
 

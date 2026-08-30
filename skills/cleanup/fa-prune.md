@@ -163,24 +163,32 @@ When the section is found in archive:
 | 2 | Add a new entry to HOT without restoring, even when the same keyword exists in archive | Restore → add recurrence marker → append new entry body |
 | 3 | Assume "archive is a permanent cleanup" | Archive = COLD cache. Can return to HOT immediately on recurrence |
 
-### 8. RAG dispatch (`--rag=<skill>:<topic>`, vendor-agnostic)
+### 8. RAG dispatch (workspace-config resolved, vendor-agnostic)
 
 Same abstract contract as the `/archive` skill. Simultaneously store COLD-demoted sections to a RAG receiver to strengthen semantic search / recurrence detection (Section 7-1).
 
-**Invocation format**:
+**Receiver resolution**: read the workspace bindings config through
+`bash <hook-kit-skill>/resources/workspace-config.sh --export` and use the
+`WSCFG_RAG_*` values it exports. The binding lives in the config, so swapping
+vendors stays a one-line config edit and **no caller flag is required**.
 
-```
-/cleanup fa-prune --rag=<skill>:<topic>
-```
+| Resolved state | Behavior |
+|---|---|
+| `WSCFG_RAG_KIND` unset / `none` / resolver unavailable | **Skip quietly** — no dispatch, no warning, no block |
+| `WSCFG_RAG_KIND` set to a receiver kind | Dispatch per section using `WSCFG_RAG_ENDPOINT` + the matching `WSCFG_RAG_COLLECTION_*` |
+| `--no-rag` passed | Skip regardless of the resolved binding |
+| `--rag=<skill>:<topic>` passed | Optional override, takes precedence over the resolved binding |
 
-Or when invoking `Skill("cleanup", "fa-prune")`, include `--rag=<skill>:<topic>` in args. The caller (Claude) specifies the receiver available in the environment — the vendor name is the caller's domain; the callee (fa-prune) only receives the receiver identifier and dispatches.
+`kind: none` means the role is unconfigured, and the config's own contract states
+consumers must **skip rather than block**. Never warn, fail, or deny a call merely
+because a receiver is absent or a flag was omitted.
 
 #### Applicable matrix
 
 | Task | Dispatch target | Default behavior |
 |------|-------------|------------|
-| COLD-demoted sections (after Section 4 execution) | Store 1 per section to the receiver | `--rag` not specified = no dispatch |
-| Backfill (bulk-store existing archive to the receiver) | All archive sections | Explicit `--rag` + `--backfill` flag |
+| COLD-demoted sections (after Section 4 execution) | Store 1 per section to the receiver | Resolved receiver; `kind: none` = no dispatch |
+| Backfill (bulk-store existing archive to the receiver) | All archive sections | Explicit `--backfill` flag |
 
 #### Receiver protocol (vendor-agnostic)
 
@@ -200,24 +208,29 @@ The receiver uses an idempotent id (e.g., sha1(`fa-archive:<file>:<title>`)) for
 
 | # | Don't | Do |
 |---|-------------|-----------------|
-| 1 | Hardcode a specific vendor (vector DB / embedding model / MCP tool name directly in fa-prune.md) | Let the caller specify the receiver via `--rag=<skill>:<topic>`. Keep the callee vendor-agnostic |
+| 1 | Hardcode a specific vendor (vector DB / embedding model / MCP tool name directly in fa-prune.md) | Resolve the receiver from the workspace config. Keep the callee vendor-agnostic |
 | 2 | Ignore section-level granularity and store an entire archive file as 1 chunk | Store per-section — Section 7-1 semantic search depends on section-level matching |
 | 3 | Omit metadata | 4 metadata keys required (type/project/date/category) + source_file/section_title |
-| 4 | Auto-dispatch when `--rag` is not specified | If not specified = no dispatch. Auto-supply is the caller's (Claude's) responsibility (`skill-usage.md` "Auto-supply available vendor dispatch when invoking a shared skill") |
+| 4 | Block, warn, or demand a flag when no receiver is configured | `kind: none` = skip quietly and continue. An absent receiver is a valid state, not an error |
 | 5 | Also delete from the receiver on restore (Section 7-2) | Restore only brings back to HOT. Receiver data is kept (archive history also helps semantic search) |
 
 **HTTP fallback script (when receiver MCP is down)**: `scripts/fa-batch-store.py` — consumes `--cut-dir` output or `--backfill <archive.md>` + `--skip-existing` (idempotent). Do not write ad-hoc inline store scripts.
 
 #### Self-check (right before running fa-prune)
 
-1. Is the `--rag=<skill>:<topic>` flag included in the invocation?
-2. If not included + a RAG receiver is available (a RAG store tool exists in the caller's environment) → the caller must auto-supply (skill-usage.md HARD STOP)
-3. On COLD demote, call the receiver for each section, then write to the archive file
-4. Backfill mode: bulk-store existing archive files to the receiver via `--backfill --rag=<skill>:<topic>`
+1. Resolve the receiver via `workspace-config.sh --export` (or `--json`) — do not require a caller flag
+2. If `WSCFG_RAG_KIND` is unset or `none` (and no `--rag` override):
+   - Archive COLD-demoted sections to disk
+   - Skip receiver call and skip count-equality requirements
+   - Report 0 chunks stored (`receiver: none (unconfigured)`)
+3. When a receiver is resolved or explicitly overridden:
+   - Call the receiver for each COLD section
+   - Stored chunk count must equal demoted section count
+4. Backfill mode: bulk-store existing archive files to the receiver via `--backfill`
 
 #### RAG store quantity reporting obligation (HARD STOP)
 
-After fa-prune completes, **state the number of chunks added quantitatively at the end of the response**. If N sections were demoted to COLD + N were stored to the RAG receiver, state that number exactly.
+After fa-prune completes, **state the number of chunks added quantitatively at the end of the response**. When a receiver is active, if N sections were demoted to COLD + N were stored to the RAG receiver, state that number exactly. When no receiver is configured (`kind: none`), state 0 chunks stored with N sections demoted.
 
 ```
 RAG store summary: N chunks added (receiver: <skill>:<topic>)
@@ -231,7 +244,7 @@ COLD demoted sections: N
 |---|-------|----|
 | 1 | Status-only "RAG store per section complete" | Quantitative "RAG store summary: 3 chunks added (receiver: <skill>:<topic>)" |
 | 2 | Report only mid-response, omit from the end | Show the RAG summary block **again** at the end of the response |
-| 3 | Mismatch between demote count and store count (e.g., 3 demoted but only 2 stored) | demote count = store count = reported count to the user. Verify all 3 match |
+| 3 | Mismatch between demote count and store count when a receiver is active (e.g., 3 demoted but only 2 stored) | demote count = store count = reported count to the user (when receiver is active). Verify all 3 match |
 
 Detailed format rule: see `~/.agents/rules/skill-usage.md` "RAG store report format obligation" section.
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/git-repo-v0.9.1...git-repo-v0.10.0) (2026-08-29)
+
+
+### Features
+
+* **git-repo:** add push commit count limit guard (BASE-6) to doctor and pre-push hook ([#383](https://github.com/es6kr/skills/issues/383)) ([3dde967](https://github.com/es6kr/skills/commit/3dde96749923f2c59788981b3133e7b922c0677d))
+* promote next-feat batch (backlog skill, hooks JS port, git-repo doctor, pre-push guard) ([0d76a4c](https://github.com/es6kr/skills/commit/0d76a4c01180fbdc78bfeec8dea91373b4912470))
+
+
+### Bug Fixes
+
+* address CodeRabbit and Copilot review feedback on PR [#385](https://github.com/es6kr/skills/issues/385) ([e94de34](https://github.com/es6kr/skills/commit/e94de34ce5e075c79b7edc5d672813cea94a0acc))
+* **git-repo:** exclude existing remote tracking commits in pre-push commit count limit guard ([2c5a793](https://github.com/es6kr/skills/commit/2c5a79369d43d41d6995668baf83fab7478ff0ea))
+* **git-repo:** refine pre-push base branch detection and update plane test candidate paths ([b09a6c8](https://github.com/es6kr/skills/commit/b09a6c895113eaf698a12c79744261ec4c5c78d8))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([58e85ec](https://github.com/es6kr/skills/commit/58e85ecbb437557544cd528281aa30b804bd2532))
+
 ## [0.9.1](https://github.com/es6kr/skills/compare/git-repo-v0.9.0...git-repo-v0.9.1) (2026-08-26)
 
 

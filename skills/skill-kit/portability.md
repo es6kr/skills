@@ -63,8 +63,8 @@ This rule operates on a different axis from Rule A: A prevents dead references a
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Hardcode internal URLs/IPs directly in a generic skill topic body | Declare only an abstract dispatch flag (`--rag=<skill>:<topic>`). Keep URLs inside the vendor skill |
-| 2 | Explicitly call a vendor skill from a generic skill (e.g., `Skill("<vendor>", "...")`) | Accept it as a call-site parameter (e.g., `--rag=<skill>:<topic>` — the caller specifies the vendor) |
+| 1 | Hardcode internal URLs/IPs directly in a generic skill topic body | Resolve the receiver from the workspace config (`workspace-config.sh --export` → `WSCFG_<ROLE>_*`). Keep URLs in the config and inside the vendor skill |
+| 2 | Explicitly call a vendor skill from a generic skill (e.g., `Skill("<vendor>", "...")`) | Read the binding from the workspace config; accept a call-site flag (e.g., `--rag=<skill>:<topic>`) only as an optional override, never as a requirement |
 | 3 | Add a vendor-specific verification procedure to a generic skill | Declare only the abstract contract (let the receiver own its healthcheck); put actual verification in the vendor skill |
 | 4 | "Write vendor-specific code inside the generic skill and have the vendor call it" | Reverse the direction: the generic skill declares the interface, the vendor skill implements the receiver. Coupling belongs only in the call-site flag |
 | 5 | Write a new implementation in the generic skill when an existing dispatch pattern already exists in a vendor skill | Grep for existing dispatch patterns before editing — if found, follow that pattern |
