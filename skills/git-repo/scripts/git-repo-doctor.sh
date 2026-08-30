@@ -178,6 +178,18 @@ else
   add_result "BASE-6" "Base" "Push Commit Limit" "WARN" "No pre-push hook found."
 fi
 
+# BASE-7: pre-push merge-conflict-marker guard (blocks pushing commits whose message
+# still carries the auto-generated "Conflicts:" residue from a non-interactive merge commit)
+if [[ -n "$PRE_PUSH_CONTENT" ]]; then
+  if echo "$PRE_PUSH_CONTENT" | grep -qE '(Conflicts:|CONFLICT_COMMITS|PUSH_CONFLICT_MSG_OVERRIDE)'; then
+    add_result "BASE-7" "Base" "Conflict Marker Guard" "PASS" "pre-push hook scans outgoing commit messages for leftover '# Conflicts:' residue."
+  else
+    add_result "BASE-7" "Base" "Conflict Marker Guard" "FAIL" "pre-push hook lacks a guard blocking commits whose message still contains a literal '# Conflicts:' section (leftover from a non-interactively committed merge)."
+  fi
+else
+  add_result "BASE-7" "Base" "Conflict Marker Guard" "WARN" "No pre-push hook found."
+fi
+
 # -----------------------------------------------------------------------------
 # Tier 2: Conditional Checks
 # -----------------------------------------------------------------------------
@@ -191,6 +203,56 @@ if [[ $HAS_MD -eq 1 ]]; then
     add_result "COND-MD" "Conditional" "Markdown Lint" "PASS" "Markdown files present and validated by hook."
   else
     add_result "COND-MD" "Conditional" "Markdown Lint" "FAIL" "Repository contains .md files but lacks a markdown lint or reference validation hook."
+  fi
+fi
+
+# COND-MD-STYLE: genuine markdown STYLE lint (trailing whitespace, heading/list
+# rules, etc.) — distinct from COND-MD above, which is satisfied by narrow
+# tools like check-hangul.py (Korean-text-only) or lint-frontmatter.sh
+# (frontmatter-only). Neither of those catches trailing whitespace, so a
+# COND-MD PASS gives false confidence that markdown "quality" is covered.
+# Detection source depends on what tooling manifests the repo actually has
+# (Makefile / package.json / scripts/) — each is probed only if present.
+if [[ $HAS_MD -eq 1 ]]; then
+  MD_STYLE_TOOL_PATTERN='(markdownlint|remark-lint|remark\.config|remarkrc|mdl\b|prettier[^"]*\.md)'
+  LINT_MANIFEST_SOURCES=""
+  HAS_MD_STYLE_TOOL=0
+
+  if [[ -f "Makefile" ]]; then
+    LINT_MANIFEST_SOURCES="${LINT_MANIFEST_SOURCES}Makefile "
+    if grep -qiE "$MD_STYLE_TOOL_PATTERN" Makefile 2>/dev/null; then
+      HAS_MD_STYLE_TOOL=1
+    fi
+  fi
+
+  if [[ -f "package.json" ]]; then
+    LINT_MANIFEST_SOURCES="${LINT_MANIFEST_SOURCES}package.json "
+    if grep -qiE "$MD_STYLE_TOOL_PATTERN" package.json 2>/dev/null; then
+      HAS_MD_STYLE_TOOL=1
+    fi
+  fi
+
+  if [[ -d "scripts" ]]; then
+    LINT_MANIFEST_SOURCES="${LINT_MANIFEST_SOURCES}scripts/ "
+    if ls scripts 2>/dev/null | grep -qiE 'markdown|mdlint|md-lint|remark'; then
+      HAS_MD_STYLE_TOOL=1
+    fi
+  fi
+
+  if [[ -z "$LINT_MANIFEST_SOURCES" ]]; then
+    add_result "COND-MD-STYLE" "Conditional" "Markdown Style Lint" "WARN" "No Makefile, package.json, or scripts/ directory found — cannot verify markdown style/whitespace lint coverage from project tooling manifests."
+  elif [[ $HAS_MD_STYLE_TOOL -eq 0 ]]; then
+    add_result "COND-MD-STYLE" "Conditional" "Markdown Style Lint" "WARN" "Checked ${LINT_MANIFEST_SOURCES}but found no markdown style/whitespace lint tool (markdownlint/remark-lint/mdl/prettier --check *.md). check-hangul/lint-frontmatter (if present) do not catch trailing whitespace or markdown style issues."
+  else
+    CI_WORKFLOW_CONTENT=""
+    if [[ -d ".github/workflows" ]]; then
+      CI_WORKFLOW_CONTENT="$(cat .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null || true)"
+    fi
+    if echo "$CLEAN_HOOKS_CONTENT $CI_WORKFLOW_CONTENT" | grep -qiE "${MD_STYLE_TOOL_PATTERN}|make lint|npm run lint|pnpm( run)? lint"; then
+      add_result "COND-MD-STYLE" "Conditional" "Markdown Style Lint" "PASS" "Markdown style/whitespace lint tool declared (${LINT_MANIFEST_SOURCES}) and wired into pre-commit, pre-push, or CI."
+    else
+      add_result "COND-MD-STYLE" "Conditional" "Markdown Style Lint" "FAIL" "Markdown style lint tool declared in ${LINT_MANIFEST_SOURCES}but not invoked from pre-commit, pre-push, or CI workflows — declared tooling is dead weight."
+    fi
   fi
 fi
 
