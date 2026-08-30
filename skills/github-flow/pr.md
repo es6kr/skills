@@ -36,8 +36,19 @@ If any target file overlaps an open PR's diff:
 | 1 | Silently open a new PR because the change is "conceptually different" from the open PR's purpose | `AskUserQuestion`: "add a commit to PR #N" vs "open a separate PR" — state the overlapping file(s) explicitly in the option description |
 | 2 | Assume the open PR will merge first (or won't) without checking its state | Check the open PR's mergeability/CI state (`gh pr view <N> --json mergeable,state`) before presenting options — sequencing affects which choice avoids the conflict |
 | 3 | Rationalize a "separate by concern" convention after the fact to justify a new PR | No such convention is documented in this skill set — don't invent one. The actual decision axis is file overlap risk, not conceptual grouping |
+| 4 | Default the "separate PR" option to Recommended on unrelatedness grounds alone | Weigh **review-cost vs conflict-resolution cost**, not conceptual relatedness — see "Default weighting" below |
 
-**Self-check (before every `gh pr create`)**: did I run the overlap check above? If any target file matches an open PR's diff, did I `AskUserQuestion` before creating a second PR?
+**Default weighting: consolidate unless one condition below applies (HARD STOP)**
+
+Opening a new PR is not free — it starts a whole new review cycle. A file-overlap conflict is usually cheap to resolve (a single-line or single-hunk merge conflict via cherry-pick). Default to **adding the commit to the existing open PR**, and mark "open a separate PR" Recommended only when at least one of these holds:
+
+- Consolidating would push either PR's changed-file count near/over a reviewer's hard cap (e.g. CodeRabbit's 50-file review limit) — check `gh pr view <N> --json changedFiles` before deciding
+- The two changes have genuinely independent merge/revert timelines (one may need reverting without affecting the other, or one is blocked on an unrelated approval) — not just "different topic"
+- The conflict resolution itself is non-trivial (deep logic conflict, not a renumbering/relabeling collision)
+
+None of these apply → consolidate is the default, not merely an option alongside "separate PR."
+
+**Self-check (before every `gh pr create`)**: did I run the overlap check above? If any target file matches an open PR's diff, did I `AskUserQuestion` before creating a second PR? Did I check the "Default weighting" conditions before deciding which option gets Recommended?
 
 ### Step 0: Visibility + language decision guard (HARD STOP — run every time, right before PR creation)
 
