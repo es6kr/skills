@@ -61,11 +61,20 @@ gh issue view <N> --json state,closedAt,url -q '{state: .state, closedAt: .close
 
 Use the same format as [format.md](./format.md) item state changes: `(YYYY-MM-DD HH:mm completed: sync)`. The `sync` keyword indicates this state change came from automated GitHub polling rather than a session-driven completion.
 
-### 5. Chain into move
+### 5. Automated Integrity Checks
+
+Execute the skill's integrity check scripts immediately following GitHub sync:
+
+```bash
+python ./scripts/stale_check.py --root .
+python ./scripts/hook_integrity_check.py --root .
+```
+
+### 6. Chain into move
 
 Items just synced to `[x]` are immediate candidates for the next [move](./move.md) cycle. The recommended sequence is `sync` → `move` so the freshly-merged items roll into Completed in the same pass.
 
-### 6. Milestone-Boundary Sync (task.md ↔ plan-*.md ↔ fix_plan.md)
+### 7. Milestone-Boundary Sync (task.md ↔ plan-*.md ↔ fix_plan.md)
 
 When executing deep tasks (`/fix-plan add --deep`, `/code-workflow`), real-time sub-step tool calls are tracked in `task.md` to avoid token churn on large files.
 
