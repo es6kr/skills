@@ -284,6 +284,10 @@ while read lref lsha rref rsha; do
   MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
   COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
   [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ] && exit 1
+  CONFLICT_COMMITS=$(git rev-list origin/main.."$lsha" 2>/dev/null | while read -r sha; do
+    git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:' && echo "$sha"
+  done)
+  [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ] && exit 1
 done
 EOF
 chmod +x "$REPO_9/.githooks/pre-commit" "$REPO_9/.githooks/pre-push"
@@ -322,6 +326,10 @@ while read lref lsha rref rsha; do
   MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
   COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
   [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ] && exit 1
+  CONFLICT_COMMITS=$(git rev-list origin/main.."$lsha" 2>/dev/null | while read -r sha; do
+    git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:' && echo "$sha"
+  done)
+  [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ] && exit 1
 done
 EOF
 chmod +x "$REPO_10/.githooks/pre-commit" "$REPO_10/.githooks/pre-push"
@@ -357,6 +365,10 @@ while read lref lsha rref rsha; do
   MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
   COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
   [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ] && exit 1
+  CONFLICT_COMMITS=$(git rev-list origin/main.."$lsha" 2>/dev/null | while read -r sha; do
+    git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:' && echo "$sha"
+  done)
+  [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ] && exit 1
 done
 EOF
 chmod +x "$REPO_11/.githooks/pre-commit" "$REPO_11/.githooks/pre-push"
