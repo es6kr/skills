@@ -100,6 +100,11 @@ scripts/rename-session.sh --show <session_id>
 scripts/rename-session.sh --list
 ```
 
+**Orca Dispatched / Peer Session**:
+When renaming a session running in an Orca terminal (resolved via `id.md`'s Orca lookup):
+1. **Interactive copyable format**: Provide copyable `/rename <candidate>` options for the user to paste directly into the target Orca terminal tab.
+2. **Background script format**: Alternatively, apply it non-interactively via `bash scripts/rename-session.sh <session_id> "<selected name>"`.
+
 ## Storage Format
 
 Both records are appended together at the end of the session JSONL:
