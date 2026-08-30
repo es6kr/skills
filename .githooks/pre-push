@@ -95,8 +95,10 @@ EOF
   # Conflict marker guard — block push of a commit whose message still carries
   # the auto-generated "Conflicts:" residue (unresolved non-interactive merge commit)
   CONFLICT_COMMITS=$(git rev-list "$BASE_REF..$local_sha" 2>/dev/null | while read -r sha; do
-    git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:' && echo "$sha"
-  done)
+    if git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:'; then
+      echo "$sha"
+    fi
+  done || true)
   if [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ]; then
     cat >&2 <<EOF
 ERROR: The following commit(s) still contain a leftover '# Conflicts:' section:
