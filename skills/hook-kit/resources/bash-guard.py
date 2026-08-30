@@ -946,12 +946,14 @@ def evaluate(
 
     # ── Phase 2 ──
     if re.search(r"git\s+commit", command) and "--amend" not in command:
+        staged_files: list[str] = []
         try:
             r = subprocess.run(
                 ["git", "diff", "--cached", "--name-only"],
                 capture_output=True, text=True, timeout=5,
             )
-            staged = len([l for l in r.stdout.splitlines() if l.strip()])
+            staged_files = [l for l in r.stdout.splitlines() if l.strip()]
+            staged = len(staged_files)
             if staged == 0:
                 warnings.append("[staged-guard] No staged files. Run git add first.")
             elif staged > 2:
@@ -964,6 +966,23 @@ def evaluate(
             msg = m.group(1)
             if not re.match(r"^(feat|fix|docs|style|refactor|test|chore|ci|perf|build|revert)(\(.+\))?!?:", msg):
                 warnings.append("[commit-validator] Conventional Commit format recommended: type(scope): description")
+            elif re.match(r"^docs(\(.+\))?!?:", msg):
+                # Skill markdown is a behaviour surface, not documentation
+                # (feedback_skill_md_commit_tag_staging.md) — es6kr/skills'
+                # next-fix/next-feat "adjudicate" CI job hard-fails
+                # docs(<skill>): commits, forcing a rebase reword after the
+                # commit is already pushed. Catch it here instead.
+                skill_md_touched = [f for f in staged_files if re.match(r"skills/[^/]+/.*\.md$", f)]
+                if skill_md_touched:
+                    shown = ", ".join(skill_md_touched[:5])
+                    if len(skill_md_touched) > 5:
+                        shown += ", ..."
+                    soft_blocks.append(
+                        f"BLOCK: [skill-md-tag] Commit tagged 'docs:' but touches skill .md file(s) "
+                        f"({shown}). Skill markdown is a behaviour surface, not documentation - retag "
+                        "as fix(<skill>): (content fix/hardening/substep) or feat(<skill>): (new "
+                        "top-level topic)."
+                    )
 
     if re.match(r"^(kubectl|helm)\s", command):
         if re.search(r"--context\s+kvm|KUBECONFIG.*kvm", command) and re.search(r"\sdelete\s", command):
