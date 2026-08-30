@@ -263,6 +263,109 @@ exit_8=$?
 check "Base: pre-push missing conflict marker guard (BASE-7)" 1 "$exit_8"
 rm -rf "$REPO_8"
 
+# -----------------------------------------------------------------------------
+# Test 9: Conditional - COND-MD-STYLE WARN when no lint manifest exists at all
+# -----------------------------------------------------------------------------
+REPO_9="$(make_temp_repo)"
+mkdir -p "$REPO_9/.githooks"
+git_in "$REPO_9" config core.hooksPath .githooks
+echo "# Title" > "$REPO_9/README.md"
+git_in "$REPO_9" add README.md
+git_in "$REPO_9" -c user.name="Test" -c user.email="test@test.com" commit -m "docs: add readme" --quiet
+cat > "$REPO_9/.githooks/pre-commit" << 'EOF'
+#!/bin/sh
+check-hangul.py
+EOF
+cat > "$REPO_9/.githooks/pre-push" << 'EOF'
+#!/bin/sh
+while read lref lsha rref rsha; do
+  [ "$lsha" = "0000000000000000000000000000000000000000" ] && exit 0
+  if [ "$lref" = "refs/heads/local" ]; then exit 1; fi
+  MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
+  COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
+  [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ] && exit 1
+done
+EOF
+chmod +x "$REPO_9/.githooks/pre-commit" "$REPO_9/.githooks/pre-push"
+# No Makefile, no package.json, no scripts/ — COND-MD-STYLE has nothing to probe.
+out_9=$(bash "$SCRIPT" "$REPO_9" 2>&1)
+exit_9=$?
+check "Conditional: COND-MD-STYLE WARN (no manifest, exit stays 0)" 0 "$exit_9" "$out_9"
+if ! echo "$out_9" | grep -q "COND-MD-STYLE.*No Makefile, package.json, or scripts/"; then
+  echo "FAIL  COND-MD-STYLE no-manifest message missing"
+  FAIL=1
+fi
+rm -rf "$REPO_9"
+
+# -----------------------------------------------------------------------------
+# Test 10: Conditional - COND-MD-STYLE FAIL when tool declared but not wired
+# -----------------------------------------------------------------------------
+REPO_10="$(make_temp_repo)"
+mkdir -p "$REPO_10/.githooks"
+git_in "$REPO_10" config core.hooksPath .githooks
+echo "# Title" > "$REPO_10/README.md"
+cat > "$REPO_10/Makefile" << 'EOF'
+lint:
+	npx markdownlint-cli2 "**/*.md"
+EOF
+git_in "$REPO_10" add README.md Makefile
+git_in "$REPO_10" -c user.name="Test" -c user.email="test@test.com" commit -m "docs: add readme" --quiet
+cat > "$REPO_10/.githooks/pre-commit" << 'EOF'
+#!/bin/sh
+check-hangul.py
+EOF
+cat > "$REPO_10/.githooks/pre-push" << 'EOF'
+#!/bin/sh
+while read lref lsha rref rsha; do
+  [ "$lsha" = "0000000000000000000000000000000000000000" ] && exit 0
+  if [ "$lref" = "refs/heads/local" ]; then exit 1; fi
+  MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
+  COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
+  [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ] && exit 1
+done
+EOF
+chmod +x "$REPO_10/.githooks/pre-commit" "$REPO_10/.githooks/pre-push"
+# Makefile declares markdownlint-cli2, but no hook or CI actually invokes it.
+out_10=$(bash "$SCRIPT" "$REPO_10" 2>&1)
+exit_10=$?
+check "Conditional: COND-MD-STYLE FAIL (declared but not wired)" 1 "$exit_10" "$out_10"
+rm -rf "$REPO_10"
+
+# -----------------------------------------------------------------------------
+# Test 11: Conditional - COND-MD-STYLE PASS when tool declared and wired
+# -----------------------------------------------------------------------------
+REPO_11="$(make_temp_repo)"
+mkdir -p "$REPO_11/.githooks"
+git_in "$REPO_11" config core.hooksPath .githooks
+echo "# Title" > "$REPO_11/README.md"
+cat > "$REPO_11/Makefile" << 'EOF'
+lint:
+	npx markdownlint-cli2 "**/*.md"
+EOF
+git_in "$REPO_11" add README.md Makefile
+git_in "$REPO_11" -c user.name="Test" -c user.email="test@test.com" commit -m "docs: add readme" --quiet
+cat > "$REPO_11/.githooks/pre-commit" << 'EOF'
+#!/bin/sh
+check-hangul.py
+make lint
+EOF
+cat > "$REPO_11/.githooks/pre-push" << 'EOF'
+#!/bin/sh
+while read lref lsha rref rsha; do
+  [ "$lsha" = "0000000000000000000000000000000000000000" ] && exit 0
+  if [ "$lref" = "refs/heads/local" ]; then exit 1; fi
+  MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
+  COUNT=$(git rev-list --count origin/main.."$lsha" 2>/dev/null || echo 0)
+  [ "$COUNT" -gt "$MAX_COMMITS" ] && [ "${PUSH_COMMIT_LIMIT_OVERRIDE:-0}" != "1" ] && exit 1
+done
+EOF
+chmod +x "$REPO_11/.githooks/pre-commit" "$REPO_11/.githooks/pre-push"
+# Makefile declares markdownlint-cli2 AND pre-commit invokes `make lint`.
+out_11=$(bash "$SCRIPT" "$REPO_11" 2>&1)
+exit_11=$?
+check "Conditional: COND-MD-STYLE PASS (declared and wired)" 0 "$exit_11" "$out_11"
+rm -rf "$REPO_11"
+
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "ALL TESTS PASSED"
