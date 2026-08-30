@@ -2,8 +2,8 @@
 # workspace-config.sh — shared workspace config resolver.
 #
 # Single entry point for every hook/script that needs to know which
-# receivers (checklist / backlog / rag / wiki) the current workspace is
-# wired to. Consumers do not parse the config themselves:
+# receivers (checklist / backlog / rag / wiki / artifacts) the current
+# workspace is wired to. Consumers do not parse the config themselves:
 #
 #     eval "$(workspace-config.sh --export)"
 #     [ "${WSCFG_RAG_KIND:-none}" = "none" ] && exit 0   # receiver absent -> skip

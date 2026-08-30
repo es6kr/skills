@@ -91,11 +91,6 @@ def isolated_workspace(tmp_path, monkeypatch, scripts_on_path):
     import workspace_profile
 
     monkeypatch.setattr(workspace_profile, "CONFIG_FILE", config_file)
-    # The v2 loader reads CONFIG_FILE_V2 (~/.config/agent-workspace/config.json)
-    # before CONFIG_FILE. On a machine that has a real v2 config, that file would
-    # shadow this fixture and the workspace would resolve to the wrong (or
-    # default) profile. Point it at a path that does not exist so the loader
-    # falls through to the fixture on CONFIG_FILE.
     monkeypatch.setattr(
         workspace_profile, "CONFIG_FILE_V2", tmp_path / "no-agent-workspace.json"
     )
@@ -127,6 +122,44 @@ def test_resolve_profile_reaches_workspace_config(isolated_workspace):
     )
     assert profile["workspace_slug"] == expected["workspace_name"]
     assert profile["default_project"] == expected["default_project"]
+
+
+def test_workspace_profile_resolves_artifacts_path(tmp_path, monkeypatch, scripts_on_path):
+    """workspace_profile must resolve artifacts_path from v2 config and provide defaults."""
+    import workspace_profile
+
+    v2_config_file = tmp_path / "agent-workspace.json"
+    v2_config_file.write_text(
+        json.dumps({
+            "version": 2,
+            "defaults": {
+                "artifacts": {"kind": "dir", "path": ".agents/docs/generated"}
+            },
+            "profiles": {
+                "custom_ws": {
+                    "match": {"path_components": ["custom_ws"]},
+                    "roles": {
+                        "artifacts": {"kind": "dir", "path": "custom/docs/path"}
+                    }
+                },
+                "default_ws": {
+                    "match": {"path_components": ["default_ws"]},
+                    "roles": {}
+                }
+            }
+        }),
+        encoding="utf-8"
+    )
+
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE_V2", v2_config_file)
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE", tmp_path / "no-v1.json")
+
+    prof_custom = workspace_profile.get_profile(workspace_name="custom_ws")
+    assert prof_custom["artifacts_path"] == "custom/docs/path"
+
+    prof_default = workspace_profile.get_profile(workspace_name="default_ws")
+    assert prof_default["artifacts_path"] == ".agents/docs/generated"
+
 
 
 def test_workspace_profile_exposes_the_symbol_the_scripts_import(scripts_on_path):

@@ -272,6 +272,16 @@
         }
       ]
     },
+    "skills/orca": {
+      "package-name": "orca",
+      "component": "orca",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/repo": {
       "package-name": "repo",
       "component": "repo",
