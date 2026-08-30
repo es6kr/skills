@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/session-v0.8.2...session-v0.9.0) (2026-08-29)
+
+
+### Features
+
+* **hooks:** migrate standalone hooks into plugin resources and fix test regressions ([897ac2e](https://github.com/es6kr/skills/commit/897ac2e1921115e6e8987b2f8460f2bfded41714))
+
+
+### Bug Fixes
+
+* **consolidate:** address CodeRabbit review feedback on PR [#392](https://github.com/es6kr/skills/issues/392) ([3b50e26](https://github.com/es6kr/skills/commit/3b50e26d53666f069eb489211cc67a2820a7cd8a))
+* **hook-kit:** document --json mode and scope WSCFG_* to hook scripts ([373634c](https://github.com/es6kr/skills/commit/373634c022b0e2b114a3bbb799bb9a8934c9fbb2))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([58e85ec](https://github.com/es6kr/skills/commit/58e85ecbb437557544cd528281aa30b804bd2532))
+* **hook-kit:** resolve RAG receiver from workspace config instead of mandating --rag ([1412773](https://github.com/es6kr/skills/commit/1412773466d11354eca7521e4351faa5a78d9081))
+* **hook-kit:** scope PR-URL bare-ref check to per-number match, allow force-push in worktrees ([dd50dce](https://github.com/es6kr/skills/commit/dd50dced989eed4847daaf9a0cd4be12a04426e1))
+* **review:** apply copilot review feedback on hooks and test suites ([cba86f4](https://github.com/es6kr/skills/commit/cba86f4ebbf274a0c979ab21aeea6d483f8cb8f3))
+* **skills:** finish the config-resolution sweep for receiver dispatch ([c188d44](https://github.com/es6kr/skills/commit/c188d44de268ef169070dedee525b2a483e57b40))
+
 ## [0.8.2](https://github.com/es6kr/skills/compare/session-v0.8.1...session-v0.8.2) (2026-08-26)
 
 
