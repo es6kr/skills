@@ -90,7 +90,7 @@ check_claudify_calls() {
   HAS_CLAUDIFY_IMPROVE=0
   HAS_CLAUDIFY_PERSIST=0
   local calls
-  calls=$(echo "$segment" | grep -oE '"skill":"claudify"[^}]*}' 2>/dev/null)
+  calls=$(echo "$segment" | grep -oE '"skill":"([^"]*:)?claudify"[^}]*}' 2>/dev/null)
   if echo "$calls" | grep -qE '"args":"[^"]*improve'; then HAS_CLAUDIFY_IMPROVE=1; fi
   if echo "$calls" | grep -qE '"args":"[^"]*persist'; then HAS_CLAUDIFY_PERSIST=1; fi
 }
@@ -131,7 +131,7 @@ if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
     if (( TOTAL_LINES - CLEANUP_CMD_LINE <= GATEB_WINDOW )); then
       SCOPED=$(tail -n +"$CLEANUP_CMD_LINE" "$TRANSCRIPT_PATH")
       MISSING=""
-      if ! echo "$SCOPED" | grep -q '"skill":"cleanup"'; then
+      if ! echo "$SCOPED" | grep -qE '"skill":"([^"]*:)?cleanup"'; then
         MISSING="${MISSING}Skill(\"cleanup\"), "
       fi
       check_claudify_calls "$SCOPED"

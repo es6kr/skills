@@ -54,7 +54,7 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step | Invocation obligation (automatic) | Ask (user decision) | Auto-invocation condition |
 |------|------------------|------------------|---------------|
 | Step 0 | Call `TaskList` | — | Clean up when TaskList has completed tasks |
-| Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (`--rag=<skill>:<topic>`) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
+| Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (receiver resolved from the workspace config) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
 | Step 1 | `Skill("commit-tidy")` or `/commit-tidy` | Decide split strategy (internal ask inside the skill) | When there is 1+ uncommitted change |
 | Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
 | Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) | **Always** + auto-import when the RAG receiver readyz responds |
@@ -212,7 +212,7 @@ Clean up `completed`-status tasks from TaskList and reflect their completion in 
 When a workspace has adopted Plane as its canonical backlog (its local `fix_plan.md`/`checklist.md` demoted to an **index** — signalled by a `workspace_profile.py --json` non-empty `plane_host`, or a pinned note in the tracker itself stating Plane is the source of truth), a matched line carrying a `→ Plane (<issue URL>)` suffix must **not** be marked `[x]` locally until the indexed Plane issue itself reflects completion. The local marker is a pointer, not the record — completing the pointer while the record it points at is still open leaves the canonical backlog wrong.
 
 **Procedure**:
-1. Extract the Plane issue URL/ID from the matched line's `→ Plane (...)` suffix (real-world example: `[INFRA-6] ... → Plane (https://plane.dgs.ai.kr/.../issues/<id>) *(Phase 3 indexing ...)*`).
+1. Extract the Plane issue URL/ID from the matched line's `→ Plane (...)` suffix (real-world example: `[INFRA-6] ... → Plane (https://plane.example.com/.../issues/<id>) *(Phase 3 indexing ...)*`).
 2. No script in this environment currently **pushes** completion state to Plane (`plane_sync.py` is pull-only — Plane state → fix_plan marker, per `fix-plan/sync.md`). So: either (a) the Plane issue was already completed independently (verify via `plane-backlog sync --dry-run` or a direct issue-state read) — if so, the pull already reconciled it, proceed to check `[x]` locally, or (b) it has not — in that case do **not** mark local `[x]` autonomously. Surface the Plane issue URL to the user (report line or, if other decisions are already being asked this turn, fold it into that `AskUserQuestion`) and hold the local marker at its current state until the user confirms the Plane issue is completed (manually, or via a future push-capable script).
 3. Never silently complete the local index while the canonical Plane record remains open — that is the exact drift this gate prevents.
 

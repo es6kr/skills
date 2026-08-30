@@ -72,14 +72,15 @@ def resolve_script_operand(command):
         tokens = shlex.split(command, posix=(sys.platform != "win32"))
     except ValueError:
         tokens = command.split()
-    for tok in tokens:
+    for raw_tok in tokens:
+        tok = raw_tok.strip('"').strip("'")
         if not tok or tok.startswith("-"):
             continue
         if "=" in tok and not tok.startswith(("/", ".", "~", "$")):
             continue  # env-var assignment prefix
         if os.path.basename(tok) in INTERPRETERS:
             continue
-        return tok.strip('"').strip("'")
+        return tok
     return ""
 
 def check_hook_integrity(root):

@@ -213,6 +213,5 @@ check "T30 staging main from profile"           "main"                   "${WSCF
 
 load "/tmp/wsB/repo"
 check "T31 unset staging degrades to none"      "none"                   "${WSCFG_STAGING_KIND:-}"
-
 printf -- '---\npass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

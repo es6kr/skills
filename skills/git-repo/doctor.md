@@ -160,8 +160,10 @@ In `.githooks/pre-push`:
 
 ```sh
 # Commit count limit guard — prevent pushing massive commits from wrong base branch
+# Exclude commits that already exist on remote tracking branches (--remotes=origin)
+# so that merged upstream/remote branches do not inflate the count of new outgoing commits.
 if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ -n "$remote_sha" ]; then
-  COMMIT_COUNT=$(git rev-list --count "$remote_sha..$local_sha" 2>/dev/null || echo 0)
+  COMMIT_COUNT=$(git rev-list --count "$local_sha" --not "$remote_sha" --remotes=origin 2>/dev/null || echo 0)
 else
   DEFAULT_BASE="origin/main"
   case "$local_ref" in
@@ -181,7 +183,7 @@ else
     MIN_COUNT=999999
     for cand in origin/next-feat origin/next-fix origin/main origin/master; do
       if git rev-parse --verify "$cand" >/dev/null 2>&1; then
-        cnt=$(git rev-list --count "$cand..$local_sha" 2>/dev/null || echo 999999)
+        cnt=$(git rev-list --count "$local_sha" --not "$cand" --remotes=origin 2>/dev/null || echo 999999)
         if [ "$cnt" -lt "$MIN_COUNT" ]; then
           MIN_COUNT="$cnt"
           DEFAULT_BASE="$cand"
@@ -189,7 +191,7 @@ else
       fi
     done
   fi
-  COMMIT_COUNT=$(git rev-list --count "$DEFAULT_BASE..$local_sha" 2>/dev/null || echo 0)
+  COMMIT_COUNT=$(git rev-list --count "$local_sha" --not "$DEFAULT_BASE" --remotes=origin 2>/dev/null || echo 0)
 fi
 
 MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"

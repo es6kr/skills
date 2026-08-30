@@ -125,12 +125,6 @@ class TestRestApiPriorityInjection(unittest.TestCase):
             self._captured_payload("P9")
 
 
-@unittest.skip(
-    "blocked on https://github.com/es6kr/skills/pull/349 (f-string brace "
-    "escaping fix) promoting from next-fix to main — the K3s fallback "
-    "template on main still crashes on ANY generation, independent of this "
-    "priority-injection change. Un-skip once #349 lands on main."
-)
 class TestK3sFallbackPriorityInjection(unittest.TestCase):
     def _generated_script(self, priority):
         captured_cmd = {}

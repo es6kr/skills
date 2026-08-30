@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.5...commit-tidy-v0.6.0) (2026-08-29)
+
+
+### Features
+
+* **works-config:** implement v0.2.0 role-based resolution & neutral SSOT guards config ([e22e117](https://github.com/es6kr/skills/commit/e22e117371370c59b18b77c72bdb926dcb1897cb))
+
+
+### Bug Fixes
+
+* **hook-kit:** scope PR-URL bare-ref check to per-number match, allow force-push in worktrees ([dd50dce](https://github.com/es6kr/skills/commit/dd50dced989eed4847daaf9a0cd4be12a04426e1))
+
 ## [0.5.5](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.4...commit-tidy-v0.5.5) (2026-08-20)
 
 
