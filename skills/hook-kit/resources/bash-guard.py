@@ -420,7 +420,12 @@ def check_pr_create_draft(command: str, transcript_path: str = "") -> str | None
             transcript = f.read()
     except OSError:
         return None  # unreadable — fail open
-    if '"skill":"github-flow"' in transcript:
+    # The harness records the skill name as invoked. When the skill ships inside a
+    # plugin, that name is plugin-qualified ("es6kr:github-flow"), so a bare-literal
+    # match sees nothing and the guard becomes unsatisfiable through its own
+    # documented path #1 — leaving the audit bypass as the only way through.
+    # Accept an optional "<plugin>:" prefix.
+    if re.search(r'"skill":"(?:[A-Za-z0-9_.-]+:)?github-flow"', transcript):
         return None
     return (
         "`gh pr create` has no prior Skill(\"github-flow\", ...) invocation in this session's transcript.\n\n"
@@ -1138,11 +1143,23 @@ def self_test() -> int:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
         f.write('{"skill":"github-flow","args":"pr"}\n')
         with_skill_transcript = f.name
+    # When the skill ships inside a plugin the harness records a plugin-qualified
+    # name. A bare-literal match misses it, which made this guard unsatisfiable
+    # through its own documented path #1 in plugin installs.
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"skill":"es6kr:github-flow","args":"pr"}\n')
+        with_qualified_skill_transcript = f.name
+    # A different skill must not satisfy the check just by ending in the same name.
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"skill":"not-github-flow","args":"pr"}\n')
+        wrong_skill_transcript = f.name
     try:
         transcript_cases = [
             # (expect_block, command, transcript_path)
             (True, "gh pr create --draft --title x", no_skill_transcript),
             (False, "gh pr create --draft --title x", with_skill_transcript),
+            (False, "gh pr create --draft --title x", with_qualified_skill_transcript),
+            (True, "gh pr create --draft --title x", wrong_skill_transcript),
             (False, "GH_PR_CREATE_SKILL_BYPASS=1 gh pr create --draft --title x", no_skill_transcript),
             (False, "gh pr create --draft --title x", ""),  # no transcript — fail open
             (False, 'grep "gh pr create" README.md', no_skill_transcript),  # not a real invocation
@@ -1159,6 +1176,8 @@ def self_test() -> int:
     finally:
         os.unlink(no_skill_transcript)
         os.unlink(with_skill_transcript)
+        os.unlink(with_qualified_skill_transcript)
+        os.unlink(wrong_skill_transcript)
 
     print(f"\n{passed} passed, {failed} failed")
 
