@@ -161,19 +161,35 @@ def parse_registrations(hooks_json: dict, surface: str, marketplace: str) -> lis
 
 
 def scan_resources(root: str, marketplace: str) -> set[str]:
-    """Repo-relative paths of every hook script under `skills/*/resources/`."""
+    """Repo-relative paths of every hook script a marketplace can register.
+
+    Two locations, because two layouts are in use. `skills/<skill>/resources/`
+    is the common one — a hook owned by the skill it belongs to. A root-level
+    `hooks/` directory is the other, used by a marketplace whose root itself is
+    the plugin. Scanning only the first made every registration from the second
+    look like an ORPHAN_REGISTRATION no matter what was on disk, which is a
+    false positive that no amount of committing files can clear.
+    """
     found: set[str] = set()
+
     skills_dir = os.path.join(root, "skills")
-    if not os.path.isdir(skills_dir):
-        return found
-    for skill in sorted(os.listdir(skills_dir)):
-        resources = os.path.join(skills_dir, skill, "resources")
-        if not os.path.isdir(resources):
-            continue
-        for name in sorted(os.listdir(resources)):
+    if os.path.isdir(skills_dir):
+        for skill in sorted(os.listdir(skills_dir)):
+            resources = os.path.join(skills_dir, skill, "resources")
+            if not os.path.isdir(resources):
+                continue
+            for name in sorted(os.listdir(resources)):
+                if runtime_of(name) == "other":
+                    continue
+                found.add(f"skills/{skill}/resources/{name}")
+
+    hooks_dir = os.path.join(root, "hooks")
+    if os.path.isdir(hooks_dir):
+        for name in sorted(os.listdir(hooks_dir)):
             if runtime_of(name) == "other":
                 continue
-            found.add(f"skills/{skill}/resources/{name}")
+            found.add(f"hooks/{name}")
+
     return found
 
 
