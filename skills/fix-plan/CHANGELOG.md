@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/fix-plan-v0.10.0...fix-plan-v0.11.0) (2026-09-01)
+
+
+### Features
+
+* staging branch next-feat sync into main ([e582ea2](https://github.com/es6kr/skills/commit/e582ea248beefa70886716741b8965d91cfb7414))
+
+
+### Bug Fixes
+
+* **fix-plan:** recommend Orca session-launch on pm-profile handoff ([dbbde8a](https://github.com/es6kr/skills/commit/dbbde8a74709b963c62adfc880884fdf02830c17))
+* **fix-plan:** warn against issue-comments-only AI Review Summary check ([#401](https://github.com/es6kr/skills/issues/401)) ([2ec416d](https://github.com/es6kr/skills/commit/2ec416d1e1a7c518747ea0f4fd3cb568694c9cb5))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/fix-plan-v0.9.1...fix-plan-v0.10.0) (2026-08-29)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2](https://github.com/es6kr/skills/compare/next-v0.9.1...next-v0.9.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **next:** add plan-doc self-authored-decision premise-verification row ([#402](https://github.com/es6kr/skills/issues/402)) ([ea5f911](https://github.com/es6kr/skills/commit/ea5f91111095c7f428317962d53108e21f131843))
+* staging branch next-fix sync into main ([bbbd460](https://github.com/es6kr/skills/commit/bbbd460bf3b6b1cba4c6d07b3641afa734c89860))
+
 ## [0.9.1](https://github.com/es6kr/skills/compare/next-v0.9.0...next-v0.9.1) (2026-08-26)
 
 

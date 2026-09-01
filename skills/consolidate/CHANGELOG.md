@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/es6kr/skills/compare/consolidate-v0.6.1...consolidate-v0.6.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **consolidate:** identify review artifacts by title line, not whole-body substring ([#397](https://github.com/es6kr/skills/issues/397)) ([8143da7](https://github.com/es6kr/skills/commit/8143da79baff109325d4e187d5ef4d67b6fe213d))
+* staging branch next-fix sync into main ([bbbd460](https://github.com/es6kr/skills/commit/bbbd460bf3b6b1cba4c6d07b3641afa734c89860))
+
 ## [0.6.1](https://github.com/es6kr/skills/compare/consolidate-v0.6.0...consolidate-v0.6.1) (2026-08-26)
 
 
