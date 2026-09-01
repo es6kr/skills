@@ -98,7 +98,12 @@ ASK_TEXT=$(echo "$INPUT" | jq -r '
 # (payload-wide "any URL exists" checking under-enforces multi-PR asks — a URL
 # for PR #A does not satisfy a bare reference to PR #B in the same payload)
 # Strip PR quantity mentions (e.g. "PR 2 items", "PR 3 items", "PR 5 items") before finding referenced PR numbers
-CLEANED_ASK_TEXT=$(echo "$ASK_TEXT" | sed -E "s/\bPR[[:space:]]*[0-9]+[[:space:]]*(${HG_QUANTIFIER_SUFFIX}${HG_QUANTIFIER_SUFFIX:+|}items|prs|pull requests)\b//gI")
+# `\b` is a GNU sed extension. BSD sed (macOS) reads it as a literal backspace,
+# so the whole strip silently matched nothing there and quantity phrases reached
+# the reference counter — "PR 3 items", and the localized counter forms this
+# gate strips via HG_QUANTIFIER_SUFFIX, were all counted as a reference to
+# PR #3 and denied. Use a portable boundary instead.
+CLEANED_ASK_TEXT=$(echo "$ASK_TEXT" | sed -E "s/(^|[^A-Za-z])PR[[:space:]]*[0-9]+[[:space:]]*(${HG_QUANTIFIER_SUFFIX}${HG_QUANTIFIER_SUFFIX:+|}items|prs|pull requests)/\1/gI")
 PR_NUMS_REFERENCED=$(echo "$CLEANED_ASK_TEXT" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
 if [[ -n "$PR_NUMS_REFERENCED" ]]; then
   PR_NUMS_WITH_URL=$(echo "$ASK_TEXT" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
