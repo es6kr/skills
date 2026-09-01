@@ -3,8 +3,8 @@
 # without a parallel RAG dispatch (qdrant-store call or --rag= flag).
 #
 # Trigger: Write or Edit on a path matching:
-#   - .ralph/docs/generated/research-*.md
-#   - .ralph/docs/generated/plan-*.md
+#   - <any-prefix>/docs/generated/research-*.md
+#   - <any-prefix>/docs/generated/plan-*.md
 #   - .omc/plans/*.md (plan or research patterns)
 # Action: Inject a stderr reminder to dispatch the artifact via RAG receiver.
 #
@@ -20,8 +20,8 @@
 #
 # Detection logic:
 #   - File path matches research-*.md / plan-*.md pattern above
-#   - No qdrant-store call in this session transcript (best-effort heuristic
-#     via $CLAUDE_TRANSCRIPT_PATH if available)
+#   - No qdrant-store call in this session transcript (best-effort heuristic;
+#     transcript path read from the hook payload, falling back to the env var)
 #   - If transcript is unavailable, warn unconditionally (safer to over-warn)
 
 INPUT=$(cat)
@@ -36,9 +36,17 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 
 # Pattern match: research-*.md, plan-*.md inside generated/ or plans/
+#
+# Match on the `docs/generated/` suffix rather than on one specific directory
+# prefix. Workspaces differ in which top-level directory holds the artifact
+# tree, and where one such directory is a symlink to another the tool reports
+# whichever path the caller actually used — so a prefix-anchored pattern goes
+# silent on every workspace that does not use the one hardcoded prefix, without
+# any signal that it has stopped firing. The suffix form matches regardless of
+# what precedes it, which is the property this guard needs.
 case "$FILE_PATH" in
-  */.ralph/docs/generated/research-*.md) ;;
-  */.ralph/docs/generated/plan-*.md) ;;
+  *docs/generated/research-*.md) ;;
+  *docs/generated/plan-*.md) ;;
   */.omc/plans/research-*.md) ;;
   */.omc/plans/plan-*.md) ;;
   *) exit 0 ;;
@@ -65,7 +73,13 @@ fi
 [[ -z "$RAG_KIND" || "$RAG_KIND" == "none" ]] && exit 0
 
 # Best-effort: check session transcript for prior qdrant-store invocation or --no-rag opt-out.
-TRANSCRIPT="${CLAUDE_TRANSCRIPT_PATH:-}"
+# Prefer the transcript path carried in the hook payload. The environment
+# variable is not populated in every harness build; when it is empty this
+# branch never runs, so the dedup check silently stops working and the guard
+# warns on writes that did dispatch. Fall back to the variable only as a
+# secondary source.
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+[[ -z "$TRANSCRIPT" ]] && TRANSCRIPT="${CLAUDE_TRANSCRIPT_PATH:-}"
 if [[ -n "$TRANSCRIPT" && -r "$TRANSCRIPT" ]]; then
   # Detect opt-out flag in transcript
   if grep -qE -- '--no-rag' "$TRANSCRIPT" 2>/dev/null; then
