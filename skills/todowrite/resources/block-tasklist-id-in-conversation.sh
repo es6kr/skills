@@ -68,6 +68,24 @@ if [[ "${1:-}" == "--test" ]]; then
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"PR 2 items to review?","options":[{"label":"proceed","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"PR 3 items to check","options":[{"label":"yes","description":"x"}]}]}}'
   check ALLOW '{"tool_name":"Bash","tool_input":{"command":"echo #123 not an ask"}}'
+  # Bare "PR N" (no "#") with a boundary right after the digits is still a
+  # genuine reference and must still require its own URL — the new boundary
+  # check must not regress this.
+  check DENY  '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"see PR 118 for background","description":"x"}]}]}}'
+  # Bare "PR N" (no "#") immediately followed by a suffix glued directly onto
+  # the digit (no separating space) is NOT a PR-number reference — a counter
+  # word attached to the number this way (e.g. a locale quantity counter) is
+  # not covered by the English quantity-phrase strip above. ASCII stand-in
+  # used here (this file stays ASCII-only per the PUBLIC-repo Korean-text CI
+  # gate); the boundary check treats any non-space/non-punct glued suffix the
+  # same way, non-ASCII counters included. (FA class=ask-option-hook-keyword-fp,
+  # 3rd recurrence: a label pairing "PR" with a bare quantity count and a
+  # non-ASCII counter suffix glued directly onto the digit — no "#", no
+  # separating space — was denied for a missing PR-number URL, though the
+  # number was only a count, not a PR reference.)
+  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"PR 2x ready to flip","description":"x"}]}]}}'
+  # "Loop #1" is an ordinal iteration reference, not a bare TaskList ID.
+  check ALLOW '{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"q","options":[{"label":"Loop #1 already covered this case","description":"x"}]}]}}'
 
   echo "Total: $((pass+fail)), Pass: $pass, Fail: $fail"
   [[ "$fail" -eq 0 ]] && exit 0 || exit 1
@@ -97,9 +115,29 @@ ASK_TEXT=$(echo "$INPUT" | jq -r '
 # --- PR-URL gate: each DISTINCT PR number must have its own matching URL ---
 # (payload-wide "any URL exists" checking under-enforces multi-PR asks — a URL
 # for PR #A does not satisfy a bare reference to PR #B in the same payload)
-# Strip PR quantity mentions (e.g. "PR 2 items", "PR 3 items", "PR 5 items") before finding referenced PR numbers
-CLEANED_ASK_TEXT=$(echo "$ASK_TEXT" | sed -E "s/\bPR[[:space:]]*[0-9]+[[:space:]]*(${HG_QUANTIFIER_SUFFIX}${HG_QUANTIFIER_SUFFIX:+|}items|prs|pull requests)\b//gI")
-PR_NUMS_REFERENCED=$(echo "$CLEANED_ASK_TEXT" | grep -oiE '\bPR[[:space:]]*#?[0-9]+' | grep -oE '[0-9]+' | sort -un)
+# Strip PR quantity mentions (e.g. "PR 2 items", "PR 3 items", "PR 5 items") before finding referenced PR numbers.
+# Boundaries use `(^|[^[:alnum:]])` / `([^[:alnum:]]|$)` rather than `\b`: BSD
+# sed (the default /usr/bin/sed on macOS) does not support `\b` in -E mode —
+# it silently fails to match, so the whole strip was a no-op on that
+# platform (confirmed: this exact pattern with `\b` never stripped anything
+# here, regardless of the `I` flag, which BSD sed does support).
+CLEANED_ASK_TEXT=$(echo "$ASK_TEXT" | sed -E "s/(^|[^[:alnum:]])PR[[:space:]]*[0-9]+[[:space:]]*(${HG_QUANTIFIER_SUFFIX}${HG_QUANTIFIER_SUFFIX:+|}items|prs|pull requests)([^[:alnum:]]|\$)/\1\3/gI")
+# Split hash-explicit vs bare-number references. An explicit "#" is an
+# unambiguous PR-number marker regardless of what immediately follows the
+# digits (a particle can glue directly onto a number with no separating
+# space, e.g. locale grammar attaching a suffix to "#118"), so it needs no
+# trailing-boundary check. A bare "PR N" (no "#") is a weaker signal shared
+# with quantity phrases ("PR 2 items") and locale counter suffixes glued
+# directly onto the digit with no space (e.g. a counter word immediately
+# after "2") — require a boundary (whitespace/punctuation/end-of-line) right
+# after the digits so a counter word glued onto the number isn't mistaken for
+# a PR-number reference. HG_QUANTIFIER_SUFFIX above already strips the known
+# English quantity phrases; this boundary check generalizes the same
+# protection to any suffix glued directly onto the digits without a space,
+# without needing to enumerate locale-specific counter words here.
+PR_NUMS_REFERENCED=$(echo "$CLEANED_ASK_TEXT" \
+  | grep -oiE '\bPR[[:space:]]*#[0-9]+|\bPR[[:space:]]+[0-9]+([[:space:]]|[[:punct:]]|$)' \
+  | grep -oE '[0-9]+' | sort -un)
 if [[ -n "$PR_NUMS_REFERENCED" ]]; then
   PR_NUMS_WITH_URL=$(echo "$ASK_TEXT" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
   MISSING_URL_FOR=()
@@ -139,8 +177,8 @@ fi
 ISSUE_PREFIX='(PR|issue|pull)[[:space:]]*#[0-9]|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]'
 # Explicit enumeration prefix -> not a TaskList ID, an ordinal reference
 # (e.g., "Finding #3", "Item #5", "Section #N", "Important #1", "Nitpick #2",
-#  "Critical #4", "Comment #1", "Walkthrough #2", "Task #3")
-FINDING_PREFIX='(Finding|Item|Section|Important|Nitpick|Critical|Comment|Walkthrough|Task)[[:space:]]*#[0-9]'
+#  "Critical #4", "Comment #1", "Walkthrough #2", "Task #3", "Loop #1")
+FINDING_PREFIX='(Finding|Item|Section|Important|Nitpick|Critical|Comment|Walkthrough|Task|Loop)[[:space:]]*#[0-9]'
 # Past-tense merge / history reference -> not an active task
 RETROSPECT_PR='(merged|MERGED|previously|prior)[^0-9]{0,20}#[0-9]'
 
