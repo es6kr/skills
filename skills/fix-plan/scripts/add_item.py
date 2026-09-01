@@ -191,6 +191,121 @@ def insert_item(text: str, section: str, item: str, position: str) -> str:
     return "\n".join(lines[:at] + block + lines[at:])
 
 
+ITEM_LINE = re.compile(r"^[ \t]*-[ \t]+\[[^\]]*\][ \t]+")
+
+
+def find_item_block(lines: list[str], query: str) -> tuple[int, int]:
+    """Locate an existing item by substring match on its marker line.
+
+    Returns (start, end) where `start` is the index of the `- [marker] ...` line
+    and `end` is one past the item's last body line. Raises ValueError when the
+    query matches zero or more than one item — an ambiguous match must never
+    silently pick one, since the caller is about to rewrite that item's body.
+    """
+    q = query.strip()
+    if not q:
+        raise ValueError("--match must not be empty")
+
+    hits = [i for i, ln in enumerate(lines) if ITEM_LINE.match(ln) and q in ln]
+    if not hits:
+        raise ValueError(f"no item matches {q!r}")
+    if len(hits) > 1:
+        preview = "; ".join(lines[i].strip()[:70] for i in hits[:4])
+        raise ValueError(f"{len(hits)} items match {q!r} — narrow the query. Matches: {preview}")
+
+    start = hits[0]
+    end = start + 1
+    while end < len(lines):
+        ln = lines[end]
+        if ITEM_LINE.match(ln) or ln.startswith("## "):
+            break
+        if not ln.strip():
+            # a blank line ends the item only when the item already has a body
+            nxt = end + 1
+            while nxt < len(lines) and not lines[nxt].strip():
+                nxt += 1
+            if nxt >= len(lines) or ITEM_LINE.match(lines[nxt]) or lines[nxt].startswith("## "):
+                break
+        end += 1
+
+    # trim trailing blanks so appended lines attach to the body, not after a gap
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    return start, end
+
+
+def append_subs(text: str, query: str, subs: list[str]) -> str:
+    """Append sub-bullets to an existing item, preserving its Why/How verbatim.
+
+    upsert.md Step 3 requires updating a matched item in place rather than
+    opening a duplicate, but every other path here only ever creates items — so
+    that step had no executable route. This is that route. Already-present
+    sub-bullets are skipped, making re-runs idempotent.
+    """
+    for s in subs:
+        if "\n" in s or "\r" in s:
+            raise ValueError("--append-sub arguments must not contain newline characters")
+
+    lines = text.split("\n")
+    start, end = find_item_block(lines, query)
+    existing = {ln.strip() for ln in lines[start:end]}
+
+    new_lines = []
+    for s in subs:
+        s = s.strip()
+        if not s:
+            continue
+        bullet = f"  - {s}"
+        if bullet.strip() in existing:
+            continue
+        new_lines.append(bullet)
+
+    if not new_lines:
+        return text
+
+    body = (end - start) + len(new_lines)
+    if body > MAX_BODY_LINES:
+        raise ValueError(
+            f"item body would become {body} lines, over the {MAX_BODY_LINES}-line budget. "
+            "Move the overflow into a research-<slug>.md / plan-<slug>.md artefact and "
+            "append a one-line pointer instead (add.md 'Deliverable separation matrix')."
+        )
+
+    return "\n".join(lines[:end] + new_lines + lines[end:])
+
+
+def run_append_sub(args: argparse.Namespace) -> int:
+    if not os.path.exists(args.file):
+        print(f"ERROR: tracker not found: {args.file}", file=sys.stderr)
+        return 1
+
+    with io.open(args.file, "r+", encoding="utf-8") as fh:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            src = fh.read()
+            out = append_subs(src, args.match, args.append_sub)
+
+            if out == src:
+                print(f"SKIP: all sub-bullets already present on {args.match!r} (idempotent no-op)")
+                return 0
+
+            if args.dry_run:
+                lines = out.split("\n")
+                start, end = find_item_block(lines, args.match)
+                print("--- dry-run: item after append ---")
+                print("\n".join(lines[start:end]))
+                return 0
+
+            atomic_write(args.file, out)
+            print(f"OK: appended {len(args.append_sub)} sub-bullet(s) to {args.match!r} in {args.file}")
+            lines = out.split("\n")
+            start, end = find_item_block(lines, args.match)
+            print("\n".join(lines[start:end]))
+            return 0
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+
+
 def atomic_write(path: str, text: str, prefix: str = ".add_item.") -> None:
     d = os.path.dirname(os.path.abspath(path)) or "."
     fd, tmp = tempfile.mkstemp(dir=d, prefix=prefix, suffix=".tmp")
@@ -323,6 +438,56 @@ def self_test() -> int:
     except ValueError:
         check("missing section rejected", True)
 
+    # append_subs — upsert.md "update in place"
+    tracker = (
+        "## Priority Tasks\n"
+        "\n"
+        "- [ ] P0 first task\n"
+        "  - **Why**: original motivation\n"
+        "  - **How to apply**: original steps\n"
+        "\n"
+        "- [BLOCKED:P2:external] second task\n"
+        "  - **Why**: w2\n"
+        "  - **How to apply**: h2\n"
+        "\n"
+        "## Completed\n"
+        "\n"
+        "- done\n"
+    )
+
+    got = append_subs(tracker, "P0 first task", ["**delta**: re-checked, scope narrowed"])
+    check("append lands inside the matched item", "original steps\n  - **delta**" in got)
+    check("append preserves the original Why", "**Why**: original motivation" in got)
+    check("append leaves sibling items untouched", "- [BLOCKED:P2:external] second task" in got)
+    check("append leaves other sections untouched", "## Completed\n\n- done" in got)
+
+    check("append is idempotent", append_subs(got, "P0 first task", ["**delta**: re-checked, scope narrowed"]) == got)
+    check("append with no new content is a no-op", append_subs(tracker, "P0 first task", ["  "]) == tracker)
+
+    try:
+        append_subs(tracker, "nonexistent task", ["x"])
+        check("append rejects a query with no match", False)
+    except ValueError:
+        check("append rejects a query with no match", True)
+
+    try:
+        append_subs(tracker, "task", ["x"])
+        check("append rejects an ambiguous query", False)
+    except ValueError:
+        check("append rejects an ambiguous query", True)
+
+    try:
+        append_subs(tracker, "P0 first task", [f"sub {i}" for i in range(10)])
+        check("append honours the length budget", False)
+    except ValueError:
+        check("append honours the length budget", True)
+
+    try:
+        append_subs(tracker, "P0 first task", ["two\nlines"])
+        check("append rejects embedded newlines", False)
+    except ValueError:
+        check("append rejects embedded newlines", True)
+
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
 
@@ -339,10 +504,31 @@ def main() -> int:
     p.add_argument("--marker", default="[ ]", help="'[ ]', '[x]', or '[BLOCKED:P<0-3>:external|selfable]'")
     p.add_argument("--position", choices=("top", "bottom"), default="top")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument(
+        "--match",
+        help="substring identifying an EXISTING item's marker line (append mode; use with --append-sub)",
+    )
+    p.add_argument(
+        "--append-sub",
+        action="append",
+        default=[],
+        help="append a one-line sub-bullet to the item selected by --match, preserving its Why/How "
+        "(upsert.md 'update in place'; repeatable, idempotent)",
+    )
     args = p.parse_args()
 
     if args.test:
         return self_test()
+
+    if args.append_sub:
+        missing = [f for f in ("file", "match") if not getattr(args, f)]
+        if missing:
+            p.error("append mode requires: " + ", ".join("--" + m for m in missing))
+        try:
+            return run_append_sub(args)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
 
     missing = [f for f in ("file", "action", "why", "how") if not getattr(args, f)]
     if missing:
