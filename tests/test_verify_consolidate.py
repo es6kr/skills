@@ -12,7 +12,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from skills.consolidate.scripts.verify_consolidate import ConsolidateValidator
+from skills.consolidate.scripts.verify_consolidate import (
+    INTERNAL_SLUG,
+    SUMMARY_SLUG,
+    ConsolidateValidator,
+    titled_as,
+)
 
 
 class TestVerifyConsolidate(unittest.TestCase):
@@ -113,3 +118,76 @@ Recommend merge via `/github-flow merge 123`.
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTitleLineArtifactDetection(unittest.TestCase):
+    """Artifact identity comes from the title line, not from a substring anywhere
+    in the body.
+
+    Regression for the es6kr/claude-plugins PR #38 miss: a single fabricated
+    Summary that merely named both protocols in a bullet satisfied the old
+    whole-body substring filters for BOTH artifacts, so `internal_reviews[-1]`
+    and `summaries[-1]` resolved to the same comment, the chronological check
+    compared a timestamp with itself, and "Missing Internal Code Review comment"
+    stayed silent on a PR that had no Internal Review at all.
+    """
+
+    INTERNAL = ("## Internal Code Review — [requesting-code-review]"
+                "(https://skills.sh/obra/superpowers/requesting-code-review)\n"
+                "<!-- consolidate:verified -->\nfindings\n")
+    SUMMARY = ("## AI Review Summary — [receiving-code-review]"
+               "(https://skills.sh/obra/superpowers/receiving-code-review)\n"
+               "<!-- consolidate:verified -->\ntable\n")
+
+    def test_proper_titles_classify_to_exactly_one_artifact(self):
+        self.assertTrue(titled_as(self.INTERNAL, INTERNAL_SLUG))
+        self.assertFalse(titled_as(self.INTERNAL, SUMMARY_SLUG))
+        self.assertTrue(titled_as(self.SUMMARY, SUMMARY_SLUG))
+        self.assertFalse(titled_as(self.SUMMARY, INTERNAL_SLUG))
+
+    def test_caller_custom_review_title_still_recognised(self):
+        """post.md permits a caller-supplied title; the link is what identifies it."""
+        body = ("## Code Review — [requesting-code-review]"
+                "(https://skills.sh/obra/superpowers/requesting-code-review)\nfindings\n")
+        self.assertTrue(titled_as(body, INTERNAL_SLUG))
+
+    def test_prose_mention_of_both_slugs_is_neither_artifact(self):
+        """The PR #38 body verbatim in shape: a heading with no link, and both
+        protocol names mentioned on a later line."""
+        body = ("# AI Review Summary — PR #38 (Integration: `develop -> main`)\n\n"
+                "- **Review Protocols**: `requesting-code-review` & `receiving-code-review`\n")
+        self.assertFalse(titled_as(body, INTERNAL_SLUG))
+        self.assertFalse(titled_as(body, SUMMARY_SLUG))
+
+    def test_summary_discussing_the_pairing_stays_a_summary(self):
+        """A Summary is allowed to explain the requesting/receiving pairing in its
+        body without being misread as the Internal Review — the case that made the
+        old filter actively hostile to an honest write-up."""
+        body = self.SUMMARY + "\nThe requesting-code-review skill was never invoked.\n"
+        self.assertTrue(titled_as(body, SUMMARY_SLUG))
+        self.assertFalse(titled_as(body, INTERNAL_SLUG))
+
+    def test_heading_without_link_is_not_an_artifact(self):
+        self.assertFalse(titled_as("## Internal Code Review\nfindings\n", INTERNAL_SLUG))
+
+    def test_missing_internal_review_is_reported_with_a_near_miss_hint(self):
+        issue_comments = [
+            {"id": 1, "created_at": "2026-08-29T00:00:00Z", "body": "## Internal Code Review\nno link\n"},
+            {"id": 2, "created_at": "2026-08-29T01:00:00Z", "body": self.SUMMARY},
+        ]
+        v = ConsolidateValidator(pr_num=1, repo="o/r")
+        with patch("skills.consolidate.scripts.verify_consolidate.run_gh_api") as gh:
+            gh.side_effect = [[], issue_comments]
+            v.validate()
+        joined = " ".join(v.errors)
+        self.assertIn("Missing Internal Code Review comment", joined)
+        self.assertIn("comment 1", joined)
+
+    def test_one_comment_titled_as_both_is_rejected(self):
+        both = ("## Review — [requesting-code-review](https://x/requesting-code-review) "
+                "and [receiving-code-review](https://x/receiving-code-review)\nbody\n")
+        v = ConsolidateValidator(pr_num=1, repo="o/r")
+        with patch("skills.consolidate.scripts.verify_consolidate.run_gh_api") as gh:
+            gh.side_effect = [[], [{"id": 9, "created_at": "2026-08-29T00:00:00Z", "body": both}]]
+            v.validate()
+        self.assertIn("titled as BOTH", " ".join(v.errors))

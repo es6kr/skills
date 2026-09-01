@@ -112,6 +112,7 @@ Use only when the script cannot run (permission issues, non-standard paths, etc.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
+| A new branch created via `git checkout -b` lands on a stale/wrong base (worktree HEAD ahead of or diverged from the intended base, e.g. `origin/next-fix`) | `git checkout -b` roots the new branch at the worktree's current HEAD, not at a chosen base ref | Do **not** use `git reset <base-ref>` — it is HARD-blocked for agents (bash-guard.py). Instead: `git stash push -u -m '<label>'` → `git checkout <original-branch>` → `git branch -D <wrong-base-branch>` → `git checkout -b <name> <correct-base-ref>` → `git stash pop` → commit. Preserves the uncommitted diff while re-rooting the branch cleanly |
 | `fatal: not a git repository` | `.git` file points to old metadata path OR uses Unix-style `/c/...` on Windows | Update `.git` file in worktree dir with Windows-style `C:/...` path |
 | worktree not in `git worktree list` | metadata dir name mismatch | Check `.git/worktrees/` for old name remnants |
 | `fatal: <path> is already registered` | old metadata not fully renamed | Remove old entry, re-register |
