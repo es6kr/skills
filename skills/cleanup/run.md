@@ -132,6 +132,22 @@ For accumulated violation cases, see failed-attempts.md HOT (occurrence classifi
 - **Fully skip** if there is no conversation content or only simple questions
 - If a `config.md` settings file exists, skip the tasks disabled in it
 
+## Context-threshold gate on an auto-trigger entry (HARD STOP)
+
+When cleanup is entered via a **Stop-hook "cleanup trigger"** (the completion-keyword auto-trigger — `trigger-Stop.js` / next-trigger, NOT an explicit user `/cleanup`), measure **live context** against the model's cleanup threshold (Fable/Mythos 55%, Opus 50%, others 45%) before running the full 5-step sequence:
+
+- **live context ≥ threshold** → run the full cleanup (session-end preservation is warranted).
+- **live context < threshold** → do NOT run the full ceremony. Address only the specific concern the trigger / co-firing hook raised (e.g. a `check-session-rag` find/store imbalance → one RAG find, or a single session-import only if a real gap exists), then stop. A low-context auto-trigger is a nudge, not a mandate — full session-end preservation (claudify improve + wip + full report) at low context with ample budget is premature.
+
+This generalizes the identical gate already documented for the `check-session-import-gap.js` trigger (`qdrant-import-modes.md` "context-threshold gate") to the general Stop cleanup-trigger. The trigger fires on completion keywords and knows nothing about context — do not read it as an unconditional order to run full cleanup.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat a Stop "cleanup trigger" as a mandate → run the full 5-step cleanup regardless of context | Measure live context first; < model threshold → light-touch (address the specific hook concern only), ≥ threshold → full run |
+| 2 | Read the `block-cleanup-option-below-context-gate.sh` hook's `Live context usage: N%` line as only an ask-gating datum | It is also the **entry signal** for this gate — `N% < threshold` means full cleanup is premature |
+
+**Self-check (on any completion-keyword auto-entry to cleanup)**: (1) explicit user `/cleanup`, or an auto-trigger? (2) if auto-trigger, is live context ≥ the model threshold? (3) if < threshold → light-touch only (address the specific hook concern); do NOT run claudify improve / wip / full report. This gate does not apply when the user typed `/cleanup` explicitly — an explicit request runs the full sequence regardless of context.
+
 ## Ralph Mode
 
 Ralph cannot use AskUserQuestion, so every step performs **detection + recording to improvements.md only**.
