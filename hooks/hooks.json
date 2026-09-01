@@ -83,6 +83,15 @@
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-plan/resources/warn-fixplan-item-schema.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-corpus-prelookup-guard.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [
