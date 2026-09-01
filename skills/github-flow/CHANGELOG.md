@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/es6kr/skills/compare/github-flow-v0.10.0...github-flow-v0.10.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **githooks:** fix set -e crash in BASE-7 guard + weigh review-cost in pr.md Step -1 ([#405](https://github.com/es6kr/skills/issues/405)) ([e651cc4](https://github.com/es6kr/skills/commit/e651cc49fa7051cdea819562b161964588979699))
+* staging branch next-fix sync into main ([bbbd460](https://github.com/es6kr/skills/commit/bbbd460bf3b6b1cba4c6d07b3641afa734c89860))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/github-flow-v0.9.1...github-flow-v0.10.0) (2026-08-29)
 
 
