@@ -615,6 +615,18 @@ hooks:
     event: PreToolUse
     matcher: Bash
     command: bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-new-tab-without-split-check.sh
+- id: block-orca-send-without-target-ask
+  owner_skill: orca
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/orca/resources/block-orca-send-without-target-ask.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Bash
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-send-without-target-ask.sh
 - id: block-plan-artifact-no-plane-link
   owner_skill: hook-kit
   marketplace: es6kr-skills

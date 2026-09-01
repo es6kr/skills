@@ -136,6 +136,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-new-tab-without-split-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-send-without-target-ask.sh"
           }
         ]
       },
