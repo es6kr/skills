@@ -13,6 +13,10 @@ Analyze session episodic data (mistakes, hook/skill behavior, repeated patterns)
 
 Scan conversation for mistake signals and record to feedback memory + failed-attempts.md.
 
+The record procedure itself is owned by the `fa` skill — invoke `Skill("fa")` (its
+[retrospect.md](../fa/retrospect.md) topic) for the actual write; this section only defines
+the improve-loop framing around it.
+
 **Signals**:
 
 | Signal | Example |
@@ -44,7 +48,7 @@ This mirrors the obligation C (Pattern Detect) already carries for its candidate
 
 **Skip condition for registration only**: the finding's remediation was fully executed in this session (state that in the report), or the finding is purely descriptive with no follow-up action.
 
-**FA Prune**: After recording, run [fa-prune.md](../cleanup/fa-prune.md) automatically when any axis in its "Execution trigger (class-based)" table fires. That table is the single source for the trigger — do not restate a section-count threshold here; the flat counts it replaced are deprecated.
+**FA Prune**: After recording, run [fa-prune.md](../fa/fa-prune.md) automatically when any axis in its "Execution trigger (class-based)" table fires. That table is the single source for the trigger — do not restate a section-count threshold here; the flat counts it replaced are deprecated.
 
 **Skip condition**: No mistakes/corrections in conversation.
 
