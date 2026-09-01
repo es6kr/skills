@@ -50,6 +50,7 @@ import datetime
 import hashlib
 import json
 import os
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -296,6 +297,34 @@ def write_registry(path: str, registry: dict) -> None:
         )
 
 
+def _git_ever_tracked(root: str, rel: str) -> bool:
+    """Has this repo ever had `rel` under version control, on any ref?
+
+    An orphan registration has two very different causes that look identical on
+    disk. Either the script was deleted — git remembers it, deregistering is
+    correct — or it was never committed, and the registration is simply ahead of
+    an implementation that exists only in someone's working tree (possibly a
+    different checkout of the same repo). Tombstoning the second case destroys a
+    guard that works for whoever holds that file.
+
+    Treat "git has never heard of this path" as not-my-call and leave it alone.
+    A root that is not a git checkout, or a git call that fails, answers the same
+    way: this mode only deletes registrations it can positively justify deleting.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", root, "log", "--all", "--oneline", "--", rel],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False  # cannot tell — fail towards leaving the registration alone
+    if out.returncode != 0:
+        return False
+    return bool(out.stdout.strip())
+
+
 def _today() -> str:
     """Tombstone date. Isolated so a caller can freeze it in tests."""
     return datetime.date.today().isoformat()
@@ -305,14 +334,19 @@ def _hooks_json_path(root: str) -> str:
     return os.path.join(root, "hooks", "hooks.json")
 
 
-def _dead_commands(registry: dict, disk_index: dict) -> dict:
-    """Map marketplace -> set of registration commands whose script is absent.
+def _dead_commands(registry: dict, disk_index: dict, roots: dict | None = None) -> tuple:
+    """Split orphan registrations into correctable and not-my-call.
 
     Mirrors hook_registry._check_registrations' ORPHAN_REGISTRATION rule: a
-    command is dead when a plugin-root-relative path it references is not in
-    that marketplace's on-disk resource index.
+    command is orphaned when a plugin-root-relative path it references is not in
+    that marketplace's on-disk resource index. It then splits those by whether
+    git has ever tracked the path — see `_git_ever_tracked` for why that
+    distinction decides whether deregistering is a repair or a demolition.
+
+    Returns (dead, skipped), both mapping marketplace -> set of commands.
     """
     dead: dict[str, set[str]] = {}
+    skipped: dict[str, set[str]] = {}
     for hook in registry.get("hooks") or []:
         marketplace = hook.get("marketplace")
         present = disk_index.get(marketplace) or set()
@@ -321,9 +355,15 @@ def _dead_commands(registry: dict, disk_index: dict) -> dict:
             paths = list(hr.iter_command_paths(command)) or (
                 [reg["file"]] if reg.get("file") else []
             )
-            if paths and any(rel not in present for rel in paths):
-                dead.setdefault(marketplace, set()).add(command)
-    return dead
+            missing = [rel for rel in paths if rel not in present]
+            if not missing:
+                continue
+            root = roots.get(marketplace) if roots else None
+            if root and any(not _git_ever_tracked(root, rel) for rel in missing):
+                skipped.setdefault(marketplace, set()).add(command)
+                continue
+            dead.setdefault(marketplace, set()).add(command)
+    return dead, skipped
 
 
 def _strip_commands_from_hooks_json(path: str, commands: set[str]) -> int:
@@ -379,7 +419,18 @@ def apply_fix(registry: dict, roots: dict, disk_index: dict, dry_run: bool) -> b
     forces (a concurrent rebase, a partial refactor), and a one-shot manual
     cleanup has an expected lifetime close to zero in that environment.
     """
-    dead = _dead_commands(registry, disk_index)
+    dead, skipped = _dead_commands(registry, disk_index, roots)
+    for marketplace, commands in sorted(skipped.items()):
+        for command in sorted(commands):
+            print(
+                f"fix: LEAVING ALONE [{marketplace}] {command}\n"
+                "     git has never tracked that path, so the registration is "
+                "likely ahead of an\n"
+                "     uncommitted implementation rather than pointing at a "
+                "deleted one. Commit the\n"
+                "     script (or remove the registration by hand) — this mode "
+                "will not decide it."
+            )
     if not dead:
         print("fix: nothing to correct — no orphan registrations")
         return False
