@@ -13,6 +13,11 @@
     uv run --with pyyaml python skills/hook-kit/scripts/hook_registry_verify.py \
         --check --check-copies
 
+    # correct what is mechanically decidable: deregister orphan registrations
+    # and tombstone the entries they leave empty (--dry-run to preview)
+    uv run --with pyyaml python skills/hook-kit/scripts/hook_registry_verify.py \
+        --fix --plugins-root ~/ghq/github.com/es6kr/claude-plugins
+
 `--bootstrap` derives each entry's status from observation rather than trusting
 a declaration:
 
@@ -24,6 +29,15 @@ Existing `status: removed` entries are carried over untouched. Tombstones are
 the one thing bootstrap must never regenerate away — a removal record that a
 rescan can erase is not a record.
 
+`--fix` closes the loop between judging and acting. `--check` can already tell
+an orphan registration from a live one; leaving the correction to a human means
+the same findings get cleaned by hand every time an outside force (a concurrent
+rebase, a half-finished refactor) re-introduces them, and a one-shot manual
+cleanup has an expected lifetime close to zero in that environment. Only
+ORPHAN_REGISTRATION is corrected — the registered script is simply absent, so
+the registration cannot be doing anything but exiting 127. Every other finding
+class needs a human decision about intent and is left alone.
+
 The validation logic lives in `hook_registry.py`, which is import-safe and
 dependency-free so the test suite needs no packages. PyYAML is required here
 and only here.
@@ -32,6 +46,7 @@ and only here.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -281,6 +296,163 @@ def write_registry(path: str, registry: dict) -> None:
         )
 
 
+def _today() -> str:
+    """Tombstone date. Isolated so a caller can freeze it in tests."""
+    return datetime.date.today().isoformat()
+
+
+def _hooks_json_path(root: str) -> str:
+    return os.path.join(root, "hooks", "hooks.json")
+
+
+def _dead_commands(registry: dict, disk_index: dict) -> dict:
+    """Map marketplace -> set of registration commands whose script is absent.
+
+    Mirrors hook_registry._check_registrations' ORPHAN_REGISTRATION rule: a
+    command is dead when a plugin-root-relative path it references is not in
+    that marketplace's on-disk resource index.
+    """
+    dead: dict[str, set[str]] = {}
+    for hook in registry.get("hooks") or []:
+        marketplace = hook.get("marketplace")
+        present = disk_index.get(marketplace) or set()
+        for reg in hook.get("registrations") or []:
+            command = reg.get("command") or ""
+            paths = list(hr.iter_command_paths(command)) or (
+                [reg["file"]] if reg.get("file") else []
+            )
+            if paths and any(rel not in present for rel in paths):
+                dead.setdefault(marketplace, set()).add(command)
+    return dead
+
+
+def _strip_commands_from_hooks_json(path: str, commands: set[str]) -> int:
+    """Remove hook objects whose command is in `commands`. Returns count removed.
+
+    Empty matcher groups and empty event lists are pruned too — a group left
+    with zero hooks is registration noise the harness still has to walk.
+    """
+    if not os.path.isfile(path) or not commands:
+        return 0
+    with open(path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    events = doc.get("hooks")
+    if not isinstance(events, dict):
+        return 0
+    removed = 0
+    for event, groups in list(events.items()):
+        if not isinstance(groups, list):
+            continue
+        kept_groups = []
+        for group in groups:
+            hooks = group.get("hooks")
+            if not isinstance(hooks, list):
+                kept_groups.append(group)
+                continue
+            kept = [h for h in hooks if (h or {}).get("command") not in commands]
+            removed += len(hooks) - len(kept)
+            if kept:
+                group["hooks"] = kept
+                kept_groups.append(group)
+        if kept_groups:
+            events[event] = kept_groups
+        else:
+            del events[event]
+    if removed:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(doc, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+    return removed
+
+
+def apply_fix(registry: dict, roots: dict, disk_index: dict, dry_run: bool) -> bool:
+    """Deregister every ORPHAN_REGISTRATION and tombstone what is left empty.
+
+    Only this one finding class is machine-correctable: the registered script is
+    simply not on disk, so the registration cannot be doing anything except
+    exiting 127 — which the harness reads as "the guard had no objection". Every
+    other finding class needs a human decision about intent and is left alone.
+
+    Idempotent by construction: a second run finds no dead command (the
+    registrations are gone) and no entry left to tombstone, so it is a no-op.
+    That matters because the states this repairs are re-introduced by outside
+    forces (a concurrent rebase, a partial refactor), and a one-shot manual
+    cleanup has an expected lifetime close to zero in that environment.
+    """
+    dead = _dead_commands(registry, disk_index)
+    if not dead:
+        print("fix: nothing to correct — no orphan registrations")
+        return False
+
+    total_dropped = 0
+    tombstoned = []
+    for marketplace, commands in sorted(dead.items()):
+        root = roots.get(marketplace)
+        if not root:
+            print(
+                f"fix: skipping {marketplace} — its root is not available",
+                file=sys.stderr,
+            )
+            continue
+        path = _hooks_json_path(root)
+        for command in sorted(commands):
+            print(f"fix: deregister [{marketplace}] {command}")
+        if dry_run:
+            continue
+        total_dropped += _strip_commands_from_hooks_json(path, commands)
+
+    for hook in registry.get("hooks") or []:
+        marketplace = hook.get("marketplace")
+        commands = dead.get(marketplace) or set()
+        if not commands:
+            continue
+        kept = [
+            reg
+            for reg in hook.get("registrations") or []
+            if (reg.get("command") or "") not in commands
+        ]
+        if len(kept) == len(hook.get("registrations") or []):
+            continue
+        if kept:
+            hook["registrations"] = kept
+            continue
+        # Nothing registered and nothing on disk: this hook no longer exists in
+        # any operative sense. Record that as a tombstone rather than deleting
+        # the entry — a removal record a later --bootstrap can erase is not a
+        # record (see this file's module docstring).
+        hook.pop("registrations", None)
+        present = disk_index.get(marketplace) or set()
+        if not [f for f in hr._files_of(hook) if f in present]:
+            hook["status"] = "removed"
+            hook.setdefault(
+                "tombstone",
+                {
+                    "date": _today(),
+                    "reason": (
+                        "Every registration pointed at a script that is not on "
+                        "disk, so the guard could only exit 127 — which the "
+                        "harness reads as 'no objection'. Deregistered by "
+                        "hook_registry_verify.py --fix; if the guard is still "
+                        "wanted, restore the script and re-register it rather "
+                        "than editing this tombstone."
+                    ),
+                },
+            )
+            tombstoned.append(hook.get("id"))
+
+    for hook_id in tombstoned:
+        print(f"fix: tombstone {hook_id} (status: removed)")
+
+    if dry_run:
+        print("(dry run — no file written)")
+    else:
+        print(
+            f"fix: dropped {total_dropped} registration(s), "
+            f"tombstoned {len(tombstoned)} entry(ies)"
+        )
+    return True
+
+
 def report(findings: list) -> int:
     if not findings:
         print("registry: no findings")
@@ -317,7 +489,15 @@ def main(argv=None) -> int:
         "drifted copies (implies --check)",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", help="with --bootstrap, print instead of write"
+        "--fix",
+        action="store_true",
+        help="deregister orphan registrations and tombstone entries left empty "
+        "(implies --check)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --bootstrap or --fix, print instead of write",
     )
     parser.add_argument(
         "--allow-partial",
@@ -326,11 +506,11 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.check_copies:
+    if args.check_copies or args.fix:
         args.check = True
 
     if not (args.bootstrap or args.check):
-        parser.error("pass --bootstrap, --check, or both")
+        parser.error("pass --bootstrap, --check, --fix, or a combination")
 
     roots = {
         "es6kr-skills": args.repo_root,
@@ -386,6 +566,21 @@ def main(argv=None) -> int:
         registry_to_validate = dict(registry, hooks=active_hooks)
     else:
         registry_to_validate = registry
+    if args.fix:
+        changed = apply_fix(registry_to_validate, roots, disk_index, args.dry_run)
+        if changed and not args.dry_run:
+            write_registry(registry_path, registry)
+            print(f"wrote {registry_path}")
+            registry = load_registry(registry_path)
+            registry_to_validate = (
+                dict(registry, hooks=[
+                    h for h in registry.get("hooks", [])
+                    if h.get("marketplace") in roots
+                ])
+                if missing_root
+                else registry
+            )
+
     copy_index = (
         scan_copies(registry_to_validate, args.repo_root) if args.check_copies else None
     )
