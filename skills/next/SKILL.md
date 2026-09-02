@@ -149,6 +149,7 @@ Identify the type of task just completed.
 | 2 | Treat "it was in_progress when the summary was written" as proof it still is | in_progress in a stale summary is a snapshot, not current truth — verify, don't assume |
 | 3 | Skip verification because the investigation "sounds involved" | The verification itself (grep fix_plan, one RAG query, one Plane check) is cheaper than dispatching the user into a re-investigation of an already-solved problem |
 | 4 | Compose a decision ask from a fix_plan item's inline "Why"/summary text alone, when that item's "How to apply" points at a linked plan doc | Read the linked doc's own Progress Checklist / phase-completion state first — fix_plan's inline note can go stale relative to the doc's own tracked progress (e.g. a phase the fix_plan note calls undecided may already show complete in the plan doc) |
+| 5 | Treat a plan doc's own recorded "decision" (a numbered decision table, a "Decisions" section) as user-authorized just because it reads as settled | The doc's formatting doesn't distinguish a decision the user actually made (via an `AskUserQuestion` answer, an explicit chat instruction) from scope the assistant added while authoring the plan solo. Before resuming such a decision from a prior session, re-derive the original user ask (RAG search / session transcript), not the plan doc's own summary of it |
 
 #### Self-check (every time before calling AskUserQuestion)
 

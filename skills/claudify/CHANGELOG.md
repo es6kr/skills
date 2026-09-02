@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/claudify-v0.7.1...claudify-v0.8.0) (2026-09-01)
+
+
+### Features
+
+* **claudify:** require retrospect findings to reach the tracker ([d1703b5](https://github.com/es6kr/skills/commit/d1703b55090b57193c659ec4e403eb4307a893e4))
+* staging branch next-feat sync into main ([e582ea2](https://github.com/es6kr/skills/commit/e582ea248beefa70886716741b8965d91cfb7414))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/claudify-v0.7.0...claudify-v0.7.1) (2026-08-26)
 
 

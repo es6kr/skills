@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.1](https://github.com/es6kr/skills/compare/git-repo-v0.10.0...git-repo-v0.10.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **git-repo:** add BASE-7 conflict marker guard to doctor topic ([79fe2b5](https://github.com/es6kr/skills/commit/79fe2b5d795cff905f9199f308347b3273bbd82c))
+* **git-repo:** document clobbered-branch-pointer recovery in rebase-audit ([#396](https://github.com/es6kr/skills/issues/396)) ([69b346f](https://github.com/es6kr/skills/commit/69b346fd382c8c3c4f25c9b407358b579fea304e))
+* **git-repo:** document COND-MD-STYLE in the doctor topic ([190b9c1](https://github.com/es6kr/skills/commit/190b9c1a3f7abb842ab443a5e9d261a99f7db71f))
+* staging branch next-fix sync into main ([bbbd460](https://github.com/es6kr/skills/commit/bbbd460bf3b6b1cba4c6d07b3641afa734c89860))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/git-repo-v0.9.1...git-repo-v0.10.0) (2026-08-29)
 
 

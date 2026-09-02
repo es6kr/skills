@@ -7,6 +7,16 @@ on:
     branches: [main, develop]
 
 jobs:
+  bash-guard:
+    name: Hook Guard Tests (bash-guard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 skills/hook-kit/resources/bash-guard.py --test
+
   bats:
     name: Structure Tests (bats)
     runs-on: ubuntu-latest
