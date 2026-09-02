@@ -59,6 +59,21 @@ hardcode the path.
 5. **Stop.** This skill never performs `/fix`'s Step 0 TodoWrite, Step 1 5-Why, Step 2
    Edit/Write on rule/hook files, Step 3 Resume, or Step 4 wrap-up — those stay `/fix`'s job.
 
+   **Scope of "Stop" (HARD STOP — do not over-read it)**: this clause withholds *authority over
+   rule/hook/skill files*, not permission to leave a broken artifact broken. When the violation
+   you just recorded names a defect in an artifact that **currently exists** — a posted review
+   comment, a tracker entry, a file written earlier this session — correcting that artifact is
+   the **remaining part of the original work**, not `/fix`'s Step 3, and it belongs in this same
+   turn. Only the rule/hook/skill edit waits for `/fix`. Ending the turn with a prose question
+   ("let me know if you want it corrected") while the defective artifact stands is the exact
+   failure this note exists to prevent — the record is written and the defect survives.
+
+   | # | Don't | Do |
+   |---|-------|-----|
+   | 1 | Read "never performs Step 3 Resume" as "change nothing this turn" | It scopes *file ownership*. Fix the defective artifact the record points at; leave rule/hook edits to `/fix` |
+   | 2 | Record the violation, then ask the user whether to correct the artifact | Correct it, then report what changed. Ask only when the correction itself needs a decision the user alone can make |
+   | 3 | Treat "recorded" as "handled" when the artifact is still wrong | The record and the correction are separate deliverables — a record alone leaves the defect in place |
+
 ## Skip conditions
 
 [retrospect.md](./retrospect.md) Steps 5 (skill-malfunction scan) and 6 (FA Prune mandatory
