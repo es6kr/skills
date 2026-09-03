@@ -361,6 +361,11 @@
           },
           {
             "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/reap-orphaned-helper-procs.js",
+            "async": true
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-idle-wait-without-short-cycle.sh",
             "timeout": 10
           },
