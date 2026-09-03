@@ -27,10 +27,12 @@ try:
     import fcntl
 except ImportError:
     fcntl = None
+import hashlib
 import io
 import os
 import re
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from add_item import validate_marker, atomic_write, MAX_BODY_LINES  # noqa: E402
@@ -170,12 +172,22 @@ def run_update(args: argparse.Namespace) -> int:
         raise ValueError(f"tracker not found: {args.file}")
 
     # Hold an exclusive lock across the WHOLE read-modify-write, not just the read.
-    # The lock lives on a sidecar file because atomic_write() replaces the tracker via
+    # The lock needs its own file because atomic_write() replaces the tracker via
     # os.replace(): that swaps the inode, so a lock held on the tracker's own fd would
     # protect a file the writer no longer points at. Two concurrent updates could
     # otherwise both read the same state and have the later write silently drop the
     # earlier one's marker or progress note.
-    lock_path = args.file + ".lock"
+    #
+    # It lives in the temp dir, keyed by a hash of the tracker's absolute path, rather
+    # than beside the tracker: a `<tracker>.lock` sibling shows up as an untracked file
+    # in the repo holding the tracker (`fix_plan.md` is typically gitignored, but a
+    # `.lock` suffix is not), so it would leave visible debris on every update. Deriving
+    # the name from the absolute path keeps every process addressing one tracker on the
+    # same lock; losing the temp dir is harmless since the file is recreated on demand.
+    lock_path = os.path.join(
+        tempfile.gettempdir(),
+        "fix-plan-" + hashlib.sha1(os.path.abspath(args.file).encode("utf-8")).hexdigest() + ".lock",
+    )
     lock_fh = io.open(lock_path, "a+", encoding="utf-8")
     try:
         if fcntl:
@@ -352,8 +364,6 @@ def self_test() -> int:
         check("append-note still works in ## Hold", run_update(ns3) == 0)
     finally:
         os.unlink(hold_path)
-        if os.path.exists(hold_path + ".lock"):
-            os.unlink(hold_path + ".lock")
 
     # sidecar lock: created next to the tracker, and the tracker itself is replaced
     with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
@@ -369,7 +379,12 @@ def self_test() -> int:
         ns4.append_note = "locked write"
         ns4.dry_run = False
         check("run_update with sidecar lock returns 0", run_update(ns4) == 0)
-        check("sidecar lock file is used", os.path.exists(lock_doc + ".lock"))
+        check("lock file is NOT left beside the tracker", not os.path.exists(lock_doc + ".lock"))
+        _lock = os.path.join(
+            tempfile.gettempdir(),
+            "fix-plan-" + hashlib.sha1(os.path.abspath(lock_doc).encode("utf-8")).hexdigest() + ".lock",
+        )
+        check("lock file lives in the temp dir", os.path.exists(_lock))
         with open(lock_doc, encoding="utf-8") as fh:
             check("locked write landed", "- locked write" in fh.read())
         # dry-run must not mutate, even holding the lock
@@ -380,8 +395,6 @@ def self_test() -> int:
         check("dry-run leaves the tracker byte-identical", open(lock_doc, encoding="utf-8").read() == before)
     finally:
         os.unlink(lock_doc)
-        if os.path.exists(lock_doc + ".lock"):
-            os.unlink(lock_doc + ".lock")
 
     # missing tracker file
     try:
