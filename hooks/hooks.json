@@ -247,6 +247,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-pr-url-gate.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-consolidate-summary-ask.sh"
           },
           {
@@ -275,6 +280,16 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "TaskCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-pr-url-gate.sh",
+            "timeout": 10
           }
         ]
       },
