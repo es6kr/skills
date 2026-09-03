@@ -313,6 +313,8 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 
 > [!IMPORTANT]
 > **Prohibit Using Verified Status (HARD STOP)**: Never use `Verified` as a status for valid findings. Valid findings must be marked as `🔴 Pending` from the beginning if they are inside the diff (awaiting fix), or `🟡 Deferred (author follow-up)` if they are outside the diff (postponed).
+>
+> Enforced mechanically by `resources/block-summary-status-vocab.py` (PreToolUse:Bash, blocks the POST) and by `scripts/verify_consolidate.py` check 11 (blocks completion). Prose alone did not hold — this rule was violated four times while it already existed.
 
 **The fix_plan tracking tags are for Step 7.6 deferred registration only (when writing entries inside fix_plan.md's Hold section)**. Carrying the same tag into the Summary body Status column leaves the GitHub reader with no meaning (zero readability).
 
@@ -323,6 +325,8 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 | 3 | "Same tag is convenient since it's registered in fix_plan anyway" reasoning | fix_plan deferred entry (Step 7.6) ≠ Summary Status (Step 7). Different medium → separate notation |
 | 4 | Mirroring the same tag in both Summary and fix_plan as a cross-link attempt | Cross-link by citing the fix_plan section URL / entry from the Summary body (when needed). Do not mirror the tag |
 | 5 | Realizing only after the user points out the readability issue that a fix_plan tag like "[REVIEW_FEEDBACK]" appeared in the response | Run the self-check below every time before drafting the Summary |
+| 6 | Promoting `classify.md` Step 4-0's **validity verdict** (`✅ VALID` / `⚪ REJECTED`) — or the `receiving-code-review` accept/reject frame it comes from — into this Status column | They are separate axes. Validity asks *is this finding correct*; Status encodes *does it block merge*. A finding can be perfectly valid and still be `🔴 Pending`. Keep the validity judgement in an evidence/verification column, never in Status |
+| 7 | Renaming the column itself (`Verdict`, `Verdict + verification`, `Assessment`, …) so a non-contract value "fits" | The column name is fixed to `Status`. Renaming it is how the judgement frame leaks in — and because the merge recommendation is derived FROM this column, a renamed column silently zeroes the `🔴 Pending` count and flips the conclusion to "no merge blocker" |
 
 **Self-check (every time before POSTing the Summary)**:
 
@@ -332,6 +336,9 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
    - `[BLOCKED]` → `🔴 Pending — <blocker reason>` or `🟡 Deferred — <reason>`
    - `[DEFERRED]` → `🟢 Deferred (no action)` or `🟡 Deferred (author follow-up)`
 3. Re-grep after replacement — confirm zero matches before POST
+4. Confirm the column is literally named `Status` — not `Verdict` or any variant
+5. Confirm every Status cell matches one of the five allowed values above. Words carried over from the validity axis (`VALID`, `Accept`, `Verified`, `Unverified`, `Out of scope`) are the recurring failure — this class has shipped four times
+6. Cross-check the conclusion against the column: any `🔴 Pending` present ⇒ the recommendation must be Hold. If you wrote "no merge blocker" while Pending rows exist, one of the two is wrong
 
 ### Conclusion line emoji rule (HARD STOP)
 
