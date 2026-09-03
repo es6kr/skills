@@ -110,6 +110,54 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
     return block
 
 
+SECTION_RE = re.compile(r"^##[ \t]+(.*\S)[ \t]*$")
+
+# format.md "Marker syntax" lists `- [x]` under `## Progress`, but real trackers
+# also drive active work from project-specific sections (`## TODO`,
+# `## Priority Tasks`, ...) and legitimately mark those `[x]` -- `sync.md` does
+# exactly that before handing off to `move`. So this guard refuses only the two
+# states format.md positively forbids, rather than allow-listing one section:
+#   - any checkbox marker inside `## Completed` (summarised history, no checkboxes)
+#   - `[x]` inside `## Hold`, which exists to park un-actionable BLOCKED items
+COMPLETED_SECTION = "## Completed"
+HOLD_SECTION = "## Hold"
+
+
+def enclosing_section(lines: list[str], index: int) -> str | None:
+    """Nearest `## ` heading at or above `index` (None when the item precedes any)."""
+    for i in range(index, -1, -1):
+        m = SECTION_RE.match(lines[i])
+        if m:
+            return f"## {m.group(1)}"
+    return None
+
+
+def validate_section_marker(section: str | None, marker: str) -> None:
+    """Refuse a marker the item's own section does not permit.
+
+    `add_item.py` already guards this on the insert path (it rejects active
+    markers aimed at `## Completed`); without the same guard here the sanctioned
+    *update* path can write a state the schema forbids -- which is exactly the
+    corruption `block-direct-checklist-edit.js` blocks raw edits to prevent.
+    """
+    if section is None:
+        return
+    normalised = marker.strip()
+    if section == COMPLETED_SECTION:
+        raise ValueError(
+            f"cannot set marker {normalised} on an item in {COMPLETED_SECTION!r} -- that "
+            "section holds summarised historical lines without checkboxes (format.md "
+            "'Marker syntax')"
+        )
+    if normalised == "[x]" and section == HOLD_SECTION:
+        raise ValueError(
+            f"cannot set {normalised} on an item in {HOLD_SECTION!r} -- that section "
+            "parks un-actionable BLOCKED items, and format.md's marker table allows "
+            "only '[ ]' / '[BLOCKED...]' there. Move the item back to an active "
+            "section first, or use cleanup.py to migrate it into '## Completed'."
+        )
+
+
 def run_update(args: argparse.Namespace) -> int:
     if not args.set_marker and not args.append_note:
         raise ValueError("at least one of --set-marker / --append-note is required")
@@ -121,27 +169,40 @@ def run_update(args: argparse.Namespace) -> int:
     if not os.path.exists(args.file):
         raise ValueError(f"tracker not found: {args.file}")
 
-    with io.open(args.file, "r+", encoding="utf-8") as fh:
-        try:
-            if fcntl:
-                fcntl.flock(fh, fcntl.LOCK_EX)
+    # Hold an exclusive lock across the WHOLE read-modify-write, not just the read.
+    # The lock lives on a sidecar file because atomic_write() replaces the tracker via
+    # os.replace(): that swaps the inode, so a lock held on the tracker's own fd would
+    # protect a file the writer no longer points at. Two concurrent updates could
+    # otherwise both read the same state and have the later write silently drop the
+    # earlier one's marker or progress note.
+    lock_path = args.file + ".lock"
+    lock_fh = io.open(lock_path, "a+", encoding="utf-8")
+    try:
+        if fcntl:
+            fcntl.flock(lock_fh, fcntl.LOCK_EX)
+
+        with io.open(args.file, "r", encoding="utf-8") as fh:
             src = fh.read()
-        finally:
-            if fcntl:
-                fcntl.flock(fh, fcntl.LOCK_UN)
 
-    lines = src.split("\n")
-    start, end, _indent = find_item_block(lines, args.match)
-    block = apply_update(lines[start:end], args.set_marker, args.append_note)
+        lines = src.split("\n")
+        start, end, _indent = find_item_block(lines, args.match)
+        if args.set_marker:
+            validate_section_marker(enclosing_section(lines, start), args.set_marker)
+        block = apply_update(lines[start:end], args.set_marker, args.append_note)
 
-    out = "\n".join(lines[:start] + block + lines[end:])
+        out = "\n".join(lines[:start] + block + lines[end:])
 
-    if args.dry_run:
-        print("--- dry-run: item after update ---")
-        print("\n".join(block))
-        return 0
+        if args.dry_run:
+            print("--- dry-run: item after update ---")
+            print("\n".join(block))
+            return 0
 
-    atomic_write(args.file, out)
+        atomic_write(args.file, out)
+    finally:
+        if fcntl:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+        lock_fh.close()
+
     print(f"OK: updated item matching --match {args.match!r} in {args.file}")
     print("\n".join(block))
     return 0
@@ -238,6 +299,89 @@ def self_test() -> int:
         check("run_update left the other item untouched", "- [ ] first item unique-marker-alpha" in result)
     finally:
         os.unlink(tmp_path)
+
+    # enclosing_section: nearest heading above the item
+    check("enclosing_section finds the heading", enclosing_section(doc_lines, 4) == "## Priority Tasks")
+    check("enclosing_section returns None above any heading", enclosing_section(doc_lines, 0) is None)
+
+    # validate_section_marker: the two states format.md forbids
+    for section, marker, should_raise, name in (
+        ("## Hold", "[x]", True, "[x] rejected in ## Hold"),
+        ("## Hold", "[ ]", False, "[ ] allowed in ## Hold"),
+        ("## Hold", "[BLOCKED:P1:external]", False, "[BLOCKED] allowed in ## Hold"),
+        ("## Completed", "[ ]", True, "any checkbox rejected in ## Completed"),
+        ("## Progress", "[x]", False, "[x] allowed in ## Progress"),
+        ("## TODO", "[x]", False, "[x] allowed in a project-specific active section"),
+        (None, "[x]", False, "no enclosing heading is permissive"),
+    ):
+        try:
+            validate_section_marker(section, marker)
+            check(name, not should_raise)
+        except ValueError:
+            check(name, should_raise)
+
+    # end-to-end: the Hold case row 10 actually reproduced
+    import tempfile as _tf
+    hold_doc = [
+        "# T", "", "## Hold", "",
+        "- [BLOCKED:P1:external] parked item unique-marker-hold",
+        "  - **Why**: waiting", "",
+    ]
+    with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+        tf.write("\n".join(hold_doc))
+        hold_path = tf.name
+    try:
+        class NS3:
+            pass
+        ns3 = NS3()
+        ns3.file = hold_path
+        ns3.match = "unique-marker-hold"
+        ns3.set_marker = "[x]"
+        ns3.append_note = None
+        ns3.dry_run = False
+        try:
+            run_update(ns3)
+            check("run_update refuses [x] in ## Hold", False)
+        except ValueError:
+            check("run_update refuses [x] in ## Hold", True)
+        with open(hold_path, encoding="utf-8") as fh:
+            check("rejected update left the file untouched", "[BLOCKED:P1:external]" in fh.read())
+        # a note (no marker change) is still allowed in ## Hold
+        ns3.set_marker = None
+        ns3.append_note = "still waiting on upstream"
+        check("append-note still works in ## Hold", run_update(ns3) == 0)
+    finally:
+        os.unlink(hold_path)
+        if os.path.exists(hold_path + ".lock"):
+            os.unlink(hold_path + ".lock")
+
+    # sidecar lock: created next to the tracker, and the tracker itself is replaced
+    with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+        tf.write("\n".join(doc_lines))
+        lock_doc = tf.name
+    try:
+        class NS4:
+            pass
+        ns4 = NS4()
+        ns4.file = lock_doc
+        ns4.match = "unique-marker-alpha"
+        ns4.set_marker = None
+        ns4.append_note = "locked write"
+        ns4.dry_run = False
+        check("run_update with sidecar lock returns 0", run_update(ns4) == 0)
+        check("sidecar lock file is used", os.path.exists(lock_doc + ".lock"))
+        with open(lock_doc, encoding="utf-8") as fh:
+            check("locked write landed", "- locked write" in fh.read())
+        # dry-run must not mutate, even holding the lock
+        before = open(lock_doc, encoding="utf-8").read()
+        ns4.append_note = "should not persist"
+        ns4.dry_run = True
+        run_update(ns4)
+        check("dry-run leaves the tracker byte-identical", open(lock_doc, encoding="utf-8").read() == before)
+    finally:
+        os.unlink(lock_doc)
+        if os.path.exists(lock_doc + ".lock"):
+            os.unlink(lock_doc + ".lock")
 
     # missing tracker file
     try:
