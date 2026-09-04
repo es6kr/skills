@@ -41,7 +41,9 @@ Set via project CLAUDE.md or skill invocation argument:
 
 ### Task Checklist Registration (MANDATORY Tool Call #1 HARD STOP)
 
-Upon invoking `/code-workflow`, **registering/updating the task checklist (`task.md` or `TodoWrite`) MUST be Tool Call #1**. No research commands (`run_command`), file inspection (`view_file`), or search (`grep_search`) may precede task checklist registration.
+Upon invoking `/code-workflow`, **registering/updating the task checklist MUST be Tool Call #1**. No research commands (`run_command`), file inspection (`view_file`), or search (`grep_search`) may precede task checklist registration.
+
+**Checklist medium is environment-scoped (HARD STOP)**: `task.md` is the **Antigravity task artifact only**. Claude Code sessions register via `TaskCreate`/`TodoWrite`; when those tools are unavailable or disabled in the session, fall back to a **session-scratchpad checklist file** (a `.md` under the session's scratchpad directory) — never the workspace `.agents/task.md`, which belongs to Antigravity sessions and must not carry another harness's session state.
 
 ### TDD Red-First Task Breakdown (MANDATORY Default HARD STOP)
 
