@@ -30,8 +30,11 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.resolve()))
-import plane_sync  # noqa: E402 -- needs sys.path adjusted first (sibling script)
+_SCRIPT_DIR = Path(__file__).parent.resolve()
+sys.path.insert(0, str(_SCRIPT_DIR))
+# plane_sync lives in the backlog skill's scripts/ since the plane->backlog migration.
+sys.path.insert(0, str(_SCRIPT_DIR.parent.parent / "backlog" / "scripts"))
+import plane_sync  # noqa: E402 -- needs sys.path adjusted first (backlog skill script)
 
 DEFAULT_TTL_HOURS = 4
 
