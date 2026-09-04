@@ -30,6 +30,7 @@ graph TD
     B --> B7[BASE-7: Conflict Marker Guard]
     
     C --> C1[COND-MD: Markdown Lint]
+    C --> C1S[COND-MD-STYLE: Markdown Style Lint]
     C --> C2[COND-SKILL: Skill Frontmatter]
     C --> C3[COND-AGENT: Tracker Guard]
     C --> C4[COND-GO: Go Toolchain Lint]
@@ -54,6 +55,7 @@ graph TD
 | ID | Trigger Condition | Category | Requirement |
 | :--- | :--- | :--- | :--- |
 | **`COND-MD`** | Repository contains `*.md` | **Markdown Lint** | `pre-commit` or `pre-push` must contain markdown/hangul or link reference validator. |
+| **`COND-MD-STYLE`** | Repository contains `*.md` | **Markdown Style Lint** | A markdown style/whitespace linter (`markdownlint`, `remark-lint`, `mdl`, or `prettier --check` on `*.md`) declared in a `Makefile`, `package.json`, or `scripts/` must be invoked from `pre-commit`, `pre-push`, or CI. Distinct from `COND-MD`: frontmatter and hangul checks do not catch trailing whitespace or style drift, so a repository can pass `COND-MD` while having no style lint at all. WARN when no tooling manifest is present, or when a manifest exists but declares no style linter; FAIL when a linter is declared but never invoked. |
 | **`COND-SKILL`** | Repository contains `skills/*/SKILL.md` | **Skill Frontmatter** | `pre-push` or `pre-commit` must run `lint-frontmatter.sh` or equivalent metadata validator. |
 | **`COND-AGENT`** | Workspace is `.agents/` or has `fix_plan.md` | **Tracker Guard** | `pre-commit` must protect against committing untracked/dirty `fix_plan.md`. |
 | **`COND-GO`** | `go.mod` is present | **Go Toolchain** | `pre-commit`/`pre-push` must run `gofmt` / `go vet` / `go test`. |

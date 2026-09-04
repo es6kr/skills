@@ -57,6 +57,8 @@ The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](
 
 **Prohibited**: Deciding the next action by only looking at task checklist items without reading the research/plan files. A task list is a summary; the plan file contains detailed sequences and constraints.
 
+**Resume is not the pre-lookup (HARD STOP)**: finishing this step does **not** satisfy Step 1's "Mandatory Corpus & RAG Pre-Lookup". They answer different questions — Resume asks *does a downstream artifact for this task already exist*, while the pre-lookup asks *are the primary sources that artifact cites already in the corpus*. Having read an upstream `research-*.md` is therefore not evidence that its cited sources were checked; the summary in that document is secondhand, and the source it summarizes may be sitting in the wiki `raw/` layer in full. Run Step 1's lookup on its own terms even when Step 0 found an artifact and you have read it.
+
 ## Milestone Checklist Sync Discipline (HARD STOP)
  
 When executing multi-phase workflows (`/code-workflow`, `/fix-plan add --deep`), 3 checklist surfaces exist:
@@ -183,7 +185,9 @@ chain: []                  # optional: issue dependency chain (see github-flow/d
 
 The plan body starts after the frontmatter with `# Plan: [Title]` heading. The heading title should match the frontmatter `title` field.
 
-**Backlog & LLM Wiki Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) and `llm-wiki/index.md` / `log.md` is MANDATORY**. Never leave a newly created plan un-indexed in the backlog or LLM Wiki repository. **If the plan was promoted from a Plan Draft, the entry MUST be moved from `## Plan Drafts` to `## Fable Target Tasks` (with `audit_status: pending_opus_fable_audit` / `[BLOCKED:P*:selfable]`) for Fable/Opus+ model deep audit before implementation.** Leaving `[PROMOTED]` items in `## Plan Drafts` is strictly prohibited.
+**Backlog & LLM Wiki Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) and the wiki index is MANDATORY**. Never leave a newly created plan un-indexed in the backlog or wiki repository.
+
+**The target repository's own policy governs where — read it before registering (HARD STOP)**: this instruction names *what* to register, not *where the target repo accepts it*. Wiki repositories carry their own `AGENTS.md` / `CONTRIBUTING.md`, and those files routinely retire a surface or forbid a class of document from an index — an activity log can be discontinued in favour of commit history, and a derived-artifact directory can be barred from an index reserved for canonical pages. Read the target repo's policy file first and follow it; when it forbids the registration, that prohibition wins over this step, and the correct action is to record why rather than to register anyway or to skip silently. Carrying a generic instruction into a repository without checking its policy is the same failure as citing a summary instead of the source it summarizes. **If the plan was promoted from a Plan Draft, the entry MUST be moved from `## Plan Drafts` to `## Fable Target Tasks` (with `audit_status: pending_opus_fable_audit` / `[BLOCKED:P*:selfable]`) for Fable/Opus+ model deep audit before implementation.** Leaving `[PROMOTED]` items in `## Plan Drafts` is strictly prohibited.
 
 **Mandatory sections** (Plan is incomplete if any are missing):
 1. **Approach** — Detailed explanation of the chosen approach

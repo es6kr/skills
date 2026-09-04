@@ -79,9 +79,16 @@ while IFS= read -r line; do
     COMMIT_COUNT=$(git rev-list --count "$local_sha" --not "$DEFAULT_BASE" --remotes=origin 2>/dev/null || echo 0)
   fi
 
+  # $remote_ref is the ref name on the REMOTE (e.g. refs/heads/next-fix). On a
+  # same-name push it also resolves LOCALLY -- to the very branch being pushed --
+  # so "$remote_ref..$local_sha" collapses to an empty range and every outgoing
+  # commit scan below silently inspects nothing. The remote SHA is the true fork
+  # point for an existing remote branch, so scan ranges use that instead.
   BASE_REF="${DEFAULT_BASE:-origin/main}"
   if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ -n "$remote_sha" ]; then
-    BASE_REF="$remote_ref"
+    SCAN_RANGE="$remote_sha..$local_sha"
+  else
+    SCAN_RANGE="$BASE_REF..$local_sha"
   fi
 
   MAX_COMMITS="${PUSH_MAX_COMMITS:-5}"
@@ -89,7 +96,7 @@ while IFS= read -r line; do
     cat >&2 <<EOF
 ERROR: Pushing $COMMIT_COUNT commits on '$local_ref' exceeds the limit ($MAX_COMMITS).
 This usually happens when branching off the wrong base branch or accumulating diverged history.
-Inspect commits with: git log --oneline $BASE_REF..$local_sha
+Inspect commits with: git log --oneline $SCAN_RANGE
 If this large batch push is intended, override with: PUSH_COMMIT_LIMIT_OVERRIDE=1 git push ...
 EOF
     exit 1
@@ -97,7 +104,7 @@ EOF
 
   # Conflict marker guard — block push of a commit whose message still carries
   # the auto-generated "Conflicts:" residue (unresolved non-interactive merge commit)
-  CONFLICT_COMMITS=$(git rev-list "$BASE_REF..$local_sha" 2>/dev/null | while read -r sha; do
+  CONFLICT_COMMITS=$(git rev-list "$SCAN_RANGE" 2>/dev/null | while read -r sha; do
     if git log -1 --format='%B' "$sha" | grep -qE '^#?[[:space:]]*Conflicts:'; then
       echo "$sha"
     fi

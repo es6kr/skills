@@ -63,9 +63,13 @@ IM = re.IGNORECASE | re.MULTILINE  # sh version greps per line — keep line sem
 # ── Phase 1: simple hard-block patterns ──
 SIMPLE_BLOCKS = [
     # System / file destruction
-    # /tmp/<subpath> is exempt (OS scratch space, routinely rm -rf'd by tests/cleanup);
-    # bare `/tmp` (no subpath) still blocks below since the lookahead requires "tmp/".
-    (r"\brm\s+-rf\s+/(?!tmp/)", "rm -rf / is extremely dangerous"),
+    # /tmp/<subpath> is exempt (OS scratch space, routinely rm -rf'd by tests/cleanup),
+    # but only a STRICT descendant: the lookahead now requires a non-empty path segment
+    # after "tmp/", so the bare scratch root itself still blocks. A ".." traversal that
+    # escapes the scratch dir satisfies that segment, so it is blocked by its own rule below.
+    (r"\brm\s+-rf\s+/(?!tmp/[^\s/]+)", "rm -rf / is extremely dangerous"),
+    (r"\brm\s+-rf\s+/tmp/\S*\.\.(?:/|\s|$)",
+     "rm -rf with a .. traversal escaping /tmp can delete data outside the scratch dir"),
     (r"\brm\s+-rf\s+~", "rm -rf ~ deletes your home directory"),
     (r"\brm\s+-rf\s+\.\.", "rm -rf .. can delete a parent directory"),
     (r"\brm\s+-rf\s+\*", "rm -rf * is dangerous"),
@@ -331,10 +335,23 @@ TIME_BOUND = re.compile(
 # following timeout/-m/--max-time (ConnectTimeout excluded — it bounds only the
 # TCP handshake phase, not overall command wait time).
 TIME_BOUND_VALUE = re.compile(
-    r"(?:(?:^|[;&|(]\s*|\s)g?timeout\s+(?:-[a-zA-Z-]+\s+)*|--max-time[= ]|(?:^|\s)-m\s*)(\d+)",
+    r"(?:(?:^|[;&|(]\s*|\s)g?timeout\s+(?:-[a-zA-Z-]+\s+)*|--max-time[= ]|(?:^|\s)-m\s*)(\d+)([smhd]?)",
     IM,
 )
 TIME_BOUND_CEILING = 270
+
+# GNU timeout accepts a unit suffix (s/m/h/d). Capturing digits only made
+# `timeout 5m` read as a 5-second bound, so a 300-second background command
+# slipped under the ceiling while the equivalent `timeout 300` was blocked.
+_TIME_BOUND_UNIT_SECONDS = {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}
+
+
+def time_bound_seconds(command: str) -> list[int]:
+    """All command-level time bounds in `command`, normalized to seconds."""
+    return [
+        int(value) * _TIME_BOUND_UNIT_SECONDS[unit.lower()]
+        for value, unit in TIME_BOUND_VALUE.findall(command)
+    ]
 
 EXECUTOR = re.compile(r"\b(?:ba|z|k)?sh\s+-c\b|\bssh\b|\beval\b|\bxargs\b", I)
 HEREDOC_WRITER = re.compile(r"^[ \t]*(cat|tee)[ \t].*<<")
@@ -420,7 +437,12 @@ def check_pr_create_draft(command: str, transcript_path: str = "") -> str | None
             transcript = f.read()
     except OSError:
         return None  # unreadable — fail open
-    if '"skill":"github-flow"' in transcript:
+    # The harness records the skill name as invoked. When the skill ships inside a
+    # plugin, that name is plugin-qualified ("es6kr:github-flow"), so a bare-literal
+    # match sees nothing and the guard becomes unsatisfiable through its own
+    # documented path #1 — leaving the audit bypass as the only way through.
+    # Accept an optional "<plugin>:" prefix.
+    if re.search(r'"skill":"(?:[A-Za-z0-9_.-]+:)?github-flow"', transcript):
         return None
     return (
         "`gh pr create` has no prior Skill(\"github-flow\", ...) invocation in this session's transcript.\n\n"
@@ -736,9 +758,13 @@ def _worktree_add_new_nonprod_branch(scan: str) -> bool:
     the start-point (safe: it is never checked out for mutation), so creating a feature
     branch FROM master/prod is allowed, while `git worktree add <path> <prod-branch>`
     (which checks out the protected branch itself) stays blocked."""
-    if not re.search(r"git\s+worktree\s+add\b", scan, IM):
+    # Scope the -b/-B search to the `git worktree add` segment only. Scanning the
+    # whole compound command let a LATER command's -b clear the block for this one
+    # (e.g. `git worktree add ../wt <prod> && git switch -b feature`).
+    seg = re.search(r"git\s+worktree\s+add\b([^\n]*?)(?=&&|\|\||;|\||$)", scan, IM)
+    if not seg:
         return False
-    m = re.search(r"-[bB]\s+(\S+)", scan)
+    m = re.search(r"-[bB]\s+(\S+)", seg.group(1))
     if not m:
         return False
     new_branch = m.group(1)
@@ -863,7 +889,7 @@ def evaluate(
         )
 
     if run_bg:
-        bound_values = [int(v) for v in TIME_BOUND_VALUE.findall(command)]
+        bound_values = time_bound_seconds(command)
         if bound_values and max(bound_values) > TIME_BOUND_CEILING:
             return hard(
                 f"run_in_background command-level time bound ({max(bound_values)}s) exceeds "
@@ -913,6 +939,10 @@ def evaluate(
     prod_branch_reason = check_prod_branch_ops(command)
     if prod_branch_reason:
         return hard(prod_branch_reason)
+
+    staging_branch_reason = check_staging_branch_without_divergence(command)
+    if staging_branch_reason:
+        return hard(staging_branch_reason)
 
     if LOCAL_OVERLAY is not None:
         overlay_reason = LOCAL_OVERLAY.check(command, tool_name, transcript_path)
@@ -977,6 +1007,15 @@ def self_test() -> int:
     cases = [
         # (expect_block, run_bg, command)
         # ── FN cases: destructive git that MUST be blocked ──
+        # scratch-dir exemption must be a strict descendant (rm -rf regression)
+        (True, False, "rm -rf /tmp/"),
+        (True, False, "rm -rf /tmp/../home"),
+        (False, False, "rm -rf /tmp/scratch/x"),
+        # timeout unit suffixes normalize to seconds before the ceiling check
+        (True, True, "timeout 5m sleep 300"),
+        (False, True, "timeout 4m sleep 200"),
+        # -[bB] must bind to the worktree add segment, not a chained command
+        (True, False, "git worktree add ../wt master && git switch -b feature"),
         # ── staging-branch base gate (merged from the tracked copy) ──
         (True, False, "git switch -C fix/x origin/next-fix"),
         (True, False, "git checkout -b fix/y origin/next-feat"),
@@ -1138,11 +1177,23 @@ def self_test() -> int:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
         f.write('{"skill":"github-flow","args":"pr"}\n')
         with_skill_transcript = f.name
+    # When the skill ships inside a plugin the harness records a plugin-qualified
+    # name. A bare-literal match misses it, which made this guard unsatisfiable
+    # through its own documented path #1 in plugin installs.
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"skill":"es6kr:github-flow","args":"pr"}\n')
+        with_qualified_skill_transcript = f.name
+    # A different skill must not satisfy the check just by ending in the same name.
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"skill":"not-github-flow","args":"pr"}\n')
+        wrong_skill_transcript = f.name
     try:
         transcript_cases = [
             # (expect_block, command, transcript_path)
             (True, "gh pr create --draft --title x", no_skill_transcript),
             (False, "gh pr create --draft --title x", with_skill_transcript),
+            (False, "gh pr create --draft --title x", with_qualified_skill_transcript),
+            (True, "gh pr create --draft --title x", wrong_skill_transcript),
             (False, "GH_PR_CREATE_SKILL_BYPASS=1 gh pr create --draft --title x", no_skill_transcript),
             (False, "gh pr create --draft --title x", ""),  # no transcript — fail open
             (False, 'grep "gh pr create" README.md', no_skill_transcript),  # not a real invocation
@@ -1159,6 +1210,8 @@ def self_test() -> int:
     finally:
         os.unlink(no_skill_transcript)
         os.unlink(with_skill_transcript)
+        os.unlink(with_qualified_skill_transcript)
+        os.unlink(wrong_skill_transcript)
 
     print(f"\n{passed} passed, {failed} failed")
 
