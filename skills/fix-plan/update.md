@@ -27,7 +27,7 @@ At least one of `--set-marker` / `--append-note` is required; both may be combin
 
 ## What it does NOT do
 
-- **Does not move sections.** Flipping `--set-marker "[x]"` changes the marker in place; it does not relocate the item into `## Completed` — that stays `move.md` / `cleanup.py`'s job (which also does the completion-summary condensation `add.md`'s length budget expects).
+- **Does not move sections.** Flipping `--set-marker "[x]"` changes the marker in place; it does not relocate the item into `## Completed` — that stays `move.md` / `cleanup.py`'s job (which also does the completion-summary condensation `add.md`'s length budget expects). `format.md`'s "Completion Migration Rule (HARD STOP)" requires the marker flip and the `## Completed` migration to happen in the **same edit/turn** — after `--set-marker "[x]"`, chain straight into `move.md` / `cleanup.py` before ending the turn; do not leave a bare `[x]` sitting in `## Progress` across turns.
 - **Does not rewrite Why / How to apply.** Only the marker and append-only notes are mutable. If the original Why/How is wrong, that is a correctness problem in the entry itself, not a progress update — write a fresh item via `add_item.py` instead of silently rewriting history in place.
 - **Does not bypass the length budget** (`add.md` "Length budget — verbose body forbidden"). `--append-note` re-checks the item's total line count against the same 10-line hard cap `add_item.py` enforces; a note that would push it over is rejected with a pointer to move the content into a research/plan artefact instead.
 
@@ -39,7 +39,7 @@ Same as `add.md`: `[ ]`, `[x]`, `[-]`, or `[BLOCKED:P<0-3>:external|selfable]`. 
 
 ```bash
 # A dependency surfaced mid-session — flip the marker and leave a note in one call
-python skills/fix-plan/scripts/update_item.py --file fix_plan.md \
+python <skill-dir>/scripts/update_item.py --file fix_plan.md \
   --match "Migrate auth middleware" \
   --set-marker "[BLOCKED:P1:external]" \
   --append-note "Blocked on legal review of session-token retention policy — see #212"

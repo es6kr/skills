@@ -4,11 +4,14 @@
 // Enforces that modifications must be routed through fix-plan skill scripts.
 //
 // Claude Code sessions are exempt: this guard exists to stop lower-capability
-// harnesses (e.g. Antigravity/Gemini) from schema-corrupting direct edits, and
-// the sanctioned scripts cover item ADDITION only — Claude Code sessions still
-// need direct edits for item updates, sync auto-checks, and pipeline-log
-// stamps. Claude Code exposes CLAUDE_PROJECT_DIR (and, for plugin hooks,
-// CLAUDE_PLUGIN_ROOT) to hook processes; other harnesses do not.
+// harnesses (e.g. Antigravity/Gemini) from schema-corrupting direct edits.
+// add_item.py and update_item.py now cover ADD and marker-flip/note-append
+// respectively, but neither covers sync auto-check stamps or
+// `## Pipeline Execution Log` entries — Claude Code sessions still need
+// direct edits for those. Claude Code exposes CLAUDE_PROJECT_DIR (and, for
+// plugin hooks, CLAUDE_PLUGIN_ROOT) to hook processes; other harnesses do
+// not — this premise is unverified in this repo (no test asserts it) and
+// should be re-checked if the exemption ever misfires.
 
 const fs = require('fs');
 

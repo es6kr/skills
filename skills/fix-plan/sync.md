@@ -66,8 +66,8 @@ Use the same format as [format.md](./format.md) item state changes: `(YYYY-MM-DD
 Execute the skill's integrity check scripts immediately following GitHub sync:
 
 ```bash
-python ./scripts/stale_check.py --root .
-python ./scripts/hook_integrity_check.py --root .
+python <skill-dir>/scripts/stale_check.py --root .
+python <skill-dir>/scripts/hook_integrity_check.py --root .
 ```
 
 ### 6. Chain into move
@@ -78,11 +78,11 @@ Items just synced to `[x]` are immediate candidates for the next [move](./move.m
 
 When executing deep tasks (`/fix-plan add --deep`, `/code-workflow`), real-time sub-step tool calls are tracked in `task.md` to avoid token churn on large files.
 
-At **major phase boundaries** (Phase 2 Plan authoring, Phase 3 Review disposition, Phase 4 TDD completion, Phase 5 verification), synchronize state across all 3 surfaces:
+At **major phase boundaries** (Phase 2 Plan authoring, Phase 3 Review disposition, Phase 4 TDD completion, Phase 5 verification), synchronize state across all 3 surfaces using a stable match on the same item (same title/slug) in each file:
 - `task.md`: Current execution step marked `[x]`
 - `plan-*.md`: Section 3 Layered Roadmap / Progress Checklist marked `[x]`
-- `fix_plan.md`: Task status updated with model + timestamp metadata `(YYYY-MM-DD, <Model> <SessionID8>; completed: YYYY-MM-DD, <Model> <SessionID8>)`
-- `/cleanup`: Final verification ensuring zero sync gap across all 3 files.
+- `fix_plan.md`: The matching item marked `[x]` (not metadata alone) with model + timestamp metadata `(YYYY-MM-DD, <Model> <SessionID8>; completed: YYYY-MM-DD, <Model> <SessionID8>)`
+- `/cleanup`: Final verification ensuring zero sync gap across all 3 files — a state where `task.md`/`plan-*.md` are `[x]` but the matching `fix_plan.md` item is not is a sync gap, not a partial completion.
 
 ## Secondary-tracker sync cadence
 

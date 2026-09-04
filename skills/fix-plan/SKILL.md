@@ -323,7 +323,7 @@ MERGED PR or CLOSED issue → auto `[x]`. PR CLOSED-without-merge → `[BLOCKED:
 
 ### Plane Intake Ingestion Gate for PR & Completed Items (HARD STOP)
 
-Work items backed by GitHub PRs or completed during sessions without a Plane identifier (`[ES6KR-<N>]`, `[INFRA-<N>]`, etc.) MUST be ingested into Plane via Intake (`plane_create_issue.py`) to preserve historical audit logs and decisions. See `plane-backlog` skill.
+Work items backed by GitHub PRs or completed during sessions without a Plane identifier (`[ES6KR-<N>]`, `[INFRA-<N>]`, etc.) MUST be ingested into Plane via Intake (`plane_create_issue.py`) to preserve historical audit logs and decisions. See `backlog` skill.
 
 ## See Also
 

@@ -40,7 +40,7 @@ Maintain a dedicated tracker section named `## <Model> Target Tasks` (e.g., a to
 
 1. **Scan via Scanner Script** — Run the automated replenishment candidate scanner:
    ```bash
-   python ./scripts/fable_queue_replenish.py --root .
+   python <skill-dir>/scripts/fable_queue_replenish.py --root .
    ```
 2. **Scan Tracker Sections** — Scan every tracker section outside the dedicated one (priority work, TODO, hold/deferred, plan drafts, carry-over), **plus any `impl`-promoted plan artifact awaiting audit** (see [draft.md](./draft.md) "Role ownership" — `impl` promotes drafts by default; this scan is where architecture-scale output gets picked up for `deep` review, not authored by `deep` from scratch) — title-level scan first, entry-level read only for ambiguous items
 3. **Classify** each candidate against the category table; discard anti-fit matches

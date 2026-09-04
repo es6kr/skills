@@ -17,7 +17,7 @@ Schema and structure for `fix_plan.md` / `checklist.md` files. Section layout, i
 
 ## Completed
 
-- 2026-06-07 12:00 — One-line summary (PR #N, Session xxxxxxxx)
+- 2026-06-07 12:00 — One-line summary ([PR #N](https://github.com/<owner>/<repo>/pull/N), Claude Sonnet xxxxxxxx)
 
 ---
 

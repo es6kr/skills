@@ -97,7 +97,19 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
         m = ITEM_RE.match(block[0])
         assert m is not None
         indent = len(m.group(1))
-        note_line = " " * (indent + 2) + f"- {append_note.strip()}"
+        # Reuse the indent characters an existing sub-bullet already uses
+        # (tabs vs spaces) instead of always emitting spaces -- a hardcoded
+        # space indent mismatches tab-indented siblings and mixes styles
+        # within one item.
+        note_indent = None
+        for existing in block[1:]:
+            stripped = existing.lstrip(" \t")
+            if stripped.startswith("-"):
+                note_indent = existing[: len(existing) - len(stripped)]
+                break
+        if note_indent is None:
+            note_indent = " " * (indent + 2)
+        note_line = f"{note_indent}- {append_note.strip()}"
         prospective_len = len(block) + 1
         if prospective_len > MAX_BODY_LINES:
             raise ValueError(
@@ -209,7 +221,7 @@ def run_update(args: argparse.Namespace) -> int:
             print("\n".join(block))
             return 0
 
-        atomic_write(args.file, out)
+        atomic_write(args.file, out, prefix=".update_item.")
     finally:
         if fcntl:
             fcntl.flock(lock_fh, fcntl.LOCK_UN)
@@ -279,6 +291,16 @@ def self_test() -> int:
     check("append-note grows block by one line", len(updated2) == len(block) + 1)
     check("append-note is indented 2 under item", updated2[-1] == "  - progress note text")
     check("append-note preserves original marker", updated2[0] == block[0])
+
+    # apply_update: append-note reuses tab indentation from an existing sibling
+    tab_block = ["- [ ] tab-item", "\t- **Why**: r"]
+    tab_updated = apply_update(tab_block, None, "tabnote")
+    check("append-note matches an existing tab-indented sibling", tab_updated[-1] == "\t- tabnote")
+
+    # apply_update: append-note falls back to spaces with no existing sub-bullet
+    bare_block = ["- [ ] bare-item"]
+    bare_updated = apply_update(bare_block, None, "first note")
+    check("append-note falls back to 2-space indent with no siblings", bare_updated[-1] == "  - first note")
 
     # apply_update: budget enforcement
     padded_block = block + [f"  - pad {i}" for i in range(7)]  # 3 + 7 = 10 lines, +1 note = 11 > 10
