@@ -153,8 +153,8 @@ Do NOT use file-existence checks to detect the environment — both `.gemini/` a
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Skip `/fix` step-by-step procedure when the correction seems simple or obvious | Always execute Step 0 (TodoWrite/task.md) first, followed sequentially by Step 1 (5-Why), Step 1.5, Step 2, Step 3, and Step 4 |
-| 2 | Directly modify files or execute commands on a `/fix` trigger before initializing the task checklist | Ensure `task.md` or `TodoWrite` is initialized as the very first tool call in the turn |
+| 1 | Skip `/fix` step-by-step procedure when the correction seems simple or obvious | Always execute Step 0 (`TaskCreate`/`TodoWrite`, or `task.md` for Antigravity) first, followed sequentially by Step 1 (5-Why), Step 1.5, Step 2, Step 3, and Step 4 |
+| 2 | Directly modify files or execute commands on a `/fix` trigger before initializing the task checklist | Ensure the environment-appropriate checklist medium (`TaskCreate`/`TodoWrite` for Claude Code, `task.md` for Antigravity) is initialized as the very first tool call in the turn |
 
 **Zero-content abusive invocation exception (HARD STOP)**: the "no trivial exception" rule above assumes the `/fix` arguments contain *some* identifiable behavior-correction content, however terse. When the arguments are **pure abuse with zero identifiable target** (e.g. a single insult with no instruction, no described mistake, no reference to prior turns), the full Step 0-4 procedure does not apply — there is nothing to run 5-Why analysis against. In this case: do not fabricate a target by guessing, and do not run TodoWrite/5-Why against an empty premise. Instead, briefly name the pattern (repeated content-free abusive messages) and set a boundary — invoke `AskUserQuestion` or plain text asking what specifically should be corrected, if the pattern is a first occurrence in the conversation. If abusive messages continue to recur with no content across multiple turns despite this, that is a candidate for `EndConversation` per its own tool guidance (sustained abuse, explicit prior warning required) — this exception does not itself authorize ending the conversation. The moment any subsequent `/fix` invocation in the same conversation contains identifiable content (even mixed with continued abusive language), the full Step 0-4 procedure resumes as normal — this exception is scoped to content-free invocations only, not to the presence of any abusive language.
 
@@ -268,7 +268,7 @@ Before moving to Step 3 Resume, **you MUST run concrete, empirical verification*
 
 ### 2.8 Active Task Completion & Ask Priority Gate (HARD STOP)
 
-Completing active tasks in `task.md` / `TaskList` is the #1 top priority over invoking the `next` skill or proposing next-step options.
+Completing active tasks in the session's checklist medium (`TaskList`/`TodoWrite` for Claude Code, `task.md` for Antigravity) is the #1 top priority over invoking the `next` skill or proposing next-step options.
 - If an active task has open questions, trade-offs, or requires user confirmation/decision, presenting `AskUserQuestion` for that active task is MANDATORY as the very first action of the turn.
 - Invoking `next` skill or offering next-action suggestions while tasks are pending/in_progress or open asks remain is strictly forbidden (`HARD STOP`).
 
@@ -278,7 +278,7 @@ Completing active tasks in `task.md` / `TaskList` is the #1 top priority over in
 
 **When the resumed step is itself a skill/tool call** (e.g., an un-invoked `next` / consolidate / ask), it becomes its **own terminal task** and the actual call MUST run **this turn** before wrap-up — reporting "it should now be called" and stopping is the exact Antigravity drift the guard exists for. See step3-resume.md "Skill/tool-invocation resume is a first-class task".
 
-**Read [step3-resume.md](./step3-resume.md) before executing** — it holds intent inference, missing-question identification, dismissal-signal handling, reject-cause classification + secondary-issue default, the verification-scope-reduction guard, the Step 3 mandatory self-questions (PR Test Plan sync, architectural-finding record), and the skill/tool-invocation resume rule (same-turn call, unchecked `task.md` box blocks wrap-up).
+**Read [step3-resume.md](./step3-resume.md) before executing** — it holds intent inference, missing-question identification, dismissal-signal handling, reject-cause classification + secondary-issue default, the verification-scope-reduction guard, the Step 3 mandatory self-questions (PR Test Plan sync, architectural-finding record), and the skill/tool-invocation resume rule (same-turn call, an unchecked box in the session's checklist medium blocks wrap-up).
 
 ### 4. Wrap-up (Report + Task Pruning)
 
