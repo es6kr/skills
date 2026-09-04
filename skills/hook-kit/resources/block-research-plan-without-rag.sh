@@ -35,6 +35,13 @@ esac
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" ]] && exit 0
 
+# Normalize Windows path separators before glob matching. On Windows the tool
+# reports whatever separator the caller used — a backslash path never matches
+# the slash-only patterns below, so the guard goes silent on exactly the
+# platform builds where the harness passes native paths. Same failure shape as
+# the prefix-anchoring bug this file already documents: no match, no signal.
+FILE_PATH=${FILE_PATH//\\//}
+
 # Pattern match: research-*.md, plan-*.md inside generated/ or plans/
 #
 # Match on the `docs/generated/` suffix rather than on one specific directory
