@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -26,9 +27,18 @@ def run_gh_api(endpoint: str, repo: Optional[str] = None) -> Any:
     return json.loads(res.stdout)
 
 
-def git_sha_exists(sha: str) -> bool:
-    """Check if a git SHA exists in the local repository."""
-    res = subprocess.run(["git", "cat-file", "-e", sha], capture_output=True)
+def git_sha_exists(sha: str, repo: Optional[str] = None) -> bool:
+    """Check if a git SHA exists in the local repository.
+
+    `-R <repo>` only steers `gh api` calls; git itself always resolves
+    against the process cwd. When `repo` is given, resolve it to the local
+    ghq checkout (`~/ghq/github.com/<owner>/<name>`) instead of assuming cwd.
+    """
+    cmd = ["git"]
+    if repo:
+        cmd.extend(["-C", os.path.expanduser(f"~/ghq/github.com/{repo}")])
+    cmd.extend(["cat-file", "-e", sha])
+    res = subprocess.run(cmd, capture_output=True)
     return res.returncode == 0
 
 
@@ -321,7 +331,7 @@ class ConsolidateValidator:
             # Avoid matching purely numeric issue IDs like #347
             if re.match(r"^[0-9]+$", sha):
                 continue
-            if not git_sha_exists(sha):
+            if not git_sha_exists(sha, self.repo):
                 self.errors.append(f"Hallucinated or non-existent commit SHA cited in Summary: '{sha}'")
 
         # 10. Check merge recommendation format
