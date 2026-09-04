@@ -1,10 +1,10 @@
 ---
 name: session
 description: |
-  Claude Code & Antigravity session management. Topics — id (lookup UUID), list (enumerate), search (keyword validate), import, summarize, analyze (stats), archive (flat bak), classify, clean-profanity (sanitize JSONL), split (boundaries), compress (MCP), destroy, dual-sync (Win/WSL memory), install (hook), memory-trim (budget trim), migrate (to worktree), move (update cwd), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), rewind (context truncate), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "session rename", "session split", "session purge", "session rewind", "session analyze", "session import", "session summarize", "session archive", "archive session", "clean profanity", "session cleanup", "memory trim", "dual sync"
+  Claude Code & Antigravity session management. Topics — id (lookup UUID), list (enumerate), search (keyword validate), import, summarize, analyze (stats), archive (flat bak), classify, clean-profanity (sanitize JSONL), split (boundaries), compress (MCP), context (usage measurement pull/push), destroy, dual-sync (Win/WSL memory), install (hook), memory-trim (budget trim), migrate (to worktree), move (update cwd), purge (dead sessions), rename (custom title), repair (chain/tool_result/UUID), rewind (context truncate), url (web URL). Use when: "session id", "current session", "session list", "list sessions", "session search", "find session", "session classify", "session compress", "session migrate", "session move", "session repair", "session rename", "session split", "session purge", "session rewind", "session analyze", "session import", "session summarize", "session archive", "archive session", "clean profanity", "session cleanup", "memory trim", "dual sync", "measure context", "context usage", "context percent", "how full is the session", "context-usage-now", "context-usage-inject", "post-compact context"
 metadata:
   author: es6kr
-  version: "0.8.0"
+  version: "0.9.0"
 depends-on:
   - cleanup
   - git-repo
@@ -46,6 +46,7 @@ Decision procedure:
 | clean-profanity | Sanitize profanity tokens in a session JSONL file (in-place replacement) | [clean-profanity.md](./clean-profanity.md) |
 | split | Analyze topic boundaries and recommend session split points | [split.md](./split.md) |
 | compress | AI-compress sessions via claude-sessions-mcp | [compress.md](./compress.md) |
+| context | On-demand and injected context-window usage measurement across Claude Code and Antigravity | [context.md](./context.md) |
 | destroy | Delete current session and restart IDE | [destroy.md](./destroy.md) |
 | dual-sync | Windows ↔ WSL project memory path mapping — keep both environments' memory in sync | [dual-sync.md](./dual-sync.md) |
 | id | Look up current session ID (UUID) | [id.md](./id.md) |

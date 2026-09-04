@@ -162,9 +162,12 @@ fi
 #   4. $HOME/.claude/skills/...    — legacy absolute path, kept for back-compat
 CTX_INJECT=""
 for _cand in \
+  "$(dirname "$0")/../../session/resources/context-usage-inject.sh" \
   "$(dirname "$0")/../../hook-kit/resources/context-usage-inject.sh" \
   "$(dirname "$0")/../../context-measure/resources/context-usage-inject.sh" \
+  "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/session/resources/context-usage-inject.sh" \
   "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/hook-kit/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/session/resources/context-usage-inject.sh" \
   "$HOME/.claude/skills/hook-kit/resources/context-usage-inject.sh"; do
   if [[ -f "$_cand" ]]; then CTX_INJECT="$_cand"; break; fi
 done
