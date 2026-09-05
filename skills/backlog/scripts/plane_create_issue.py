@@ -210,6 +210,26 @@ def markdown_to_tiptap_and_html(md_text: str):
     return tiptap_doc, html_out, md_text
 
 
+def build_intake_payload(title: str, description: str = "", priority: str = None) -> dict:
+    """Build the request body for Plane's intake endpoint.
+
+    Plane's intake view reads `request.data["issue"]["name"]`, so `issue` must
+    be a nested mapping describing the issue to create — the endpoint creates
+    the issue itself. Passing an already-created issue's id (a bare string)
+    makes the server call `.get()` on a str and return an opaque HTTP 500.
+    """
+    tiptap_doc, html_desc, plain_desc = markdown_to_tiptap_and_html(description)
+    issue = {
+        "name": title,
+        "description": tiptap_doc,
+        "description_html": html_desc,
+        "description_stripped": plain_desc,
+    }
+    if priority:
+        issue["priority"] = normalize_priority(priority)
+    return {"issue": issue}
+
+
 def create_via_rest_api(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
     plane_host = (profile.get("plane_host") or "").rstrip("/")
     token = profile.get("token")
@@ -253,6 +273,11 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
     if priority:
         payload["priority"] = normalize_priority(priority)
 
+    if is_intake:
+        return _create_intake_via_rest_api(
+            plane_host, workspace_slug, prj_id, headers, title, description, priority
+        )
+
     try:
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -260,17 +285,6 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
             issue_id = data.get("id")
             seq_id = data.get("sequence_id")
             issue_url = f"{plane_host}/{workspace_slug}/projects/{prj_id}/issues/{issue_id}"
-            
-            intake_registered = False
-            if is_intake:
-                intake_url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/intake-issues/"
-                try:
-                    intake_req = urllib.request.Request(intake_url, data=json.dumps({"issue": issue_id}).encode("utf-8"), headers=headers, method="POST")
-                    urllib.request.urlopen(intake_req, timeout=30)
-                    intake_registered = True
-                except Exception as e:
-                    sys.stderr.write(f"WARN: Failed to register intake issue: {e}\n")
-                    intake_registered = False
 
             return {
                 "success": True,
@@ -279,12 +293,52 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
                 "sequence_id": seq_id,
                 "title": title,
                 "url": issue_url,
-                "intake": intake_registered if is_intake else False
+                "intake": False
             }
     except urllib.error.HTTPError as e:
         return {"success": False, "reason": f"HTTP Error {e.code}: {e.reason}"}
     except Exception as e:
         return {"success": False, "reason": str(e)}
+
+
+def _create_intake_via_rest_api(plane_host, workspace_slug, prj_id, headers, title, description, priority):
+    """POST to the intake endpoint, which creates the issue in the triage inbox.
+
+    Errors are returned to the caller with status and response body. The old
+    code swallowed them into a one-line stderr WARN and still reported
+    success, which is why a server-side 500 went unnoticed.
+    """
+    intake_url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/intake-issues/"
+    body = json.dumps(build_intake_payload(title, description, priority)).encode("utf-8")
+    try:
+        req = urllib.request.Request(intake_url, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8", "replace")
+        except Exception:
+            detail = ""
+        return {
+            "success": False,
+            "reason": f"Intake HTTP Error {e.code}: {e.reason} {detail}".strip(),
+        }
+    except Exception as e:
+        return {"success": False, "reason": f"Intake request failed: {e}"}
+
+    detail = data.get("issue_detail") if isinstance(data.get("issue_detail"), dict) else {}
+    issue_ref = data.get("issue")
+    issue_id = detail.get("id") or (issue_ref if isinstance(issue_ref, str) else None) or data.get("id")
+    seq_id = detail.get("sequence_id") or data.get("sequence_id")
+    return {
+        "success": True,
+        "method": "REST API (intake)",
+        "id": issue_id,
+        "sequence_id": seq_id,
+        "title": title,
+        "url": f"{plane_host}/{workspace_slug}/projects/{prj_id}/issues/{issue_id}",
+        "intake": True,
+    }
 
 
 def build_k3s_py_script(workspace_slug: str, prj_id: str, plane_host: str, title: str, description: str, is_intake: bool, normalized_priority: str = None) -> str:

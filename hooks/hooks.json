@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/ssh-config-ip-check.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/ssh-config-ip-check.sh"
           }
         ]
       },
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/commit-tidy/resources/commit-review-trigger.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/commit-tidy/resources/commit-review-trigger.sh"
           }
         ]
       },
@@ -25,15 +25,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/ui-change-notify.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/ui-change-notify.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-research-plan-without-rag.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-research-plan-without-rag.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/plan-undecided-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/plan-undecided-guard.sh"
           },
           {
             "type": "command",
@@ -46,15 +46,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/ui-change-notify.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/ui-change-notify.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-research-plan-without-rag.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-research-plan-without-rag.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/plan-undecided-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/plan-undecided-guard.sh"
           },
           {
             "type": "command",
@@ -67,11 +67,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/fix-step-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/fix-step-guard.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/topic-dispatch-discipline.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/topic-dispatch-discipline.sh"
           }
         ]
       },
@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-corpus-prelookup-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-corpus-prelookup-guard.sh"
           }
         ]
       }
@@ -104,7 +104,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-compound-commands.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-compound-commands.sh"
           },
           {
             "type": "command",
@@ -161,31 +161,31 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/complex-logic-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/complex-logic-guard.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/staged-protect.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/staged-protect.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/edit-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/edit-guard.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-case-history-in-feedback-memory.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-case-history-in-feedback-memory.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/e2e-expect-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/e2e-expect-guard.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-references-rule.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-references-rule.sh"
           },
           {
             "type": "command",
@@ -193,7 +193,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
           },
           {
             "type": "command",
@@ -210,23 +210,23 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/staged-protect.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/staged-protect.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/edit-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/edit-guard.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-case-history-in-feedback-memory.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-case-history-in-feedback-memory.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/wip/resources/block-wip-register-before-execute.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-references-rule.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-references-rule.sh"
           },
           {
             "type": "command",
@@ -234,7 +234,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
           },
           {
             "type": "command",
@@ -252,11 +252,11 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-consolidate-summary-ask.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-consolidate-summary-ask.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-manual-delegation-without-automation-check.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-manual-delegation-without-automation-check.sh"
           },
           {
             "type": "command",
@@ -264,22 +264,22 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/todowrite/resources/block-tasklist-id-in-conversation.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/todowrite/resources/block-tasklist-id-in-conversation.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-option-below-context-gate.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-option-below-context-gate.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-on-question-signal.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-on-question-signal.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
           }
         ]
       },
@@ -298,7 +298,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskoutput-long-block.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskoutput-long-block.sh"
           }
         ]
       },
@@ -316,7 +316,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-workflow-without-cost-gate.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-workflow-without-cost-gate.sh",
             "timeout": 15
           }
         ]
@@ -326,7 +326,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-agent-spawn-without-model.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-agent-spawn-without-model.sh",
             "timeout": 10
           }
         ]
@@ -342,7 +342,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"
           }
         ]
       }
@@ -352,23 +352,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-ask-bypass-keywords.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-ask-bypass-keywords.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-session-rag.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-session-rag.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-rag.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-rag.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-claudify.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-claudify.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-malformed-tool-call.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-malformed-tool-call.sh"
           },
           {
             "type": "command",
@@ -376,20 +376,25 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-idle-wait-without-short-cycle.sh",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/reap-orphaned-helper-procs.js",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-idle-wait-without-short-cycle.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-slash-command-skill-invoked.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-slash-command-skill-invoked.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-manual-handoff-web-task.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-manual-handoff-web-task.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-rename.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-rename.sh"
           }
         ]
       }
@@ -399,11 +404,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/fix/resources/fix-and-ambiguity-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fix/resources/fix-and-ambiguity-guard.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/idle-wait-reactive-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/idle-wait-reactive-guard.sh"
           }
         ]
       }

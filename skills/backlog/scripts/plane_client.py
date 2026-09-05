@@ -131,12 +131,18 @@ def resolve_profile(cwd=None):
         )
         profile = {}
 
+    # Token precedence: the profile-resolved token (workspace_profile.get_profile
+    # sources it from the profile's token_env / PLANE_API_KEY / token_file), then
+    # the generic env keys. A previous hardcoded `DGS_PLANE_API_KEY` tail was
+    # removed: baking one specific workspace's env var into this vendor-agnostic
+    # client silently routed *other* workspaces' calls out under the wrong key
+    # whenever their own token was unset (HTTP 403 "token is not valid"),
+    # defeating the per-workspace isolation this client is supposed to enforce.
     token_env = profile.get("plane_token_env", "PLANE_API_KEY")
     token = (
         profile.get("plane_token")
         or os.environ.get(token_env)
         or os.environ.get("PLANE_API_KEY")
-        or os.environ.get("DGS_PLANE_API_KEY")
     )
     return {
         "plane_host": (profile.get("plane_host") or os.environ.get("PLANE_HOST", "")).rstrip("/"),

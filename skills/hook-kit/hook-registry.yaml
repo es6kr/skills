@@ -1082,11 +1082,16 @@ hooks:
 - id: reap-orphaned-helper-procs
   owner_skill: hook-kit
   marketplace: es6kr-skills
-  status: dormant
+  status: active
   implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/reap-orphaned-helper-procs.sh
-  registrations: []
+  - runtime: js
+    file: skills/hook-kit/resources/reap-orphaned-helper-procs.js
+  registrations:
+  - surface: hooks.json
+    event: Stop
+    matcher: ''
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/reap-orphaned-helper-procs.js
+    async: true
 - id: reap-stale-wrapper-shells
   owner_skill: hook-kit
   marketplace: es6kr-skills
