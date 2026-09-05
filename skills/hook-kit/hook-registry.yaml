@@ -654,11 +654,19 @@ hooks:
 - id: block-pr-url-gate
   owner_skill: github-flow
   marketplace: es6kr-skills
-  status: dormant
+  status: active
   implementations:
   - runtime: sh
     file: skills/github-flow/resources/block-pr-url-gate.sh
-  registrations: []
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: AskUserQuestion
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-pr-url-gate.sh
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: TaskCreate
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-pr-url-gate.sh
 - id: block-prod-branch-autonomous-ops
   owner_skill: hook-kit
   marketplace: es6kr-skills
