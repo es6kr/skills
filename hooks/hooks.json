@@ -311,6 +311,11 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-plugin-load-failures.js SessionStart",
+            "timeout": 10
           }
         ]
       }
