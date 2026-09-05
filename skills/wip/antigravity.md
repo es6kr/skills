@@ -19,10 +19,10 @@ Track in-session work progress using the `task.md` artifact file.
 | Notation | Meaning | Description |
 |----------|---------|-------------|
 | `- [ ]` | **Pending** | Not yet started |
-| `- [/]` | **In Progress** | Currently working (only one at a time) |
+| `- [/]` (IDE) / `- [ ] 🔄` (CLI) | **In Progress** | Currently working (only one at a time). In CLI environment, use `🔄` instead of `⏳` |
 | `- [x]` | **Completed** | Finished |
 
-> **`[/]` scope**: `task.md` artifact only. Do NOT use `[/]` in plain markdown files (fix_plan.md, checklist.md, GitHub issue body, etc.) — express partial completion via the count of `[x]` sub-items.
+> **`[/]` vs `🔄` scope**: In Antigravity IDE `task.md`, use `- [/]`. In `antigravity-cli` (terminal CLI) where `[/]` is unsupported, use `- [ ] 🔄`. Always use `🔄` as the standard in-progress indicator instead of `⏳`.
 
 ## Rendering Rules
 
