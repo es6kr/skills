@@ -150,28 +150,20 @@ hooks:
     file: skills/es6p-hooks/resources/check-session-rag.sh
   registrations: []
 - id: context-usage-inject
-  owner_skill: context-measure
+  owner_skill: session
   marketplace: es6kr-plugins
   status: dormant
   implementations:
   - runtime: sh
-    file: skills/context-measure/resources/context-usage-inject.sh
+    file: skills/session/resources/context-usage-inject.sh
   registrations: []
 - id: context-usage-now
-  owner_skill: context-measure
+  owner_skill: session
   marketplace: es6kr-plugins
   status: dormant
   implementations:
   - runtime: sh
-    file: skills/context-measure/resources/context-usage-now.sh
-  registrations: []
-- id: context_measure
-  owner_skill: context-measure
-  marketplace: es6kr-plugins
-  status: dormant
-  implementations:
-  - runtime: py
-    file: skills/context-measure/resources/context_measure.py
+    file: skills/session/resources/context-usage-now.sh
   registrations: []
 - id: experience-logger-session-end
   owner_skill: experience-logger
