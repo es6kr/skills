@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/session-v0.9.0...session-v0.10.0) (2026-09-05)
+
+
+### Features
+
+* **session:** merge context-measure into session and add Antigravity compaction awareness ([#449](https://github.com/es6kr/skills/issues/449)) ([157eecd](https://github.com/es6kr/skills/commit/157eecd2215304485c38a21ce395f4603257d8fe))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/session-v0.8.2...session-v0.9.0) (2026-08-29)
 
 

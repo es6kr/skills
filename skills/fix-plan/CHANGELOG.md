@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.1](https://github.com/es6kr/skills/compare/fix-plan-v0.11.0...fix-plan-v0.11.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **fix-plan:** add simple-vs-session self-check before Orca recommendation ask ([46e5d77](https://github.com/es6kr/skills/commit/46e5d77e3faefb0524fb4e4e6e80aa056d2d66ca))
+* **fix-plan:** hold the update lock across the write and reject invalid section markers ([b70f95d](https://github.com/es6kr/skills/commit/b70f95d3de46f0b78ff432c007c47ff798b3b54c))
+* **fix-plan:** move the update lock out of the tracker's directory ([da58b2d](https://github.com/es6kr/skills/commit/da58b2d9081c6e1bbfad12d55078749a329a43a8))
+* **fix-plan:** require RAG pre-lookup before authoring add/upsert items ([#419](https://github.com/es6kr/skills/issues/419)) ([1cff476](https://github.com/es6kr/skills/commit/1cff4767b37443fa57ff7841da3ee6a1bd9e81c0))
+* **fix-plan:** resolve remaining PR [#407](https://github.com/es6kr/skills/issues/407) review findings ([708475b](https://github.com/es6kr/skills/commit/708475bd3a882d3c27dd29f3e7b594f53f961e24))
+
 ## [0.11.0](https://github.com/es6kr/skills/compare/fix-plan-v0.10.0...fix-plan-v0.11.0) (2026-09-01)
 
 
