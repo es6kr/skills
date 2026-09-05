@@ -30,7 +30,7 @@ Before recording a new mistake to failed-attempts.md, **apply the same 2-stage p
 **Key behavior**:
 
 1. **Stage 0 (RAG)**: if a RAG receiver (`mcp__<vendor>__*-find` tool) is registered in the current environment, call it with the mistake pattern's key keywords → if there's a semantic match hit, classify as an Nth recurrence
-2. **Stage 1 (grep)**: recursive grep on `~/.claude/skills/cleanup/data/` (search HOT + archive simultaneously) + grep on `~/.agents/rules/*.md`
+2. **Stage 1 (grep)**: recursive grep on `$FA_STORE/` (search HOT + archive simultaneously) + grep on `~/.agents/rules/*.md`
 3. **On archive-only hit**: call `Skill("fa", "fa-prune")` Step 7 restore procedure (return to HOT + recurrence label)
 4. **Result**: include the recurrence info in the title label of the per-mistake analysis in Step 2 (e.g., `## ... (2026-MM-DD, 2nd recurrence)`)
 
@@ -88,7 +88,7 @@ retrospect is the **step that records the learning trace** — a single recorded
 2. Is multiSelect `true`? → If false, that's a false positive (forcing the user to select only 1 item is not the intent of retrospect)
 3. Does Recommended or default act as "skip"? → If so, it's a violation
 
-For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "retrospect options set to single-select with a default skip."
+For case history, see `$FA_STORE/failed-attempts.md` under "retrospect options set to single-select with a default skip."
 
 #### Single-mistake case — no ask (AskUserQuestion requires >= 2 options)
 
@@ -138,7 +138,7 @@ type: feedback
 
 #### 4-2. Add to failed-attempts.md
 
-Add a section to `~/.claude/skills/cleanup/data/failed-attempts.md` (HOT). This is skill data, not a rules file — `~/.agents/rules/failed-attempts.md` only contains a location-pointer stub.
+Add a section to `$FA_STORE/failed-attempts.md` (HOT). This is skill data, not a rules file — `~/.agents/rules/failed-attempts.md` only contains a location-pointer stub.
 
 **Profanity masking (MANDATORY)**: when recording FA, exclude or mask the user's profanity/swearing with `****`/`XX`. If the anger-signal context needs to be preserved, describe it with a neutral term ("anger") or quote with masking in the form "(profanity masked: ...****...)". Do not record raw profanity verbatim. **Same rule applies to `fix.md` Step 2 FA recording** (cross-ref).
 
@@ -181,7 +181,7 @@ Immediately after 4-2's file write, store a structured chunk to the same abstrac
 | 3 | Seed the id with the bare class/topic label alone (e.g. `sha1("fa-hot:<class>")`) | Two distinct entries sharing a class/topic across projects or recurrence dates will collide on that seed — a later write silently upserts over an unrelated earlier entry. Always include `<project>` and the full date/occurrence-qualified `<title>` |
 | 4 | Assume this write-time id and fa-prune's archive-time id (`sha1("fa-archive:<file>:<title>")`, [fa-prune.md](./fa-prune.md) Section 8) collapse into the same point | They are deliberately two distinct ids (different prefix, different `<project>`/`<file>` component) — the archive-time store is a **second**, separately-idempotent point, not an update of the HOT-time point. Each is idempotent against re-runs of itself; they do not double-index each other because they never share an id |
 
-**On store failure (HARD STOP — do not silently drop)**: if the RAG-store call in this section fails or every medium in [rag-store.md](../cleanup/rag-store.md)'s Medium Matrix (1)-(3) is unreachable, this is the same "RAG server down ≠ info lost" case rag-store.md's Medium (4) covers — write `~/.claude/skills/cleanup/data/rag-pending/<session-uuid>.md` **this turn** with this entry's content + idempotent id + one-line unreachable-reason, per rag-store.md's Medium (4) spec. Do not defer to "fa-prune will pick it up at archive time" — archive time is a separate, much-later trigger (per the Don't/Do table above) and does not substitute for the immediate-store obligation this section exists to satisfy.
+**On store failure (HARD STOP — do not silently drop)**: if the RAG-store call in this section fails or every medium in [rag-store.md](../cleanup/rag-store.md)'s Medium Matrix (1)-(3) is unreachable, this is the same "RAG server down ≠ info lost" case rag-store.md's Medium (4) covers — write `$FA_STORE/rag-pending/<session-uuid>.md` **this turn** with this entry's content + idempotent id + one-line unreachable-reason, per rag-store.md's Medium (4) spec. Do not defer to "fa-prune will pick it up at archive time" — archive time is a separate, much-later trigger (per the Don't/Do table above) and does not substitute for the immediate-store obligation this section exists to satisfy.
 
 **Self-check (before ending Step 4)**: did the just-written HOT entry get a RAG-store call this turn (not just a file Edit)? If a RAG-store tool is registered in the environment and this step was skipped, go back and store it before proceeding to Step 5. If the store call failed, did the medium (4) queue-file write above happen this turn?
 
@@ -206,9 +206,15 @@ Check the skills used in the session to identify any that need improvement.
 
 After completing retrospect recording, **always** do the following:
 
-1. **Check stale COLD candidates** (required):
+1. **Check stale COLD candidates** (required) — resolve the scripts dir the same way
+   [fa-prune.md](./fa-prune.md) does, so this works on every supported install layout:
    ```bash
-   uv run python ~/.claude/skills/fa/scripts/fa-classify.py --relaxed | head -2
+   for d in "${FA_SCRIPTS:-}" "${CLAUDE_PLUGIN_ROOT:-}/skills/fa/scripts" \
+            "$HOME/.claude/plugins/marketplaces/es6kr-skills/skills/fa/scripts" \
+            "${AGENT_SKILLS_HOME:-$HOME/.agents}/skills/fa/scripts"; do
+     [ -n "$d" ] && [ -d "$d" ] && FA_SCRIPTS="$d" && break
+   done
+   uv run python "$FA_SCRIPTS/fa-classify.py" --relaxed | head -2
    ```
 2. **If COLD candidates ≥1 — calling `Skill("fa", "fa-prune")` is mandatory** (HARD STOP):
    - Apply `skill-usage.md` "Execute the procedure immediately after Skill tool returns" — merely announcing "fa-prune is needed" as text without executing it violates this step
@@ -246,8 +252,8 @@ Detailed format rule: see `~/.agents/rules/skill-usage.md` "RAG store report for
 
 - Skip if there were no mistakes/corrections in the conversation
 - If the same content already exists in feedback memory or **HOT or archive**, branch handling (not a plain skip):
-  - **In HOT** (`cleanup/data/failed-attempts.md`) → just add a recurrence marker
-  - **In archive** (`cleanup/data/archive/*.md`) → restore to HOT via `/fa fa-prune` Step 7 procedure + add recurrence marker
+  - **In HOT** (`$FA_STORE/failed-attempts.md`) → just add a recurrence marker
+  - **In archive** (`$FA_STORE/archive/*.md`) → restore to HOT via `/fa fa-prune` Step 7 procedure + add recurrence marker
 
 ## Pre-search Obligation (HARD STOP)
 
@@ -255,7 +261,7 @@ Before recording, always search in this order:
 
 ```bash
 # 1. HOT + archive simultaneous grep (recursive)
-grep -rlE "<2-3 key keywords>" ~/.claude/skills/cleanup/data/
+grep -rlE "<2-3 key keywords>" $FA_STORE/
 
 # 2. feedback memory grep
 ls ~/.claude/projects/*/memory/feedback_*.md 2>/dev/null | xargs grep -l "<keyword>"
@@ -267,7 +273,7 @@ ls ~/.claude/projects/*/memory/feedback_*.md 2>/dev/null | xargs grep -l "<keywo
 
 | # | Don't | Do |
 |---|-------------|-----------------|
-| 1 | Grep HOT only → miss archive | Use `grep -rl ~/.claude/skills/cleanup/data/` for recursive search |
+| 1 | Grep HOT only → miss archive | Use `grep -rl $FA_STORE/` for recursive search |
 | 2 | Treat an archive match as a new entry anyway | Call the restore procedure (fa-prune Step 7) to return to HOT |
 
 ## Notes
@@ -280,7 +286,7 @@ ls ~/.claude/projects/*/memory/feedback_*.md 2>/dev/null | xargs grep -l "<keywo
 
 ## Prohibition on writing violation cases in skill/rule files (HARD STOP)
 
-**Violation cases · "Nth-occurrence records" · case history belong in a single location: `~/.claude/skills/cleanup/data/failed-attempts.md`.** Do not write violation cases / "Violation case (YYYY-MM-DD, Nth occurrence)" / "Accumulated violation cases" / "N recurrences" / quoted body text in skill files (`*/SKILL.md`, `*/<topic>.md`) or rule files (`~/.agents/rules/*.md`, `<repo>/.claude/rules/*.md`).
+**Violation cases · "Nth-occurrence records" · case history belong in a single location: `$FA_STORE/failed-attempts.md`.** Do not write violation cases / "Violation case (YYYY-MM-DD, Nth occurrence)" / "Accumulated violation cases" / "N recurrences" / quoted body text in skill files (`*/SKILL.md`, `*/<topic>.md`) or rule files (`~/.agents/rules/*.md`, `<repo>/.claude/rules/*.md`).
 
 ### Don't / Do
 

@@ -39,6 +39,17 @@ backward-compatible default: `${FA_DATA_DIR:-$HOME/.claude/skills/cleanup/data}`
 A future physical relocation only changes this default — callers and scripts must not
 hardcode the path.
 
+The `fa` topics refer to the resolved directory as `$FA_STORE`. Resolve it once per shell
+before running any command that touches the store:
+
+```bash
+FA_STORE="${FA_DATA_DIR:-$HOME/.claude/skills/cleanup/data}"
+```
+
+This covers the whole store — the HOT body, `archive/`, and `rag-pending/` alike. Honouring
+`FA_DATA_DIR` for one of them and hardcoding the others splits the store in half, so a
+configured run would classify one file while recurrence checks and archive moves read another.
+
 ## Procedure
 
 1. **Recurrence pre-check** — run the Stage 0 (RAG) + Stage 1 (grep) procedure exactly as

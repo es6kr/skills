@@ -10,7 +10,7 @@ For each section, check whether the "prevention" content already exists as a rul
 
 ```bash
 # Analysis target
-Each ## section in ~/.claude/skills/cleanup/data/failed-attempts.md
+Each ## section in $FA_STORE/failed-attempts.md
 
 # Comparison target rules
 ~/.agents/rules/*.md (excluding the failed-attempts.md stub itself)
@@ -45,8 +45,8 @@ Apply a self-improving pattern. Classify sections as HOT/COLD based on section d
 
 | Classification | Criterion | Location |
 |------|------|------|
-| HOT | Occurred within the last 30 days **OR** has recurrence history **OR** has a future hook obligation | Kept in `~/.claude/skills/cleanup/data/failed-attempts.md` |
-| COLD | Older than 30 days + no recurrence + COVERED/SKILL_DONE + no future hook obligation | Moved to `~/.claude/skills/cleanup/data/archive/failed-attempts-archive-<YYYY-MM-DD>.md` (see Section 6) |
+| HOT | Occurred within the last 30 days **OR** has recurrence history **OR** has a future hook obligation | Kept in `$FA_STORE/failed-attempts.md` |
+| COLD | Older than 30 days + no recurrence + COVERED/SKILL_DONE + no future hook obligation | Moved to `$FA_STORE/archive/failed-attempts-archive-<YYYY-MM-DD>.md` (see Section 6) |
 
 **Date detection**: Extract the latest date from the `(YYYY-MM-DD)` or `(YYYY-MM-DD, MM-DD)` pattern in the section title. Class-format sections (with an `<!-- fa: ... -->` meta line) instead read the meta line's `last=` field as the section's newest date.
 
@@ -122,9 +122,9 @@ Default values are operating defaults — adjustable by user instruction. HOT/CO
 
 ### 6. Archive file management
 
-`~/.claude/skills/cleanup/data/archive/failed-attempts-archive-<YYYY-MM-DD>.md`:
+`$FA_STORE/archive/failed-attempts-archive-<YYYY-MM-DD>.md`:
 - Stores COLD-demoted sections in date order
-- Location: `~/.claude/skills/cleanup/data/archive/` (same directory as the HOT body → automatically included in recursive Grep)
+- Location: `$FA_STORE/archive/` (same directory as the HOT body → automatically included in recursive Grep)
 - **The archive is not loaded always_on** (the `data/` directory is on-demand only)
 - On name collision, distinguish with a date suffix (e.g., `failed-attempts-archive-YYYY-MM-DD.md`)
 
@@ -138,7 +138,7 @@ Before recording a new case / classifying recurrence, always:
 
 ```bash
 # Search HOT + archive simultaneously (recursive)
-grep -rlE "<key-keywords>" ~/.claude/skills/cleanup/data/
+grep -rlE "<key-keywords>" $FA_STORE/
 ```
 
 - Match in HOT only → new (1st occurrence)
