@@ -21,6 +21,7 @@ Defect 2 survived: one copy was fixed, the other kept the stale template).
 import ast
 import filecmp
 import io
+import re
 import importlib.util
 import json
 import sys
@@ -272,4 +273,34 @@ def test_intake_failure_is_reported_not_swallowed(script_path, monkeypatch):
     assert "Something went wrong" in reported, (
         "intake error body must reach the caller — swallowing it to a one-line "
         "WARN is what made this defect expensive to diagnose"
+    )
+
+
+# ----------------------------------------- Defect 4: plane scripts stay out of fix-plan
+#
+# plane_* scripts belong to the backlog skill (and plane_sync.py to the
+# company-side plane skill). The fix-plan skill previously carried its own
+# copies, and that dual-script drift is how Defect 2 survived. This guard
+# fails the build if any plane_* script reappears under skills/fix-plan/.
+
+
+def test_fix_plan_skill_carries_no_plane_scripts():
+    if not FIX_PLAN_SCRIPTS.is_dir():
+        pytest.skip("fix-plan skill has no scripts directory")
+    strays = sorted(p.name for p in FIX_PLAN_SCRIPTS.glob("plane_*.py"))
+    assert strays == [], (
+        "plane_* scripts must not live under skills/fix-plan/scripts/ — they "
+        f"belong to the backlog skill. Found: {strays}"
+    )
+
+
+def test_fix_plan_skill_md_does_not_own_plane_scripts():
+    skill_md = REPO_ROOT / "skills" / "fix-plan" / "SKILL.md"
+    if not skill_md.is_file():
+        pytest.skip("fix-plan SKILL.md absent")
+    text = skill_md.read_text(encoding="utf-8")
+    owned = re.findall(r"fix-plan/scripts/(plane_\w+\.py)", text)
+    assert owned == [], (
+        "fix-plan SKILL.md must not point at plane_* scripts under its own "
+        f"scripts/ dir. Found: {sorted(set(owned))}"
     )
