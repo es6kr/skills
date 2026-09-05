@@ -143,9 +143,9 @@ def insert_item(text: str, section: str, item: str, position: str) -> str:
     return "\n".join(lines[:at] + block + lines[at:])
 
 
-def atomic_write(path: str, text: str) -> None:
+def atomic_write(path: str, text: str, prefix: str = ".add_item.") -> None:
     d = os.path.dirname(os.path.abspath(path)) or "."
-    fd, tmp = tempfile.mkstemp(dir=d, prefix=".add_item.", suffix=".tmp")
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=prefix, suffix=".tmp")
     try:
         with io.open(fd, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)

@@ -591,6 +591,18 @@ hooks:
     reason: Retired in favor of commit-tidy and github-flow rules
   implementations: []
   registrations: []
+- id: block-summary-status-vocab
+  owner_skill: consolidate
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: python
+    file: skills/consolidate/resources/block-summary-status-vocab.py
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Bash
+    command: python3 ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-status-vocab.py
 - id: block-noncompliant-review-comment
   owner_skill: consolidate
   marketplace: es6kr-skills
