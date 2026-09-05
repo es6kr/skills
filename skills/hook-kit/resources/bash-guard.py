@@ -536,6 +536,193 @@ def check_pr_merge_ready_empty_commits(command: str) -> str | None:
     )
 
 
+# ── gh pr merge --squash / --rebase prevention guard (Merge-Commit Enforcement) ──
+GH_PR_MERGE_RE = re.compile(r"\bgh\s+pr\s+merge\b")
+
+
+def check_pr_merge_squash_policy(command: str) -> str | None:
+    """Block squash/rebase merges on multi-commit PRs.
+    Squash or rebase merging collapses Conventional Commit granularity,
+    corrupting release-please per-package semantic version bumps.
+    Bypass: ALLOW_SQUASH_MERGE=1.
+    """
+    if os.environ.get("ALLOW_SQUASH_MERGE") == "1" or "ALLOW_SQUASH_MERGE=1" in command:
+        return None
+    if not GH_PR_MERGE_RE.search(command):
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+
+    # Verify gh pr merge is a real invocation
+    is_merge = False
+    for i in range(len(tokens) - 2):
+        if tokens[i] == "gh" and tokens[i + 1] == "pr" and tokens[i + 2] == "merge":
+            is_merge = True
+            break
+    if not is_merge:
+        return None
+
+    has_squash = any(t in ("-s", "--squash") for t in tokens)
+    has_rebase = any(t in ("-r", "--rebase") for t in tokens)
+
+    if has_squash or has_rebase:
+        strategy = "--squash" if has_squash else "--rebase"
+        return (
+            f"`gh pr merge {strategy}` is blocked on multi-commit PRs.\n\n"
+            "Why blocked:\n"
+            "  - Squash-merging or rebase-merging multi-commit PRs collapses Conventional Commit granularity "
+            "and causes release-please to corrupt per-package semantic version bumps.\n"
+            "  - Multi-commit PRs must use `gh pr merge <PR> --merge` to create a merge commit and preserve commit history.\n\n"
+            "Required action:\n"
+            "  - Use `gh pr merge <PR> --merge` (default merge-commit policy), OR\n"
+            "  - If squash merge is explicitly intended for a single atomic commit, prefix with ALLOW_SQUASH_MERGE=1.\n\n"
+            "Reference: github-flow/merge.md 'Merge-Commit Enforcement'."
+        )
+    return None
+
+
+# ── Feat tag file-addition integrity guard ──
+def check_feat_tag_file_addition_integrity(
+    commit_msg: str,
+    staged_files: list[tuple[str, str]] | list[str],
+) -> str | None:
+    """Enforce:
+    1. If commit type is `feat`, at least 1 new skill/topic/script file MUST be added (Status 'A').
+    2. If a new skill/topic/script file is added (Status 'A'), commit type MUST be `feat`.
+    """
+    is_feat = bool(re.match(r"^feat(\([^)]+\))?!?:", commit_msg))
+
+    parsed_files: list[tuple[str, str]] = []
+    for item in staged_files:
+        if isinstance(item, tuple):
+            parsed_files.append(item)
+        elif isinstance(item, str):
+            parsed_files.append(("M", item))
+
+    has_added_skill_file = any(
+        status == "A" and bool(re.search(r"^skills/[^/]+/(topics/|scripts/|resources/|[^/]+\.md$|[^/]+\.py$|[^/]+\.sh$)", path))
+        for status, path in parsed_files
+    )
+
+    if is_feat and not has_added_skill_file:
+        return (
+            "`feat:` commit tag requires adding a new skill, topic, or script file.\n\n"
+            "Why blocked:\n"
+            "  - Conventional Commit `feat:` triggers a minor version bump in release-please.\n"
+            "  - Pure modifications, bugfixes, or refactors on existing files must use `fix:`, `refactor:`, "
+            "or `chore:` to prevent unintended minor version bumps.\n\n"
+            "Required action:\n"
+            "  - If modifying existing files, change commit tag to `fix(scope):` or `refactor(scope):`, OR\n"
+            "  - If adding a genuinely new feature/skill/topic, ensure the new file is staged as an added file (Status 'A').\n\n"
+            "Reference: plan-conflict-reduction-merge-flow.md 'Feat Tag File-Addition Integrity Guard'."
+        )
+
+    if not is_feat and has_added_skill_file:
+        return (
+            "Adding a new skill, topic, or script file requires commit type `feat:`.\n\n"
+            "Why blocked:\n"
+            "  - Adding a new skill capability, topic, or script is a new feature that must trigger a minor version bump in release-please.\n"
+            "  - Using `fix:` or `chore:` when adding new skill files causes release-please to skip or under-bump the package version.\n\n"
+            "Required action:\n"
+            "  - Change commit tag to `feat(scope): <description>`.\n\n"
+            "Reference: plan-conflict-reduction-merge-flow.md 'Feat Tag File-Addition Integrity Guard'."
+        )
+    return None
+
+
+# ── Direct main PR threshold & CodeRabbit 50-file guard ──
+def check_pr_create_routing_and_file_limit(
+    command: str,
+    changed_files: list[str] | None = None,
+    commit_count: int | None = None,
+) -> str | None:
+    """Block direct PR to main if < 5 commits and < 10 files, and block PR if > 50 files (CodeRabbit limit)."""
+    if not GH_TOKEN_RE.search(command) or not PR_CREATE_PREFILTER.search(command):
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+
+    is_pr_create = False
+    for i in range(len(tokens) - 2):
+        if tokens[i] == "gh" and tokens[i + 1] == "pr" and tokens[i + 2] == "create":
+            is_pr_create = True
+            break
+    if not is_pr_create:
+        return None
+
+    # Resolve target base branch
+    base_branch = "develop"
+    for i, tok in enumerate(tokens):
+        if tok in ("-B", "--base") and i + 1 < len(tokens):
+            base_branch = tokens[i + 1]
+            break
+        elif tok.startswith("--base="):
+            base_branch = tok.split("=", 1)[1]
+            break
+
+    target_is_main = base_branch in ("main", "master", "origin/main", "origin/master")
+    allow_direct_main = os.environ.get("ALLOW_DIRECT_MAIN_PR") == "1" or any(t == "ALLOW_DIRECT_MAIN_PR=1" for t in tokens)
+
+    # Lazily query git diff / log if not supplied
+    if changed_files is None:
+        try:
+            r = subprocess.run(
+                ["git", "diff", "--name-only", f"origin/{base_branch}...HEAD"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if r.returncode == 0:
+                changed_files = [l for l in r.stdout.splitlines() if l.strip()]
+            else:
+                changed_files = []
+        except Exception:
+            changed_files = []
+
+    if commit_count is None:
+        try:
+            r = subprocess.run(
+                ["git", "log", f"origin/{base_branch}..HEAD", "--oneline"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if r.returncode == 0:
+                commit_count = len([l for l in r.stdout.splitlines() if l.strip()])
+            else:
+                commit_count = 0
+        except Exception:
+            commit_count = 0
+
+    # 1. CodeRabbit 50-file limit check (applies to all PRs)
+    if len(changed_files) > 50:
+        return (
+            f"PR contains {len(changed_files)} changed files (exceeds CodeRabbit 50-file review limit).\n\n"
+            "Why blocked:\n"
+            "  - CodeRabbit review drops out or fails on PRs exceeding 50 changed files.\n"
+            "  - Large batch PRs must be split into smaller atomic batches (<= 50 files).\n\n"
+            "Required action:\n"
+            "  - Split changes into smaller PRs with at most 50 files each.\n\n"
+            "Reference: plan-conflict-reduction-merge-flow.md '50-File CodeRabbit Guard'."
+        )
+
+    # 2. Direct Main PR Threshold check
+    if target_is_main and not allow_direct_main:
+        if commit_count < 5 and len(changed_files) < 10:
+            return (
+                f"Direct PR to `{base_branch}` with only {commit_count} commit(s) and {len(changed_files)} file(s) is blocked.\n\n"
+                "Why blocked:\n"
+                "  - Small feature/fix branches must target `develop` staging branch to avoid constant merge conflicts on `main`.\n"
+                "  - Direct PR to `main` is reserved for batched promotion PRs (>= 5 commits OR >= 10 changed files).\n\n"
+                "Required action:\n"
+                "  - Target `develop` instead: `gh pr create --base develop ...`, OR\n"
+                "  - If this is an urgent hotfix directly approved for main, prefix with `ALLOW_DIRECT_MAIN_PR=1`.\n\n"
+                "Reference: plan-conflict-reduction-merge-flow.md 'Develop vs Main Routing'."
+            )
+
+    return None
+
+
 # ── gh api -f/--raw-field with @<path> file-read syntax (ported from
 # block-gh-api-lowercase-f-file-read.sh) — -f always sends a literal string;
 # only -F/--field supports @file reads. The bug silently PATCHes/POSTs the
@@ -915,6 +1102,14 @@ def evaluate(
     if pr_reason:
         return hard(pr_reason)
 
+    pr_create_routing_reason = check_pr_create_routing_and_file_limit(command)
+    if pr_create_routing_reason:
+        return hard(pr_create_routing_reason)
+
+    pr_merge_squash_reason = check_pr_merge_squash_policy(command)
+    if pr_merge_squash_reason:
+        return hard(pr_merge_squash_reason)
+
     pr_merge_ready_reason = check_pr_merge_ready_empty_commits(command)
     if pr_merge_ready_reason:
         return hard(pr_merge_ready_reason)
@@ -947,12 +1142,17 @@ def evaluate(
     # ── Phase 2 ──
     if re.search(r"git\s+commit", command) and "--amend" not in command:
         staged_files: list[str] = []
+        staged_files_with_status: list[tuple[str, str]] = []
         try:
             r = subprocess.run(
-                ["git", "diff", "--cached", "--name-only"],
+                ["git", "diff", "--cached", "--name-status"],
                 capture_output=True, text=True, timeout=5,
             )
-            staged_files = [l for l in r.stdout.splitlines() if l.strip()]
+            for line in r.stdout.splitlines():
+                parts = line.strip().split("\t", 1)
+                if len(parts) == 2:
+                    staged_files_with_status.append((parts[0], parts[1]))
+                    staged_files.append(parts[1])
             staged = len(staged_files)
             if staged == 0:
                 warnings.append("[staged-guard] No staged files. Run git add first.")
@@ -966,7 +1166,12 @@ def evaluate(
             msg = m.group(1)
             if not re.match(r"^(feat|fix|docs|style|refactor|test|chore|ci|perf|build|revert)(\(.+\))?!?:", msg):
                 warnings.append("[commit-validator] Conventional Commit format recommended: type(scope): description")
-            elif re.match(r"^docs(\(.+\))?!?:", msg):
+            else:
+                feat_tag_reason = check_feat_tag_file_addition_integrity(msg, staged_files_with_status)
+                if feat_tag_reason:
+                    soft_blocks.append(f"BLOCK: [feat-tag-integrity] {feat_tag_reason}")
+
+            if re.match(r"^docs(\(.+\))?!?:", msg):
                 # Skill markdown is a behaviour surface, not documentation
                 # (feedback_skill_md_commit_tag_staging.md) — es6kr/skills'
                 # next-fix/next-feat "adjudicate" CI job hard-fails
@@ -1168,6 +1373,12 @@ def self_test() -> int:
         (False, False, "gh pr comment 123 --body 'plain review comment'"),
         (False, False, "gh pr view 123"),
         (False, False, 'echo "posting AI Review Summary later"'),
+        # ── gh pr merge --squash / --rebase prevention guard ──
+        (True, False, "gh pr merge 123 --squash"),
+        (True, False, "gh pr merge 123 --rebase"),
+        (False, False, "gh pr merge 123 --merge"),
+        (False, False, "ALLOW_SQUASH_MERGE=1 gh pr merge 123 --squash"),
+        (False, False, 'echo "gh pr merge --squash is forbidden"'),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:
