@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# .githooks/post-commit
+# Automatically reflect local skill changes into Claude Code marketplace clone
+# Enables instant 0-second testing in local agent sessions before PR/merge.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+DEV_REFLECT_SCRIPT="$REPO_ROOT/skills/cc-plugin/scripts/dev-reflect.sh"
+
+if [ -f "$DEV_REFLECT_SCRIPT" ] && [ -d "$HOME/.claude/plugins/marketplaces/es6kr-skills" ]; then
+  echo "[post-commit] Reflecting local changes to marketplace clone (es6kr-skills)..."
+  bash "$DEV_REFLECT_SCRIPT" --source "$REPO_ROOT" --marketplace es6kr-skills >/dev/null 2>&1 || true
+  echo "[post-commit] ✅ dev-reflect completed (0-sec hot reload active for current machine)."
+fi
+
+exit 0

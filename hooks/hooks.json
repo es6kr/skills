@@ -184,7 +184,7 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js"
           }
         ]
       },
@@ -225,7 +225,7 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js"
           }
         ]
       },
@@ -308,10 +308,6 @@
       {
         "matcher": "",
         "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/session/resources/session-id-inject.js SessionStart"
-          },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"

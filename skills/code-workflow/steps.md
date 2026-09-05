@@ -2,7 +2,7 @@
 
 The core 4-stage procedure (Steps 0-3). Step 4 (Implement) is in [implement.md](./implement.md).
 
-> **`output-dir`**: All research/plan files are written to the configured `output-dir` (default: workspace-local `llm-wiki/outputs/`; authoritative plans may be promoted to `pages/<domain>/` per the workspace wiki convention). Examples below use `{output-dir}` as placeholder.
+> **`output-dir`**: All research/plan files are written to the configured `output-dir` (resolved via `WSCFG_ARTIFACTS_PATH`, default: `.agents/docs/generated`; authoritative domain knowledge may be promoted to LLM Wiki via `raw-ingest`). Examples below use `{output-dir}` as placeholder.
 
 0. **Task Checklist Registration (Tool Call #1 MANDATORY HARD STOP)**: The very first tool call upon entering `/code-workflow` MUST be creating or updating `task.md` (or `TodoWrite`) with the 4 workflow steps (Research, Plan, Review, Implement). No research commands (`run_command`), file viewing (`view_file`), or search (`grep_search`) are allowed before `task.md` is initialized.
 1. Check if **research/plan files** already exist in `{output-dir}` for the target task. **If the project-local `{output-dir}` has nothing for the task, also check the workspace-root Ralph directory** (e.g. `<workspace-root>/.ralph/docs/generated/`, one level above any individual project repo) before concluding no governing plan exists — cross-cutting or organization-level plans (e.g. a release-branch-strategy decision spanning multiple repos) are often written there instead of inside a single project's `docs/generated/`
@@ -69,6 +69,7 @@ When executing multi-phase workflows (`/code-workflow`, `/fix-plan add --deep`),
 - **Phase & Milestone Boundaries**: At major boundaries (Phase 2 Plan authoring complete, Phase 3 User Review approved, Phase 4 TDD implementation complete, Phase 5 verification complete), the agent MUST synchronize the progress across `plan-*.md` (marking completed phases/items as `[x]`) and `fix_plan.md` (updating task status and audit/completion metadata).
 - **Phase-Completion Mandatory Commit Gate (HARD STOP)**: At the completion of each implementation Phase (e.g. Phase 1-B) or independent logical unit, the agent MUST review modified files, analyze commit split discipline via `commit-tidy`, and execute the Pre-Commit Verification Ask (`AskUserQuestion`) to secure user approval and commit changes before moving to the next Phase or suggesting `/next`.
 - **Session Wrap-up (`/cleanup`)**: Final reconciliation ensures all 3 surfaces are 100% consistent.
+ 
 **Examples**:
 - Even if `[ ] PR #278 merge` is in the task list, if the plan states "Phase 1 Unit Test → Phase 2 Proxy Test → ... → PR merge", start from Phase 1
 - Simple items with no plan file can be proceeded immediately
@@ -183,7 +184,7 @@ chain: []                  # optional: issue dependency chain (see github-flow/d
 
 The plan body starts after the frontmatter with `# Plan: [Title]` heading. The heading title should match the frontmatter `title` field.
 
-**Backlog & LLM Wiki Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) and `llm-wiki/index.md` / `log.md` is MANDATORY**. Never leave a newly created plan un-indexed in the backlog or LLM Wiki repository. **If the plan was promoted from a Plan Draft, the entry MUST be moved from `## Plan Drafts` to `## Fable Target Tasks` (with `audit_status: pending_opus_fable_audit` / `[BLOCKED:P*:selfable]`) for Fable/Opus+ model deep audit before implementation.** Leaving `[PROMOTED]` items in `## Plan Drafts` is strictly prohibited.
+**Backlog & Workspace Registration (MANDATORY HARD STOP)**: Upon writing or updating any `plan-*.md` file in `{output-dir}`, **registering the plan entry in the active workspace's backlog (`fix_plan.md`) is MANDATORY**. Never leave a newly created plan un-indexed in the backlog. If the plan represents curated domain knowledge intended for team sharing, ask the user via `AskUserQuestion` whether it should be ingested to LLM Wiki via the `raw-ingest` skill (never write directly to `llm-wiki/outputs/` or index un-curated notes into `index.md`). **If the plan was promoted from a Plan Draft, the entry MUST be moved from `## Plan Drafts` to `## Fable Target Tasks` (with `audit_status: pending_opus_fable_audit` / `[BLOCKED:P*:selfable]`) for Fable/Opus+ model deep audit before implementation.** Leaving `[PROMOTED]` items in `## Plan Drafts` is strictly prohibited.
 
 **Mandatory sections** (Plan is incomplete if any are missing):
 1. **Approach** — Detailed explanation of the chosen approach

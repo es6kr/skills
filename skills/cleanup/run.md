@@ -273,8 +273,7 @@ Even if the user chose "don't commit now" / "hold" in a prior turn/cleanup, **th
 2. Are you about to extend a prior user decision ("don't commit now" etc.) to this cleanup? → Violation. A new ask is required for new changes at this cleanup point
 3. Are you about to write an autonomous-judgment word like "user decision: hold maintained" in the Step 1 row of the report? → Violation. Use factual wording: "commit-tidy call result: N commits / N ask-hold decisions"
 4. Are you about to skip the commit-tidy call itself? → Skip is only allowed with 0 changes. If there is 1+ change, calling is mandatory
-
-For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "extending a prior commit-hold decision to new changes."
+5. **Before offering a "push this branch" option after a commit, does the current branch name match an accumulation-only pattern** (`local`, `local-only`, `wip`, `scratch`, `staging-local`, etc. — repo-agnostic, not limited to any one project's documented branch)? If yes, do not offer a push option for it — offer "cherry-pick to a feature branch, then push that branch" instead. If unsure, check `git ls-remote origin | grep <branch>` first: zero history there is itself evidence of accumulation-only intent. (Case history: a commit landed on a branch literally named `local-only`, with zero prior push history on origin, and a push option was still offered for it.)
 
 **Ralph mode**: record the list of uncommitted files to `.ralph/improvements.md`. Do not directly execute commits.
 
@@ -298,7 +297,15 @@ Analyze mistakes made during the session and record them to feedback memory + fa
 
 **Procedure**: see [retrospect.md](../fa/retrospect.md) (owned by the `fa` skill — invoke via `Skill("fa")`) — in Step 6 (FA Prune), when any axis in [fa-prune.md](../fa/fa-prune.md) "Execution trigger (class-based)" fires, calling `Skill("fa", "fa-prune")` is **mandatory** (a text-only note is ❌). Do not restate a numeric threshold here: the flat section-count triggers are deprecated in favour of the class-count / hook-debt / stale-line axes, and a copy of the old number silently diverges from the source the moment it is tuned.
 
-**Skip condition**: skip if there were no mistakes/corrections in the conversation
+**Findings that imply future work must also reach the tracker (HARD STOP)**: the retrospect log records what went wrong; `fix_plan.md` records what will be done. When a finding's remediation is **not fully executed in this session** — a hook the escalation matrix now mandates, a trigger to register, a rule to strengthen, a defect to check elsewhere — register it as a `- [ ]` item in the tracker, in the same step. 2-C below already carries this obligation for pattern-detect candidates; retrospect findings carry it identically. Without the registration the remediation is invisible to the next session's backlog read, so the escalation the entry itself declares never runs.
+
+| # | Don't | Do |
+|---|-------------|-----------------|
+| 1 | Record the finding in the retrospect log and treat 2-A as complete | Also register the outstanding remediation as a tracker `- [ ]` item before closing 2-A |
+| 2 | Turn "should we do this remediation?" into a user ask in place of registering it | Registration makes the work visible; it is not a request to run it now. Scheduling is a separate decision |
+| 3 | Apply the registration obligation only to 2-C because that is where it is written | 2-A and 2-C are symmetric on this point — the medium differs, the obligation does not |
+
+**Skip condition**: skip if there were no mistakes/corrections in the conversation. The tracker-registration obligation additionally skips when the remediation was fully executed this session (say so in the report) or the finding is purely descriptive.
 
 ### 2-B. Automation Review (hook + skill check)
 
@@ -812,6 +819,7 @@ Example: `opus-vsix-release-a1b2c3d4` (the `<sessid8>` shown is illustrative —
 | 5 | **The comprehensive/end report omits the UUID entirely** (only mentions commits/files/RAG) | **The end report's first line or table must include an explicit "Session ID: <UUID>" row** |
 | 6 | Propose a bare topic-slug name (no model prefix, no session-id suffix) in the cleanup end-report | Use the `<model>-<topic>-<sessid8>` format — e.g. `opus-vsix-release-a1b2c3d4` — so the name carries model + session-id for findability + grep |
 | 7 | Glue a label and colon inside the same code span as the command (e.g. `` `Recommend: /rename <name>` ``) — copying that span pastes "Recommend: /rename <name>" as one broken string | Keep the command in its own clean span — `` `/rename <name>` `` — with the label as plain text outside it, so a single copy-paste of the span is directly runnable |
+| 8 | Put the `/rename` command in a fenced code block (triple-backtick fence) — a fence with no language specifier renders as plain monospace with no color highlight, so the command reads as unhighlighted plain text and does not stand out | Use an **inline code span** — `` `/rename <name>` `` — which renders with a highlighted background, making the single runnable command visually distinct at a glance. "code span" throughout this row means the inline single-backtick form, never a fenced block |
 
 **Applicable timing**: all text throughout this skill's steps — progress reports, AskUserQuestion descriptions, completion reports, checklist items.
 
@@ -846,7 +854,7 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 
 Chat text alone is not a state-preservation medium — it scrolls away and is not resumable across a compact/session boundary the way a file is. Antigravity's `wip/antigravity.md` already mandates a persistent `walkthrough.md` artifact with incremental updates as work progresses (its own environment's "Mandatory Incremental Walkthrough Update" rule); Claude Code sessions never got the equivalent, so this comprehensive report existed only as ephemeral response text.
 
-**Procedure**: in addition to emitting the comprehensive matrix as response text (unchanged), write (or, on a 2nd+ cleanup pass this session, incrementally update) the same content to a file named `walkthrough-<topic>-<sessid8>.md`, using the storage-location fallback logic from `vibe-coding/artifact-rules.md` "Artifact Storage Locations" (`{ws}/llm-wiki/generated/` → `{ws}/.ralph/docs/generated/` (or the workspace's equivalently-named Ralph-loop directory, e.g. `.agents/docs/generated/`) → `{ws}/.omc/plans/` → `{ws}/docs/generated/` fallback). `<topic>` and `<sessid8>` follow the same convention as the `/rename` recommendation (dominant-work topic, kebab-case; session UUID's leading 8 hex).
+**Procedure**: in addition to emitting the comprehensive matrix as response text (unchanged), write (or, on a 2nd+ cleanup pass this session, incrementally update) the same content to a file named `walkthrough-<topic>-<sessid8>.md`, using the workspace artifacts storage path (`$WSCFG_ARTIFACTS_PATH` or fallback: `{ws}/.agents/docs/generated/` → `{ws}/.ralph/docs/generated/` → `{ws}/docs/generated/`). `<topic>` and `<sessid8>` follow the same convention as the `/rename` recommendation (dominant-work topic, kebab-case; session UUID's leading 8 hex).
 
 **Content**: the walkthrough file body is a narrative account of the session's work — not merely a copy of the comprehensive matrix table. Include what was attempted, what was found, what decisions were made and why, and what the matrix's rows summarize in table form. The matrix table itself may be embedded at the end of the file as a quick-reference appendix.
 
@@ -857,7 +865,7 @@ Chat text alone is not a state-preservation medium — it scrolls away and is no
 | 1 | Treat the chat-text comprehensive report as sufficient state preservation | Also write it to a `walkthrough-<topic>-<sessid8>.md` file — chat text is ephemeral, the file persists |
 | 2 | Copy the matrix table verbatim as the entire file body | Write a narrative account (what/why/decisions), with the matrix as an appendix |
 | 3 | Create a new walkthrough file on every `/cleanup` firing within the same session | Update the existing session walkthrough file incrementally |
-| 4 | Guess a storage path | Follow `vibe-coding/artifact-rules.md`'s Artifact Storage Locations fallback logic |
+| 4 | Guess a storage path | Follow the workspace-configured `WSCFG_ARTIFACTS_PATH` or `.agents/docs/generated/` fallback |
 
 **Mandatory report-medium items** (all included in a single response text):
 
