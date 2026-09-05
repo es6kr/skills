@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/fix-v0.4.2...fix-v0.5.0) (2026-09-05)
+
+
+### Features
+
+* **fa:** move FA lifecycle ownership (retrospect, fa-prune, scripts) from cleanup to fa ([fd7f18e](https://github.com/es6kr/skills/commit/fd7f18ef9e85b8e3170b41ed6a52bce524d81bc7))
+* promote next-feat (fa lifecycle ownership) ([90c90bb](https://github.com/es6kr/skills/commit/90c90bb4796087ff6eaa5491b3c4524f7ed829a7))
+
+
+### Bug Fixes
+
+* **cleanup:** hand retrospect and fa-prune ownership to the fa skill ([5821410](https://github.com/es6kr/skills/commit/58214106c334fbce36559a1495d5131513152524))
+* **fix:** honour FA_DATA_DIR in the Stage 1 recurrence pre-check ([df2eb5b](https://github.com/es6kr/skills/commit/df2eb5b41d7a4133a2b5700a31e4f074174947dd))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/fix-v0.4.1...fix-v0.4.2) (2026-08-29)
 
 

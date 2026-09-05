@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/todowrite-v0.8.2...todowrite-v0.9.0) (2026-09-05)
+
+
+### Features
+
+* promote develop (schema, hook-kit, cleanup, wip, todowrite) ([5938cea](https://github.com/es6kr/skills/commit/5938cea0a20eaf93aec4d373298e58ccc3f2a682))
+
+
+### Documentation
+
+* **todowrite:** clarify TaskList pending task registration for residual follow-up work ([851f899](https://github.com/es6kr/skills/commit/851f899a3276727a52202b5e17f80007b89ebf85))
+
 ## [0.8.2](https://github.com/es6kr/skills/compare/todowrite-v0.8.1...todowrite-v0.8.2) (2026-08-26)
 
 

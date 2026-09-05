@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/cleanup-v0.3.0...cleanup-v0.4.0) (2026-09-05)
+
+
+### Features
+
+* promote develop (schema, hook-kit, cleanup, wip, todowrite) ([5938cea](https://github.com/es6kr/skills/commit/5938cea0a20eaf93aec4d373298e58ccc3f2a682))
+* promote next-feat (fa lifecycle ownership) ([90c90bb](https://github.com/es6kr/skills/commit/90c90bb4796087ff6eaa5491b3c4524f7ed829a7))
+
+
+### Bug Fixes
+
+* **cleanup:** make hook review registry-first (hook-registry.yaml before live surfaces) ([389fff8](https://github.com/es6kr/skills/commit/389fff87eaa5270e7031cee0e64a3456b5727848))
+* **cleanup:** stop the context gate matching a keyword inside branch names ([60d0ac5](https://github.com/es6kr/skills/commit/60d0ac5b11ca05de5f5d2bc2579f385c6bc074e4))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/cleanup-v0.2.0...cleanup-v0.3.0) (2026-09-05)
 
 

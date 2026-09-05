@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/claudify-v0.8.0...claudify-v0.9.0) (2026-09-05)
+
+
+### Features
+
+* promote next-feat (fa lifecycle ownership) ([90c90bb](https://github.com/es6kr/skills/commit/90c90bb4796087ff6eaa5491b3c4524f7ed829a7))
+
+
+### Bug Fixes
+
+* **claudify:** dispatch FA prune through Skill("fa", "fa-prune") ([82468bf](https://github.com/es6kr/skills/commit/82468bf455eed29bbb260d65a15ae24727779099))
+* **claudify:** make improve B.1 hook review registry-first ([2a24e73](https://github.com/es6kr/skills/commit/2a24e73bfb92ce7704b8f210c6944f0dde4e7cda))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/claudify-v0.7.1...claudify-v0.8.0) (2026-09-01)
 
 
