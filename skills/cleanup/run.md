@@ -285,7 +285,7 @@ For case history, see `~/.claude/skills/cleanup/data/failed-attempts.md` under "
 Analyze session mistakes, review hooks/skills, and detect patterns.
 
 **Automated Script Execution**:
-- Run `python <skill-dir>/scripts/fa-analyze.py` to audit the retrospect log's rules and status tags and surface recurring error classes. The log lives in this skill's own gitignored data directory, so a fresh install will not have one — the script raises `FileNotFoundError` rather than skipping, so pass `--file` a log that exists.
+- Run `python <fa-skill-dir>/scripts/fa-analyze.py` (the script moved to the `fa` skill with FA lifecycle ownership) to audit the retrospect log's rules and status tags and surface recurring error classes. The log lives in a gitignored data store (`FA_DATA_DIR` resolvable — see fa/SKILL.md "FA data store"), so a fresh install will not have one — the script raises `FileNotFoundError` rather than skipping, so pass `--file` a log that exists.
 
 [claudify/improve.md](../claudify/improve.md) — planned conversion to a `Skill("claudify", "improve")` call.
 Currently the procedure below runs directly within cleanup.
@@ -296,7 +296,7 @@ Analyze the session's episodic data (mistakes, hook/skill behavior, repeated pat
 
 Analyze mistakes made during the session and record them to feedback memory + failed-attempts.md.
 
-**Procedure**: see [retrospect.md](./retrospect.md) — in Step 6 (FA Prune), when any axis in [fa-prune.md](./fa-prune.md) "Execution trigger (class-based)" fires, calling `Skill("cleanup", "fa-prune")` is **mandatory** (a text-only note is ❌). Do not restate a numeric threshold here: the flat section-count triggers are deprecated in favour of the class-count / hook-debt / stale-line axes, and a copy of the old number silently diverges from the source the moment it is tuned.
+**Procedure**: see [retrospect.md](../fa/retrospect.md) (owned by the `fa` skill — invoke via `Skill("fa")`) — in Step 6 (FA Prune), when any axis in [fa-prune.md](../fa/fa-prune.md) "Execution trigger (class-based)" fires, calling `Skill("fa", "fa-prune")` is **mandatory** (a text-only note is ❌). Do not restate a numeric threshold here: the flat section-count triggers are deprecated in favour of the class-count / hook-debt / stale-line axes, and a copy of the old number silently diverges from the source the moment it is tuned.
 
 **Skip condition**: skip if there were no mistakes/corrections in the conversation
 

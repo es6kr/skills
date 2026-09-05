@@ -63,6 +63,58 @@ jobs:
           done < <(git ls-files '*.md' '*.sh' | grep -v '^skills/')
           exit "$FAIL"
 
+  skill-tests:
+    name: Skill Tests (skills/*/tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # hook_registry_verify.py needs PyYAML, and test-hook-registry-fix.sh
+      # exits 0 with a SKIP line when it cannot import yaml — without this
+      # install the job would be green while testing nothing.
+      - run: pip install pyyaml
+      # Skill-level tests live outside the top-level tests/ dir, so neither the
+      # bats job (tests: tests/) nor the pytest job (pytest tests) reaches them.
+      # Until this job existed they ran nowhere but a developer's machine —
+      # including the only regression guard for hook_registry_verify.py --fix,
+      # which rewrites hook-registry.yaml and the live hooks/hooks.json.
+      #
+      # KNOWN-FAILING, excluded until each is fixed (do not add to this list to
+      # silence a newly-broken test — fix it or open an issue first):
+      #   test-ask-guard-allowlist.sh )  exercise skills/hook-kit/resources/ask-guard.sh,
+      #   test-ask-guard-fp.sh        )  which lives in another marketplace, not
+      #   test-guards-config.sh       )  in this repo — they cannot pass here
+      #   test-check-session-rag.sh      R6/R7 assertions fail
+      #   fa/scripts/test-fa-classify-meta.py  fa_classify.parse_section_meta missing
+      - name: Shell tests
+        run: |
+          set -u
+          SKIP='test-ask-guard-allowlist\.sh|test-ask-guard-fp\.sh|test-guards-config\.sh|test-check-session-rag\.sh'
+          FAIL=0
+          for t in skills/*/tests/*.sh; do
+            if printf '%s\n' "$t" | grep -qE "$SKIP"; then
+              echo "::notice file=$t::skipped — known-failing, see workflow comment"
+              continue
+            fi
+            echo "::group::$t"
+            bash "$t" || FAIL=1
+            echo "::endgroup::"
+          done
+          exit "$FAIL"
+      - name: Python tests
+        run: |
+          set -u
+          FAIL=0
+          for t in skills/fix-plan/tests/test_workspace_profile.py \
+                   skills/session/scripts/test-repair-compact-boundary.py; do
+            echo "::group::$t"
+            python3 "$t" || FAIL=1
+            echo "::endgroup::"
+          done
+          exit "$FAIL"
+
   frontmatter-lint:
     name: SKILL.md Frontmatter Lint
     runs-on: ubuntu-latest

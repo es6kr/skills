@@ -60,7 +60,7 @@ Example:
 | `doc-recommend` | Recommend documentation | true |
 | `infra-check` | Infra documentation check | true |
 | `memory` | Memory storage (auto memory or Serena) | true |
-| `retrospect` | Analyze mistakes and record to feedback/failed-attempts | true |
+| `retrospect` | Analyze mistakes and record to feedback/failed-attempts (procedure owned by the `fa` skill — `Skill("fa")`) | true |
 | `weekly-report` | Update Weekly Report | true |
 
 ## How It Works
