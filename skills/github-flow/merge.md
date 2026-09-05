@@ -552,11 +552,21 @@ gh pr merge <PR_NUMBER> --squash --subject "feat: add user session countdown UI 
 
 ### Regular Merge (merge commit)
 
-Use only when preserving commit history matters (e.g. merging large deploy branches).
+Use for:
+1. **Multi-commit PRs**: When a PR contains multiple distinct commits that must preserve their individual Conventional Commit history.
+2. **Promotion PRs (`develop` -> `main`)**: When promoting a batch of commits from `develop` to `main`.
+3. **Release-please / Changesets Repos**: To prevent collapsing per-package semantic version bumps (`pkg1` -> minor, `pkg2` -> patch).
 
 ```bash
 gh pr merge <PR_NUMBER> --merge
 ```
+
+#### Promotion PR Title Discipline (HARD STOP)
+
+When creating or merging a promotion PR from `develop` to `main`:
+- **PR Title MUST use `chore:` type** (e.g., `chore(develop): merge develop batch` or `chore: promote develop ...`).
+- **Never use `feat:` or `fix:` for promotion PR titles**: The resulting merge commit inherits the PR title. If the merge commit is titled `feat: ...`, release-please treats it as an umbrella minor bump across ALL touched packages in the PR, corrupting patch-only package releases into unintended minor releases.
+
 
 ## Rules
 

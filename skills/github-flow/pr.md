@@ -76,8 +76,12 @@ Detailed rule: `~/.agents/rules/opensource.md` "PRIVATE repo = Korean default" s
 ### Step 1: Pre-flight Checks
 
 ```bash
-# Detect base branch
-BASE=$(git merge-base HEAD master 2>/dev/null && echo master || echo main)
+# Detect base branch: check if repo maintains a develop staging branch
+if git rev-parse --verify --quiet origin/develop >/dev/null 2>&1; then
+  BASE="develop"
+else
+  BASE=$(git merge-base HEAD master 2>/dev/null && echo master || echo main)
+fi
 
 # Check gh CLI
 gh --version 2>/dev/null || echo "gh not found"
@@ -88,6 +92,11 @@ gh pr list --head $(git branch --show-current) --state open
 
 - If **gh CLI missing** → proceed with body template only (no creation)
 - If **PR already exists** → report to user and stop
+- **Develop Staging Flow (`develop` vs `main`)**:
+  - For repositories utilizing develop staging (e.g. `es6kr/skills`), default target base is `develop`.
+  - Direct PR to `main` is permitted ONLY for promotion PRs with commit count >= 5 OR modified file count >= 10 (or when `ALLOW_DIRECT_MAIN_PR=1` is set).
+- **CodeRabbit 50-File Review Limit (HARD STOP)**:
+  - PRs containing > 50 changed files are strictly BLOCKED. CodeRabbit review drops out or fails on PRs over 50 files. Split changes into smaller PRs (<= 50 files).
 
 #### Step 1.5: GitHub Actions Workflow YAML Verification (HARD STOP — when `.github/workflows/*.yml` was edited)
 
