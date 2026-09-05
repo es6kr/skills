@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/es6kr/skills/compare/session-v0.11.0...session-v0.11.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **session:** truncate auxiliary metadata and mandate IDE restart on rewind ([9d9ce42](https://github.com/es6kr/skills/commit/9d9ce4285a9c57a58d039d4da9f609122214adbc))
+
 ## [0.11.0](https://github.com/es6kr/skills/compare/session-v0.10.0...session-v0.11.0) (2026-09-05)
 
 

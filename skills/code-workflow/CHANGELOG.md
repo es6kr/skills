@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/code-workflow-v0.8.0...code-workflow-v0.9.0) (2026-09-05)
+
+
+### Features
+
+* **code-workflow:** un-hardcode output-dir to WSCFG_ARTIFACTS_PATH and align wiki registration ([51c5b9d](https://github.com/es6kr/skills/commit/51c5b9d56348d3fe04538406964556cdce608dce))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/code-workflow-v0.7.1...code-workflow-v0.8.0) (2026-08-29)
 
 

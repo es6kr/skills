@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/fix-v0.5.0...fix-v0.6.0) (2026-09-05)
+
+
+### Features
+
+* **cc-plugin:** implement post-commit dev-reflect and cache drift guard ([3f78c05](https://github.com/es6kr/skills/commit/3f78c054e7c00e7c33730d3378c5aff6575566e4))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/fix-v0.4.2...fix-v0.5.0) (2026-09-05)
 
 

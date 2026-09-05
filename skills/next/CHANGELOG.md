@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/next-v0.9.2...next-v0.10.0) (2026-09-05)
+
+
+### Features
+
+* **cc-plugin:** implement post-commit dev-reflect and cache drift guard ([3f78c05](https://github.com/es6kr/skills/commit/3f78c054e7c00e7c33730d3378c5aff6575566e4))
+
 ## [0.9.2](https://github.com/es6kr/skills/compare/next-v0.9.1...next-v0.9.2) (2026-09-01)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/cc-plugin-v0.6.2...cc-plugin-v0.7.0) (2026-09-05)
+
+
+### Features
+
+* **cc-plugin:** implement post-commit dev-reflect and cache drift guard ([3f78c05](https://github.com/es6kr/skills/commit/3f78c054e7c00e7c33730d3378c5aff6575566e4))
+* **hooks:** migrate standalone hooks into plugin resources and fix test regressions ([d7b0060](https://github.com/es6kr/skills/commit/d7b0060ddffdd4a7b5f4f9751039ee9a79e049db))
+
 ## [0.6.2](https://github.com/es6kr/skills/compare/cc-plugin-v0.6.1...cc-plugin-v0.6.2) (2026-09-01)
 
 

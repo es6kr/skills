@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/fa-v0.3.0...fa-v0.4.0) (2026-09-05)
+
+
+### Features
+
+* **cc-plugin:** implement post-commit dev-reflect and cache drift guard ([3f78c05](https://github.com/es6kr/skills/commit/3f78c054e7c00e7c33730d3378c5aff6575566e4))
+* **hooks:** migrate standalone hooks into plugin resources and fix test regressions ([d7b0060](https://github.com/es6kr/skills/commit/d7b0060ddffdd4a7b5f4f9751039ee9a79e049db))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/fa-v0.2.0...fa-v0.3.0) (2026-09-05)
 
 
