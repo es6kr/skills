@@ -56,7 +56,7 @@ This mirrors the obligation C (Pattern Detect) already carries for its candidate
 
 #### Hook Review
 
-1. Collect registered hooks from settings.json
+1. Collect registered hooks from the canonical inventory first (`Read skills/hook-kit/hook-registry.yaml`, hook-kit `registry.md`), then compare against the live surfaces (settings.json `hooks`, plugin `hooks/hooks.json`) — ownership comes from the registry row, not from "a plugin hooks.json also lists it"
 2. **File existence check**: Extract script paths → verify files exist → classify missing as "ghost hooks"
 3. Check each hook's session behavior:
    - Triggered + acted on → "OK"
