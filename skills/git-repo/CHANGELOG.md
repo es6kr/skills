@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/git-repo-v0.10.1...git-repo-v0.11.0) (2026-09-05)
+
+
+### Features
+
+* **works-config:** implement v0.2.0 role-based resolution & neutral SSOT guards config ([9dff5c3](https://github.com/es6kr/skills/commit/9dff5c337812dcb23ebb45f7734801f50c9b82c0))
+
 ## [0.10.1](https://github.com/es6kr/skills/compare/git-repo-v0.10.0...git-repo-v0.10.1) (2026-09-01)
 
 

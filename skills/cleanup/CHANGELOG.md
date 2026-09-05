@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/cleanup-v0.4.0...cleanup-v0.5.0) (2026-09-05)
+
+
+### Features
+
+* **cc-plugin:** implement post-commit dev-reflect and cache drift guard ([3f78c05](https://github.com/es6kr/skills/commit/3f78c054e7c00e7c33730d3378c5aff6575566e4))
+* **code-workflow:** un-hardcode output-dir to WSCFG_ARTIFACTS_PATH and align wiki registration ([51c5b9d](https://github.com/es6kr/skills/commit/51c5b9d56348d3fe04538406964556cdce608dce))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/cleanup-v0.3.0...cleanup-v0.4.0) (2026-09-05)
 
 
