@@ -289,6 +289,23 @@ def transition_issue_to_done(profile: dict, workspace: str, project: str, issue:
     return make_plane_request(profile, path, method="PATCH", data={"state": done_state_id})
 
 
+def transition_issue_to_started(profile: dict, workspace: str, project: str, issue: str) -> dict:
+    """PATCH a Plane issue's state to the project's `started`-group state.
+
+    Companion to transition_issue_to_done() -- same DELETE-free PATCH pattern,
+    targeting the "In Progress" state group instead of "Done". Intended to be
+    called at claim time (fix-plan claim_item.py) so a local [CLAIMED] lease
+    is reflected on the linked Plane issue, not just in fix_plan.md. Returns
+    {"error": ...} if the project has no started-group state or the PATCH
+    fails; otherwise the updated issue payload."""
+    states = fetch_project_states(profile, workspace, project)
+    started_state_id = find_state_id_by_group(states, "started")
+    if not started_state_id:
+        return {"error": f"No started-group state found for project {project}"}
+    path = f"workspaces/{workspace}/projects/{project}/issues/{issue}/"
+    return make_plane_request(profile, path, method="PATCH", data={"state": started_state_id})
+
+
 def compute_local_to_plane_updates(lines: list, profile: dict) -> list:
     """The reverse leg of compute_updates(): for index lines whose LOCAL
     marker is already `[x]` but the linked Plane issue isn't yet in the

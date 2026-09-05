@@ -93,10 +93,10 @@ def check_hook_integrity(root):
         "OK": []
     }
 
-    user_home = os.path.expanduser("~")
-    hooks_config = os.path.join(user_home, ".gemini", "config", "hooks.json")
+    # Use root as the base directory for finding hooks.json
+    hooks_config = os.path.join(root, ".gemini", "config", "hooks.json")
     if not os.path.exists(hooks_config):
-        hooks_config = os.path.join(user_home, ".claude", "hooks.json")
+        hooks_config = os.path.join(root, ".claude", "hooks.json")
 
     if not os.path.exists(hooks_config):
         results["MISSING"].append({"file": "hooks.json", "reason": "Global hooks.json config not found"})
