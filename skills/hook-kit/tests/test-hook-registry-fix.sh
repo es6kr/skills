@@ -129,10 +129,10 @@ TOMB=$(python3 - "$SKILLS/skills/hook-kit/hook-registry.yaml" <<'PY'
 import sys, yaml
 hooks = (yaml.safe_load(open(sys.argv[1])) or {}).get("hooks") or []
 e = next((h for h in hooks if h.get("id") == "ghost-guard"), None)
-print("missing" if e is None else f"{e.get('status')}/{bool((e.get('tombstone') or {}).get('date'))}/{bool(e.get('registrations'))}")
+print("missing" if e is None else f"{e.get('status')}/{bool((e.get('tombstone') or {}).get('removed_at'))}/{bool(e.get('registrations'))}")
 PY
 )
-check "tombstone carries status+date and no registrations" "$TOMB" "removed/True/False"
+check "tombstone carries status+removed_at and no registrations" "$TOMB" "removed/True/False"
 
 BEFORE_HASH=$(shasum "$SKILLS/skills/hook-kit/hook-registry.yaml" "$SKILLS/hooks/hooks.json" | shasum)
 FIX2="$(run_verify --fix)"
