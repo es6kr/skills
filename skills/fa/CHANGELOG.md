@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/fa-v0.2.0...fa-v0.3.0) (2026-09-05)
+
+
+### Features
+
+* **fa:** move FA lifecycle ownership (retrospect, fa-prune, scripts) from cleanup to fa ([fd7f18e](https://github.com/es6kr/skills/commit/fd7f18ef9e85b8e3170b41ed6a52bce524d81bc7))
+* **fa:** own the FA lifecycle (topics, scripts, FA_DATA_DIR resolver) ([d0989af](https://github.com/es6kr/skills/commit/d0989af280a965eb3c89d1127fadbf8f74cebfcf))
+* promote next-feat (fa lifecycle ownership) ([90c90bb](https://github.com/es6kr/skills/commit/90c90bb4796087ff6eaa5491b3c4524f7ed829a7))
+
+
+### Bug Fixes
+
+* **cleanup:** hand retrospect and fa-prune ownership to the fa skill ([5821410](https://github.com/es6kr/skills/commit/58214106c334fbce36559a1495d5131513152524))
+* **fa:** scope the "Stop" clause to file ownership, not artifact repair ([#418](https://github.com/es6kr/skills/issues/418)) ([bebf00e](https://github.com/es6kr/skills/commit/bebf00ed2b6684f91a0a35e24aeed41852eab3a8))
+* **fa:** thread the whole FA store through $FA_STORE ([0f020a3](https://github.com/es6kr/skills/commit/0f020a33dd78f5ae72879321964425991d002c4f))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/fa-v0.1.0...fa-v0.2.0) (2026-08-29)
 
 

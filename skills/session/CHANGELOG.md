@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/session-v0.10.0...session-v0.11.0) (2026-09-05)
+
+
+### Features
+
+* **session:** add Orca terminal session resolution and naming guidance ([537c8c6](https://github.com/es6kr/skills/commit/537c8c6eb6663ead32ec4f2144e483ec0ba150ab))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/session-v0.9.0...session-v0.10.0) (2026-09-05)
 
 
