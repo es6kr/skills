@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """update_item.py — sanctioned `update` path for fix_plan.md / checklist.md.
 
-`add_item.py` can add a brand-new schema-valid item, and `cleanup.py` can move
-a fully-checked item into `## Completed`. Neither can mutate an EXISTING item
-in place — flip its marker (e.g. `[ ]` -> `[BLOCKED:P1:external]`) or append a
-one-line progress note — without going around `block-direct-checklist-edit.js`
-via a raw Edit/Write. This closes that gap.
+`add_item.py` can add a brand-new schema-valid item, and `cleanup.py` archives
+entries that are already inside `## Completed` by date cutoff. Neither can
+mutate an EXISTING item in place — flip its marker (e.g. `[ ]` ->
+`[BLOCKED:P1:external]`), append a one-line progress note, or move a finished
+item out of an active section into `## Completed` — without going around
+`block-direct-checklist-edit.js` via a raw Edit/Write. This closes that gap.
 
 Matching: the single item whose action line contains --match (substring, on
 the text after the marker) is mutated. 0 or 2+ matches is an error — the
@@ -15,7 +16,19 @@ guessing which one was meant.
 Usage:
   update_item.py --file <tracker> --match "<substring of the action text>"
                  [--set-marker "[x]"] [--append-note "..."] [--dry-run]
+  update_item.py --file <tracker> --match "<substring>" --move
+                 [--summary "one-line condensed text"] [--dry-run]
   update_item.py --test        # self-test, no tracker required
+
+--move performs a MECHANICAL (non-semantic) version of the fix-plan skill's
+"Move" step (see move.md): it deletes the matched item's entire block (its
+own line plus every sub-bullet) from wherever it currently sits, and inserts
+a single-line, marker-free entry at the top of `## Completed` — either the
+item's own action text verbatim, or an operator-supplied --summary. Multi-item
+semantic merging (move.md's "Merge example") stays a manual, human-only step;
+this only gives a hook-restricted caller a sanctioned way to get one finished
+item out of an active section, even if the resulting summary is just the
+original text carried over as-is.
 
 Exit codes: 0 = ok, 1 = validation/match failure, 2 = usage error.
 """
@@ -35,7 +48,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from add_item import validate_marker, atomic_write, MAX_BODY_LINES  # noqa: E402
+from add_item import validate_marker, atomic_write, MAX_BODY_LINES, insert_item  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -124,6 +137,49 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
     return block
 
 
+def remove_block(lines: list[str], start: int, end: int) -> list[str]:
+    """Delete lines[start:end] and collapse a resulting doubled blank line.
+
+    find_item_block's `end` stops at the first blank line (or EOF/heading), so
+    that trailing blank is NOT part of [start:end) -- it's the separator before
+    whatever follows. Deleting only [start:end) would leave that separator
+    immediately after the separator that preceded the removed item, i.e. two
+    blank lines in a row. Collapse that one case; anything else (item removed
+    from the very top/bottom of a section) is left as-is since there's nothing
+    to double up.
+    """
+    new_lines = lines[:start] + lines[end:]
+    if (
+        0 < start < len(new_lines)
+        and not new_lines[start - 1].strip()
+        and not new_lines[start].strip()
+    ):
+        del new_lines[start]
+    return new_lines
+
+
+def perform_move(lines: list[str], start: int, end: int, summary: str | None) -> tuple[list[str], str]:
+    """Extract the matched block, delete it, and return (new_lines, completed_line).
+
+    completed_line is the marker-free '- <text>' entry the caller inserts into
+    '## Completed' -- kept separate from the insert step so --dry-run can show
+    it without writing, and so the caller decides where in Completed it lands.
+    """
+    m = ITEM_RE.match(lines[start])
+    assert m is not None
+    action_text = m.group(3)
+
+    text = summary.strip() if summary else action_text
+    if "\n" in text or "\r" in text:
+        raise ValueError("--summary must be a single line (no newlines)")
+    if not text:
+        raise ValueError("--summary must not be empty")
+
+    completed_line = f"- {text}"
+    new_lines = remove_block(lines, start, end)
+    return new_lines, completed_line
+
+
 SECTION_RE = re.compile(r"^##[ \t]+(.*\S)[ \t]*$")
 
 # format.md "Marker syntax" lists `- [x]` under `## Progress`, but real trackers
@@ -173,8 +229,12 @@ def validate_section_marker(section: str | None, marker: str) -> None:
 
 
 def run_update(args: argparse.Namespace) -> int:
-    if not args.set_marker and not args.append_note:
-        raise ValueError("at least one of --set-marker / --append-note is required")
+    if not args.set_marker and not args.append_note and not args.move:
+        raise ValueError("at least one of --set-marker / --append-note / --move is required")
+    if args.move and (args.set_marker or args.append_note):
+        raise ValueError("--move cannot be combined with --set-marker / --append-note")
+    if args.summary and not args.move:
+        raise ValueError("--summary only applies together with --move")
     if args.set_marker:
         validate_marker(args.set_marker)
     if args.append_note and ("\n" in args.append_note or "\r" in args.append_note):
@@ -210,6 +270,29 @@ def run_update(args: argparse.Namespace) -> int:
 
         lines = src.split("\n")
         start, end, _indent = find_item_block(lines, args.match)
+
+        if args.move:
+            section = enclosing_section(lines, start)
+            if section == COMPLETED_SECTION:
+                raise ValueError(
+                    f"item is already inside {COMPLETED_SECTION!r} -- nothing to move"
+                )
+            removed_block = lines[start:end]
+            new_lines, completed_line = perform_move(lines, start, end, args.summary)
+            out = insert_item("\n".join(new_lines), COMPLETED_SECTION, completed_line, "top")
+
+            if args.dry_run:
+                print("--- dry-run: removed from its active section ---")
+                print("\n".join(removed_block))
+                print(f"--- dry-run: inserted into {COMPLETED_SECTION!r} ---")
+                print(completed_line)
+                return 0
+
+            atomic_write(args.file, out, prefix=".update_item.")
+            print(f"OK: moved item matching --match {args.match!r} into {COMPLETED_SECTION!r} in {args.file}")
+            print(completed_line)
+            return 0
+
         if args.set_marker:
             validate_section_marker(enclosing_section(lines, start), args.set_marker)
         block = apply_update(lines[start:end], args.set_marker, args.append_note)
@@ -324,6 +407,8 @@ def self_test() -> int:
         ns.set_marker = "[x]"
         ns.append_note = "done via update_item"
         ns.dry_run = False
+        ns.move = False
+        ns.summary = None
         rc = run_update(ns)
         check("run_update returns 0", rc == 0)
         with open(tmp_path, encoding="utf-8") as fh:
@@ -373,6 +458,8 @@ def self_test() -> int:
         ns3.set_marker = "[x]"
         ns3.append_note = None
         ns3.dry_run = False
+        ns3.move = False
+        ns3.summary = None
         try:
             run_update(ns3)
             check("run_update refuses [x] in ## Hold", False)
@@ -400,6 +487,8 @@ def self_test() -> int:
         ns4.set_marker = None
         ns4.append_note = "locked write"
         ns4.dry_run = False
+        ns4.move = False
+        ns4.summary = None
         check("run_update with sidecar lock returns 0", run_update(ns4) == 0)
         check("lock file is NOT left beside the tracker", not os.path.exists(lock_doc + ".lock"))
         _lock = os.path.join(
@@ -428,10 +517,172 @@ def self_test() -> int:
         ns2.set_marker = "[x]"
         ns2.append_note = None
         ns2.dry_run = False
+        ns2.move = False
+        ns2.summary = None
         run_update(ns2)
         check("missing tracker raises", False)
     except ValueError:
         check("missing tracker raises", True)
+
+    # --move: mechanical Move-step (Issue #436)
+
+    # remove_block: deleting a middle item collapses the doubled blank line
+    move_fixture = [
+        "# T", "",
+        "## Priority Tasks", "",
+        "- [ ] item A", "  - **Why**: a", "",
+        "- [x] item B unique-move-target", "  - **Why**: b", "  - **How to apply**: steps for b", "",
+        "- [ ] item C", "  - **Why**: c", "",
+        "## Completed", "",
+        "- pre-existing completed line", "",
+    ]
+    b_start, b_end, _ = find_item_block(move_fixture, "unique-move-target")
+    removed = remove_block(move_fixture, b_start, b_end)
+    check("remove_block deletes the matched block", not any("unique-move-target" in ln for ln in removed))
+    check("remove_block collapses the doubled blank line", "\n".join(removed).count("\n\n\n") == 0)
+    check("remove_block leaves neighboring items intact", "item A" in "\n".join(removed) and "item C" in "\n".join(removed))
+
+    # perform_move: verbatim vs --summary
+    _, completed_line_verbatim = perform_move(move_fixture, b_start, b_end, None)
+    check("perform_move verbatim uses the action text, marker-free", completed_line_verbatim == "- item B unique-move-target")
+    _, completed_line_summary = perform_move(move_fixture, b_start, b_end, "condensed summary text")
+    check("perform_move --summary overrides the verbatim text", completed_line_summary == "- condensed summary text")
+    try:
+        perform_move(move_fixture, b_start, b_end, "two\nlines")
+        check("perform_move rejects a multi-line --summary", False)
+    except ValueError:
+        check("perform_move rejects a multi-line --summary", True)
+
+    # run_update --move end-to-end: active-section [x] item (with sub-bullets) -> one-line Completed entry
+    with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+        tf.write("\n".join(move_fixture))
+        move_path = tf.name
+    try:
+        class NS5:
+            pass
+        ns5 = NS5()
+        ns5.file = move_path
+        ns5.match = "unique-move-target"
+        ns5.set_marker = None
+        ns5.append_note = None
+        ns5.dry_run = False
+        ns5.move = True
+        ns5.summary = None
+        rc = run_update(ns5)
+        check("run_update --move returns 0", rc == 0)
+        with open(move_path, encoding="utf-8") as fh:
+            after_move = fh.read()
+        check(
+            "run_update --move removed the block from Priority Tasks",
+            "- [x] item B unique-move-target" not in after_move,
+        )
+        check(
+            "run_update --move added a marker-free one-line entry to Completed",
+            "- item B unique-move-target" in after_move
+            and after_move.index("- item B unique-move-target") > after_move.index("## Completed"),
+        )
+        check("run_update --move preserved the pre-existing Completed entry", "pre-existing completed line" in after_move)
+        check("run_update --move left sibling active items untouched", "item A" in after_move and "item C" in after_move)
+
+        # detect_bloated_tasks.py no longer flags the moved item's old '[x]' marker
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from detect_bloated_tasks import detect_bloated_tasks  # noqa: E402
+        from pathlib import Path
+        _ok, completed_in_active, _unmarked = detect_bloated_tasks(Path(move_path))
+        check(
+            "detect_bloated_tasks.py no longer flags the moved item",
+            not any("unique-move-target" in ln for _lineno, ln in completed_in_active),
+        )
+    finally:
+        os.unlink(move_path)
+
+    # run_update --move --dry-run: preview only, tracker byte-identical afterward
+    with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+        tf.write("\n".join(move_fixture))
+        move_dry_path = tf.name
+    try:
+        before_dry = open(move_dry_path, encoding="utf-8").read()
+
+        class NS6:
+            pass
+        ns6 = NS6()
+        ns6.file = move_dry_path
+        ns6.match = "unique-move-target"
+        ns6.set_marker = None
+        ns6.append_note = None
+        ns6.dry_run = True
+        ns6.move = True
+        ns6.summary = "would-be summary"
+        rc = run_update(ns6)
+        check("run_update --move --dry-run returns 0", rc == 0)
+        check(
+            "run_update --move --dry-run leaves the tracker byte-identical",
+            open(move_dry_path, encoding="utf-8").read() == before_dry,
+        )
+    finally:
+        os.unlink(move_dry_path)
+
+    # --move combined with --set-marker / --append-note is rejected
+    try:
+        class NS7:
+            pass
+        ns7 = NS7()
+        ns7.file = "/nonexistent/irrelevant.md"
+        ns7.match = "x"
+        ns7.set_marker = "[x]"
+        ns7.append_note = None
+        ns7.dry_run = False
+        ns7.move = True
+        ns7.summary = None
+        run_update(ns7)
+        check("--move rejects being combined with --set-marker", False)
+    except ValueError:
+        check("--move rejects being combined with --set-marker", True)
+
+    # --summary without --move is rejected
+    try:
+        class NS8:
+            pass
+        ns8 = NS8()
+        ns8.file = "/nonexistent/irrelevant.md"
+        ns8.match = "x"
+        ns8.set_marker = None
+        ns8.append_note = None
+        ns8.dry_run = False
+        ns8.move = False
+        ns8.summary = "orphan summary"
+        run_update(ns8)
+        check("--summary without --move is rejected", False)
+    except ValueError:
+        check("--summary without --move is rejected", True)
+
+    # --move on an item already inside '## Completed' is rejected. Ordinary Completed
+    # entries are marker-free ('- text', per validate_section_marker's schema) so they
+    # never match ITEM_RE in the first place -- this exercises the guard against the
+    # data-integrity anomaly of a stray checkbox marker having ended up in Completed.
+    already_completed_fixture = [
+        "# T", "", "## Completed", "", "- [x] item D unique-already-completed", "",
+    ]
+    with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+        tf.write("\n".join(already_completed_fixture))
+        already_path = tf.name
+    try:
+        class NS9:
+            pass
+        ns9 = NS9()
+        ns9.file = already_path
+        ns9.match = "unique-already-completed"
+        ns9.set_marker = None
+        ns9.append_note = None
+        ns9.dry_run = False
+        ns9.move = True
+        ns9.summary = None
+        run_update(ns9)
+        check("--move on an already-Completed item is rejected", False)
+    except ValueError:
+        check("--move on an already-Completed item is rejected", True)
+    finally:
+        os.unlink(already_path)
 
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
@@ -446,6 +697,17 @@ def main() -> int:
     p.add_argument("--match", help="substring of the target item's action text (must match exactly one item)")
     p.add_argument("--set-marker", help="'[ ]', '[x]', '[-]', or '[BLOCKED:P<0-3>:external|selfable]'")
     p.add_argument("--append-note", help="one-line progress note appended as a new sub-bullet")
+    p.add_argument(
+        "--move",
+        action="store_true",
+        help="move the matched item into '## Completed' as a marker-free one-line entry "
+        "(mechanical Move step -- see module docstring)",
+    )
+    p.add_argument(
+        "--summary",
+        help="operator-supplied one-line text to use in '## Completed' instead of the "
+        "item's own action text verbatim (only valid together with --move)",
+    )
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 
