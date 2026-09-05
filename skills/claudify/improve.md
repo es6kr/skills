@@ -48,7 +48,7 @@ This mirrors the obligation C (Pattern Detect) already carries for its candidate
 
 **Skip condition for registration only**: the finding's remediation was fully executed in this session (state that in the report), or the finding is purely descriptive with no follow-up action.
 
-**FA Prune**: After recording, run [fa-prune.md](../fa/fa-prune.md) automatically when any axis in its "Execution trigger (class-based)" table fires. That table is the single source for the trigger — do not restate a section-count threshold here; the flat counts it replaced are deprecated.
+**FA Prune**: After recording, invoke `Skill("fa", "fa-prune")` and follow [fa-prune.md](../fa/fa-prune.md) when any axis in its "Execution trigger (class-based)" table fires — [cleanup/run.md](../cleanup/run.md) makes that skill call mandatory (a text-only note is ❌), so linking the topic alone leaves this path dispatching differently from the cleanup path. That table is the single source for the trigger — do not restate a section-count threshold here; the flat counts it replaced are deprecated.
 
 **Skip condition**: No mistakes/corrections in conversation.
 
