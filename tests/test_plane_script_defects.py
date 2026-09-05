@@ -20,6 +20,8 @@ Defect 2 survived: one copy was fixed, the other kept the stale template).
 
 import ast
 import filecmp
+import io
+import re
 import importlib.util
 import json
 import sys
@@ -213,3 +215,92 @@ def test_create_issue_copies_are_byte_identical():
             "the fix-plan and backlog copies of plane_create_issue.py have "
             "drifted — apply the change to both copies"
         )
+# ------------------------------------------------ Defect 3: intake payload contract
+#
+# Plane's intake view does `request.data.get("issue", {}).get("name", False)`
+# (plane/api/views/intake.py). The `issue` value must therefore be a mapping.
+# Sending a bare issue-id string raises `AttributeError: 'str' object has no
+# attribute 'get'` server-side and surfaces as an opaque HTTP 500 — which is
+# exactly how intake registration failed silently since the skill's first
+# commit. These guards pin the request shape and the failure reporting.
+
+
+def _intake_requests(captured):
+    return [r for r in captured if r.full_url.rstrip("/").endswith("intake-issues")]
+
+
+@pytest.mark.parametrize("script_path", CREATE_ISSUE_COPIES)
+def test_intake_request_sends_nested_issue_object(script_path, monkeypatch):
+    mod = load_module(script_path, f"pci_intake_{script_path.parent.parent.name.replace('-', '_')}")
+    captured = []
+
+    def fake_urlopen(req, *args, **kwargs):
+        captured.append(req)
+        return FakeResponse({"id": "issue-1", "sequence_id": 7})
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    res = mod.create_via_rest_api(PROFILE, "Intake title", "# Head\n- item", is_intake=True)
+
+    assert res["success"] is True
+    intake = _intake_requests(captured)
+    assert intake, "no request was issued against the intake-issues endpoint"
+
+    body = json.loads(intake[0].data.decode("utf-8"))
+    assert isinstance(body.get("issue"), dict), (
+        "intake payload['issue'] must be a mapping — a bare id string makes "
+        "Plane's intake view call .get() on a str and return HTTP 500"
+    )
+    assert body["issue"]["name"] == "Intake title"
+
+
+@pytest.mark.parametrize("script_path", CREATE_ISSUE_COPIES)
+def test_intake_failure_is_reported_not_swallowed(script_path, monkeypatch):
+    mod = load_module(script_path, f"pci_intakeerr_{script_path.parent.parent.name.replace('-', '_')}")
+    body = b'{"error":"Something went wrong please try again later"}'
+
+    def fake_urlopen(req, *args, **kwargs):
+        if req.full_url.rstrip("/").endswith("intake-issues"):
+            raise mod.urllib.error.HTTPError(
+                req.full_url, 500, "Internal Server Error", {}, io.BytesIO(body)
+            )
+        return FakeResponse({"id": "issue-1", "sequence_id": 7})
+
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    res = mod.create_via_rest_api(PROFILE, "title", "desc", is_intake=True)
+
+    reported = json.dumps(res)
+    assert "500" in reported, "intake HTTP status must reach the caller, not just stderr"
+    assert "Something went wrong" in reported, (
+        "intake error body must reach the caller — swallowing it to a one-line "
+        "WARN is what made this defect expensive to diagnose"
+    )
+
+
+# ----------------------------------------- Defect 4: plane scripts stay out of fix-plan
+#
+# plane_* scripts belong to the backlog skill (and plane_sync.py to the
+# company-side plane skill). The fix-plan skill previously carried its own
+# copies, and that dual-script drift is how Defect 2 survived. This guard
+# fails the build if any plane_* script reappears under skills/fix-plan/.
+
+
+def test_fix_plan_skill_carries_no_plane_scripts():
+    if not FIX_PLAN_SCRIPTS.is_dir():
+        pytest.skip("fix-plan skill has no scripts directory")
+    strays = sorted(p.name for p in FIX_PLAN_SCRIPTS.glob("plane_*.py"))
+    assert strays == [], (
+        "plane_* scripts must not live under skills/fix-plan/scripts/ — they "
+        f"belong to the backlog skill. Found: {strays}"
+    )
+
+
+def test_fix_plan_skill_md_does_not_own_plane_scripts():
+    skill_md = REPO_ROOT / "skills" / "fix-plan" / "SKILL.md"
+    if not skill_md.is_file():
+        pytest.skip("fix-plan SKILL.md absent")
+    text = skill_md.read_text(encoding="utf-8")
+    owned = re.findall(r"fix-plan/scripts/(plane_\w+\.py)", text)
+    assert owned == [], (
+        "fix-plan SKILL.md must not point at plane_* scripts under its own "
+        f"scripts/ dir. Found: {sorted(set(owned))}"
+    )
