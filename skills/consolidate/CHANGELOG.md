@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.3](https://github.com/es6kr/skills/compare/consolidate-v0.6.2...consolidate-v0.6.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **consolidate:** enforce the Summary Status vocabulary at post time and in verify ([18c07c3](https://github.com/es6kr/skills/commit/18c07c3b7c6df058d497c6c2d17771c6a1a781eb))
+* **fix-plan:** add simple-vs-session self-check before Orca recommendation ask ([46e5d77](https://github.com/es6kr/skills/commit/46e5d77e3faefb0524fb4e4e6e80aa056d2d66ca))
+
 ## [0.6.2](https://github.com/es6kr/skills/compare/consolidate-v0.6.1...consolidate-v0.6.2) (2026-09-01)
 
 
