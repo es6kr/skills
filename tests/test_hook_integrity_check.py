@@ -138,3 +138,86 @@ def test_installed_schema_is_audited(tmp_path, monkeypatch):
     assert str(present) in ok_files
     assert str(missing) in missing_files
     assert "python3" not in ok_files + missing_files
+
+
+# --- Review-feedback regression tests (PR #451 consolidate) -----------------
+
+
+def test_falls_back_to_home_config_when_workspace_has_none(tmp_path, monkeypatch):
+    """Row 10: resolving hooks.json under `root` only made the checker
+    early-return a false MISSING for any workspace without its own config,
+    silently skipping every downstream check."""
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    hook = home / "global-hook.sh"
+    hook.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    hook.chmod(0o755)
+    (home / ".claude" / "hooks.json").write_text(json.dumps({
+        "hooks": {"PreToolUse": [
+            {"matcher": "Bash", "hooks": [{"type": "command", "command": str(hook)}]},
+        ]}
+    }), encoding="utf-8")
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+    workspace = tmp_path / "workspace"   # deliberately carries no hooks.json
+    workspace.mkdir()
+
+    results = mod.check_hook_integrity(str(workspace))
+
+    missing_files = [i["file"] for i in results["MISSING"]]
+    assert "hooks.json" not in missing_files, (
+        "workspace without a local hooks.json must fall back to the home config, "
+        f"got MISSING={results['MISSING']}"
+    )
+    assert str(hook) in [i["file"] for i in results["OK"]]
+
+
+def test_workspace_config_takes_precedence_over_home(tmp_path, monkeypatch):
+    """The root parameter must still win when the workspace does have a config."""
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    home_hook = home / "home-hook.sh"
+    home_hook.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    (home / ".claude" / "hooks.json").write_text(json.dumps({
+        "hooks": {"PreToolUse": [
+            {"matcher": "Bash", "hooks": [{"type": "command", "command": str(home_hook)}]},
+        ]}
+    }), encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+    workspace = tmp_path / "workspace"
+    (workspace / ".claude").mkdir(parents=True)
+    ws_hook = workspace / "ws-hook.sh"
+    ws_hook.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    ws_hook.chmod(0o755)
+    (workspace / ".claude" / "hooks.json").write_text(json.dumps({
+        "hooks": {"PreToolUse": [
+            {"matcher": "Bash", "hooks": [{"type": "command", "command": str(ws_hook)}]},
+        ]}
+    }), encoding="utf-8")
+
+    results = mod.check_hook_integrity(str(workspace))
+    audited = [i["file"] for i in results["OK"] + results["MISSING"] + results["STALE-PERM"]]
+    assert str(ws_hook) in audited
+    assert str(home_hook) not in audited
+
+
+def test_missing_config_message_names_the_searched_scopes(tmp_path, monkeypatch):
+    """Row 5: the operator-facing reason said "Global" even when the searched
+    path was workspace-local. It must describe what was actually searched."""
+    empty_home = tmp_path / "empty-home"
+    empty_home.mkdir()
+    monkeypatch.setenv("HOME", str(empty_home))
+    monkeypatch.setenv("USERPROFILE", str(empty_home))
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    results = mod.check_hook_integrity(str(workspace))
+    reasons = [i["reason"] for i in results["MISSING"] if i["file"] == "hooks.json"]
+    assert reasons, "a genuinely absent config should still be reported"
+    assert str(workspace) in reasons[0]
+    assert "Global hooks.json config not found" != reasons[0]

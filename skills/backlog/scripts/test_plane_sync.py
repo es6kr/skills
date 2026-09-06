@@ -8,6 +8,7 @@ mapping logic added to replace the former connectivity-probe stub.
 import sys
 import tempfile
 import unittest
+import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
@@ -434,6 +435,69 @@ class TestAutoDetectTrackerRoot(unittest.TestCase):
             combined = result.stdout + result.stderr
             self.assertNotIn(".ralph", combined)
             self.assertNotIn("not found", combined)
+
+
+# --- Review-feedback regression tests (PR #451 consolidate) -----------------
+
+
+class TestMakePlaneRequestTransport(unittest.TestCase):
+    """Rows 1 and 11: transport hardening and 2xx handling in make_plane_request."""
+
+    def _profile(self, host):
+        return {
+            "plane_host": host,
+            "plane_token": "tok",
+            "plane_token_env": "PLANE_API_TOKEN",
+        }
+
+    def test_rejects_non_https_host_without_sending_token(self):
+        # The token travels as an x-api-key header; a plaintext host would put
+        # it on the wire in the clear.
+        with unittest.mock.patch("plane_sync.urllib.request.urlopen") as mock_open:
+            res = plane_sync.make_plane_request(
+                self._profile("http://plane.example.com"), "workspaces/w/projects/"
+            )
+        mock_open.assert_not_called()
+        self.assertIn("error", res)
+        self.assertIn("https", res["error"].lower())
+
+    def test_accepts_204_no_content_as_success(self):
+        # A PATCH that returns 204 applied successfully; treating it as a
+        # failure makes transition_issue_to_started report a false negative.
+        class FakeResp:
+            status = 204
+
+            def read(self):
+                return b""
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        with unittest.mock.patch(
+            "plane_sync.urllib.request.urlopen", return_value=FakeResp()
+        ):
+            res = plane_sync.make_plane_request(
+                self._profile("https://plane.example.com"),
+                "workspaces/w/projects/p/issues/i/",
+                method="PATCH",
+                data={"state": "s"},
+            )
+        self.assertNotIn("error", res)
+
+    def test_redirects_are_not_followed(self):
+        # urllib's default redirect handler re-sends custom headers, which
+        # would forward x-api-key to the redirect target.
+        opener = plane_sync._build_opener()
+        handler = next(
+            h for h in opener.handlers
+            if isinstance(h, urllib.request.HTTPRedirectHandler)
+        )
+        self.assertIsNone(
+            handler.redirect_request(None, None, 302, "Found", {}, "https://evil.example")
+        )
 
 
 if __name__ == "__main__":
