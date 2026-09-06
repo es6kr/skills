@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostToolUse:Write/Edit — Warn when a tracked planning artifact is written or
+# PreToolUse:Write/Edit — Block when a tracked planning artifact is written or
 # edited without a Plane browse-URL link.
 #
 # Two surfaces are covered:
