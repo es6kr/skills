@@ -453,11 +453,14 @@ class TestMakePlaneRequestTransport(unittest.TestCase):
     def test_rejects_non_https_host_without_sending_token(self):
         # The token travels as an x-api-key header; a plaintext host would put
         # it on the wire in the clear.
-        with unittest.mock.patch("plane_sync.urllib.request.urlopen") as mock_open:
+        # patch.object on the module instance this test actually holds --
+        # patch("plane_sync...") would resolve the sys.modules copy that
+        # claim_item imported, leaving this assertion vacuous.
+        with unittest.mock.patch.object(plane_sync, "_build_opener") as mock_opener:
             res = plane_sync.make_plane_request(
                 self._profile("http://plane.example.com"), "workspaces/w/projects/"
             )
-        mock_open.assert_not_called()
+        mock_opener.assert_not_called()
         self.assertIn("error", res)
         self.assertIn("https", res["error"].lower())
 
@@ -476,8 +479,14 @@ class TestMakePlaneRequestTransport(unittest.TestCase):
             def __exit__(self, *exc):
                 return False
 
-        with unittest.mock.patch(
-            "plane_sync.urllib.request.urlopen", return_value=FakeResp()
+        class FakeOpener:
+            def open(self, req, timeout=None):
+                return FakeResp()
+
+        # Patch the opener, not urlopen: make_plane_request goes through a
+        # redirect-refusing opener rather than the module-level urlopen.
+        with unittest.mock.patch.object(
+            plane_sync, "_build_opener", return_value=FakeOpener()
         ):
             res = plane_sync.make_plane_request(
                 self._profile("https://plane.example.com"),

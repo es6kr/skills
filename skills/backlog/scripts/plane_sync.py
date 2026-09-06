@@ -110,13 +110,41 @@ def extract_local_priority(marker_text):
     return MARKER_TO_PRIORITY[f"P{m.group(1)}"]
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect.
+
+    The API token rides in an `x-api-key` header, and urllib's default
+    redirect handler copies custom headers onto the follow-up request --
+    it only strips content headers. A redirect to an attacker-chosen host
+    would therefore forward the credential. Returning None makes urllib
+    raise the 3xx as an HTTPError instead of following it.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _build_opener() -> urllib.request.OpenerDirector:
+    """Opener that never follows redirects (see _NoRedirect)."""
+    return urllib.request.build_opener(_NoRedirect)
+
+
 def make_plane_request(profile: dict, path: str, method: str = "GET", data: dict = None) -> dict:
     """Make an authenticated HTTP request to Plane REST API."""
     token = profile.get("plane_token")
     if not token:
-        return {"error": f"API token ({profile['plane_token_env']}) not set"}
+        return {"error": f"API token ({profile.get('plane_token_env', 'plane_token')}) not set"}
 
-    url = f"{profile['plane_host'].rstrip('/')}/api/v1/{path.lstrip('/')}"
+    host = str(profile.get("plane_host", "")).rstrip("/")
+    scheme = urllib.parse.urlparse(host).scheme
+    if scheme != "https":
+        # Never put the token on the wire in the clear.
+        return {
+            "error": f"refusing to send the Plane API token over a non-HTTPS host: "
+                     f"{host!r} (scheme {scheme or 'missing'!r}); set plane_host to an https:// URL"
+        }
+
+    url = f"{host}/api/v1/{path.lstrip('/')}"
     headers = {
         "x-api-key": token,
         "Content-Type": "application/json",
@@ -127,9 +155,15 @@ def make_plane_request(profile: dict, path: str, method: str = "GET", data: dict
     req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
 
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            if resp.status in (200, 201):
-                return json.loads(resp.read().decode("utf-8"))
+        with _build_opener().open(req, timeout=5) as resp:
+            # Any 2xx is success. PATCH commonly answers 204 No Content, which
+            # the old 200/201-only test reported as a failure even though the
+            # state transition had applied.
+            if 200 <= resp.status < 300:
+                body = resp.read().decode("utf-8")
+                if not body.strip():
+                    return {}
+                return json.loads(body)
     except Exception as e:
         return {"error": str(e)}
 
