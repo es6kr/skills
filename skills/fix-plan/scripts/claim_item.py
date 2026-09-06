@@ -27,6 +27,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -48,23 +49,127 @@ ITEM_RE = re.compile(
 
 CLAIMABLE_MARKERS = re.compile(r"^\[(?: |BLOCKED:P[0-3]:selfable)\]$")
 
+TS_FORMAT = "%Y-%m-%dT%H:%M"
+# Must agree with ITEM_RE's CLAIMED group: a sid outside this charset produces a
+# tag ITEM_RE can never re-match, which strands the item on the sanctioned path.
+SID_RE = re.compile(r"^[0-9a-f]{6,40}$")
+
+# How long to wait for the tracker lock before giving up, and the poll interval.
+LOCK_TIMEOUT_SECONDS = 10.0
+LOCK_POLL_SECONDS = 0.05
+
+
+def validate_sid(sid) -> str | None:
+    """Return an error string when `sid` is not a usable session-id prefix."""
+    if not isinstance(sid, str) or not SID_RE.match(sid):
+        return (
+            f"invalid sid {sid!r}: expected 6-40 lowercase hex characters "
+            "(claim.md uses an 8-char session-id prefix). A sid outside that "
+            "charset writes a tag this script can never find again."
+        )
+    return None
+
+
+def validate_timestamp(value, label: str) -> str | None:
+    """Return an error string when `value` is not a `YYYY-MM-DDTHH:mm` stamp."""
+    try:
+        datetime.strptime(value, TS_FORMAT)
+    except (TypeError, ValueError):
+        return f"invalid {label} {value!r}: expected {TS_FORMAT} (e.g. 2026-08-26T12:34)"
+    return None
+
+
+class _TrackerLock:
+    """Advisory exclusive lock around a whole read-validate-write transaction.
+
+    `os.replace` makes the final swap atomic but does NOT serialize the
+    read-validate-write sequence: two claimers can both read the same
+    snapshot and the later replace silently discards the earlier lease
+    mutation. A sidecar lock file created with O_CREAT|O_EXCL closes that
+    window and -- unlike fcntl -- works on native Windows Python, which this
+    module deliberately supports.
+    """
+
+    def __init__(self, path, timeout: float = LOCK_TIMEOUT_SECONDS):
+        self.lock_path = os.path.abspath(path) + ".lock"
+        self.timeout = timeout
+
+    def __enter__(self):
+        deadline = time.monotonic() + self.timeout
+        while True:
+            try:
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                return self
+            except FileExistsError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"could not acquire tracker lock within {self.timeout}s: "
+                        f"{self.lock_path} (another session may be mid-write; "
+                        "remove the lock file if no other session is running)"
+                    )
+                time.sleep(LOCK_POLL_SECONDS)
+
+    def __exit__(self, *exc_info):
+        try:
+            os.unlink(self.lock_path)
+        except FileNotFoundError:
+            pass
+        return False
+
 
 def is_stale(ts_str: str, now: str, ttl_hours: int = DEFAULT_TTL_HOURS) -> bool:
     """A claim is stale when its timestamp is older than ttl_hours relative to now."""
-    ts = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M")
-    now_dt = datetime.strptime(now, "%Y-%m-%dT%H:%M")
+    ts = datetime.strptime(ts_str, TS_FORMAT)
+    now_dt = datetime.strptime(now, TS_FORMAT)
     age_hours = (now_dt - ts).total_seconds() / 3600
     return age_hours > ttl_hours
 
 
-def _find_item(lines: list[str], action: str):
-    """Return (index, match) for the first line whose action text matches, or (None, None)."""
+def _find_all_items(lines: list[str], action: str) -> list[tuple[int, re.Match]]:
+    """Return every (index, match) whose action text equals `action`."""
     target = action.strip()
+    found = []
     for i, line in enumerate(lines):
         m = ITEM_RE.match(line)
         if m and m.group("action").strip() == target:
-            return i, m
-    return None, None
+            found.append((i, m))
+    return found
+
+
+def _find_item(lines: list[str], action: str):
+    """Return (index, match) for the first line whose action text matches, or (None, None)."""
+    matches = _find_all_items(lines, action)
+    return matches[0] if matches else (None, None)
+
+
+def _select_item(lines: list[str], action: str, prefer):
+    """Resolve `action` to exactly one item.
+
+    Returns (index, match, error). Matching the FIRST line unconditionally is
+    unsafe for a coordination lease: a duplicated action text silently
+    misroutes the claim, and a completed copy appearing above an open one
+    produces a bogus "cannot claim [x]" rejection. `prefer` narrows a
+    multi-match set to the lines that are actually actionable; only a genuine
+    ambiguity is rejected.
+    """
+    matches = _find_all_items(lines, action)
+    if not matches:
+        return None, None, f"action not found in tracker: {action!r}"
+    if len(matches) == 1:
+        return matches[0][0], matches[0][1], None
+
+    preferred = [(i, m) for i, m in matches if prefer(m)]
+    if len(preferred) == 1:
+        return preferred[0][0], preferred[0][1], None
+
+    candidates = preferred if preferred else matches
+    line_nos = ", ".join(str(i + 1) for i, _ in candidates)
+    return None, None, (
+        f"ambiguous action: {len(candidates)} tracker lines match {action!r} "
+        f"(lines {line_nos}). Disambiguate the action text before claiming -- "
+        "a lease stamped on the wrong duplicate is invisible to the other session."
+    )
 
 
 def _write_lines(path, lines: list[str], had_trailing_newline: bool) -> None:
@@ -112,9 +217,49 @@ def claim(
     API failure is surfaced via the returned `plane_sync` key but never fails
     the (already-applied) local claim -- the local write is the source of
     truth; Plane is a best-effort mirror."""
+    # Reject-before-mutate: every input is validated before the tracker is
+    # opened, so a bad argument can never leave a half-formed lease behind.
+    for err in (
+        validate_sid(sid),
+        validate_timestamp(now, "now"),
+        None if isinstance(ttl_hours, int) and not isinstance(ttl_hours, bool) and ttl_hours > 0
+        else f"invalid ttl_hours {ttl_hours!r}: expected a positive integer "
+             "(a non-positive TTL marks every live claim stale and allows instant takeover)",
+    ):
+        if err:
+            return {"ok": False, "error": err}
+
     if not os.path.exists(path):
         return {"ok": False, "error": f"tracker not found: {path}"}
 
+    try:
+        with _TrackerLock(path):
+            result, plane_action = _claim_locked(path, action, sid, now, ttl_hours)
+    except TimeoutError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    if not result["ok"] or plane_profile is None or plane_action is None:
+        return result
+
+    # The local write already succeeded. Plane is a best-effort mirror, so no
+    # failure here -- including an unexpected one from a malformed profile or
+    # an unexpected response shape -- may turn the applied claim into an error.
+    try:
+        plane_result = _push_claim_to_plane(plane_action, plane_profile)
+    except Exception as exc:
+        result["plane_sync"] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    else:
+        if plane_result is not None:
+            result["plane_sync"] = plane_result
+    return result
+
+
+def _claim_locked(path, action: str, sid: str, now: str, ttl_hours: int):
+    """The read-validate-write half of claim(), executed under the tracker lock.
+
+    Returns (result, plane_action); `plane_action` is the matched action text
+    to mirror to Plane, or None when nothing should be mirrored.
+    """
     with io.open(path, "r", encoding="utf-8") as fh:
         raw = fh.read()
     had_trailing_newline = raw.endswith("\n")
@@ -122,9 +267,11 @@ def claim(
     if had_trailing_newline and lines and lines[-1] == "":
         lines.pop()
 
-    idx, m = _find_item(lines, action)
-    if idx is None:
-        return {"ok": False, "error": f"action not found in tracker: {action!r}"}
+    idx, m, err = _select_item(
+        lines, action, prefer=lambda mt: bool(CLAIMABLE_MARKERS.match(mt.group("marker")))
+    )
+    if err:
+        return {"ok": False, "error": err}, None
 
     marker = m.group("marker")
     if not CLAIMABLE_MARKERS.match(marker):
@@ -133,17 +280,26 @@ def claim(
             "error": f"cannot claim item with marker {marker} "
             "(only [ ] and [BLOCKED:P*:selfable] are claimable; "
             "external and completed items are not progressable now)",
-        }
+        }, None
 
     existing_sid = m.group("sid")
     existing_ts = m.group("ts")
     if existing_sid is not None and existing_sid != sid:
+        ts_err = validate_timestamp(existing_ts, "stored claim timestamp")
+        if ts_err:
+            # A corrupted tag must surface as the documented structured error,
+            # not as a ValueError traceback out of the CLI.
+            return {
+                "ok": False,
+                "error": f"{ts_err} -- the tracker line for {action!r} carries a "
+                         "corrupt [CLAIMED:...] tag and needs manual repair",
+            }, None
         if not is_stale(existing_ts, now, ttl_hours):
             return {
                 "ok": False,
                 "error": f"in flight: claimed by session {existing_sid} at {existing_ts} "
                 f"(fresh, within {ttl_hours}h TTL) — pick a different item or report the conflict",
-            }
+            }, None
         # Stale — takeover falls through to the same stamp logic below.
 
     new_line = (
@@ -152,21 +308,35 @@ def claim(
     lines[idx] = new_line
     _write_lines(path, lines, had_trailing_newline)
 
-    result = {"ok": True, "line": new_line}
-    if plane_profile is not None:
-        plane_result = _push_claim_to_plane(m.group("action"), plane_profile)
-        if plane_result is not None:
-            result["plane_sync"] = plane_result
-    return result
+    return {"ok": True, "line": new_line}, m.group("action")
 
 
 def release(path, action: str, sid: str) -> dict:
     """Remove the [CLAIMED:...] tag from the item matching `action`, if it is
     this session's own claim. A no-op (ok:True) when the item carries no
-    claim tag at all. Rejects releasing another live session's claim."""
+    claim tag at all. Rejects releasing another live session's claim.
+
+    Release is local-only: it does NOT reverse the Plane started-transition
+    that `claim(--plane-sync)` applied. That is deliberate -- a released item
+    is usually still in progress for whoever picks it up next, so demoting the
+    linked Plane issue would misreport the board. Move the Plane issue back by
+    hand if a release really does mean "no longer started"."""
+    sid_err = validate_sid(sid)
+    if sid_err:
+        return {"ok": False, "error": sid_err}
+
     if not os.path.exists(path):
         return {"ok": False, "error": f"tracker not found: {path}"}
 
+    try:
+        with _TrackerLock(path):
+            return _release_locked(path, action, sid)
+    except TimeoutError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def _release_locked(path, action: str, sid: str) -> dict:
+    """The read-validate-write half of release(), executed under the tracker lock."""
     with io.open(path, "r", encoding="utf-8") as fh:
         raw = fh.read()
     had_trailing_newline = raw.endswith("\n")
@@ -174,9 +344,11 @@ def release(path, action: str, sid: str) -> dict:
     if had_trailing_newline and lines and lines[-1] == "":
         lines.pop()
 
-    idx, m = _find_item(lines, action)
-    if idx is None:
-        return {"ok": False, "error": f"action not found in tracker: {action!r}"}
+    idx, m, err = _select_item(
+        lines, action, prefer=lambda mt: mt.group("sid") == sid
+    )
+    if err:
+        return {"ok": False, "error": err}
 
     existing_sid = m.group("sid")
     if existing_sid is None:
