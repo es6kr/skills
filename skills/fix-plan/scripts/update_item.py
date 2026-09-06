@@ -169,7 +169,11 @@ def perform_move(lines: list[str], start: int, end: int, summary: str | None) ->
     assert m is not None
     action_text = m.group(3)
 
-    text = summary.strip() if summary else action_text
+    # `is not None`, not truthiness: `--summary ""` is an explicit (if useless)
+    # operator choice and must reach the empty check below, not silently fall
+    # back to the verbatim action text. Truthiness also made `--summary ""`
+    # and `--summary " "` behave differently -- the latter already raised.
+    text = summary.strip() if summary is not None else action_text
     if "\n" in text or "\r" in text:
         raise ValueError("--summary must be a single line (no newlines)")
     if not text:
@@ -233,7 +237,7 @@ def run_update(args: argparse.Namespace) -> int:
         raise ValueError("at least one of --set-marker / --append-note / --move is required")
     if args.move and (args.set_marker or args.append_note):
         raise ValueError("--move cannot be combined with --set-marker / --append-note")
-    if args.summary and not args.move:
+    if args.summary is not None and not args.move:
         raise ValueError("--summary only applies together with --move")
     if args.set_marker:
         validate_marker(args.set_marker)
@@ -548,6 +552,16 @@ def self_test() -> int:
     _, completed_line_summary = perform_move(move_fixture, b_start, b_end, "condensed summary text")
     check("perform_move --summary overrides the verbatim text", completed_line_summary == "- condensed summary text")
     try:
+        perform_move(move_fixture, b_start, b_end, "")
+        check("perform_move rejects an explicitly empty --summary", False)
+    except ValueError:
+        check("perform_move rejects an explicitly empty --summary", True)
+    try:
+        perform_move(move_fixture, b_start, b_end, "   ")
+        check("perform_move rejects a whitespace-only --summary", False)
+    except ValueError:
+        check("perform_move rejects a whitespace-only --summary", True)
+    try:
         perform_move(move_fixture, b_start, b_end, "two\nlines")
         check("perform_move rejects a multi-line --summary", False)
     except ValueError:
@@ -568,6 +582,23 @@ def self_test() -> int:
         ns5.dry_run = False
         ns5.move = True
         ns5.summary = None
+
+        # An explicitly empty --summary without --move must still trip the
+        # "only applies together with --move" guard; truthiness let it pass.
+        ns_empty = NS5()
+        ns_empty.file = move_path
+        ns_empty.match = "unique-move-target"
+        ns_empty.set_marker = "[x]"
+        ns_empty.append_note = None
+        ns_empty.dry_run = True
+        ns_empty.move = False
+        ns_empty.summary = ""
+        try:
+            run_update(ns_empty)
+            check("run_update rejects an explicitly empty --summary without --move", False)
+        except ValueError:
+            check("run_update rejects an explicitly empty --summary without --move", True)
+
         rc = run_update(ns5)
         check("run_update --move returns 0", rc == 0)
         with open(move_path, encoding="utf-8") as fh:
