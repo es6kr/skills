@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/es6kr/skills/compare/fix-plan-v0.11.1...fix-plan-v0.12.0) (2026-09-06)
+
+
+### Features
+
+* **fix-plan:** add claim_item.py and wire it to plane_sync started-transition ([add4069](https://github.com/es6kr/skills/commit/add40691c3a68c1160a43259ca358b74e4bd7518))
+
+
+### Bug Fixes
+
+* **fix-plan:** validate lease inputs, serialize claim transactions, restore hooks.json fallback ([bc32fa8](https://github.com/es6kr/skills/commit/bc32fa8546df351aa8751b83a38bddad09465c83))
+
 ## [0.11.1](https://github.com/es6kr/skills/compare/fix-plan-v0.11.0...fix-plan-v0.11.1) (2026-09-05)
 
 

@@ -5,6 +5,19 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/es6kr/skills/compare/backlog-v0.2.0...backlog-v0.3.0) (2026-09-06)
+
+
+### Features
+
+* **fix-plan:** add claim_item.py and wire it to plane_sync started-transition ([add4069](https://github.com/es6kr/skills/commit/add40691c3a68c1160a43259ca358b74e4bd7518))
+* **fix-plan:** add plane_sync transition_issue_to_started ([0a98966](https://github.com/es6kr/skills/commit/0a9896631405139bcf2739127d0a79f3e12a139f))
+
+
+### Bug Fixes
+
+* **backlog:** require HTTPS, refuse redirects, accept any 2xx in make_plane_request ([fb7b952](https://github.com/es6kr/skills/commit/fb7b952e4bbd67c588ed9450649eb152a20d2d62))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/backlog-v0.1.0...backlog-v0.2.0) (2026-08-29)
 
 
