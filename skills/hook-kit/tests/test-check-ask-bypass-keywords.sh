@@ -132,10 +132,10 @@ run_raw_test "Turn ending in tool_use-only still sees earlier prose" \
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}' \
   "block"
 
-run_raw_test "AskUserQuestion in a later entry of the same turn suppresses the block" \
+run_raw_test "AskUserQuestion in an earlier entry of the same turn suppresses the block" \
   '{"type":"user","message":{"content":"go"}}
-{"type":"assistant","message":{"content":[{"type":"text","text":"Done. Let me know and I will proceed."}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"AskUserQuestion"}]}}' \
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"AskUserQuestion"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done. Let me know and I will proceed."}]}}' \
   "pass"
 
 run_raw_test "Deferral from a PREVIOUS turn is not re-flagged" \
@@ -163,8 +163,13 @@ else
   FAIL=$((FAIL + 1))
 fi
 ADV_OUT2=$(printf '{"transcript_path":"%s"}' "$ADVISORY_TRANSCRIPT" | bash "$HOOK" 2>/dev/null)
-if [ -z "$ADV_OUT2" ]; then
+if [ -f "$WARN_MARKER" ] && [ -z "$ADV_OUT2" ]; then
   echo "PASS: Advisory does not repeat within the same session"
+elif [ ! -f "$WARN_MARKER" ]; then
+  # Silence with no marker means no advisory was ever emitted — the assertion
+  # would otherwise pass vacuously.
+  echo "FAIL: Advisory does not repeat within the same session (no marker: first call never emitted an advisory)"
+  FAIL=$((FAIL + 1))
 else
   echo "FAIL: Advisory does not repeat within the same session (got: $ADV_OUT2)"
   FAIL=$((FAIL + 1))
