@@ -1,5 +1,5 @@
 {
-  "description": "es6kr-skills root plugin hooks — migrated from ~/.claude/settings.json ~/.agents/skills/ registrations",
+  "description": "es6kr-skills root plugin hooks \u2014 migrated from ~/.claude/settings.json ~/.agents/skills/ registrations",
   "hooks": {
     "PostToolUse": [
       {
@@ -262,6 +262,10 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-commit-tag-change-without-package-count.sh"
           }
         ]
       },

@@ -404,6 +404,18 @@ hooks:
     event: Stop
     matcher: ''
     command: ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-rag.sh
+- id: block-commit-tag-change-without-package-count
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/block-commit-tag-change-without-package-count.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: AskUserQuestion
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-commit-tag-change-without-package-count.sh
 - id: block-compound-commands
   owner_skill: hook-kit
   marketplace: es6kr-skills
