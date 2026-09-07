@@ -64,6 +64,12 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 DEFAULT_FILE = os.path.expanduser(
     "~/.claude/skills/cleanup/data/failed-attempts.md"
 )
+# FA_DATA_DIR resolver: the store location is overridable via env; the literal
+# above is only the backward-compatible default (see fa/SKILL.md "FA data store").
+if os.environ.get("FA_DATA_DIR"):
+    DEFAULT_FILE = os.path.join(
+        os.path.expanduser(os.environ["FA_DATA_DIR"]), os.path.basename(DEFAULT_FILE)
+    )
 
 DATE = re.compile(r"\((\d{4}-\d{2}-\d{2})")
 # class-format meta line (`<!-- fa: class=... count=N last=YYYY-MM-DD status=... -->`)

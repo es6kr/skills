@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/wip-v0.6.0...wip-v0.7.0) (2026-09-05)
+
+
+### Features
+
+* promote develop (schema, hook-kit, cleanup, wip, todowrite) ([5938cea](https://github.com/es6kr/skills/commit/5938cea0a20eaf93aec4d373298e58ccc3f2a682))
+
+
+### Bug Fixes
+
+* **wip:** standardize in-progress markers to 🔄 in antigravity tracking ([f9f4c97](https://github.com/es6kr/skills/commit/f9f4c97ae57bf7249b92c591c807c590fe8ffe73))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/wip-v0.5.1...wip-v0.6.0) (2026-08-29)
 
 

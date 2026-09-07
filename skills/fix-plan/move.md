@@ -20,6 +20,7 @@ Keep the Completed file minimal — detailed steps, commit hashes, session IDs, 
    ```bash
    python <skill-dir>/scripts/detect_bloated_tasks.py --file <path/to/fix_plan.md>
    ```
+- **Use `cleanup.py` to execute the move — do not hand-roll the transformation (HARD STOP)**: `cleanup.py` (documented in full further below, "CRLF" section) already implements block-boundary detection, safe removal, and relocation of every top-level `[x]` entry into `## Completed`, plus period-based archiving. Reaching for a fresh ad hoc script to "extract `[x]` blocks and move them" — even a careful one with its own lossless-verification check — reimplements this tool; this exact mistake recurred across 6+ separate pipeline runs before being caught. Run `cleanup.py --dry-run` first to preview scope, then without `--dry-run` to apply. Only hand-roll a transformation for something `cleanup.py` genuinely does not cover (e.g. a non-Completed-section body compression — see `rag-store.md`'s "Other-section body compression" case).
 
 
 

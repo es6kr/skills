@@ -8,6 +8,7 @@ mapping logic added to replace the former connectivity-probe stub.
 import sys
 import tempfile
 import unittest
+import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
@@ -338,6 +339,47 @@ class TestDoneStateTransition(unittest.TestCase):
         self.assertNotIn("method='DELETE'", source)
 
 
+class TestStartedStateTransition(unittest.TestCase):
+    """Companion to TestDoneStateTransition: when a local item is claimed
+    (fix-plan claim_item.py), its linked Plane issue should move to the
+    project's `started`-group state -- the same DELETE-free PATCH pattern
+    as transition_issue_to_done(), just targeting a different state group."""
+
+    def _profile(self):
+        return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
+
+    def test_transition_issue_to_started_patches_state(self):
+        captured = {}
+
+        def fake_request(profile, path, method="GET", data=None):
+            if path.endswith("states/"):
+                return {"results": [
+                    {"id": "todo-id", "group": "unstarted"},
+                    {"id": "started-id", "group": "started"},
+                ]}
+            captured["path"] = path
+            captured["method"] = method
+            captured["data"] = data
+            return {"id": "issue1", "state": "started-id"}
+
+        with patch.object(plane_sync, "make_plane_request", side_effect=fake_request):
+            result = plane_sync.transition_issue_to_started(self._profile(), "ws", "proj1", "issue1")
+        self.assertEqual(captured["method"], "PATCH")
+        self.assertEqual(captured["data"], {"state": "started-id"})
+        self.assertNotIn("error", result)
+
+    def test_transition_issue_to_started_no_started_state(self):
+        with patch.object(plane_sync, "make_plane_request", return_value={"results": []}):
+            result = plane_sync.transition_issue_to_started(self._profile(), "ws", "proj1", "issue1")
+        self.assertIn("error", result)
+
+    def test_transition_issue_to_started_no_delete_call(self):
+        import inspect
+        source = inspect.getsource(plane_sync.transition_issue_to_started)
+        self.assertNotIn('method="DELETE"', source)
+        self.assertNotIn("method='DELETE'", source)
+
+
 class TestComputeLocalToPlaneUpdates(unittest.TestCase):
     def _profile(self):
         return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
@@ -393,6 +435,78 @@ class TestAutoDetectTrackerRoot(unittest.TestCase):
             combined = result.stdout + result.stderr
             self.assertNotIn(".ralph", combined)
             self.assertNotIn("not found", combined)
+
+
+# --- Review-feedback regression tests (PR #451 consolidate) -----------------
+
+
+class TestMakePlaneRequestTransport(unittest.TestCase):
+    """Rows 1 and 11: transport hardening and 2xx handling in make_plane_request."""
+
+    def _profile(self, host):
+        return {
+            "plane_host": host,
+            "plane_token": "tok",
+            "plane_token_env": "PLANE_API_TOKEN",
+        }
+
+    def test_rejects_non_https_host_without_sending_token(self):
+        # The token travels as an x-api-key header; a plaintext host would put
+        # it on the wire in the clear.
+        # patch.object on the module instance this test actually holds --
+        # patch("plane_sync...") would resolve the sys.modules copy that
+        # claim_item imported, leaving this assertion vacuous.
+        with unittest.mock.patch.object(plane_sync, "_build_opener") as mock_opener:
+            res = plane_sync.make_plane_request(
+                self._profile("http://plane.example.com"), "workspaces/w/projects/"
+            )
+        mock_opener.assert_not_called()
+        self.assertIn("error", res)
+        self.assertIn("https", res["error"].lower())
+
+    def test_accepts_204_no_content_as_success(self):
+        # A PATCH that returns 204 applied successfully; treating it as a
+        # failure makes transition_issue_to_started report a false negative.
+        class FakeResp:
+            status = 204
+
+            def read(self):
+                return b""
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        class FakeOpener:
+            def open(self, req, timeout=None):
+                return FakeResp()
+
+        # Patch the opener, not urlopen: make_plane_request goes through a
+        # redirect-refusing opener rather than the module-level urlopen.
+        with unittest.mock.patch.object(
+            plane_sync, "_build_opener", return_value=FakeOpener()
+        ):
+            res = plane_sync.make_plane_request(
+                self._profile("https://plane.example.com"),
+                "workspaces/w/projects/p/issues/i/",
+                method="PATCH",
+                data={"state": "s"},
+            )
+        self.assertNotIn("error", res)
+
+    def test_redirects_are_not_followed(self):
+        # urllib's default redirect handler re-sends custom headers, which
+        # would forward x-api-key to the redirect target.
+        opener = plane_sync._build_opener()
+        handler = next(
+            h for h in opener.handlers
+            if isinstance(h, urllib.request.HTTPRedirectHandler)
+        )
+        self.assertIsNone(
+            handler.redirect_request(None, None, 302, "Found", {}, "https://evil.example")
+        )
 
 
 if __name__ == "__main__":

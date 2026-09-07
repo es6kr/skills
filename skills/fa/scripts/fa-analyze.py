@@ -24,6 +24,12 @@ from datetime import date, timedelta
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 DEFAULT_FILE = os.path.expanduser("~/.claude/skills/cleanup/data/failed-attempts.md")
+# FA_DATA_DIR resolver: overridable store location; the literal above is only the
+# backward-compatible default (see fa/SKILL.md "FA data store").
+if os.environ.get("FA_DATA_DIR"):
+    DEFAULT_FILE = os.path.join(
+        os.path.expanduser(os.environ["FA_DATA_DIR"]), os.path.basename(DEFAULT_FILE)
+    )
 DATE = re.compile(r"\((\d{4}-\d{2}-\d{2})")
 RECUR_TITLE = re.compile(r"\d+\s*회(차|째)|재발")
 HOOK_FUTURE = re.compile(r"(회차|회째|다음 발생|재발).{0,20}(시|이상).{0,10}hook|hook (자동화|필수|검토)", re.I)

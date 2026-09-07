@@ -13,6 +13,28 @@ Every new fix_plan entry contains three required elements. Single-line action-on
   - {optional sub-steps, command examples, file paths}
 ```
 
+### RAG pre-lookup gate (HARD STOP — context direction)
+
+**Before adding or upserting an item, run a RAG (vector-memory) semantic search on the item's core keywords.** This gate answers a different question than the Canonical medium gate below: canonical-medium asks "is this tracker the record of truth?"; this gate asks "is there already known context on this topic?" Writing a new entry without checking prior context risks re-investigating a problem that a past session already diagnosed, or duplicating an item that already exists in a different phrasing.
+
+1. **Search first**: run the skill domain's standard semantic-search script (e.g. `qdrant-search.py --semantic "<core keywords>" --limit 5`) before touching the tracker file's content. Prefer the domain's own script over an ad-hoc MCP call — see the workspace's tool-selection-priority rule (script/CLI first, MCP only when no script exists).
+2. **Fold hits into the entry**: if the search surfaces prior diagnosis, an existing related item, or a linked plan/research document, reference it in the new entry's body (`**Why**` or a one-line sub-bullet) instead of re-deriving the same analysis from scratch.
+3. **No hits is not skip-worthy evidence of anything but absence**: zero results means proceed with authoring normally — it does not excuse skipping the search itself.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Read/edit the tracker file directly to add an item without running a semantic search on the item's topic first | Run the semantic search first, then open the tracker file to place the entry |
+| 2 | Re-derive a diagnosis or procedure from scratch when the search surfaces a matching prior session's finding | Cite the prior finding (one-line pointer) and build on it instead of repeating the investigation |
+| 3 | Treat the Canonical medium gate's pinned-header check as covering this | The two gates are independent axes — pinned-header answers "where does this belong", RAG search answers "what is already known about it". Both run, in either order relative to each other, but RAG search runs before the item body is drafted |
+
+#### Self-check before drafting a new entry
+
+1. Did you run a semantic search on the item's core keywords before drafting the entry body?
+2. If the search returned relevant hits, does the entry body reference them (rather than silently ignoring them)?
+3. If the search returned nothing, did you still author the entry normally rather than treating the empty result as a reason to skip the check next time?
+
 ### Canonical medium gate (HARD STOP — creation direction)
 
 **Before adding a new item, determine whether this tracker is the canonical backlog or an index into an external one.** When an external tracker is canonical, an entry written only here is not a record — it is a pointer with nothing behind it, and it disappears the moment the file is regenerated or overwritten by a concurrent writer.

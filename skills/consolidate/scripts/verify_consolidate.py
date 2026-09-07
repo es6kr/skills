@@ -243,7 +243,73 @@ class ConsolidateValidator:
         if "gh pr merge" in summary_body and "/github-flow merge" not in summary_body:
             self.errors.append("Summary recommends raw 'gh pr merge' instead of '/github-flow merge <N>'.")
 
+        # 11. Check findings-table Status column vocabulary
+        #
+        # post.md fixes the column name to `Status` and its values to exactly five.
+        # Checks 1-10 never looked at the values, so four separate runs shipped a
+        # self-invented vocabulary (`Verified`, `\U0001F7E2 Verified`, `\u2705 Accept`, `\u2705 VALID`)
+        # while this gate reported "ALL GATES PASSED". That matters beyond wording:
+        # post.md derives the merge recommendation FROM this column (any
+        # `\U0001F534 Pending` -> Hold), so an off-contract value zeroes the Pending
+        # count and flips the verdict to "no merge blocker".
+        self._check_status_vocabulary(summary_body)
+
         return len(self.errors) == 0
+
+    # The leading emoji is the documented form but is treated as optional here:
+    # the failure class this guard exists for is an invented *word* (VALID /
+    # Accept / Verified / Unverified / Out of scope), not a missing emoji.
+    # Requiring the emoji too would reject plain "Pending", which is already in
+    # use and is not the defect.
+    ALLOWED_STATUS_RE = [
+        re.compile(r"^(\U0001F7E2\s*)?Fixed\b"),
+        re.compile(r"^(\U0001F534\s*)?Pending\b"),
+        re.compile(r"^(\U0001F7E1\s*|\U0001F7E2\s*)?Deferred\b"),
+        re.compile(r"^(\u26AA\s*)?Rejected\b"),
+    ]
+
+    def _check_status_vocabulary(self, summary_body: str) -> None:
+        """Findings table must use the `Status` column with post.md's five values."""
+        block: List[str] = []
+        tables: List[tuple] = []
+        for line in summary_body.splitlines() + [""]:
+            stripped = line.strip()
+            if stripped.startswith("|") and stripped.endswith("|"):
+                block.append(stripped)
+                continue
+            if len(block) >= 3:
+                header = [c.strip() for c in block[0].strip("|").split("|")]
+                rows = [[c.strip() for c in r.strip("|").split("|")] for r in block[2:]]
+                rows = [r for r in rows if r and r[0].isdigit()]
+                if rows:
+                    tables.append((header, rows))
+            block = []
+
+        for header, rows in tables:
+            lowered = [h.lower() for h in header]
+            if "status" not in lowered:
+                self.errors.append(
+                    "Findings table has no 'Status' column (header: "
+                    + " | ".join(header)
+                    + "). post.md fixes the column name to 'Status'; renaming it "
+                    "(e.g. 'Verdict') leaks the receiving-code-review judgement frame "
+                    "into the published column, which post.md derives the merge "
+                    "recommendation from."
+                )
+                continue
+            idx = lowered.index("status")
+            for row in rows:
+                cell = row[idx] if idx < len(row) else ""
+                plain = re.sub(r"[*`_]", "", cell).strip()
+                if not any(rx.match(plain) for rx in self.ALLOWED_STATUS_RE):
+                    self.errors.append(
+                        f"Findings row {row[0]}: Status {cell!r} is outside the post.md "
+                        "contract. Allowed: '\U0001F7E2 Fixed (commit <sha>)', "
+                        "'\U0001F534 Pending', '\U0001F7E1 Deferred (author follow-up)', "
+                        "'\U0001F7E2 Deferred (no action)', '\u26AA Rejected \u2014 <reason>'. "
+                        "A valid in-diff finding that is not yet fixed is "
+                        "'\U0001F534 Pending' from the start."
+                    )
 
 
 def main() -> int:

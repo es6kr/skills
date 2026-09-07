@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/commit-tidy-v0.6.0...commit-tidy-v0.7.0) (2026-09-01)
+
+
+### Features
+
+* staging branch next-feat sync into main ([e582ea2](https://github.com/es6kr/skills/commit/e582ea248beefa70886716741b8965d91cfb7414))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/commit-tidy-v0.5.5...commit-tidy-v0.6.0) (2026-08-29)
 
 

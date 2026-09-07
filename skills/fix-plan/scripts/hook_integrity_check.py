@@ -83,6 +83,27 @@ def resolve_script_operand(command):
         return tok
     return ""
 
+def _resolve_hooks_config(root):
+    """Return (config_path_or_None, searched_paths).
+
+    Workspace-local candidates are checked first so a caller can point the
+    audit at an arbitrary root (and so tests can drive it with a tmp_path);
+    the user-home global config is the fallback, which is what this function
+    audited before the root parameter was introduced.
+    """
+    home = os.path.expanduser("~")
+    searched = [
+        os.path.join(root, ".gemini", "config", "hooks.json"),
+        os.path.join(root, ".claude", "hooks.json"),
+        os.path.join(home, ".gemini", "config", "hooks.json"),
+        os.path.join(home, ".claude", "hooks.json"),
+    ]
+    for candidate in searched:
+        if os.path.exists(candidate):
+            return candidate, searched
+    return None, searched
+
+
 def check_hook_integrity(root):
     results = {
         "MISSING": [],
@@ -93,13 +114,21 @@ def check_hook_integrity(root):
         "OK": []
     }
 
-    user_home = os.path.expanduser("~")
-    hooks_config = os.path.join(user_home, ".gemini", "config", "hooks.json")
-    if not os.path.exists(hooks_config):
-        hooks_config = os.path.join(user_home, ".claude", "hooks.json")
+    # Workspace-local config wins (this is what makes the function testable with
+    # a tmp_path root), but fall back to the user-home global config when the
+    # workspace carries none. Resolving under `root` alone made this function
+    # early-return a false MISSING for every workspace without its own
+    # hooks.json -- silently skipping every check below.
+    hooks_config, searched = _resolve_hooks_config(root)
 
-    if not os.path.exists(hooks_config):
-        results["MISSING"].append({"file": "hooks.json", "reason": "Global hooks.json config not found"})
+    if hooks_config is None:
+        results["MISSING"].append({
+            "file": "hooks.json",
+            "reason": (
+                f"no hooks.json found in workspace ({root}) or user home; "
+                f"searched: {', '.join(searched)}"
+            ),
+        })
         return results
 
     try:

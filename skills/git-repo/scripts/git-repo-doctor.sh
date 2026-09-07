@@ -145,12 +145,12 @@ else
   add_result "BASE-3" "Base" "Pre-push Deletion" "WARN" "No pre-push hook found."
 fi
 
-# BASE-4: pre-push 'local' branch guard
+# BASE-4: pre-push private/staging branch guard ('local*', 'wip*', 'scratch*')
 if [[ -n "$PRE_PUSH_CONTENT" ]]; then
-  if echo "$PRE_PUSH_CONTENT" | grep -qE 'refs/heads/local'; then
-    add_result "BASE-4" "Base" "Local Branch Guard" "PASS" "pre-push hook contains 'local' stage-branch push guard."
+  if echo "$PRE_PUSH_CONTENT" | grep -qE '(refs/heads/local|refs/heads/wip|refs/heads/scratch|\$\{.*refs/heads/\}|local-\*|local/\*)'; then
+    add_result "BASE-4" "Base" "Local Branch Guard" "PASS" "pre-push hook contains private/staging branch ('local*', 'wip*', 'scratch*') push guard."
   else
-    add_result "BASE-4" "Base" "Local Branch Guard" "FAIL" "pre-push hook lacks 'local' stage-branch push guard."
+    add_result "BASE-4" "Base" "Local Branch Guard" "FAIL" "pre-push hook lacks 'local'/'wip'/'scratch' stage-branch push guard."
   fi
 else
   add_result "BASE-4" "Base" "Local Branch Guard" "WARN" "No pre-push hook found."

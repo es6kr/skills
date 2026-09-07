@@ -6,7 +6,7 @@ Mandatory plan/research pre-search on entering a Task/issue/PR. Applies equally 
 
 When the user mentions `#N` or a domain keyword, the first action is a **Mandatory RAG & Corpus Pre-Lookup (HARD STOP)**:
 1. **RAG Semantic Search**: Run vector memory / RAG semantic search (e.g. `python3 scripts/qdrant-search.py "<keywords>"`) to look up past research, plans, and session decisions.
-2. **LLM Wiki & Corpus Glob Search**: Search across active and peer LLM Wiki repositories (`llm-wiki/outputs/*<keyword>*.md`, `daegunsoftDev/llm-wiki/outputs/*<keyword>*.md`, `.agents/docs/generated/*<keyword>*.md`) using keyword matching regardless of prefix (`find -iname '*<keyword>*.md'`).
+2. **Workspace & Corpus Glob Search**: Search across active and peer documentation directories (`.agents/docs/generated/*<keyword>*.md`, `daegunsoftDev/.agents/docs/generated/*<keyword>*.md`, `llm-wiki/outputs/*<keyword>*.md`) using keyword matching regardless of prefix (`find -iname '*<keyword>*.md'`).
 3. **Plan Glob before Query Commands**: Plan/Research search comes before query commands such as `gh issue view`, `gh pr view`, and `git log`.
 4. **Mandatory Read & Prior Knowledge Section**: When relevant artifacts are found, **Read the body and map it to the work scope** → cite and synthesize them under a `## Prior Knowledge & Context` section in the new research document. Asserting "no prior plan/research exists" without physically executing RAG semantic search and LLM Wiki corpus search is STRICTLY FORBIDDEN.
 

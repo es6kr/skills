@@ -42,6 +42,8 @@ name: branch-tag-adjudication
 on:
   pull_request:
     branches:
+      - main
+      - develop
       - next-feat
       - next-fix
 
@@ -185,6 +187,34 @@ jobs:
             TAG="${SKILL_TAGS[$KEY]}"
 
             case "$BASE_REF" in
+              develop|main)
+                case "$TAG" in
+                  feat)
+                    # Enforce feat tag file-addition integrity: must add at least 1 new skill file
+                    ADDED_SKILL_FILES=$(git diff-tree --no-commit-id --name-status -r "$SHA" \
+                      | grep -E '^A[[:space:]]+skills/' \
+                      || true)
+                    if [ -z "$ADDED_SKILL_FILES" ]; then
+                      echo "::error::Commit $SHA has tag 'feat:' but adds no new skill/topic/script file. Use 'fix:' or 'refactor:' for modifications to existing files."
+                      FAIL=1
+                    fi
+                    ;;
+                  fix|chore|refactor|test|style|perf|ci|build)
+                    # Enforce that adding a new skill file requires feat: tag
+                    ADDED_SKILL_FILES=$(git diff-tree --no-commit-id --name-status -r "$SHA" \
+                      | grep -E '^A[[:space:]]+skills/[^/]+/(topics/|scripts/|resources/|[^/]+\.md$|[^/]+\.py$|[^/]+\.sh$)' \
+                      || true)
+                    if [ -n "$ADDED_SKILL_FILES" ]; then
+                      echo "::error::Commit $SHA adds a new skill/topic/script file with tag '$TAG'. Adding new skill files requires commit tag 'feat:' to ensure proper minor release bump."
+                      FAIL=1
+                    fi
+                    ;;
+                  *)
+                    echo "::error::Unsupported tag '$TAG' on commit $SHA (skill=$SKILL). Allowed tags: feat, fix, refactor, test, chore, perf, ci, build."
+                    FAIL=1
+                    ;;
+                esac
+                ;;
               next-feat)
                 case "$TAG" in
                   feat)

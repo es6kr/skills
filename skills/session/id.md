@@ -58,6 +58,19 @@ Before using the marker method, check if the session ID is already visible in th
 | 2 | "Most recently modified JSONL is the active session" assumption | After `/compact` and `/session split`, multiple JSONLs in the same project key can be modified within seconds of each other. mtime races are common — mtime can show a non-active JSONL as newer than the active one. Always confirm against the hook output or env var |
 | 3 | Single-source conclusion (env var alone, or hook alone) when sources disagree | Cross-verify at least 2 sources. If hook says A and env says B, run a marker probe (outer Step 1-2) to break the tie |
 
+### Orca Running / External Terminal Session Resolution
+
+When identifying the session ID of an **external Claude session running inside an Orca terminal** (e.g. dispatched work, peer terminal, or orchestrator inspection):
+
+1. **Query Orca Terminals**: Run `orca terminal list --json` (or `orca worktree ps --json`) to obtain active terminal handles, `worktreePath`, `tabId`/`leafId`, and terminal preview output (`lastOutputAt`).
+2. **Translate Project Directory**: Convert the target terminal's `worktreePath` to Claude's project key:
+   - macOS: `/Users/<user>/ghq/...` → `~/.claude/projects/-Users-<user>-ghq-...`
+   - Linux: `/home/<user>/...` → `~/.claude/projects/-home-<user>-...`
+3. **Match Activity Timestamp & Payload**:
+   - Inspect JSONL files in that project directory ordered by `mtime` around the Orca terminal's `lastOutputAt`.
+   - Cross-verify the latest `user` message or tool invocations in the candidate JSONL against the prompt delivered via `orca terminal send` or the Orca terminal preview.
+4. **Confirm UUID**: Extract and return the confirmed 36-character session UUID (`<uuid>.jsonl` basename).
+
 ### 1. Generate and Output Marker (only if Step 0 found nothing)
 
 **Method A (recommended):** Generate a unique marker string directly in text output.

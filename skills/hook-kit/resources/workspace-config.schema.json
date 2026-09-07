@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.es6.kr/agent-workspace/config.schema.json",
+  "title": "Agent Workspace Config Schema v2",
+  "description": "Standardized schema for multi-tier agent workspace receiver bindings, profiles, and runtime configuration.",
+  "type": "object",
+  "required": [
+    "version",
+    "profiles"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "enum": [
+        2
+      ]
+    },
+    "_note": {
+      "type": "string"
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/role_binding"
+      }
+    },
+    "global": {
+      "type": "object",
+      "properties": {
+        "_note": {
+          "type": "string"
+        },
+        "rag": {
+          "$ref": "#/$defs/rag_binding"
+        }
+      },
+      "additionalProperties": true
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/profile"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "properties": {
+        "extends": {
+          "type": "string"
+        },
+        "match": {
+          "type": "object",
+          "properties": {
+            "path_components": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd_match": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "roles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/role_binding"
+          }
+        }
+      },
+      "required": [
+        "roles"
+      ],
+      "additionalProperties": false
+    },
+    "role_binding": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "none",
+            "plane",
+            "file",
+            "qdrant",
+            "vault",
+            "git",
+            "skill",
+            "mcp",
+            "branch",
+            "dir"
+          ]
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "token_env": {
+          "type": "string"
+        },
+        "token_file": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "project_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workspace_slug": {
+          "type": "string"
+        },
+        "k3s_namespace": {
+          "type": "string"
+        },
+        "k3s_ssh_host": {
+          "type": "string"
+        },
+        "secrets_path": {
+          "type": "string"
+        },
+        "mcp_prefix": {
+          "type": "string"
+        },
+        "skill": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string"
+        },
+        "tool_prefix": {
+          "type": "string"
+        },
+        "collections": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "_note": {
+          "type": "string"
+        },
+        "next_fix": {
+          "type": "string"
+        },
+        "next_feat": {
+          "type": "string"
+        },
+        "main": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "rag_binding": {
+      "type": "object",
+      "required": [
+        "kind",
+        "endpoint"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "qdrant",
+            "none"
+          ]
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "collections": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "purpose": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -2,8 +2,22 @@
 // block-direct-checklist-edit.js
 // Physically blocks direct edits on fix_plan.md and checklist.md via Edit/Write tools.
 // Enforces that modifications must be routed through fix-plan skill scripts.
+//
+// Claude Code sessions are exempt: this guard exists to stop lower-capability
+// harnesses (e.g. Antigravity/Gemini) from schema-corrupting direct edits.
+// add_item.py and update_item.py now cover ADD and marker-flip/note-append
+// respectively, but neither covers sync auto-check stamps or
+// `## Pipeline Execution Log` entries — Claude Code sessions still need
+// direct edits for those. Claude Code exposes CLAUDE_PROJECT_DIR (and, for
+// plugin hooks, CLAUDE_PLUGIN_ROOT) to hook processes; other harnesses do
+// not — this premise is unverified in this repo (no test asserts it) and
+// should be re-checked if the exemption ever misfires.
 
 const fs = require('fs');
+
+if (process.env.CLAUDE_PROJECT_DIR || process.env.CLAUDE_PLUGIN_ROOT) {
+  process.exit(0);
+}
 
 function safeParse(str) {
   try {
@@ -43,6 +57,8 @@ if (filePath) {
     process.stderr.write('Required Action: You MUST run fix-plan scripts in terminal via run_command/Bash:\n');
     process.stderr.write('  - ADD a new item:  python <skill-dir>/scripts/add_item.py --file <path> \\\n');
     process.stderr.write('        --action "..." --why "..." --how "..." [--marker "[BLOCKED:P1:external]"] [--dry-run]\n');
+    process.stderr.write('  - UPDATE an existing item (flip marker / append a note): python <skill-dir>/scripts/update_item.py --file <path> \\\n');
+    process.stderr.write('        --match "<substring of the action text>" [--set-marker "[x]"] [--append-note "..."] [--dry-run]\n');
     process.stderr.write('  - python <skill-dir>/scripts/detect_bloated_tasks.py --file <path>\n');
     process.stderr.write('  - python <skill-dir>/scripts/stale_check.py --root <path>\n');
     process.stderr.write('  - python <skill-dir>/scripts/cleanup.py --file <path>\n');

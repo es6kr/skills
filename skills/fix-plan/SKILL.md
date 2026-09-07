@@ -1,7 +1,7 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), upsert (dup-check → update in place or fall back to add), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), update (flip marker / append progress note on an existing item), upsert (dup-check → update in place or fall back to add), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
   Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
   Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role", "orca session launch", "fix-plan upsert", "dup check tracker".
 metadata:
@@ -40,6 +40,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
+| update | Mutate an EXISTING item in place — flip its marker or append a one-line progress note — via `update_item.py`, without going around `block-direct-checklist-edit.js` | [update.md](./update.md) |
 | upsert | Dup-check the tracker before authoring — match on Action semantics across all sections, update in place (preserve `Why`, state priority reclassification) when found, fall back to `add`'s schema otherwise | [upsert.md](./upsert.md) |
 | verify | Cross-check commit-hash/file-path references cited in tracker items against local git/filesystem state before trusting a "still unresolved" claim (distinct from `sync`'s external GitHub polling) | [verify.md](./verify.md) |
 
@@ -141,6 +142,8 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 
 **pm-profile completion handoff**: when a `pm` role-profile default-invocation pipeline finishes (through the REPEAT cadence check), do not close the turn with an open-ended "what's next" prompt. Reuse the `sync`/`priority` state this same run already computed and surface exactly one simple `selfable` candidate from what the `impl` row's own candidate-surfacing step would otherwise report — then confirm it via `AskUserQuestion` (proceed with it / pick something else / skip for now) instead of a generic next-step prompt. This draws from a single already-known role profile's own candidate set computed in this same run, not a speculative multi-source scan — it is a narrower, cheaper handoff than general next-action option construction. If no `selfable` candidate exists this run, skip this step and close normally.
 
+**Simple-vs-session self-check (HARD STOP — run before drafting the `pm-profile completion handoff` `AskUserQuestion`, not after)**: having read this paragraph once is not the same as applying it at the moment the ask is drafted — do not default straight to a "proceed now" option. Explicitly ask: does the candidate touch 2+ files, or does it require authoring/updating regression tests, or is it otherwise `impl`/`deep`-tier work rather than a single-file mechanical edit? If yes, it is NOT a simple in-session item — go to the Orca check below *before* finalizing the ask's options, and do not present "proceed now" as the sole or Recommended option without first completing that check.
+
 **Orca session-launch recommendation (conditional on Orca detection)**: when the `pm-profile completion handoff` above identifies a candidate that is not a simple in-session `selfable` item but genuinely needs a `deep` or `impl` role session, check whether the Orca IDE runtime (`stablyai/orca` — see the `orca` skill) is available: attempt `<orca> status --json`, resolving the CLI per the `orca` skill's "Resolve the CLI" convention (`ORCA_CLI_COMMAND` → `orca-dev` in a dev checkout → `orca-ide` outside a managed terminal on Linux → `orca`).
 
 If Orca is available, add a "launch via Orca" option to the `pm-profile completion handoff` `AskUserQuestion` for that candidate — the `orca` skill's `launch` topic (`worktree create --agent claude --prompt "<candidate + tracker path>"`) — instead of only surfacing it for later manual pickup.
@@ -161,6 +164,7 @@ If Orca is available, add a "launch via Orca" option to the `pm-profile completi
 | 3 | Auto-select among 2+ matching running sessions | List every match as a separate `AskUserQuestion` option — never guess |
 | 4 | Apply the same duplicate-check requirement to `impl` launches | `impl` sessions may run concurrently on independent items — duplicate-check is `deep`-only |
 | 5 | Silently skip the recommendation when Orca detection fails | Ask direction instead — diagnose/install Orca / use an alternative launcher (`clawo`, `openclaw`) / subagent (not recommended) / surface-only |
+| 6 | Default the `pm-profile completion handoff` ask straight to "proceed now" because the candidate seems short to describe | Run the simple-vs-session self-check first — a short description can still be multi-file/impl-tier work; length of the candidate's own text is not the signal |
 
 **Mandatory Output Reporting Contract (HARD STOP)**: The agent must physically emit the Step 4 Priority Triage candidate list (P0–P3 sorted by `:selfable` vs `:external`) in the visible response text BEFORE marking the task as completed (`[x]`) or invoking `AskUserQuestion`. Suppressing Step 4's summary table output or marking tasks completed prior to physical output emission is strictly forbidden.
 
@@ -317,9 +321,14 @@ MERGED PR or CLOSED issue → auto `[x]`. PR CLOSED-without-merge → `[BLOCKED:
 
 `issue-drafts/<slug>.md` → `gh issue create` → archive to `.bak/` → delete from fix_plan. See [issue-drafts.md](./issue-drafts.md).
 
+### Plane Intake Ingestion Gate for PR & Completed Items (HARD STOP)
+
+Work items backed by GitHub PRs or completed during sessions without a Plane identifier (`[ES6KR-<N>]`, `[INFRA-<N>]`, etc.) MUST be ingested into Plane via Intake (`plane_create_issue.py`) to preserve historical audit logs and decisions. See `backlog` skill.
+
 ## See Also
 
 - `github-flow` (depends-on) — `gh` CLI conventions for sync + register
 - `backlog` (depends-on) — Plane issue/intake lifecycle and sync engine
 - `orca` (optional, conditional) — session-launch recommendation for deep/impl role candidates when the Orca IDE runtime is detected; see "Orca session-launch recommendation" above
 - Ralph integration is a separate workstream maintained outside this published skill. A Ralph wrapper, when present, owns Ralph-specific concerns: the `## REPEAT` persistent-item section, autonomous-loop `[BLOCKED]` skip semantics, and the caller-side `--rag=<skill>:<topic>` dispatch (this skill exposes only the abstract flag contract). See the Ralph project's documentation for wrapper details
+

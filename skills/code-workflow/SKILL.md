@@ -31,12 +31,12 @@ A **Research → Plan → User Review → Implement** 4-stage procedure for code
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `output-dir` | `llm-wiki/outputs/` (workspace-local) | Directory for generated research and plan files; authoritative plans may be promoted to `pages/<domain>/` per the workspace wiki convention |
+| `output-dir` | Configured `WSCFG_ARTIFACTS_PATH` (default: `.agents/docs/generated`) | Directory for generated research, plan, and walkthrough files; authoritative domain knowledge may be promoted to LLM Wiki via `raw-ingest` |
 
-Set via project CLAUDE.md or skill invocation argument:
+Set via project CLAUDE.md, workspace profile config, or skill invocation argument:
 
 ```text
-/code-workflow --output-dir llm-wiki/outputs/
+/code-workflow --output-dir .agents/docs/generated
 ```
 
 ### Task Checklist Registration (MANDATORY Tool Call #1 HARD STOP)

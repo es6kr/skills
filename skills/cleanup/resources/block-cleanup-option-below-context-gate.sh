@@ -43,7 +43,13 @@ fi
 # unrelated slash-delimited text (e.g. "resume/shutdown/cleanup/agent-messages")
 # — only a standalone "/cleanup" token (not preceded by alnum or another slash)
 # counts as the slash-command reference.
-WRAPUP_PATTERN_EN='wrap[- ]?up|(?<![a-zA-Z0-9/])/cleanup|session cleanup|retrospect'
+# "retrospect" carries the same identifier hazard: it is a substring of branch
+# names and file paths (fix/retrospect-script-path, cleanup/retrospect.md), and
+# an option that merely *names* such a branch is not offering a wrap-up. Require
+# it to stand alone as a word — not preceded by an identifier/path character, and
+# not followed by one that turns it into a slug or filename. A trailing letter is
+# still allowed so "retrospective" keeps matching.
+WRAPUP_PATTERN_EN='wrap[- ]?up|(?<![a-zA-Z0-9/])/cleanup|session cleanup|(?<![a-zA-Z0-9/-])retrospect(?![-/.])'
 if [[ -n "${HG_CONTEXT_GATE_WRAPUP_KO:-}" ]]; then
   WRAPUP_PATTERN="${WRAPUP_PATTERN_EN}|${HG_CONTEXT_GATE_WRAPUP_KO}"
 else
@@ -162,9 +168,12 @@ fi
 #   4. $HOME/.claude/skills/...    — legacy absolute path, kept for back-compat
 CTX_INJECT=""
 for _cand in \
+  "$(dirname "$0")/../../session/resources/context-usage-inject.sh" \
   "$(dirname "$0")/../../hook-kit/resources/context-usage-inject.sh" \
   "$(dirname "$0")/../../context-measure/resources/context-usage-inject.sh" \
+  "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/session/resources/context-usage-inject.sh" \
   "${CLAUDE_PLUGIN_ROOT:-/nonexistent}/skills/hook-kit/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/session/resources/context-usage-inject.sh" \
   "$HOME/.claude/skills/hook-kit/resources/context-usage-inject.sh"; do
   if [[ -f "$_cand" ]]; then CTX_INJECT="$_cand"; break; fi
 done

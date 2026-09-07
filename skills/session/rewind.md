@@ -88,5 +88,11 @@ sqlite3 "$HOME/.gemini/antigravity-cli/conversation_summaries.db" \
 ## Safety & Backups
 
 - SQLite DB files are atomically backed up as `<uuid>.db.bak`.
-- Transcript logs are backed up as `transcript.jsonl.bak`.
+- Transcript logs are backed up as `transcript.jsonl.bak` and `transcript_full.jsonl.bak`.
 - Local working directory source code files are **100% untouched**.
+
+## Antigravity IDE Session Reflection (Mandatory App Restart)
+
+- Antigravity IDE background language server (`language_server_macos_arm`) caches conversation trajectories in process memory.
+- `Developer: Reload Window` (`Cmd+R`) only reloads the Electron frontend and **will NOT reload the backend language server's memory state**.
+- To ensure the rewound SQLite DB and transcript are cleanly loaded without pre-invocation hook errors, **completely quit Antigravity IDE (`Cmd + Q`) and restart it**.

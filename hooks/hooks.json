@@ -144,6 +144,10 @@
           },
           {
             "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-status-vocab.py"
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-new-tab-without-split-check.sh"
           },
           {
@@ -197,7 +201,7 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js"
           }
         ]
       },
@@ -238,7 +242,7 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js"
           }
         ]
       },
@@ -338,11 +342,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/session/resources/session-id-inject.js SessionStart"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cc-plugin/resources/cache-cleanup.sh 2>/dev/null || true"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-plugin-load-failures.js SessionStart",
+            "timeout": 10
           }
         ]
       }

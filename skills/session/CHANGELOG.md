@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.11.1](https://github.com/es6kr/skills/compare/session-v0.11.0...session-v0.11.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **session:** truncate auxiliary metadata and mandate IDE restart on rewind ([9d9ce42](https://github.com/es6kr/skills/commit/9d9ce4285a9c57a58d039d4da9f609122214adbc))
+
+## [0.11.0](https://github.com/es6kr/skills/compare/session-v0.10.0...session-v0.11.0) (2026-09-05)
+
+
+### Features
+
+* **session:** add Orca terminal session resolution and naming guidance ([537c8c6](https://github.com/es6kr/skills/commit/537c8c6eb6663ead32ec4f2144e483ec0ba150ab))
+
+## [0.10.0](https://github.com/es6kr/skills/compare/session-v0.9.0...session-v0.10.0) (2026-09-05)
+
+
+### Features
+
+* **session:** merge context-measure into session and add Antigravity compaction awareness ([#449](https://github.com/es6kr/skills/issues/449)) ([157eecd](https://github.com/es6kr/skills/commit/157eecd2215304485c38a21ce395f4603257d8fe))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/session-v0.8.2...session-v0.9.0) (2026-08-29)
 
 

@@ -151,6 +151,25 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
         except Exception:
             pass
 
+    user_turns = 0
+    model_turns = 0
+    if transcript_path and os.path.exists(transcript_path):
+        try:
+            with open(transcript_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    s_idx = data.get("step_index", 0)
+                    if s_idx <= effective_cutoff:
+                        st = data.get("type", "")
+                        if st == "USER_INPUT":
+                            user_turns += 1
+                        elif st == "PLANNER_RESPONSE":
+                            model_turns += 1
+        except Exception:
+            pass
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
@@ -163,8 +182,13 @@ def rewind_antigravity_db(db_path, cutoff_step, cid=None, summary_db_path=None, 
     shutil.copy2(db_path, backup_db)
 
     cursor.execute("DELETE FROM steps WHERE idx > ?", (effective_cutoff,))
+    if user_turns > 0:
+        cursor.execute("DELETE FROM executor_metadata WHERE idx >= ?", (user_turns,))
+    if model_turns > 0:
+        cursor.execute("DELETE FROM gen_metadata WHERE idx >= ?", (model_turns,))
     conn.commit()
     conn.close()
+
 
     # Truncate transcript.jsonl & transcript_full.jsonl if present
     if transcript_path and os.path.exists(transcript_path):

@@ -117,7 +117,15 @@ def test_plane_sync_request_sends_browser_user_agent(monkeypatch):
         captured.append(req)
         return FakeResponse({}, status=200)
 
-    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    # make_plane_request goes through a redirect-refusing opener rather than
+    # urllib.request.urlopen (the default handler forwards the x-api-key header
+    # across redirects). The UA contract asserted below is unchanged; only the
+    # interception point moves.
+    class FakeOpener:
+        def open(self, req, timeout=None):
+            return fake_urlopen(req)
+
+    monkeypatch.setattr(mod, "_build_opener", lambda: FakeOpener())
     mod.make_plane_request(
         {"plane_host": "https://plane.invalid", "plane_token": "tok", "plane_token_env": "X"},
         "workspaces/testws/projects/",

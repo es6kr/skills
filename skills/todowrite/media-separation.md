@@ -25,6 +25,7 @@
 | 2 | Dump multi-paragraph execution logs (`✅ classification complete`, `✅ execution complete`, detailed audit tables) into `fix_plan.md` | Post detailed execution logs and audit narratives as **Plane issue comments** (`plane_create_comment.py`) or session walkthroughs, keeping `fix_plan.md` strictly lean with concise 1-line pointers |
 | 3 | Accumulate completed-work records as wiki pages | RAG store via `/cleanup` rag-store flow. Only distilled knowledge (not records) goes to wiki |
 | 4 | Bury decisions/facts from completed work in RAG alone | Promote knowledge to a wiki page — recording ("what did we do") ≠ knowledge ("what is true") |
+| 5 | Leave pending follow-up work that a decision or selection just produced (deferred items, "user decides later", carried over to a next session) only in a tracking-file's prose or in the conversation | Register it as a **TaskList pending task** too. The moment an ask/decision yields follow-up work, that work is a trackable item — not just a durable note. Within the Tracking layer the two media split by role: the durable file (fix_plan.md / checklist.md) is the cross-session record, while TaskList is the source of truth for what is pending/in-progress *right now* and must actually show it. Marking the investigation/prep task done without opening a task for the residual work it produced hides that residual work |
 
 ## Exceptions
 
