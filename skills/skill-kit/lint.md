@@ -258,7 +258,7 @@ If `uv` is missing:
 | Platform | Install uv |
 |----------|------------|
 | macOS | `brew install uv` |
-| Linux | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| Linux | `curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh && sh /tmp/uv-install.sh` |
 | Windows (PowerShell) | `irm https://astral.sh/uv/install.ps1 \| iex` — runs in user scope, no elevation needed |
 
 If neither `uv` nor a viable installer is available in the current environment, **skip Step 0 and proceed with Step 1** — the custom rules below provide partial coverage only (description-length budget, depends-on order, hardlink scan), not the upstream spec enforcement. **Report the skip explicitly** with a risk statement naming which upstream checks were not exercised (e.g., "Step 0 skipped — `skills-ref` name-match and properties-JSON validation not run").
