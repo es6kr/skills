@@ -5,13 +5,13 @@ Package a working-tree change (in-place edit or uncommitted diff) into its own b
 ## When to Use
 
 - The change is a scoped, working-tree edit (not yet its own commit) that needs to land as an independent PR
-- The target repo uses a staging-base branch model (`next-fix`/`next-feat` → `main`, or any CI-gate-only integration branch) — see `merge.md`'s CI-gate-only exception for how to detect this
+- The target repo uses a staging-base branch model (`develop` -> `main`, or any CI-gate-only integration branch) — see `merge.md`'s CI-gate-only exception for how to detect this
 - Repeated 2+ times in a session (e.g., multiple independent skill-file fixes each needing their own PR) — doing this by hand each time is what this topic replaces
 
 ## Procedure
 
 1. **Resolve staging base & branch from base** (not from a possibly-stale local branch):
-   - Check `WSCFG_STAGING_*` (e.g. `WSCFG_STAGING_NEXT_FIX` for patch fixes, `WSCFG_STAGING_NEXT_FEAT` for features) if `roles.staging` is configured.
+   - Check `WSCFG_STAGING_*` (e.g. `develop` for unified staging flow) if `roles.staging` is configured.
    - Run `git fetch origin <staging-base>` → `git branch <topic-branch> origin/<staging-base>`
 2. **Isolate the change into its own worktree** — avoids disturbing the main working tree's other in-progress edits: `git worktree add .worktrees/<topic-branch> <topic-branch>` (per `git-repo/worktree.md` — check for a reusable existing worktree first)
 3. **Bring the change into the worktree**: if it's an existing commit, cherry-pick it; if it's an uncommitted working-tree diff, copy the exact files (`cp <path-in-main-tree> <path-in-worktree>`), verify with `git diff --stat` before committing

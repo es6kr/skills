@@ -20,7 +20,7 @@ name: auto-ready
 
 on:
   workflow_run:
-    workflows: ["branch-tag-adjudication"]
+    workflows: ["branch-tag-adjudication", "Test"]
     types: [completed]
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
           fi
 
           case "$BASE_REF" in
-            next-feat|next-fix) ;;
+            develop|next-feat|next-fix) ;;
             *)
               echo "PR #$PR_NUMBER targets '${BASE_REF:-<unknown>}', not a staging branch — skipping."
               exit 0
