@@ -26,7 +26,11 @@ Exit codes: 0 = ok, 1 = validation failure, 2 = usage error.
 from __future__ import annotations
 
 import argparse
-import fcntl
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+import hashlib
 import io
 import os
 import re
@@ -177,28 +181,42 @@ def run_add(args: argparse.Namespace) -> int:
     escaped_action = re.escape(args.action.strip())
     pattern = re.compile(rf"^[ \t]*-[ \t]+\[[ x/X-]\][ \t]+{escaped_action}(?:[ \t]|$)", re.MULTILINE)
 
-    with io.open(args.file, "r+", encoding="utf-8") as fh:
-        try:
-            fcntl.flock(fh, fcntl.LOCK_EX)
+    # Lock a sibling file rather than the tracker itself: atomic_write() replaces
+    # the tracker via os.replace(), which Windows refuses while a handle on the
+    # target is still open. Same lock path update_item.py derives, so the two
+    # scripts actually exclude each other.
+    lock_path = os.path.join(
+        tempfile.gettempdir(),
+        "fix-plan-" + hashlib.sha1(os.path.abspath(args.file).encode("utf-8")).hexdigest() + ".lock",
+    )
+    lock_fh = io.open(lock_path, "a+", encoding="utf-8")
+    try:
+        if fcntl:
+            fcntl.flock(lock_fh, fcntl.LOCK_EX)
+
+        with io.open(args.file, "r", encoding="utf-8") as fh:
             src = fh.read()
-            if pattern.search(src):
-                print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
-                return 0
 
-            out = insert_item(src, args.section, item, args.position)
-
-            if args.dry_run:
-                print("--- dry-run: item that would be inserted ---")
-                print(item)
-                print(f"--- into section {args.section!r} at {args.position} ---")
-                return 0
-
-            atomic_write(args.file, out)
-            print(f"OK: added to {args.section!r} in {args.file} (+{len(out) - len(src)} chars)")
-            print(item)
+        if pattern.search(src):
+            print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
             return 0
-        finally:
-            fcntl.flock(fh, fcntl.LOCK_UN)
+
+        out = insert_item(src, args.section, item, args.position)
+
+        if args.dry_run:
+            print("--- dry-run: item that would be inserted ---")
+            print(item)
+            print(f"--- into section {args.section!r} at {args.position} ---")
+            return 0
+
+        atomic_write(args.file, out)
+        print(f"OK: added to {args.section!r} in {args.file} (+{len(out) - len(src)} chars)")
+        print(item)
+        return 0
+    finally:
+        if fcntl:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+        lock_fh.close()
 
 
 def self_test() -> int:
