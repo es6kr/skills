@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/cleanup-v0.5.0...cleanup-v0.5.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **cleanup:** require the full &lt;model&gt;-&lt;topic&gt;-&lt;sessid8&gt; shape for /rename ([2f1f3b2](https://github.com/es6kr/skills/commit/2f1f3b277525d0efca8fd6fd862e7e8698861ed5))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/cleanup-v0.4.0...cleanup-v0.5.0) (2026-09-06)
 
 

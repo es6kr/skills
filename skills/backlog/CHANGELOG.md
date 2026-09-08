@@ -5,6 +5,14 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/es6kr/skills/compare/backlog-v0.3.0...backlog-v0.3.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **backlog:** stop forwarding the Plane API key across redirects ([c43c474](https://github.com/es6kr/skills/commit/c43c474f590861101ec68221cfbcf85f5ca87937))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/backlog-v0.2.0...backlog-v0.3.0) (2026-09-06)
 
 

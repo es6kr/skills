@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/es6kr/skills/compare/github-flow-v0.10.1...github-flow-v0.10.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* **github-flow:** document merge-commit policy, promotion PR discipline, and develop routing ([ace6bd4](https://github.com/es6kr/skills/commit/ace6bd4d445a2f805a8183946f70bdf34d48289f))
+
 ## [0.10.1](https://github.com/es6kr/skills/compare/github-flow-v0.10.0...github-flow-v0.10.1) (2026-09-01)
 
 
