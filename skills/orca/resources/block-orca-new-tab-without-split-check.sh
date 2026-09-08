@@ -25,6 +25,13 @@ print(ti.get("command") or d.get("command") or "")
 
 [ -z "$command" ] && exit 0
 
+# Quoted literals (e.g. `echo '; orca terminal list'`) must not satisfy any
+# guard match below — a string literal being echoed is not the command it
+# names. Strip single- and double-quoted spans before matching (heuristic:
+# no nested/escaped-quote handling, consistent with the other regex-based
+# guards in this hook family).
+sanitized_command=$(printf '%s' "$command" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+
 transcript_path=$(printf '%s' "$input" | python3 -c '
 import json, sys
 try:
@@ -43,33 +50,35 @@ marker="${TMPDIR:-/tmp}/orca-terminal-list-checked-${session_key}"
 # marker so a follow-up create/split within the next 30 minutes doesn't
 # re-trigger this gate. This must run BEFORE the create-command matching below,
 # since `terminal list`/`terminal split` never match `terminal create`.
-if echo "$command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+terminal[[:space:]]+(list|split)\b'; then
+if echo "$sanitized_command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+terminal[[:space:]]+(list|split)\b'; then
   touch "$marker" 2>/dev/null
   exit 0
 fi
 
 is_worktree_create=0
 is_terminal_create=0
-echo "$command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+worktree[[:space:]]+create\b' && is_worktree_create=1
-echo "$command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+terminal[[:space:]]+create\b' && is_terminal_create=1
+echo "$sanitized_command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+worktree[[:space:]]+create\b' && is_worktree_create=1
+echo "$sanitized_command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+terminal[[:space:]]+create\b' && is_terminal_create=1
 
 if [ "$is_worktree_create" -eq 0 ] && [ "$is_terminal_create" -eq 0 ]; then
   exit 0
 fi
 
 # Auditable opt-out — a genuinely independent new workspace was intended.
-echo "$command" | grep -q 'ORCA_NEW_WORKSPACE_APPROVED=1' && exit 0
+echo "$sanitized_command" | grep -q 'ORCA_NEW_WORKSPACE_APPROVED=1' && exit 0
 
 # `orca terminal create --worktree active` explicitly attaches to the CURRENT
 # worktree, not a new one — that's already the safe path, allow it.
+# Accept both `--worktree active` and `--worktree=active` (Orca CLI supports
+# `--flag=value` too; the whitespace-only form rejected a valid command).
 if [ "$is_terminal_create" -eq 1 ]; then
-  echo "$command" | grep -qE -- '--worktree[[:space:]]+active' && exit 0
+  echo "$sanitized_command" | grep -qE -- '--worktree[=[:space:]]+active' && exit 0
 fi
 
 # `orca worktree create` without `--no-parent` is a deliberate stacked/branch-
 # from-current choice, not the independent-new-workspace default — allow it.
 if [ "$is_worktree_create" -eq 1 ]; then
-  echo "$command" | grep -qE -- '--no-parent' || exit 0
+  echo "$sanitized_command" | grep -qE -- '--no-parent' || exit 0
 fi
 
 if [ -f "$marker" ]; then
