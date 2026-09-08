@@ -256,9 +256,20 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
             ),
         }
 
+    # Refuse to send the API key to a non-HTTPS host (CWE-319 hardening —
+    # cleartext transmission of sensitive information).
+    if not plane_host.lower().startswith("https://"):
+        return {
+            "success": False,
+            "reason": f"Refusing to send credentials to a non-HTTPS plane_host: {plane_host!r}",
+        }
+
     url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/issues/"
+    # x-api-key is deliberately NOT in this dict — see add_unredirected_header
+    # below. urllib forwards headers passed via Request(headers=...) to any
+    # redirect target (even a downgraded http:// or a cross-origin host);
+    # add_unredirected_header keeps a header on the original request only.
     headers = {
-        "x-api-key": token,
         "Content-Type": "application/json",
         "User-Agent": UA
     }
@@ -275,11 +286,12 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
 
     if is_intake:
         return _create_intake_via_rest_api(
-            plane_host, workspace_slug, prj_id, headers, title, description, priority
+            plane_host, workspace_slug, prj_id, headers, token, title, description, priority
         )
 
     try:
         req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+        req.add_unredirected_header("x-api-key", token)
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             issue_id = data.get("id")
@@ -301,7 +313,7 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
         return {"success": False, "reason": str(e)}
 
 
-def _create_intake_via_rest_api(plane_host, workspace_slug, prj_id, headers, title, description, priority):
+def _create_intake_via_rest_api(plane_host, workspace_slug, prj_id, headers, token, title, description, priority):
     """POST to the intake endpoint, which creates the issue in the triage inbox.
 
     Errors are returned to the caller with status and response body. The old
@@ -312,6 +324,7 @@ def _create_intake_via_rest_api(plane_host, workspace_slug, prj_id, headers, tit
     body = json.dumps(build_intake_payload(title, description, priority)).encode("utf-8")
     try:
         req = urllib.request.Request(intake_url, data=body, headers=headers, method="POST")
+        req.add_unredirected_header("x-api-key", token)
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
