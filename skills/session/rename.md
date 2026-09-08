@@ -43,6 +43,8 @@ The bare single-slug rule above is the **default** — optimized for the `agent-
 - the user explicitly asks to match cleanup's rename format ("match cleanup's format", "findable name", etc.), or
 - this suggestion is being composed as part of (or immediately adjacent to) a session wrap-up / `/cleanup` report
 
+"Immediately adjacent" is a session-wide check, not a literal-`/cleanup`-in-the-last-turn check — scan the whole session, not just the preceding 1-2 turns. Any of the following, anywhere earlier in the session, counts as adjacency even for a standalone `/session rename` request with no `/cleanup` wording at all: a Stop hook "cleanup trigger" fired (even if the actual cleanup ceremony was then skipped), or `/fix`/`/fa` (which delegates to `cleanup:retrospect`) was invoked. Enforced mechanically by `block-rename-schema-when-wrapup-adjacent.sh` (Stop) — see failed-attempts.md "session-rename-schema-missing-sessid8-suffix" for the recurrence history.
+
 Otherwise, default to the bare single-slug rule above.
 
 | # | Don't | Do |
