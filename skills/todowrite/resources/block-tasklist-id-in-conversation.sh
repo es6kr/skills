@@ -135,8 +135,14 @@ CLEANED_ASK_TEXT=$(echo "$ASK_TEXT" | sed -E "s/(^|[^[:alnum:]])PR[[:space:]]*[0
 # English quantity phrases; this boundary check generalizes the same
 # protection to any suffix glued directly onto the digits without a space,
 # without needing to enumerate locale-specific counter words here.
+# BSD/macOS grep -E does not define \b as a word boundary (same incompatibility
+# already documented and fixed for the sed line above) — use an explicit
+# start-of-string-or-non-alnum boundary instead so "PR 118" is not silently
+# missed on that platform. Also allow punctuation (e.g. a markdown code-span
+# backtick, as in "PR `#118`") between "PR" and "#" — CodeRabbit's own
+# regression probe used exactly that sample.
 PR_NUMS_REFERENCED=$(echo "$CLEANED_ASK_TEXT" \
-  | grep -oiE '\bPR[[:space:]]*#[0-9]+|\bPR[[:space:]]+[0-9]+([[:space:]]|[[:punct:]]|$)' \
+  | grep -oiE '(^|[^[:alnum:]])PR[[:space:][:punct:]]*#[0-9]+|(^|[^[:alnum:]])PR[[:space:]]+[0-9]+([[:space:]]|[[:punct:]]|$)' \
   | grep -oE '[0-9]+' | sort -un)
 if [[ -n "$PR_NUMS_REFERENCED" ]]; then
   PR_NUMS_WITH_URL=$(echo "$ASK_TEXT" | grep -oiE 'https?://[^[:space:])]+/(pull|merge_requests)/[0-9]+' | grep -oE '[0-9]+$' | sort -un)
