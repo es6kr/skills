@@ -17,6 +17,14 @@ name: branch-tag-adjudication
 # - Any commit touching skills/**/*.md with tag chore or docs is REJECTED —
 #   skill md changes must use fix: (or feat: when accompanied by a new topic
 #   file). Skill md = behaviour surface, not documentation.
+# - New-component gate (develop / main only): a commit that ADDS a new skill or
+#   topic md file (skills/<name>/<topic>.md or skills/<name>/topics/<topic>.md,
+#   excluding README/CHANGELOG) must be tagged feat: so release-please emits a
+#   minor bump. Files added under resources/, scripts/ and tests/ are supporting
+#   files inside an existing skill — they carry a fix and stay patch-level, so
+#   they are NOT gated. Widening this to every added file made promotion
+#   batches unpassable: commits that legitimately shipped as fix: on a staging
+#   branch were re-judged under the stricter main policy.
 # - New-topic gate (advisory): a commit tagged feat that touches a skill dir
 #   should also add a new *.md file (A-status). Advisory only — the
 #   release-please-validate workflow enforces new-component initial versions
@@ -200,12 +208,21 @@ jobs:
                     fi
                     ;;
                   fix|chore|refactor|test|style|perf|ci|build)
-                    # Enforce that adding a new skill file requires feat: tag
+                    # Enforce that adding a new *component* requires the feat: tag.
+                    # Component == a new skill (skills/<name>/SKILL.md) or a new
+                    # topic (skills/<name>/<topic>.md or skills/<name>/topics/<topic>.md)
+                    # — these are the additions that warrant a minor bump.
+                    # Supporting files added under resources/, scripts/ and tests/
+                    # (hook scripts, helper scripts, test files) implement a fix
+                    # inside an existing skill and stay patch-level, so they are
+                    # NOT gated here. README.md / CHANGELOG.md are documentation
+                    # (same exemption as the doc-file rules above).
                     ADDED_SKILL_FILES=$(git diff-tree --no-commit-id --name-status -r "$SHA" \
-                      | grep -E '^A[[:space:]]+skills/[^/]+/(topics/|scripts/|resources/|[^/]+\.md$|[^/]+\.py$|[^/]+\.sh$)' \
+                      | grep -E '^A[[:space:]]+skills/[^/]+/(topics/)?[^/]+\.md$' \
+                      | grep -vE '/(README|CHANGELOG)\.md$' \
                       || true)
                     if [ -n "$ADDED_SKILL_FILES" ]; then
-                      echo "::error::Commit $SHA adds a new skill/topic/script file with tag '$TAG'. Adding new skill files requires commit tag 'feat:' to ensure proper minor release bump."
+                      echo "::error::Commit $SHA adds a new skill or topic md file with tag '$TAG'. Adding a new skill/topic requires commit tag 'feat:' to ensure proper minor release bump."
                       FAIL=1
                     fi
                     ;;
