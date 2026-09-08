@@ -18,7 +18,10 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const LEAK_NAME = /^(jq|cygwin-console-helper|ssh|git|git-remote-https)\.exe$/i;
-const NODE_LEAK = /(\.claude|hooks|check-checklist|check-completed|ccstatusline|statusline)/i;
+// Anchor to the Claude hook directory or to specific known helper scripts, so
+// an unrelated project path merely containing the bare word "hooks" (e.g.
+// `node server.js --config hooks.json`) is never matched.
+const NODE_LEAK = /([\\/]\.claude[\\/]|[\\/]check-checklist|[\\/]check-completed|ccstatusline|statusline)/i;
 const PROTECTED_NAME = /(orca|OpenConsole)/i;
 
 /**

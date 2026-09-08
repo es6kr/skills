@@ -14,6 +14,7 @@ const PROCS = [
   { ProcessId: 12, ParentProcessId: 998, Name: 'node.exe',                  CommandLine: 'node C:\\Users\\x\\.claude\\hooks\\t.js' },
   { ProcessId: 13, ParentProcessId: 997, Name: 'node.exe',                  CommandLine: 'node C:\\app\\server.js' },
   { ProcessId: 14, ParentProcessId: 996, Name: 'cygwin-console-helper.exe', CommandLine: null },
+  { ProcessId: 15, ParentProcessId: 995, Name: 'node.exe',                  CommandLine: 'node C:\\work\\app\\hooks\\watch.js' },
 ];
 
 test('orphaned leak processes are selected', () => {
@@ -35,6 +36,14 @@ test('processes whose parent is alive are never selected', () => {
 test('unrelated node processes are not selected', () => {
   const ids = selectTargets(PROCS).map(p => p.ProcessId);
   assert.ok(!ids.includes(13));
+});
+
+test('unrelated project paths containing "hooks" are not selected', () => {
+  // pid 15 is an orphan (parent 995 gone), but its path is an unrelated
+  // project script that merely contains the bare word "hooks" — must not be
+  // reaped just because NODE_LEAK used to match that substring anywhere.
+  const ids = selectTargets(PROCS).map(p => p.ProcessId);
+  assert.ok(!ids.includes(15));
 });
 
 test('null CommandLine does not throw', () => {
