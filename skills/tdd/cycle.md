@@ -101,7 +101,7 @@ const filePath = path.join(a, b)    // NOT manual string concatenation
 
 ## Commit Rules
 
-**Red→Green→Refactor is ONE atomic unit. Do not commit or push between stages.**
+**Red→Green→Refactor is ONE atomic unit by default. Do not commit or push between stages — except the two exceptions below, which apply to isolated/CI-only surfaces, not shared branches.**
 
 - Red only (test written, no implementation) → **commit forbidden by default on any shared/pushed branch** (see the two exceptions below)
 - Red + Green (test passes) → commit allowed
