@@ -112,6 +112,8 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 
 **Plan & Research Reading Prerequisite Gate (HARD STOP)**: When executing tasks from `fix_plan.md` or cited plan snippets, the agent MUST first read the full related research document or plan file (`plan-*.md`, `docs/`) via `view_file` before starting any implementation steps (CLI commands, repo renames, code edits).
 
+**Premise re-verification (HARD STOP)**: reading the plan is not enough. Before the first implementation step, re-verify the plan's external premises against primary sources — every issue / PR / release / tracker item the plan cites as a blocker or precondition (`gh pr view` / `gh issue view` / the cited tracker line). A `status: decided|approved` plan may predate the world: a cited external blocker can resolve (or reverse) between authoring and start. This extends [draft.md](./draft.md) Stage 2 step 1's promote-time re-verification to ALL plan-gated starts, not only draft promotes.
+
 The default pipeline is scoped by the execution role, so a high-capability session is not spent on mechanical bookkeeping — and a bookkeeping session does not attempt deep-analysis passes it is unsuited for.
 
 **Role resolution chain** (first match wins):
@@ -132,6 +134,8 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 | `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format, flowchart-sync — surfaced as a delegation remainder for a `pm` session |
 | `impl` | sync → priority → **REPEAT overdue check** (run REPEAT items overdue by 24h+), then surface `selfable` implementation candidates | move, format, model-triage, flowchart-sync |
 | (unresolved) | full pipeline | — |
+
+**First-edit timebox (impl profile — HARD STOP)**: an `impl`-profile run exists to land implementation edits. If N minutes (default 15) elapse after the first tool call with zero deliverable edits (no Edit/Write on a non-tracker file), STOP front-loading (triage reading, option pre-verification, plan re-reads) and either (a) start the smallest viable implementation step now, or (b) report the blocker to the user. Front-loading gates (recency check, full-header read, Plan Reading Gate, premise re-verification) bound *what* to read — they never authorize unbounded *time* before the first edit. In high-latency environments (large trackers, heavy hook chains), also batch reads: prefer 1-2 large Read calls over many small shell reads, and keep pre-edit lookup calls to roughly 10 or fewer.
 
 - **REPEAT Section Execution Cadence Rule**:
   - **`/fix-plan --pm`**: Check `## REPEAT` section. If any item's due period (its "period" field) has elapsed since its "last run" field, execute it immediately.

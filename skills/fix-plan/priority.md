@@ -55,6 +55,22 @@ The reason distinguishes true blockers from items that look blocked but are actu
 | 3 | Omit the reason on `:external` | Always include the reason on new `[BLOCKED]` items. Reasonless items can't be triaged |
 | 4 | Treat `:selfable` as a permanent classification | Reclassify on every triage — once the item is in flight, it's no longer BLOCKED |
 
+## Workaround linkage (`↳ workaround-for:`)
+
+When an item exists as a workaround for another (usually `[BLOCKED:P*:external]`) item, append a suffix line under the workaround item so the dependency lives at tracker level, not only in plan prose:
+
+```markdown
+- [ ] [P2:selfable] <workaround action>
+  - ↳ workaround-for: <anchor/keyword of the original blocked item>
+```
+
+Triage MUST surface the original blocker alongside the workaround when filtering `selfable` items — a selfable workaround whose reason-to-exist is an invisible external blocker misrepresents the queue: the workaround shows up, the reason it exists does not.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Encode the workaround↔blocker dependency only in the plan document's prose | Add the `↳ workaround-for:` suffix line at tracker level so `selfable`-only filters cannot hide the original blocker |
+| 2 | List a linked workaround in sorted output without its original blocker | Print the blocker (with its own tag) indented under the workaround entry in the triage report |
+
 ## Triage workflow
 
 When the user asks "extract priority from BLOCKED" or "pick what to do next":
@@ -95,6 +111,7 @@ When the user asks "extract priority from BLOCKED" or "pick what to do next":
 2. Did sync produce any auto-resolutions (`[x]`) this run? — If yes, those entries leave the BLOCKED list (do not include them in sorted output)
 3. Are any items in the sorted output > 7 days old without sync verification? — Mark them with the date of last sync; consider them suspect until re-synced
 4. Did the report surface "N entries auto-resolved" before listing live BLOCKERs? — Without that line, the user cannot tell whether triage actually checked external state
+5. Does any `selfable` entry in the sorted output carry a `↳ workaround-for:` suffix? — If yes, print its original blocker (with tag) alongside it (see "Workaround linkage" above)
 
 ## Compatibility
 
