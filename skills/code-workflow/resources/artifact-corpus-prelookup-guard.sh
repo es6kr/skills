@@ -24,6 +24,11 @@ esac
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [ -z "$FILE_PATH" ] && exit 0
 
+# Normalize a native Windows path (the hook payload reports whatever separator
+# the caller used) — a backslash path never matches the slash-only case
+# patterns below. Same normalization as block-research-plan-without-rag.sh.
+FILE_PATH=${FILE_PATH//\\//}
+
 # Target the research/plan artifact family in its established directories only.
 # The tracker family (fix_plan.md, checklist.md) is a different artifact class
 # owned by another skill and is deliberately excluded — same scoping rationale
@@ -56,8 +61,15 @@ TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 RAG_RE='qdrant-search|--semantic|mcp__[A-Za-z0-9_]+__[A-Za-z0-9_-]*find|"name":"[A-Za-z0-9_.:-]*-find"'
 WIKI_RE='llm-wiki/index\.md|llm-wiki/raw/|/raw/(articles|specs|meetings)/|wiki[^"]*/index\.md'
 
-if grep -qE "$RAG_RE" "$TRANSCRIPT" 2>/dev/null; then exit 0; fi
-if grep -qE "$WIKI_RE" "$TRANSCRIPT" 2>/dev/null; then exit 0; fi
+# Restrict evidence to actual tool-invocation records (message content blocks
+# of type "tool_use") — not the raw transcript text. A plain grep over the
+# whole file also matches user prose and Bash tool_result stdout (e.g. an
+# `echo` containing "--semantic"), which would satisfy this guard with no
+# real corpus lookup having happened.
+TOOL_USE_RECORDS=$(jq -c 'select(.message.content != null) | .message.content[]? | select(.type == "tool_use")' "$TRANSCRIPT" 2>/dev/null)
+
+if printf '%s' "$TOOL_USE_RECORDS" | grep -qE "$RAG_RE"; then exit 0; fi
+if printf '%s' "$TOOL_USE_RECORDS" | grep -qE "$WIKI_RE"; then exit 0; fi
 
 {
   echo "⚠️ [artifact-corpus-prelookup-guard] no corpus pre-lookup trace this session"
