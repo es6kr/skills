@@ -99,9 +99,13 @@ fi
 # let "/rename recommended" style prose through — the token was present, the
 # candidate was not (failed-attempts.md "cleanup-report-chunk-and-rename-omission"
 # 21st recurrence: the row read "`/rename` <recommended>" with no name at all).
-# A session name is ASCII (model-topic-sessid8), so any non-ASCII word following
-# the token is prose, not a candidate.
-if echo "$RESPONSE" | grep -qE "/rename[[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]{2,}"; then
+# A bare ASCII-word check ("recommended" itself is ASCII alphanumeric) still let
+# that exact prose through, so the candidate must match the full mandatory
+# cleanup shape <model>-<topic>-<sessid8>: at least two hyphen-separated
+# segments before a trailing 8-lowercase-hex-char session-id suffix
+# (cleanup/run.md "Session identity (mandatory)" — sessid8 = the session
+# UUID's leading 8 hex chars).
+if echo "$RESPONSE" | grep -qE "/rename[[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9._-]+-[0-9a-f]{8}([[:space:]]|[[:punct:]]|$)"; then
   exit 0
 fi
 
