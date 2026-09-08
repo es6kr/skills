@@ -586,6 +586,30 @@ hooks:
     event: PreToolUse
     matcher: Bash
     command: bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh
+- id: block-orca-new-tab-without-split-check
+  owner_skill: orca
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/orca/resources/block-orca-new-tab-without-split-check.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Bash
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-new-tab-without-split-check.sh
+- id: block-orca-send-without-target-ask
+  owner_skill: orca
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/orca/resources/block-orca-send-without-target-ask.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Bash
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-send-without-target-ask.sh
 - id: block-plan-artifact-no-plane-link
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -613,11 +637,19 @@ hooks:
 - id: block-pr-url-gate
   owner_skill: github-flow
   marketplace: es6kr-skills
-  status: dormant
+  status: active
   implementations:
   - runtime: sh
     file: skills/github-flow/resources/block-pr-url-gate.sh
-  registrations: []
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: AskUserQuestion
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-pr-url-gate.sh
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: TaskCreate
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/github-flow/resources/block-pr-url-gate.sh
 - id: block-prod-branch-autonomous-ops
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -1036,6 +1068,19 @@ hooks:
     event: PostToolUse
     matcher: Write
     command: ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/plan-undecided-guard.sh
+- id: reap-orphaned-helper-procs
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: js
+    file: skills/hook-kit/resources/reap-orphaned-helper-procs.js
+  registrations:
+  - surface: hooks.json
+    event: Stop
+    matcher: ''
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/reap-orphaned-helper-procs.js
+    async: true
 - id: reap-stale-wrapper-shells
   owner_skill: hook-kit
   marketplace: es6kr-skills

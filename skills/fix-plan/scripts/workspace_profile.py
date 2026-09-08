@@ -87,6 +87,16 @@ def v2_profile_to_flat(profile: dict, defaults: dict, global_roles: dict = None)
         flat["plane_host"] = backlog.get("endpoint", "")
         flat["plane_token_env"] = backlog.get("token_env", "PLANE_API_KEY")
         flat["default_project"] = backlog.get("project", "")
+        # workspace_slug and token_file are part of the v2 backlog contract but
+        # were dropped in translation, so the slug silently fell back to the
+        # profile NAME (wrong for e.g. `es6kr_skills`, whose real slug is
+        # `es6kr`) and the token was never loaded from its file — token
+        # resolution then leaked to whatever generic env key happened to be set,
+        # defeating the per-workspace isolation this module exists to provide.
+        if backlog.get("workspace_slug"):
+            flat["workspace_slug"] = backlog["workspace_slug"]
+        if backlog.get("token_file"):
+            flat["token_file"] = backlog["token_file"]
         if "k3s_namespace" in backlog:
             flat["k3s_namespace"] = backlog["k3s_namespace"]
         if "k3s_kubeconfig" in backlog:
@@ -280,9 +290,18 @@ def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
     profile.update(profiles.get(name, {}))
     profile.setdefault("workspace_name", name)
 
-    # API Token resolution from ENV
+    # API Token resolution: the profile's own token_env, then the generic
+    # PLANE_API_KEY, then the profile's token_file (a path holding the key for
+    # workspaces that keep it on disk rather than in the environment). The file
+    # is the last resort so an explicitly-exported env var still overrides it.
     token_env = profile["plane_token_env"]
     profile["plane_token"] = os.environ.get(token_env) or os.environ.get("PLANE_API_KEY", "")
+    if not profile["plane_token"] and profile.get("token_file"):
+        token_path = Path(profile["token_file"]).expanduser()
+        try:
+            profile["plane_token"] = token_path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            print(f"Warning: token_file unreadable ({token_path}): {exc}", file=sys.stderr)
 
     # Resolve the tracker root dynamically (env > raw config > auto-detect > ".ralph"),
     # overriding the static DEFAULT_PROFILE value so consumers get the real root.

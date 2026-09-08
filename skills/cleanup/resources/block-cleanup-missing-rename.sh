@@ -94,9 +94,18 @@ EOF
   exit 0
 fi
 
-# The row is satisfied if a `/rename` command token appears anywhere in the
-# response (candidates are often listed as separate code spans).
-if echo "$RESPONSE" | grep -qE "/rename[[:space:]]"; then
+# The row is satisfied only by an EXECUTABLE candidate: `/rename` followed by a
+# name token the user can copy-paste as-is. Requiring merely the `/rename` token
+# let "/rename recommended" style prose through — the token was present, the
+# candidate was not (failed-attempts.md "cleanup-report-chunk-and-rename-omission"
+# 21st recurrence: the row read "`/rename` <recommended>" with no name at all).
+# A bare ASCII-word check ("recommended" itself is ASCII alphanumeric) still let
+# that exact prose through, so the candidate must match the full mandatory
+# cleanup shape <model>-<topic>-<sessid8>: at least two hyphen-separated
+# segments before a trailing 8-lowercase-hex-char session-id suffix
+# (cleanup/run.md "Session identity (mandatory)" — sessid8 = the session
+# UUID's leading 8 hex chars).
+if echo "$RESPONSE" | grep -qE "/rename[[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9._-]+-[0-9a-f]{8}([[:space:]]|[[:punct:]]|$)"; then
   exit 0
 fi
 

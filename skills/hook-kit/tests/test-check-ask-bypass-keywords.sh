@@ -64,8 +64,29 @@ run_test "Trailing question mark" "Should we commit these changes now?" false "b
 run_test "Plain reporting output" "The task is complete. All 10 tests passed successfully." false "pass"
 
 # 5. Korean conditional deferral via custom regex pattern (using Unicode escapes to keep repo clean)
-# Mock HG_DATA_FILE
+# Mock HG_DATA_FILE.
+#
+# The hook resolves its locale data file as $(dirname $0)/../data/hangul-patterns.regex,
+# a hardcoded path, so the mock has to live at that exact location. That makes this
+# section destructive to a real operator-authored file: the previous version wrote the
+# mock straight over it and then `rm -rf`'d the whole data/ directory on the way out,
+# silently disarming every guard that sources it (check-ask-bypass-keywords itself
+# falls back to __NEVER_MATCH__ = complete no-op) until someone re-authored the file.
+# Stash any pre-existing data/ first and restore it via an EXIT trap so an early
+# failure or Ctrl-C cannot leave the operator's file destroyed either.
 MOCK_DATA_DIR="$SCRIPT_DIR/../data"
+MOCK_DATA_STASH=""
+if [ -e "$MOCK_DATA_DIR" ]; then
+  MOCK_DATA_STASH="$(mktemp -d)/data"
+  mv "$MOCK_DATA_DIR" "$MOCK_DATA_STASH"
+fi
+restore_mock_data() {
+  rm -rf "$MOCK_DATA_DIR"
+  if [ -n "$MOCK_DATA_STASH" ] && [ -e "$MOCK_DATA_STASH" ]; then
+    mv "$MOCK_DATA_STASH" "$MOCK_DATA_DIR"
+  fi
+}
+trap restore_mock_data EXIT
 mkdir -p "$MOCK_DATA_DIR"
 # Pattern encoded without direct Korean characters
 KO_PATTERN="$(printf '(\uC54C\uB824\uC8FC\uC2DC\uBA74|\uC9C0\uC2DC\uD574? \uC8FC\uC2DC\uBA74|\uB9D0\uC500\uD574? \uC8FC\uC2DC\uBA74|\uC6D0\uD558\uC2DC\uBA74|\uD544\uC694\uD558\uC2DC\uBA74|\uC6D0\uD558\uC2E4 \uACBD\uC6B0|\uD544\uC694\uD560 \uACBD\uC6B0).*(\uC9C4\uD589|\uC2E4\uD589|\uC218\uD589|\uBC18\uC601|\uC791\uC5C5|\uC218\uC815|\uBC30\uD3EC|\uC801\uC6A9)\uD558(\uACA0|\uACA0\uC2B5|\u3139|\uB3C4\uB85D)')"
@@ -83,7 +104,8 @@ run_test "Korean conditional deferral: if desired I will apply" "$KO_TEXT_2" fal
 run_test "Korean conditional deferral: if needed I will fix" "$KO_TEXT_3" false "block"
 run_test "Korean plain statement: all tasks completed" "$KO_TEXT_PASS" false "pass"
 
-rm -rf "$MOCK_DATA_DIR"
+restore_mock_data
+trap - EXIT
 
 if [ "$FAIL" -gt 0 ]; then
   echo "Tests finished with $FAIL failure(s)."
