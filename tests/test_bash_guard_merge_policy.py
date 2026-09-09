@@ -138,6 +138,62 @@ def test_non_skill_new_file_with_chore_or_test_is_allowed():
     assert mod.check_feat_tag_file_addition_integrity(commit_msg, staged) is None
 
 
+# --- Skill-root README/CHANGELOG exemption (CI parity) -------------------------
+# branch-tag-adjudication.yml exempts `skills/<name>/(README|CHANGELOG).md` from
+# its docs/chore checks. Without the same exemption here, a skill README added
+# under docs:/chore: is blocked locally but passes CI, and retagging it feat: to
+# get past the local guard causes a wrong minor bump.
+
+def test_docs_tag_adding_skill_readme_is_allowed():
+    commit_msg = "docs(consolidate): add skill README"
+    staged = [("A", "skills/consolidate/README.md")]
+    assert mod.check_feat_tag_file_addition_integrity(commit_msg, staged) is None
+
+
+def test_chore_tag_adding_skill_changelog_is_allowed():
+    commit_msg = "chore(fix-plan): add generated CHANGELOG"
+    staged = [("A", "skills/fix-plan/CHANGELOG.md")]
+    assert mod.check_feat_tag_file_addition_integrity(commit_msg, staged) is None
+
+
+def test_feat_tag_with_only_new_skill_readme_is_blocked():
+    # A README addition is documentation, not a new capability, so it must not
+    # be what justifies a feat: minor bump.
+    commit_msg = "feat(consolidate): add skill README"
+    staged = [("A", "skills/consolidate/README.md")]
+    reason = mod.check_feat_tag_file_addition_integrity(commit_msg, staged)
+    assert reason is not None
+    assert "adding a new" in reason.lower()
+
+
+def test_docs_tag_adding_readme_plus_real_topic_is_still_blocked():
+    # The exemption is scoped to the doc files themselves — a genuine new topic
+    # in the same commit must still force feat:.
+    commit_msg = "docs(consolidate): add README and a new topic"
+    staged = [("A", "skills/consolidate/README.md"), ("A", "skills/consolidate/collect.md")]
+    reason = mod.check_feat_tag_file_addition_integrity(commit_msg, staged)
+    assert reason is not None
+    assert "feat:" in reason
+
+
+def test_nested_readme_under_skill_is_not_exempt():
+    # Only the skill-root README/CHANGELOG are documentation surface; a README
+    # nested under resources/ or topics/ is a real added file (same scoping as
+    # the workflow's `^skills/<name>/(README|CHANGELOG)\.md$` anchor).
+    commit_msg = "docs(hook-kit): add resources README"
+    staged = [("A", "skills/hook-kit/resources/README.md")]
+    reason = mod.check_feat_tag_file_addition_integrity(commit_msg, staged)
+    assert reason is not None
+    assert "feat:" in reason
+
+
+def test_modified_skill_readme_under_docs_is_allowed():
+    # Regression guard for the pre-existing behaviour: modifications never count.
+    commit_msg = "docs(consolidate): tighten README wording"
+    staged = [("M", "skills/consolidate/README.md")]
+    assert mod.check_feat_tag_file_addition_integrity(commit_msg, staged) is None
+
+
 # ==============================================================================
 # 3. Direct Main PR Threshold & CodeRabbit 50-File Guard Tests
 # ==============================================================================

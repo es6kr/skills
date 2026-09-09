@@ -606,8 +606,16 @@ def check_feat_tag_file_addition_integrity(
         elif isinstance(item, str):
             parsed_files.append(("M", item))
 
+    # Skill-root README.md / CHANGELOG.md are documentation surface, not a new
+    # capability. .github/workflows/branch-tag-adjudication.yml already exempts
+    # them (NON_DOC and MD_TOUCHED both filter `^skills/<name>/(README|CHANGELOG)\.md$`),
+    # so without the same exemption here a README added under `docs:`/`chore:`
+    # is blocked locally yet passes CI — and retagging it `feat:` to satisfy this
+    # guard produces a spurious minor bump in release-please.
     has_added_skill_file = any(
-        status == "A" and bool(re.search(r"^skills/[^/]+/(topics/|scripts/|resources/|[^/]+\.md$|[^/]+\.py$|[^/]+\.sh$)", path))
+        status == "A"
+        and not re.match(r"^skills/[^/]+/(README|CHANGELOG)\.md$", path)
+        and bool(re.search(r"^skills/[^/]+/(topics/|scripts/|resources/|[^/]+\.md$|[^/]+\.py$|[^/]+\.sh$)", path))
         for status, path in parsed_files
     )
 
