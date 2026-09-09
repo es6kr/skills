@@ -128,9 +128,9 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 
 | Profile | Steps executed | Skipped (reported as remainder) |
 |---------|----------------|--------------------------------|
-| `pm` | move → format → sync → priority → flowchart-sync → **REPEAT cadence check** (run all due REPEAT items) | — |
+| `pm` | move → format → sync → priority → flowchart-sync → **REPEAT cadence check** (run all due REPEAT items) → **Plan Drafts trigger scan** (surface, never author — see [draft.md](./draft.md) "Role ownership") | — |
 | `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format, flowchart-sync — surfaced as a delegation remainder for a `pm` session |
-| `impl` | sync → priority → **REPEAT overdue check** (run REPEAT items overdue by 24h+), then surface `selfable` implementation candidates | move, format, model-triage, flowchart-sync |
+| `impl` | sync → priority → **REPEAT overdue check** (run REPEAT items overdue by 24h+) → **Plan Drafts promote execution** (premise re-verify + `code-workflow` research→plan dispatch for triggered drafts — see [draft.md](./draft.md) "Role ownership"), then surface `selfable` implementation candidates | move, format, model-triage, flowchart-sync |
 | (unresolved) | full pipeline | — |
 
 - **REPEAT Section Execution Cadence Rule**:
