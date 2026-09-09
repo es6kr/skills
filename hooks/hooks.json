@@ -404,6 +404,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-rename.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-walkthrough.sh"
           }
         ]
       }
