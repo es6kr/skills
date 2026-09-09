@@ -153,6 +153,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-send-without-target-ask.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wsl-var-payload.sh"
           }
         ]
       },
