@@ -869,6 +869,18 @@ hooks:
     event: Stop
     matcher: ''
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-ask-bypass-keywords.sh
+- id: check-absence-claim-single-probe
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/check-absence-claim-single-probe.sh
+  registrations:
+  - surface: hooks.json
+    event: Stop
+    matcher: ''
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-absence-claim-single-probe.sh
 - id: check-completed-bloat
   owner_skill: fix-plan
   marketplace: es6kr-skills
