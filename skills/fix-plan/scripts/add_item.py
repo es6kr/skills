@@ -26,7 +26,11 @@ Exit codes: 0 = ok, 1 = validation failure, 2 = usage error.
 from __future__ import annotations
 
 import argparse
-import fcntl
+try:
+    import fcntl
+except ImportError:  # native Windows Python has no fcntl
+    fcntl = None
+import hashlib
 import io
 import os
 import re
@@ -177,10 +181,21 @@ def run_add(args: argparse.Namespace) -> int:
     escaped_action = re.escape(args.action.strip())
     pattern = re.compile(rf"^[ \t]*-[ \t]+\[[ x/X-]\][ \t]+{escaped_action}(?:[ \t]|$)", re.MULTILINE)
 
-    with io.open(args.file, "r+", encoding="utf-8") as fh:
+    # Lock a temp-dir sentinel keyed by the tracker's absolute path rather than the
+    # tracker handle itself: holding the target open across atomic_write() makes the
+    # final os.replace() fail with WinError 5 on Windows, which does not allow renaming
+    # over an open file. Mirrors update_item.py's lock strategy so both scripts serialise
+    # on the same sentinel when they touch the same tracker.
+    lock_path = os.path.join(
+        tempfile.gettempdir(),
+        "fix-plan-" + hashlib.sha1(os.path.abspath(args.file).encode("utf-8")).hexdigest() + ".lock",
+    )
+    with io.open(lock_path, "a+", encoding="utf-8") as fh:
         try:
-            fcntl.flock(fh, fcntl.LOCK_EX)
-            src = fh.read()
+            if fcntl:
+                fcntl.flock(fh, fcntl.LOCK_EX)
+            with io.open(args.file, "r", encoding="utf-8") as src_fh:
+                src = src_fh.read()
             if pattern.search(src):
                 print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
                 return 0
@@ -198,7 +213,8 @@ def run_add(args: argparse.Namespace) -> int:
             print(item)
             return 0
         finally:
-            fcntl.flock(fh, fcntl.LOCK_UN)
+            if fcntl:
+                fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def self_test() -> int:
