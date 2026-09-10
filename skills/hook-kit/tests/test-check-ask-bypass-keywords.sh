@@ -7,7 +7,14 @@ HOOK="$SCRIPT_DIR/../resources/check-ask-bypass-keywords.sh"
 [[ -f "$HOOK" ]] || { echo "Hook script not found: $HOOK" >&2; exit 1; }
 
 FAIL=0
-TMPDIR="$(mktemp -d)"
+# Exported, not just assigned: the locale-advisory assertion below reads the
+# hook's once-per-session marker at "${TMPDIR:-/tmp}/...", and the hook runs as
+# a child process. A bare assignment only reaches that child on hosts where
+# TMPDIR already happens to be exported (Git Bash on Windows) — on a CI runner
+# it is unset, so the child falls back to /tmp, writes the marker there, and the
+# assertion looks in the wrong directory. Exporting keeps parent and child on
+# the same path and keeps the marker inside the trap-cleaned temp dir.
+export TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 run_test() {
