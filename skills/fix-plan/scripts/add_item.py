@@ -15,7 +15,7 @@ Enforces the `add` topic's schema (see add.md):
 
 Usage:
   add_item.py --file <tracker> --action "..." --why "..." --how "..."
-              [--section "## Priority Tasks"] [--marker "[ ]"]
+              [--section "## TODO"] [--marker "[ ]"]
               [--sub "**Research**: path/to/doc.md"]... [--position top|bottom]
               [--dry-run]
   add_item.py --test        # self-test, no tracker required
@@ -38,7 +38,7 @@ import sys
 import tempfile
 
 DEFAULT_TRACKER = "fix_plan.md"
-DEFAULT_SECTION = "## Priority Tasks"
+DEFAULT_SECTION = "## TODO"
 DEFAULT_MARKER = "[ ]"
 MAX_BODY_LINES = 10  # 3 elements + up to 7 --sub entries (budget target 5-7, hard cap 10)
 
@@ -299,7 +299,7 @@ def main() -> int:
     p.add_argument("--why", help="motivation, 1-2 sentences (required)")
     p.add_argument("--how", help="procedure / tools / verification (required)")
     p.add_argument("--sub", action="append", default=[], help="extra one-line sub-bullet (repeatable)")
-    p.add_argument("--section", default="## Priority Tasks", help="target section heading")
+    p.add_argument("--section", default=DEFAULT_SECTION, help="target section heading")
     p.add_argument("--marker", default="[ ]", help="'[ ]', '[x]', or '[BLOCKED:P<0-3>:external|selfable]'")
     p.add_argument("--position", choices=("top", "bottom"), default="top")
     p.add_argument("--dry-run", action="store_true")
