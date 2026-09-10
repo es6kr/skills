@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/es6kr/skills/compare/fix-plan-v0.12.0...fix-plan-v0.12.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **fix-plan:** add a mechanical --move mode to update_item.py ([#459](https://github.com/es6kr/skills/issues/459)) ([e198675](https://github.com/es6kr/skills/commit/e1986758f1edecf72e3db1075cde0110da337876))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.12.0](https://github.com/es6kr/skills/compare/fix-plan-v0.11.1...fix-plan-v0.12.0) (2026-09-06)
 
 
