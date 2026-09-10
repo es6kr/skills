@@ -327,7 +327,7 @@ Analyze mistakes made during the session and record them to feedback memory + fa
 
 #### Hook behavior review
 
-1. Collect the registered hooks from the canonical inventory first — `Read skills/hook-kit/hook-registry.yaml` (hook-kit `registry.md`), then compare it against the live surfaces (`~/.claude/settings.json` `hooks`, each plugin's `hooks/hooks.json`). A settings.json entry whose id is already registered on a plugin surface is a dual registration to remove; a file with no registry row is a backfill candidate, not an orphan to re-point by guesswork
+1. Collect the registered hooks from the canonical inventory first — `Read` the registry at `~/ghq/github.com/es6kr/claude-plugins/hook-registry.yaml` (relocated 2026-09-10; procedure: that repo's `hook-registry.md`, or `hook-kit`'s `registry.md` redirect), then compare it against the live surfaces (`~/.claude/settings.json` `hooks`, each plugin's `hooks/hooks.json`). A settings.json entry whose id is already registered on a plugin surface is a dual registration to remove; a file with no registry row is a backfill candidate, not an orphan to re-point by guesswork
 2. **Verify hook file existence**:
    - Extract the executable path from each hook's `command`
    - Check whether the file actually exists
