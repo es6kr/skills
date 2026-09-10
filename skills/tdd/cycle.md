@@ -96,20 +96,20 @@ const filePath = path.join(a, b)    // NOT manual string concatenation
 
 ## Test Data Rules
 
-- No personal/real paths (`/Users/es6kr/...` → `/home/user/projects/work`)
+- No personal/real paths (`/Users/<name>/...` → `/home/user/projects/work`)
 - Use actual functions over mocks (`folderNameToPath(name)` > `'~/projects/work'`)
 
 ## Commit Rules
 
-**Red→Green→Refactor is ONE atomic unit. Do not commit or push between stages.**
+**Red→Green→Refactor is ONE atomic unit by default. Do not commit or push between stages — except the two exceptions below, which apply to isolated/CI-only surfaces, not shared branches.**
 
-- Red only (test written, no implementation) → **commit forbidden by default**
+- Red only (test written, no implementation) → **commit forbidden by default on any shared/pushed branch** (see the two exceptions below)
 - Red + Green (test passes) → commit allowed
 - Red + Green + Refactor → ideal commit point
 
 ### Exception: `[CI-VERIFY]` Red-only commit
 
-The "Red only forbidden" rule has **one narrow exception**, scoped to the "Exceptions (Red authored but cannot be executed)" cases above:
+The "Red only forbidden" rule has **two narrow exceptions**. The first is scoped to the "Exceptions (Red authored but cannot be executed)" cases above:
 
 - Test environment cannot run locally **and** CI is the only available execution surface
 - Or the test infrastructure itself is being built
@@ -121,6 +121,34 @@ In those cases, committing Red authoring **is allowed** with `[CI-VERIFY]` in th
 3. A follow-up commit lands the implementation + closes the `[CI-VERIFY]` thread once CI reports the passing run
 
 If the test simply "can't run on my machine" but a different runner / mock / container could execute it, the exception does **not** apply — pick the alternative runner and complete Green locally before committing.
+
+### Exception: local-isolation Red commit (governance-mandated)
+
+The global TDD lifecycle governance rule (`rules/common.md`) **requires** a
+test-only Red commit before Green, and that requirement wins over the default above whenever it applies.
+The two rules are not actually in conflict — they govern different surfaces:
+
+| Surface | Rule |
+|---------|------|
+| Shared / pushed branch (`main`, staging, an open PR's head) | Red-only commit forbidden — the default above |
+| Local isolated branch or dedicated worktree, not yet pushed | Red-only commit **mandatory** — the governance rule |
+
+Why the governance rule wants it: once Green lands, the failure can never be reproduced again. A Red commit
+pins the observed failure to a SHA, so anyone can `git checkout <red-sha>` and watch it fail. Without it,
+"M of N tests failed" is an unverifiable self-report, which is exactly what the mandatory approval ask after
+the Red commit is supposed to be able to check.
+
+Gates on this exception:
+
+1. **Test files only.** Stage `tests/*` (or the equivalent) and nothing else — no implementation may ride along
+2. Commit message follows `test: add failing tests for <scope> (red)`
+3. The failure was **actually executed and observed** first — a Red commit whose failure was never run is worthless
+4. Report the measured failure matrix and obtain approval via `AskUserQuestion` before starting Green
+5. The Red commit stays on the isolated branch until Green lands on top of it; the branch is pushed as a
+   Red+Green unit, which is why this exception never contradicts the shared-branch default
+
+If you are not on an isolated branch, create one first — authoring Red on top of a dirty tree that already
+contains implementation code destroys the evidence the Red commit exists to capture.
 
 ### TodoWrite/TaskCreate for TDD tracking
 
@@ -149,7 +177,7 @@ TaskCreate([
 | Testing with logic different from production | Replicate exact production code logic |
 | Writing tests by guessing without reading source code | Verify exact lines with `grep -n`, etc. |
 | Creating tests forced to fail | Define expected behavior → natural failure due to missing implementation |
-| Committing after Red only (no Green) | Complete Red→Green→Refactor before commit |
+| Committing after Red only (no Green) **on a shared/pushed branch** | Complete Red→Green→Refactor before pushing. On a local isolated branch the Red-only commit is mandatory instead — see "Exception: local-isolation Red commit" |
 
 ## Test-Authoring Principles (when NOT to write a test)
 

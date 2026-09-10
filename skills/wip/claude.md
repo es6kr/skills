@@ -39,6 +39,8 @@ For the workflow procedure (cleanup → per-item direction ask → execute), see
 
 **Walkthrough file is a separate medium from task tracking**: Antigravity's `task.md` (progress checklist) and `walkthrough.md` (narrative account) are two distinct artifacts serving two distinct purposes — Claude Code's equivalents are `TaskList`/`TodoWrite` (progress) and the walkthrough file (narrative), respectively. Registering tasks does not substitute for the walkthrough file, and vice versa.
 
+**Never write session checklists into the workspace `.agents/task.md` (HARD STOP)**: that file is the **Antigravity harness's own task artifact** — a Claude Code session editing it mixes two harnesses' session state in one file (FA class `claude-code-session-checklist-in-agents-task-md`). Claude Code medium order: (1) `TaskCreate`/`TodoWrite` when available; (2) when both are disabled in the session, a **session-scratchpad checklist file** (a `.md` under the session's scratchpad directory) for session-scoped progress; durable multi-session fix-task tracking uses the `claude-task` CLI instead (see the fix skill's Step 0 fallback).
+
 ## Tool Selection
 
 ### Decision Tree
