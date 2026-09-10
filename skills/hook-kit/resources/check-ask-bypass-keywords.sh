@@ -45,6 +45,8 @@ fi
 HG_BYPASS_KEYWORD_PATTERN="${HG_BYPASS_KEYWORD_PATTERN:-__NEVER_MATCH__}"
 HG_BYPASS_INTERROGATIVE_PATTERN="${HG_BYPASS_INTERROGATIVE_PATTERN:-__NEVER_MATCH__}"
 HG_BYPASS_CONDITIONAL_DEFERRAL_PATTERN="${HG_BYPASS_CONDITIONAL_DEFERRAL_PATTERN:-__NEVER_MATCH__}"
+LOCALE_DATA_PRESENT=1
+[ -f "$HG_DATA_FILE" ] || LOCALE_DATA_PRESENT=0
 ENGLISH_CONDITIONAL_DEFERRAL_PATTERN='(let me know|if you('\''d like| want| prefer)|on your instruction|whenever you('\''re| are) ready|if needed).*(I will|we can|I'\''ll|proceed)'
 
 # Debug log of this hook's own invocations — mirrors next-trigger.sh's
@@ -66,22 +68,42 @@ if [ ! -f "$TRANSCRIPT" ]; then
   exit 0
 fi
 
-# Last assistant message (whole JSON entry)
-LAST_MSG=$(jq -s 'map(select(.type == "assistant")) | last // empty' "$TRANSCRIPT" 2>/dev/null)
-if [ -z "$LAST_MSG" ] || [ "$LAST_MSG" = "null" ]; then
+# Assistant entries belonging to the CURRENT turn — everything after the last
+# user entry. Reading only the final assistant entry misses any turn that ends
+# with a tool_use-only block: the prose sits in an earlier entry of the same
+# turn, so the hook early-exited as no_text_content and never evaluated the
+# text at all (2 of the first 3 logged invocations took that path, while the
+# turn they belonged to did end in prose).
+TURN=$(jq -s '
+  . as $all
+  | ([range(0; ($all | length)) | select($all[.].type == "user")] | last) as $u
+  | (if $u == null then $all else $all[($u + 1):] end)
+  | map(select(.type == "assistant"))
+' "$TRANSCRIPT" 2>/dev/null)
+if [ -z "$TURN" ] || [ "$TURN" = "null" ] || [ "$TURN" = "[]" ]; then
   _log "early_exit=no_last_assistant_msg" "$TRANSCRIPT"
   exit 0
 fi
 
-# Concatenate all text-content from the assistant message
-LAST_TEXT=$(echo "$LAST_MSG" | jq -r '.message.content // [] | map(select(.type == "text") | .text) | join("\n")' 2>/dev/null)
+# The last NON-EMPTY text block of the turn — i.e. the prose the user actually
+# read last. Keeping "last block" rather than "all blocks joined" preserves the
+# trailing-question-mark check's original scope.
+LAST_TEXT=$(echo "$TURN" | jq -r '
+  map(.message.content // [] | map(select(.type == "text") | .text) | join("\n"))
+  | map(select(length > 0))
+  | last // ""
+' 2>/dev/null)
 if [ -z "$LAST_TEXT" ]; then
   _log "early_exit=no_text_content" "$TRANSCRIPT"
   exit 0
 fi
 
-# Skip if AskUserQuestion was actually called in this response
-ASK_COUNT=$(echo "$LAST_MSG" | jq -r '.message.content // [] | map(select(.type == "tool_use" and .name == "AskUserQuestion")) | length' 2>/dev/null)
+# Skip if AskUserQuestion was called ANYWHERE in this turn. Scoping this to the
+# same turn (not one entry) is what makes the widened text scope safe: a turn
+# whose prose and whose ask sit in different entries must not be flagged.
+ASK_COUNT=$(echo "$TURN" | jq -r '
+  [.[] | .message.content // [] | .[] | select(.type == "tool_use" and .name == "AskUserQuestion")] | length
+' 2>/dev/null)
 if [ -n "$ASK_COUNT" ] && [ "$ASK_COUNT" != "0" ]; then
   _log "early_exit=ask_already_called ask_count=$ASK_COUNT" "$TRANSCRIPT"
   exit 0
@@ -106,6 +128,28 @@ LAST_LINE=$(printf '%s' "$LAST_TEXT" | tail -n 1)
 TRAILING_QUESTION=0
 if printf '%s' "$LAST_LINE" | grep -qE '[?？][[:space:]"'"'"']*$'; then
   TRAILING_QUESTION=1
+fi
+
+# Locale data absent -> every HG_BYPASS_* pattern is __NEVER_MATCH__ and this
+# hook silently detects nothing but the English regex and a trailing "?".
+# That silence is what let the plain-text-deferral class reach 13 recurrences:
+# the guard looked installed and registered while being a no-op. Surface it
+# once per session so a missing data/ file cannot go unnoticed for months.
+if [ "$LOCALE_DATA_PRESENT" = "0" ]; then
+  _log "warn=locale_data_absent file=$HG_DATA_FILE" "$TRANSCRIPT"
+  SESSION_KEY=$(basename "$TRANSCRIPT" .jsonl)
+  # Marker lives in the OS temp dir, not the repo tree — it is ephemeral
+  # session state, and writing it beside the script leaves untracked files
+  # behind on every run (including test runs).
+  WARN_MARKER="${TMPDIR:-/tmp}/ask-bypass-locale-warned-$SESSION_KEY"
+  if [ ! -f "$WARN_MARKER" ]; then
+    : > "$WARN_MARKER" 2>/dev/null || true
+    jq -n --arg f "$HG_DATA_FILE" '{
+      decision: "block",
+      reason: ("[hook:check-ask-bypass-keywords] Locale pattern data is MISSING: \($f)\n\nEvery HG_BYPASS_* pattern has fallen back to __NEVER_MATCH__, so this hook currently detects only the English deferral regex and a bare trailing \"?\". Locale-specific text-question detection is OFF.\n\nThe file is machine-local by design (.gitignore `skills/*/data`) — it is not restored by pulling. Rebuild it, then re-run skills/hook-kit/tests/test-check-ask-bypass-keywords.sh to confirm the patterns load.\n\nThis notice fires once per session.")
+    }'
+    exit 0
+  fi
 fi
 
 MATCH_REASON=""

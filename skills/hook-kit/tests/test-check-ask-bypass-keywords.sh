@@ -105,6 +105,76 @@ run_test "Korean conditional deferral: if needed I will fix" "$KO_TEXT_3" false 
 run_test "Korean plain statement: all tasks completed" "$KO_TEXT_PASS" false "pass"
 
 restore_mock_data
+
+# --- Turn-scoped parsing -----------------------------------------------------
+# A turn whose LAST assistant entry is tool_use-only used to early-exit as
+# no_text_content, so its prose was never evaluated. The hook now reads every
+# assistant entry after the last user entry.
+run_raw_test() {
+  local desc="$1" transcript_body="$2" expected_decision="$3"
+  local transcript_file="$TMPDIR/raw.jsonl"
+  printf '%s\n' "$transcript_body" > "$transcript_file"
+  local output decision="pass"
+  output=$(printf '{"transcript_path":"%s"}' "$transcript_file" | bash "$HOOK" 2>/dev/null)
+  [ -n "$output" ] && decision=$(echo "$output" | jq -r '.decision // "pass"' 2>/dev/null)
+  if [ "$decision" != "$expected_decision" ]; then
+    echo "FAIL: $desc (expected $expected_decision, got $decision)"
+    echo "  Output: $output"
+    FAIL=$((FAIL + 1))
+  else
+    echo "PASS: $desc"
+  fi
+}
+
+run_raw_test "Turn ending in tool_use-only still sees earlier prose" \
+  '{"type":"user","message":{"content":"go"}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done. Let me know and I will proceed."}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}' \
+  "block"
+
+run_raw_test "AskUserQuestion in an earlier entry of the same turn suppresses the block" \
+  '{"type":"user","message":{"content":"go"}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"AskUserQuestion"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done. Let me know and I will proceed."}]}}' \
+  "pass"
+
+run_raw_test "Deferral from a PREVIOUS turn is not re-flagged" \
+  '{"type":"user","message":{"content":"go"}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done. Let me know and I will proceed."}]}}
+{"type":"user","message":{"content":"next"}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"All 10 tests passed successfully."}]}}' \
+  "pass"
+
+# --- Locale-data absence advisory -------------------------------------------
+# With no data/ file every HG_BYPASS_* pattern is __NEVER_MATCH__. The hook must
+# say so once per session instead of silently degrading to a no-op.
+ADVISORY_TRANSCRIPT="$TMPDIR/advisory-session.jsonl"
+cat > "$ADVISORY_TRANSCRIPT" <<'ADV'
+{"type":"user","message":{"content":"go"}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"All 10 tests passed successfully."}]}}
+ADV
+WARN_MARKER="${TMPDIR:-/tmp}/ask-bypass-locale-warned-$(basename "$ADVISORY_TRANSCRIPT" .jsonl)"
+rm -f "$WARN_MARKER"
+ADV_OUT=$(printf '{"transcript_path":"%s"}' "$ADVISORY_TRANSCRIPT" | bash "$HOOK" 2>/dev/null)
+if echo "$ADV_OUT" | jq -e '.decision == "block"' >/dev/null 2>&1; then
+  echo "PASS: Missing locale data raises a first-time advisory"
+else
+  echo "FAIL: Missing locale data raises a first-time advisory (got: $ADV_OUT)"
+  FAIL=$((FAIL + 1))
+fi
+ADV_OUT2=$(printf '{"transcript_path":"%s"}' "$ADVISORY_TRANSCRIPT" | bash "$HOOK" 2>/dev/null)
+if [ -f "$WARN_MARKER" ] && [ -z "$ADV_OUT2" ]; then
+  echo "PASS: Advisory does not repeat within the same session"
+elif [ ! -f "$WARN_MARKER" ]; then
+  # Silence with no marker means no advisory was ever emitted — the assertion
+  # would otherwise pass vacuously.
+  echo "FAIL: Advisory does not repeat within the same session (no marker: first call never emitted an advisory)"
+  FAIL=$((FAIL + 1))
+else
+  echo "FAIL: Advisory does not repeat within the same session (got: $ADV_OUT2)"
+  FAIL=$((FAIL + 1))
+fi
+rm -f "$WARN_MARKER"
 trap - EXIT
 
 if [ "$FAIL" -gt 0 ]; then
