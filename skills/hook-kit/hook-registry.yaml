@@ -293,28 +293,27 @@ hooks:
 - id: block-ask-on-question-signal
   owner_skill: hook-kit
   marketplace: es6kr-skills
-  status: active
-  implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/block-ask-on-question-signal.sh
-  registrations:
-  - surface: hooks.json
-    event: PreToolUse
-    matcher: AskUserQuestion
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-on-question-signal.sh
-    timeout: 10
+  status: removed
+  tombstone:
+    date: '2026-09-10'
+    reason: This repo is PUBLIC and English-only, so the hook's Korean interrogative
+      pattern could only ever live in a git-ignored local data file — absent that
+      file the check degraded to a language-agnostic fallback. Relocated to a
+      private repo where the pattern can be a committed default.
+    relocated_to: daegunsoftDev/skills plugins/ask-user/hooks/block-ask-on-question-signal.sh
+  implementations: []
+  registrations: []
 - id: block-ask-without-token-measure
   owner_skill: hook-kit
   marketplace: es6kr-skills
-  status: active
-  implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/block-ask-without-token-measure.sh
-  registrations:
-  - surface: hooks.json
-    event: PreToolUse
-    matcher: AskUserQuestion
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh
+  status: removed
+  tombstone:
+    date: '2026-09-10'
+    reason: Migrated alongside its two ask-family siblings for consolidation —
+      no locale dependency itself, pure content move.
+    relocated_to: daegunsoftDev/skills plugins/ask-user/hooks/block-ask-without-token-measure.sh
+  implementations: []
+  registrations: []
 - id: block-axis-merged-ask
   owner_skill: hook-kit
   marketplace: es6kr-skills
@@ -872,15 +871,18 @@ hooks:
 - id: check-ask-bypass-keywords
   owner_skill: hook-kit
   marketplace: es6kr-skills
-  status: active
-  implementations:
-  - runtime: sh
-    file: skills/hook-kit/resources/check-ask-bypass-keywords.sh
-  registrations:
-  - surface: hooks.json
-    event: Stop
-    matcher: ''
-    command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-ask-bypass-keywords.sh
+  status: removed
+  tombstone:
+    date: '2026-09-10'
+    reason: This repo is PUBLIC and English-only, so the HG_BYPASS_* trio's Korean
+      patterns could only ever live in a git-ignored local data file — absent
+      that file the hook was a complete no-op. A 3rd-recurrence hook defect this
+      session (closed verb enumeration missing an open-ended ending) traced back
+      to that same structural gap. Relocated to a private repo where the patterns
+      can be committed defaults instead of a locally-recreated file.
+    relocated_to: daegunsoftDev/skills plugins/ask-user/hooks/check-ask-bypass-keywords.sh
+  implementations: []
+  registrations: []
 - id: check-completed-bloat
   owner_skill: fix-plan
   marketplace: es6kr-skills
