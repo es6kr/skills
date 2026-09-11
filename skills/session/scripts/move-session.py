@@ -85,42 +85,36 @@ def extract_cwd_values(content: str) -> list[str]:
     return sorted(set(re.findall(r'"cwd":"([^"]*)"', content)))
 
 
-def replace_cwd(content: str, old_suffix: str, mode: str) -> tuple[str, int]:
-    """Replace cwd values in JSONL content.
+def replace_cwd(content: str, old_cwd: str, new_cwd: str, mode: str) -> tuple[str, int]:
+    """Rewrite exact `"cwd":"<value>"` tokens in JSONL content.
+
+    Only the cwd field itself is rewritten. An identical path string appearing
+    elsewhere on the same line -- a message body, a recorded tool_use command --
+    is left intact. (An earlier implementation replaced the path substring
+    anywhere on any line carrying a cwd field, which silently truncated
+    transcript content that happened to mention the same path.)
 
     Args:
         content: Full file content
-        old_suffix: The path suffix to remove (e.g., \\\\sub-project)
-        mode: 'first' or 'all'
+        old_cwd: Existing cwd value, exactly as encoded in the JSON
+        new_cwd: Replacement cwd value, in the same encoding
+        mode: 'first' (rewrite only the first occurrence) or 'all'
 
     Returns:
         (new_content, replacement_count)
     """
+    old_token = f'"cwd":"{old_cwd}"'
+    new_token = f'"cwd":"{new_cwd}"'
+    if old_token == new_token:
+        return content, 0
+
+    occurrences = content.count(old_token)
+    if occurrences == 0:
+        return content, 0
+
     if mode == "all":
-        lines = content.split("\n")
-        total = 0
-        new_lines = []
-        for line in lines:
-            if old_suffix in line and '"cwd"' in line:
-                count = line.count(old_suffix)
-                line = line.replace(old_suffix, "")
-                total += count
-            new_lines.append(line)
-        return "\n".join(new_lines), total
-    else:
-        # first mode: only replace in lines that contain "cwd"
-        # Actually, replace the first occurrence of the full cwd pattern
-        lines = content.split("\n")
-        total = 0
-        new_lines = []
-        replaced = False
-        for line in lines:
-            if not replaced and old_suffix in line and '"cwd"' in line:
-                line = line.replace(old_suffix, "", 1)
-                total = 1
-                replaced = True
-            new_lines.append(line)
-        return "\n".join(new_lines), total
+        return content.replace(old_token, new_token), occurrences
+    return content.replace(old_token, new_token, 1), 1
 
 
 def main():
@@ -190,20 +184,18 @@ def main():
                 print(f"  WARN: cwd '{cwd_val}' doesn't share prefix with target, skipping")
                 continue
 
-            # Find the suffix to remove
-            suffix_normalized = cwd_normalized[len(target_normalized):]
-            # Convert back to JSON-escaped form matching the original encoding
+            # Re-encode the target in the same form the file uses for this cwd
             if "\\\\" in cwd_val:
                 # Windows JSON encoding: path separators stored as double-backslash
-                suffix_json = suffix_normalized.replace("/", chr(92) + chr(92))
+                target_json = target_normalized.replace("/", chr(92) + chr(92))
             else:
                 # macOS/Linux: path separators stored as-is
-                suffix_json = suffix_normalized
+                target_json = target_normalized
 
-            print(f"  Removing suffix: {repr(suffix_json)} from cwd (mode={opts.cwd_mode})")
+            print(f"  Rewriting cwd: {repr(cwd_val)} -> {repr(target_json)} (mode={opts.cwd_mode})")
 
             if not opts.dry_run:
-                content, count = replace_cwd(content, suffix_json, opts.cwd_mode)
+                content, count = replace_cwd(content, cwd_val, target_json, opts.cwd_mode)
                 replaced_total += count
 
         if opts.dry_run:
