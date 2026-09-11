@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - archive
   - safe-delete
-description: "Hook management. audit - reference/permission/orphan checks (stale references + chmod +x missing + unowned hook detection) [audit.md]. edit - hook script modification + dual-sync [edit.md]. install - install from resources/ to hooks/ + settings.json registration [install.md]. move - move hooks from scripts/ to hooks/ + update settings.json paths [move.md]. remove - remove hook entries from settings.json [remove.md]. registry - canonical hook inventory hook-registry.yaml: consult before any registration change, owner/marketplace/status/tombstone rows, verify script, registry-read guard [registry.md]. Use when: \"hook cleanup\", \"hook audit\", \"hook edit\", \"hook install\", \"hook move\", \"hook remove\", \"install hook\", \"edit hook\", \"edit guard\", \"bash-guard\", \"hook sync\", \"hook permission\", \"orphan hook\", \"chmod +x hook\", \"exit 126\", \"hook registry\", \"hook-registry.yaml\", \"phantom hook\", \"ghost hook\", \"hook registration\", \"hooks.json\", \"settings.json hooks\""
+description: "Hook management. add - author a NEW hook end-to-end: when a hook is the right medium, registry-first check, sibling mirroring, per-event emit schema, --test harness weighted toward negatives, dual registration (hooks.json + hook-registry.yaml) [add.md]. audit - reference/permission/orphan checks (stale references + chmod +x missing + unowned hook detection) [audit.md]. edit - hook script modification + dual-sync [edit.md]. install - install from resources/ to hooks/ + settings.json registration [install.md]. move - move hooks from scripts/ to hooks/ + update settings.json paths [move.md]. remove - remove hook entries from settings.json [remove.md]. registry - canonical hook inventory hook-registry.yaml: consult before any registration change, owner/marketplace/status/tombstone rows, verify script, registry-read guard [registry.md]. Use when: \"add a hook\", \"new hook\", \"write a hook\", \"author a hook\", \"hook cleanup\", \"hook audit\", \"hook edit\", \"hook install\", \"hook move\", \"hook remove\", \"install hook\", \"edit hook\", \"edit guard\", \"bash-guard\", \"hook sync\", \"hook permission\", \"orphan hook\", \"chmod +x hook\", \"exit 126\", \"hook registry\", \"hook-registry.yaml\", \"phantom hook\", \"ghost hook\", \"hook registration\", \"hooks.json\", \"settings.json hooks\""
 allowed-tools:
   - Read
   - Edit
@@ -32,6 +32,7 @@ Manage hooks and script files in `~/.claude/settings.json`. Includes resource (s
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| add | author a NEW hook end-to-end: registry-first check, sibling mirroring, per-event emit schema, `--test` harness weighted toward negatives, dual registration | [add.md](./add.md) |
 | audit | reference/permission/orphan checks (stale + chmod +x + resources matching) | [audit.md](./audit.md) |
 | edit | hook script modification + source sync | [edit.md](./edit.md) |
 | install | resources → hooks/ installation + settings.json registration | [install.md](./install.md) |
