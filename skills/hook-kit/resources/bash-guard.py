@@ -646,12 +646,46 @@ def check_feat_tag_file_addition_integrity(
 
 
 # ── Direct main PR threshold & CodeRabbit 50-file guard ──
+def is_plugin_repo_root(path: str) -> bool:
+    """True when `path` is a plugin/marketplace repo root.
+
+    Detected by `.claude-plugin/marketplace.json` — the same marker dev-reflect
+    uses to recognise a marketplace source — rather than a hardcoded repo list,
+    which would drift as repos are added.
+    """
+    return os.path.isfile(os.path.join(path, ".claude-plugin", "marketplace.json"))
+
+
+def _detect_plugin_repo() -> bool:
+    """Resolve the git toplevel of the cwd and test it for the plugin marker."""
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode != 0:
+            return False
+        return is_plugin_repo_root(r.stdout.strip())
+    except Exception:
+        return False
+
+
 def check_pr_create_routing_and_file_limit(
     command: str,
     changed_files: list[str] | None = None,
     commit_count: int | None = None,
+    is_plugin_repo: bool | None = None,
 ) -> str | None:
-    """Block direct PR to main if < 5 commits and < 10 files, and block PR if > 50 files (CodeRabbit limit)."""
+    """Block direct PR to main if < 5 commits and < 10 files, and block PR if > 50 files (CodeRabbit limit).
+
+    The direct-main threshold routes small PRs to a `develop` staging branch, so
+    it only applies where that branch exists — the plugin repos running this
+    flow. Elsewhere (e.g. a GitOps repo whose only long-lived branch is
+    `master`) it would deny the only PR the repo can open and point at a remedy
+    that does not exist, leaving ALLOW_DIRECT_MAIN_PR=1 as the sole path through
+    routine work. The 50-file CodeRabbit limit is about review capacity rather
+    than staging flow, so it stays global.
+    """
     if not GH_TOKEN_RE.search(command) or not PR_CREATE_PREFILTER.search(command):
         return None
     try:
@@ -719,8 +753,11 @@ def check_pr_create_routing_and_file_limit(
             "Reference: plan-conflict-reduction-merge-flow.md '50-File CodeRabbit Guard'."
         )
 
-    # 2. Direct Main PR Threshold check
-    if target_is_main and not allow_direct_main:
+    # 2. Direct Main PR Threshold check — plugin repos only (see docstring)
+    if is_plugin_repo is None:
+        is_plugin_repo = _detect_plugin_repo()
+
+    if is_plugin_repo and target_is_main and not allow_direct_main:
         if commit_count < 5 and len(changed_files) < 10:
             return (
                 f"Direct PR to `{base_branch}` with only {commit_count} commit(s) and {len(changed_files)} file(s) is blocked.\n\n"
