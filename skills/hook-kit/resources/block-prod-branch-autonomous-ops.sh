@@ -83,8 +83,21 @@ if echo "$COMMAND" | grep -qE "gh[[:space:]]+api[[:space:]].*branches/$BRANCHES"
 fi
 
 # 6. git worktree add ... production
-if echo "$COMMAND" | grep -qE "git[[:space:]]+worktree[[:space:]]+add[[:space:]]+.*$BRANCHES(\$|[[:space:]])"; then
-  BLOCKED_REASON="git worktree add on protected branch"
+#    `-b`/`-B` creates a NEW branch and the protected name that follows the
+#    command is then only the start-point, which is read-only. Branching off
+#    master is routine work, so denying it would push people onto the override
+#    for everyday commands. Judge the created branch instead: block when the
+#    protected name is the argument right after -b/-B, allow otherwise. Without
+#    -b/-B the command checks the protected branch out into a worktree, which
+#    stays blocked.
+if echo "$COMMAND" | grep -qE "git[[:space:]]+worktree[[:space:]]+add[[:space:]]"; then
+  if echo "$COMMAND" | grep -qE "[[:space:]]-[bB][[:space:]]"; then
+    if echo "$COMMAND" | grep -qE "[[:space:]]-[bB][[:space:]]+$BRANCHES(\$|[[:space:]])"; then
+      BLOCKED_REASON="git worktree add creating protected branch"
+    fi
+  elif echo "$COMMAND" | grep -qE "git[[:space:]]+worktree[[:space:]]+add[[:space:]]+.*$BRANCHES(\$|[[:space:]])"; then
+    BLOCKED_REASON="git worktree add on protected branch"
+  fi
 fi
 
 # 7. git update-ref refs/heads/production
