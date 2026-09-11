@@ -837,6 +837,18 @@ hooks:
     matcher: Workflow
     command: ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-workflow-without-cost-gate.sh
     timeout: 15
+- id: block-wsl-var-payload
+  owner_skill: hook-kit
+  marketplace: es6kr-skills
+  status: active
+  implementations:
+  - runtime: sh
+    file: skills/hook-kit/resources/block-wsl-var-payload.sh
+  registrations:
+  - surface: hooks.json
+    event: PreToolUse
+    matcher: Bash
+    command: bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wsl-var-payload.sh
 - id: block-write-file-overwrite
   owner_skill: hook-kit
   marketplace: es6kr-skills
