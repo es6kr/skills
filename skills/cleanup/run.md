@@ -97,7 +97,7 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | Step | Result |
 |------|------|
 | **Session identity (mandatory)** | **`Session ID: <full-36-UUID>` + Recommend running: `/rename <model>-<topic>-<sessid8>` (2-3 candidates; each = model family token + dominant-work topic + UUID's leading 8 hex; keep the `/rename ...` command in its own code span with no label or colon inside it, so a single copy-paste is directly runnable)** |
-| **Walkthrough & artifacts (mandatory row)** | **A markdown link to this session's walkthrough file + a one-line summary of what it covers, followed by a list of every artifact created or modified this session (PR/commit, docs, tracker, recurrence-log entries, RAG writes).** Author the file at `<workspace>/.agents/docs/generated/walkthrough-<topic>-<sessid8>.md` (or that workspace's equivalent generated-docs directory) **before** composing this row — the row links the file, it does not stand in for it. Write `none — no deliverable this session` only when the session genuinely produced nothing, and say why. |
+| **Walkthrough & artifacts (mandatory row)** | **A markdown link to this session's walkthrough file + a one-line summary of what it covers, followed by a list of every artifact created or modified this session (PR/commit, docs, tracker, recurrence-log entries, RAG writes).** Author `walkthrough-<topic>-<sessid8>.md` at the path resolved by the "Walkthrough file" subsection below (`$WSCFG_ARTIFACTS_PATH`, then the `.agents/` → `.ralph/` → `docs/` fallbacks) **before** composing this row — the row links the file, it does not stand in for it. Write `none — no deliverable this session` only when the session genuinely produced nothing, and say why. |
 | 0. TaskList | (cleanup result) |
 | 1. Commit | (commit result or skip reason) |
 | 2. Self-Improve | `claudify improve` result |
@@ -331,7 +331,7 @@ Analyze mistakes made during the session and record them to feedback memory + fa
 
 #### Hook behavior review
 
-1. Collect the registered hooks from the canonical inventory first — `Read` the registry at `~/ghq/github.com/es6kr/claude-plugins/hook-registry.yaml` (relocated 2026-09-10; procedure: that repo's `hook-registry.md`, or `hook-kit`'s `registry.md` redirect), then compare it against the live surfaces (`~/.claude/settings.json` `hooks`, each plugin's `hooks/hooks.json`). A settings.json entry whose id is already registered on a plugin surface is a dual registration to remove; a file with no registry row is a backfill candidate, not an orphan to re-point by guesswork
+1. Collect the registered hooks from the canonical inventory first — `Read` the registry at the private companion repo's `hook-registry.yaml` (relocated 2026-09-10; procedure: `hook-kit`'s `registry.md` redirect), then compare it against the live surfaces (`~/.claude/settings.json` `hooks`, each plugin's `hooks/hooks.json`). A settings.json entry whose id is already registered on a plugin surface is a dual registration to remove; a file with no registry row is a backfill candidate, not an orphan to re-point by guesswork
 2. **Verify hook file existence**:
    - Extract the executable path from each hook's `command`
    - Check whether the file actually exists
