@@ -49,7 +49,13 @@ fi
 # it to stand alone as a word — not preceded by an identifier/path character, and
 # not followed by one that turns it into a slug or filename. A trailing letter is
 # still allowed so "retrospective" keeps matching.
-WRAPUP_PATTERN_EN='wrap[- ]?up|(?<![a-zA-Z0-9/])/cleanup|session cleanup|(?<![a-zA-Z0-9/-])retrospect(?![-/.])'
+# The lookarounds exclude letters, digits, `/` and `-`, but not `_` — so the token
+# still matches inside an identifier such as a shell variable name carrying it as a
+# component. An option that merely *names* such an identifier (e.g. while reporting
+# a guard defect) is not offering a wrap-up, yet it was blocked as one. Adding `_`
+# to both sides keeps every real prose hit ("retrospect", "post-retrospect") while
+# dropping identifier-internal occurrences.
+WRAPUP_PATTERN_EN='wrap[- ]?up|(?<![a-zA-Z0-9/_])/cleanup|session cleanup|(?<![a-zA-Z0-9/_-])retrospect(?![-/._])'
 if [[ -n "${HG_CONTEXT_GATE_WRAPUP_KO:-}" ]]; then
   WRAPUP_PATTERN="${WRAPUP_PATTERN_EN}|${HG_CONTEXT_GATE_WRAPUP_KO}"
 else
