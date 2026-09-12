@@ -1,5 +1,5 @@
 {
-  "description": "es6kr-skills root plugin hooks — migrated from ~/.claude/settings.json ~/.agents/skills/ registrations",
+  "description": "es6kr-skills root plugin hooks \u2014 migrated from ~/.claude/settings.json ~/.agents/skills/ registrations",
   "hooks": {
     "PostToolUse": [
       {
@@ -198,10 +198,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js"
           }
         ]
       },
@@ -239,10 +235,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
-          },
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-hook-registration-without-registry-read.js"
           }
         ]
       },
@@ -278,12 +270,7 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-on-question-signal.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-ask-without-token-measure.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-commit-tag-change-without-package-count.sh"
           }
         ]
       },
@@ -355,10 +342,6 @@
     "Stop": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-ask-bypass-keywords.sh"
-          },
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-session-rag.sh"
