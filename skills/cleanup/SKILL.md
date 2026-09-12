@@ -40,7 +40,14 @@ Sequentially run cleanup tasks before session end.
 ```
 /cleanup              # run topic (default)
 /cleanup run          # explicit run
+/cleanup --auto       # non-interactive: decision asks become tracker upserts
 ```
+
+### `--auto` (non-interactive)
+
+`--auto` runs the same five steps but replaces every user-decision ask (Step 2 findings handling, Step 3 storage location, Step 4 medium, Step 5 wip multi-select) with an **upsert of all candidates into the workspace tracker** (`fix_plan.md` / `checklist.md`). Nothing is dropped and nothing is auto-decided — the decision becomes a tracker item.
+
+Destructive and irreversible actions (`git push`, PR creation, remote state changes, file deletion) are **never** automated by `--auto`; they stay unexecuted and are upserted as tracker items. See [run.md](./run.md) "`--auto` Mode" for the full ask → upsert mapping and how it differs from Ralph Mode.
 
 ### Change settings
 

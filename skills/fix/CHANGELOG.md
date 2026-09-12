@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/es6kr/skills/compare/fix-v0.6.0...fix-v0.6.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **fix:** mention the claude-task fallback + no-scratchpad rule in the summary table ([0ab146a](https://github.com/es6kr/skills/commit/0ab146a3f745a82b0564e806c2131c81f46fec64))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/fix-v0.5.0...fix-v0.6.0) (2026-09-06)
 
 

@@ -56,14 +56,14 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step 0 | Call `TaskList` | — | Clean up when TaskList has completed tasks |
 | Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (receiver resolved from the workspace config) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
 | Step 1 | `Skill("commit-tidy")` or `/commit-tidy` | Decide split strategy (internal ask inside the skill) | When there is 1+ uncommitted change |
-| Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
-| Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) | **Always** + auto-import when the RAG receiver readyz responds |
+| Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) — with `--auto`, upsert every finding to the tracker instead of asking (see the "`--auto` Mode" section) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
+| Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) — with `--auto`, use the default medium and upsert only genuinely ambiguous candidates (see the "`--auto` Mode" section) | **Always** + auto-import when the RAG receiver readyz responds |
 | **3-C.1 session RAG import** | **Automatic execution — no ask** | — | Immediately import when the RAG receiver readyz responds OK |
 | **3-C.2 structured discovery chunk (mode B — HARD STOP)** | **Automatic execution — no ask** | — | If the session produced **reusable discoveries/decisions/deployments** (bug root-cause, infra gotcha, a config/URL/MTU/version that took effort to find, an architecture decision), store each as a keyword-searchable chunk via the **RAG receiver's structured-store dispatch (mode B)** — separate from 3-C.1. Session import (3-C.1 mode A) has **weak keyword retrieval**: it preserves turns but does NOT make a finding queryable (e.g. "DinD MTU hang", "dev-36 k3s runner"). Skip ONLY when the session had zero reusable discovery (pure Q&A / trivial edits) — and say so explicitly in the report row |
 | **3-C.3 check for missed active-artifact RAG store** | **Automatic execution — no ask** | — | Glob → identify this-session mtime artifacts → RAG receiver scroll → immediately store missing files. Matches plan/research/analysis/report/postmortem-*.md patterns |
 | **3-C.4 workspace fix_plan-history sync (mode C)** | **Automatic execution — no ask** | — | If this session added `## Completed` entries to `fix_plan.md` AND the current workspace exposes a fix_plan→RAG sync script (per `rag-store.md` "fix_plan.md Completed Item RAG Sync + Delete Obligation"), run it. Session import (3-C.1) and structured chunks (3-C.2) are conversation-shaped; this sync is deliverable-shaped (task/decision history) — neither of the other two modes substitutes for it |
-| Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) | When this session has artifacts |
-| Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) | **Always** — state preservation for next-session resume at cleanup end |
+| Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) — with `--auto`, record to the resolved tracker without asking (see the "`--auto` Mode" section) | When this session has artifacts |
+| Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) — with `--auto`, upsert all N candidates to the tracker and skip the selection ask; the `Skill("wip")` call itself still happens (see the "`--auto` Mode" section) | **Always** — state preservation for next-session resume at cleanup end |
 | **Step 5 report (HARD STOP — re-read before writing)** | **Before composing the completion report, scroll back to "Step 5 Completion Report Table Mandatory Rows" and copy its row list literally.** That section sits *above* the Step 1-5 procedure bodies, so executing the steps in order never passes through it again — the report then gets assembled from memory, which is exactly how mandatory rows (Session identity, the 3-A LLM Wiki scope-check row, the separate 3-C.1 / 3-C.2 / 3-C.4 rows) are silently dropped | — | **Always** — applies to the cleanup wrap-up table AND any separate session-end report |
 | Step 5.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4.5+5 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
 
@@ -147,6 +147,29 @@ This generalizes the identical gate already documented for the `check-session-im
 | 2 | Read the `block-cleanup-option-below-context-gate.sh` hook's `Live context usage: N%` line as only an ask-gating datum | It is also the **entry signal** for this gate — `N% < threshold` means full cleanup is premature |
 
 **Self-check (on any completion-keyword auto-entry to cleanup)**: (1) explicit user `/cleanup`, or an auto-trigger? (2) if auto-trigger, is live context ≥ the model threshold? (3) if < threshold → light-touch only (address the specific hook concern); do NOT run claudify improve / wip / full report. This gate does not apply when the user typed `/cleanup` explicitly — an explicit request runs the full sequence regardless of context.
+
+## `--auto` Mode (non-interactive: asks become tracker upserts)
+
+`/cleanup --auto` runs the same five steps, but **every user-decision ask is replaced by upserting all of that ask's candidates into the workspace tracker** (`fix_plan.md` / `checklist.md`, resolved exactly as Step 4's "Checklist file decision order" resolves it). The ask does not disappear and it is not silently decided — it becomes a tracker item the user triages later.
+
+This section exists because `--auto` was being passed on the command line without being defined anywhere in this skill. A caller following the procedure literally still reached `AskUserQuestion` at Steps 2-5, because those steps unconditionally prescribe an ask. Recorded twice before this section was written (FA `auto-mode-flag-undefined-so-interactive-asks-still-fire`, `status=fix-required`) — the first occurrence was logged without applying the documentation change, and the second was the identical recurrence.
+
+**Ask → upsert mapping**:
+
+| Step | Ask in normal mode | `--auto` behavior |
+|------|--------------------|-------------------|
+| Step 2 Phase 2 | How to handle improve findings | Upsert each finding as its own tracker item. Do not ask which to apply |
+| Step 3 | Storage location for persisted knowledge | Store to the default medium for that content type; upsert a tracker item for any candidate whose destination is genuinely ambiguous |
+| Step 4 | Which medium records this session's artifacts | Record to the resolved tracker; do not ask the medium |
+| Step 5 | `Skill("wip")` multi-select of next-session candidates | Upsert **all** candidates to the tracker and skip the multi-select ask. The `Skill("wip")` call itself still happens — only its internal selection ask is replaced |
+
+Upserted items follow the tracker's own authoring schema (see the `fix-plan` skill's `add` topic: one-sentence Action + `Why` + `How to apply`). Default priority marker is `[P2:selfable]` unless the finding's own severity clearly implies another rank.
+
+**Destructive and irreversible actions are never automated by `--auto` (HARD STOP)**: `git push`, PR creation, any remote state change (issue/PR comment, label, close/reopen, merge), file deletion, and force operations stay **unexecuted**. They are upserted to the tracker as items instead. `--auto` removes the *ask*, not the *authorization requirement* — an unattended run must not be able to publish or destroy anything.
+
+**`--auto` vs Ralph Mode**: both suppress `AskUserQuestion`, but they differ in what they are allowed to do. Ralph Mode additionally **forbids direct modification** (rules, memory, hooks) and records `[NEEDS_REVIEW]` to `improvements.md`, because a Ralph loop has no human in the turn at all. `--auto` is an interactive-session flag: the user is present and has asked for a low-interruption run, so ordinary local edits proceed as in normal mode and only the decision asks are redirected to the tracker. When both apply (`RALPH_LOOP=1` and an explicit `--auto`), Ralph Mode's restrictions win — it is the stricter of the two.
+
+**Self-check (on entering cleanup with `--auto`)**: (1) did the invocation carry `--auto`? (2) if yes, for every step that this file marks as an ask, did I upsert candidates to the tracker instead of calling `AskUserQuestion`? (3) did any destructive action get executed rather than upserted? If (3) is yes, that is a violation of the HARD STOP above.
 
 ## Ralph Mode
 
