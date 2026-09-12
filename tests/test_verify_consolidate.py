@@ -323,3 +323,94 @@ Hold — address the Pending findings first. Merge via `/github-flow merge 123`.
             ok and not validator.errors,
             f"IR-style headers must count as internal findings. errors={validator.errors}",
         )
+
+
+class TestInlineAccountingEdgeCases(unittest.TestCase):
+    """Two defects found by running the validator against a real consolidated PR."""
+
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    def test_internal_reviews_own_inline_comment_is_not_double_counted(self, mock_sha, mock_api):
+        """When the Internal Review is posted as a review, its inline annotations
+        land in pulls/<N>/comments too. They are the same findings already counted
+        as internal findings, so counting them again inflates the expected total
+        and demands a row that must not exist."""
+        internal = {
+            "id": 999,
+            "user": {"login": "DrumRobot"},
+            "submitted_at": "2026-09-12T00:00:00Z",
+            "body": """## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
+<!-- consolidate:verified -->
+
+#### IR-1 · the one internal finding
+detail
+""",
+        }
+        summary = {
+            "created_at": "2026-09-12T00:01:00Z",
+            "body": """## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
+<!-- consolidate:verified -->
+
+> Reviewer matrix: copilot — 1 inline comments
+
+### Consolidated Findings
+| # | Source | Location | Finding | Status |
+|---|---|---|---|---|
+| 1 | copilot | `a.py:1` | external one | 🔴 Pending |
+| 2 | superpowers | `b.py:2` | internal one | 🔴 Pending |
+
+### Merge Recommendation
+Hold. Merge via `/github-flow merge 123`.
+""",
+        }
+        inline = [
+            {"user": {"login": "Copilot"}, "path": "a.py", "line": 1, "body": "external one"},
+            # the Internal Review's OWN inline annotation
+            {"user": {"login": "DrumRobot"}, "path": "b.py", "line": 2,
+             "body": "internal one", "pull_request_review_id": 999},
+        ]
+        mock_api.side_effect = [inline, [summary], [internal]]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        ok = validator.validate()
+        self.assertTrue(ok and not validator.errors, f"errors={validator.errors}")
+
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    def test_escaped_pipe_inside_cell_does_not_shift_status_column(self, mock_sha, mock_api):
+        """A finding that quotes a regex needs `\\|` inside a cell. Splitting on
+        every pipe shifts every later column, so the Status check reads a regex
+        fragment and reports an off-contract value on a correct table."""
+        internal = {
+            "created_at": "2026-09-12T00:00:00Z",
+            "body": """## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
+<!-- consolidate:verified -->
+
+#### 1. the one internal finding
+detail
+""",
+        }
+        summary = {
+            "created_at": "2026-09-12T00:01:00Z",
+            "body": r"""## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
+<!-- consolidate:verified -->
+
+> Reviewer matrix: copilot — 1 inline comments
+
+### Consolidated Findings
+| # | Source | Location | Finding | Status |
+|---|---|---|---|---|
+| 1 | copilot | `a.py:1` | regex `(?:x\|PAT)\s{0,2}(?:\btoken\b\|tok)` is too narrow | 🔴 Pending |
+| 2 | superpowers | `b.py:2` | internal one | 🔴 Pending |
+
+### Merge Recommendation
+Hold. Merge via `/github-flow merge 123`.
+""",
+        }
+        inline = [{"user": {"login": "Copilot"}, "path": "a.py", "line": 1, "body": "x"}]
+        mock_api.side_effect = [inline, [internal, summary], []]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        validator.validate()
+        self.assertFalse(
+            any("outside the post.md contract" in e for e in validator.errors),
+            f"escaped pipe must not shift the Status column. errors={validator.errors}",
+        )
