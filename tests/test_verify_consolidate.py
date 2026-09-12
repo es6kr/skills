@@ -191,3 +191,135 @@ class TestTitleLineArtifactDetection(unittest.TestCase):
             gh.side_effect = [[], [{"id": 9, "created_at": "2026-08-29T00:00:00Z", "body": both}]]
             v.validate()
         self.assertIn("titled as BOTH", " ".join(v.errors))
+
+
+class TestFindingSourceCoverage(unittest.TestCase):
+    """Every source that actually produced findings must be countable.
+
+    Three sources were invisible to the validator and each one silently forced
+    the expected-row arithmetic below the real finding count, so an honest
+    Summary listing all of them failed the gate:
+
+    1. An Internal Code Review posted as a *review* (internal.md routes it there
+       whenever line-specific Critical/Important findings exist, because only the
+       reviews API carries inline annotations) was searched for in issue comments
+       only.
+    2. A bot's *suppressed* findings live in the review body, not in
+       `pulls/<N>/comments`, so they were never counted.
+    3. A human reviewer's own review body was not counted at all.
+    """
+
+    INTERNAL_AS_REVIEW = {
+        "user": {"login": "DrumRobot"},
+        "submitted_at": "2026-09-12T00:00:00Z",
+        "body": """## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
+<!-- consolidate:verified -->
+
+#### IR-1 · Potential | Critical — first internal finding
+detail
+#### IR-2 · Potential | Important — second internal finding
+detail
+""",
+    }
+
+    COPILOT_REVIEW_WITH_SUPPRESSED = {
+        "user": {"login": "copilot-pull-request-reviewer[bot]"},
+        "submitted_at": "2026-09-12T00:00:10Z",
+        "body": """### Changes recommended
+
+<details>
+<summary>Review details</summary>
+
+### Suppressed comments (3)
+
+**scripts/a.py:10**
+* suppressed finding one
+**scripts/b.py:20**
+* suppressed finding two
+**scripts/c.py:30**
+* suppressed finding three
+</details>
+""",
+    }
+
+    HUMAN_REVIEW = {
+        "user": {"login": "daegunjhy"},
+        "submitted_at": "2026-09-12T00:00:20Z",
+        "body": "This looks wrong to me — the retry loop can spin forever.",
+    }
+
+    SUMMARY = {
+        "created_at": "2026-09-12T00:01:00Z",
+        "body": """## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
+<!-- consolidate:verified -->
+
+> Reviewer matrix: copilot — 1 inline comments (+3 suppressed) · daegunjhy — 1 review · superpowers — 2 findings
+
+### Consolidated Findings
+| # | Source | Type | Location | Finding | Status |
+|---|---|---|---|---|---|
+| 1 | copilot | Potential | `file1.py:10` | inline one | 🔴 Pending |
+| 2 | copilot | Potential | `scripts/a.py:10` | suppressed one | 🔴 Pending |
+| 3 | copilot | Potential | `scripts/b.py:20` | suppressed two | 🔴 Pending |
+| 4 | copilot | Potential | `scripts/c.py:30` | suppressed three | 🔴 Pending |
+| 5 | @daegunjhy | Potential | `file9.py:90` | human review point | 🔴 Pending |
+| 6 | superpowers | Potential | `x.py:1` | internal one | 🔴 Pending |
+| 7 | superpowers | Potential | `y.py:2` | internal two | 🔴 Pending |
+
+### Merge Recommendation
+Hold — address the Pending findings first. Merge via `/github-flow merge 123`.
+""",
+    }
+
+    ONE_INLINE = [
+        {"user": {"login": "Copilot"}, "path": "file1.py", "line": 10, "body": "inline one"},
+    ]
+
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    def test_internal_review_posted_as_review_is_found(self, mock_sha, mock_api):
+        """internal.md routes the Internal Review to the reviews API when inline
+        targets exist. Searching issue comments only reports it as missing."""
+        mock_api.side_effect = [
+            self.ONE_INLINE,
+            [self.SUMMARY],
+            [self.INTERNAL_AS_REVIEW, self.COPILOT_REVIEW_WITH_SUPPRESSED, self.HUMAN_REVIEW],
+        ]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        validator.validate()
+        self.assertFalse(
+            any("Missing Internal Code Review" in e for e in validator.errors),
+            f"Internal Review posted as a review should be found. errors={validator.errors}",
+        )
+
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    def test_suppressed_and_human_and_internal_all_counted(self, mock_sha, mock_api):
+        """1 inline + 3 suppressed + 1 human review + 2 internal = 7 rows."""
+        mock_api.side_effect = [
+            self.ONE_INLINE,
+            [self.SUMMARY],
+            [self.INTERNAL_AS_REVIEW, self.COPILOT_REVIEW_WITH_SUPPRESSED, self.HUMAN_REVIEW],
+        ]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        ok = validator.validate()
+        self.assertTrue(
+            ok and not validator.errors,
+            f"7 real findings must reconcile with 7 table rows. errors={validator.errors}",
+        )
+
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    def test_internal_findings_counted_regardless_of_header_style(self, mock_sha, mock_api):
+        """`#### IR-1 ·` is as valid a finding header as `#### 1.`."""
+        mock_api.side_effect = [
+            self.ONE_INLINE,
+            [self.SUMMARY],
+            [self.INTERNAL_AS_REVIEW, self.COPILOT_REVIEW_WITH_SUPPRESSED, self.HUMAN_REVIEW],
+        ]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        ok = validator.validate()
+        self.assertTrue(
+            ok and not validator.errors,
+            f"IR-style headers must count as internal findings. errors={validator.errors}",
+        )
