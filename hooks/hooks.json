@@ -92,6 +92,15 @@
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-corpus-prelookup-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-sibling-existence-guard.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [
