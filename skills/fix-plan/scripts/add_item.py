@@ -15,7 +15,7 @@ Enforces the `add` topic's schema (see add.md):
 
 Usage:
   add_item.py --file <tracker> --action "..." --why "..." --how "..."
-              [--section "## Priority Tasks"] [--marker "[ ]"]
+              [--section "## TODO"] [--marker "[ ]"]
               [--sub "**Research**: path/to/doc.md"]... [--position top|bottom]
               [--dry-run]
   add_item.py --test        # self-test, no tracker required
@@ -26,17 +26,65 @@ Exit codes: 0 = ok, 1 = validation failure, 2 = usage error.
 from __future__ import annotations
 
 import argparse
-import fcntl
 import io
 import os
 import re
 import sys
 import tempfile
+import time
 
 DEFAULT_TRACKER = "fix_plan.md"
-DEFAULT_SECTION = "## Priority Tasks"
+DEFAULT_SECTION = "## Progress"
 DEFAULT_MARKER = "[ ]"
 MAX_BODY_LINES = 10  # 3 elements + up to 7 --sub entries (budget target 5-7, hard cap 10)
+
+# How long to wait for the tracker lock before giving up, and the poll interval.
+LOCK_TIMEOUT_SECONDS = 10.0
+LOCK_POLL_SECONDS = 0.05
+
+
+class _TrackerLock:
+    """Advisory exclusive lock around a whole read-modify-write transaction.
+
+    `os.replace` makes the final swap atomic but does NOT serialize the
+    read-modify-write sequence: two concurrent `add_item.py` invocations can
+    both read the same pre-insert snapshot, both pass the duplicate check,
+    and the second `os.replace()` silently discards the first process's
+    inserted item. The previous `fcntl.flock` approach acquired no lock at
+    all on native Windows (`fcntl` is `None` there), leaving that whole
+    window unprotected on the one platform this script exists to support
+    (see the module docstring). A sidecar lock file created with
+    `O_CREAT|O_EXCL` closes that window and works identically on POSIX and
+    native Windows. Mirrors `claim_item.py`'s `_TrackerLock` exactly so both
+    scripts serialize on the same lock file when they touch the same tracker.
+    """
+
+    def __init__(self, path, timeout: float = LOCK_TIMEOUT_SECONDS):
+        self.lock_path = os.path.abspath(path) + ".lock"
+        self.timeout = timeout
+
+    def __enter__(self):
+        deadline = time.monotonic() + self.timeout
+        while True:
+            try:
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+                return self
+            except FileExistsError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"could not acquire tracker lock within {self.timeout}s: "
+                        f"{self.lock_path} (another session may be mid-write; "
+                        "remove the lock file if no other session is running)"
+                    )
+                time.sleep(LOCK_POLL_SECONDS)
+
+    def __exit__(self, *exc_info):
+        try:
+            os.unlink(self.lock_path)
+        except FileNotFoundError:
+            pass
+        return False
 
 
 def validate_marker(marker: str) -> None:
@@ -177,28 +225,32 @@ def run_add(args: argparse.Namespace) -> int:
     escaped_action = re.escape(args.action.strip())
     pattern = re.compile(rf"^[ \t]*-[ \t]+\[[ x/X-]\][ \t]+{escaped_action}(?:[ \t]|$)", re.MULTILINE)
 
-    with io.open(args.file, "r+", encoding="utf-8") as fh:
-        try:
-            fcntl.flock(fh, fcntl.LOCK_EX)
-            src = fh.read()
-            if pattern.search(src):
-                print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
-                return 0
-
-            out = insert_item(src, args.section, item, args.position)
-
-            if args.dry_run:
-                print("--- dry-run: item that would be inserted ---")
-                print(item)
-                print(f"--- into section {args.section!r} at {args.position} ---")
-                return 0
-
-            atomic_write(args.file, out)
-            print(f"OK: added to {args.section!r} in {args.file} (+{len(out) - len(src)} chars)")
-            print(item)
+    # Lock keyed by the tracker's absolute path, not the tracker handle itself:
+    # holding the target open across atomic_write() makes the final os.replace()
+    # fail with WinError 5 on Windows, which does not allow renaming over an
+    # open file. _TrackerLock (O_CREAT|O_EXCL sidecar, see class docstring)
+    # serializes the whole read-modify-write transaction on POSIX and native
+    # Windows alike -- unlike the previous fcntl.flock approach, which acquired
+    # no lock at all when fcntl was unavailable (native Windows).
+    with _TrackerLock(args.file):
+        with io.open(args.file, "r", encoding="utf-8") as src_fh:
+            src = src_fh.read()
+        if pattern.search(src):
+            print(f"SKIP: an item with this action already exists in {args.file} (idempotent no-op)")
             return 0
-        finally:
-            fcntl.flock(fh, fcntl.LOCK_UN)
+
+        out = insert_item(src, args.section, item, args.position)
+
+        if args.dry_run:
+            print("--- dry-run: item that would be inserted ---")
+            print(item)
+            print(f"--- into section {args.section!r} at {args.position} ---")
+            return 0
+
+        atomic_write(args.file, out)
+        print(f"OK: added to {args.section!r} in {args.file} (+{len(out) - len(src)} chars)")
+        print(item)
+        return 0
 
 
 def self_test() -> int:
@@ -283,7 +335,7 @@ def main() -> int:
     p.add_argument("--why", help="motivation, 1-2 sentences (required)")
     p.add_argument("--how", help="procedure / tools / verification (required)")
     p.add_argument("--sub", action="append", default=[], help="extra one-line sub-bullet (repeatable)")
-    p.add_argument("--section", default="## Priority Tasks", help="target section heading")
+    p.add_argument("--section", default=DEFAULT_SECTION, help="target section heading")
     p.add_argument("--marker", default="[ ]", help="'[ ]', '[x]', or '[BLOCKED:P<0-3>:external|selfable]'")
     p.add_argument("--position", choices=("top", "bottom"), default="top")
     p.add_argument("--dry-run", action="store_true")

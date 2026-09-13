@@ -4,14 +4,14 @@ Standardizes priority flowchart (dependency graph) authoring and plan document m
 
 ## When to Use
 
-- Creating or updating the Mermaid dependency flowchart (`graph TD`) in `fix_plan.md` (e.g. under a `## Priority Tasks` section).
+- Creating or updating the Mermaid dependency flowchart (`graph TD`) in `fix_plan.md` (e.g. under a `## TODO` section).
 - Mapping flowchart nodes to specific plan documents (`llm-wiki/outputs/`, `.ralph/plan-drafts/`, `.ralph/docs/generated/`).
 - Structuring precedent relationships (`A --> B`) across infrastructure, deployment, and feature plans.
 - Invoked via `/fix-plan flowchart` or when managing task execution roadmaps.
 
 ## Schema & Placement
 
-Placement: At the top of `fix_plan.md` under a `## Priority Tasks` section.
+Placement: At the top of `fix_plan.md` under a `## TODO` section.
 
 ```markdown
 

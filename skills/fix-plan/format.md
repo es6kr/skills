@@ -46,6 +46,7 @@ Top-level sections:
 | `-` followed by space, no checkbox | Already-summarised historical line | `## Completed` only |
 | `- [REPEAT]` | Persistent recurring item (Ralph-specific — see ralph/periodic.md) | `## REPEAT` section only (out of scope for this skill) |
 | `[CLAIMED:<sid>:<ts>]` | Multi-session in-progress lease (suffix **annotation**, not a checkbox state) — see [claim.md](./claim.md) | appended after `- [ ]` / `- [BLOCKED:*:selfable]` |
+| `↳ workaround-for: <anchor>` | Workaround↔blocker linkage (sub-bullet **annotation** under the workaround item) — see [priority.md](./priority.md) "Workaround linkage" | sub-bullet under any `- [ ]` / `- [BLOCKED:*]` item |
 
 When an item completes, change `- [ ]` → `- [x]` and preserve discovery metadata while appending Model, Session ID (8 chars), and timestamp to the title line.
 
