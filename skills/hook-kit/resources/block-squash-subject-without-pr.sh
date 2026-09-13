@@ -24,7 +24,16 @@ if [[ "$TOOL_NAME" != "Bash" ]]; then
   exit 0
 fi
 
-CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
+# `tr -d '\r'` is not cosmetic. On Windows (Git Bash / MSYS2) jq writes CRLF, so
+# a line-continued command arrives as `--squash \<CR><LF>  --subject ...`. shlex
+# reads the backslash as escaping the CR — a literal carriage return — instead of
+# joining the lines, so `--subject` no longer lands in the same simple-command
+# segment as `gh pr merge` and the guard denies a perfectly well-formed merge.
+# Measured: same script, same JSON input -> exit 0 under WSL bash, exit 2 under
+# Git Bash, with jq the only difference (od showed `\ \r \n`). CI is Linux, so
+# this never surfaced there; it made the repo unpushable from Windows, because
+# tests/test_block_squash_subject_without_pr.bats asserts the allow case.
+CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null | tr -d '\r')
 if [[ -z "$CMD" ]]; then
   exit 0
 fi
