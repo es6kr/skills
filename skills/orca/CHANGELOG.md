@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/orca-v0.2.1...orca-v0.3.0) (2026-09-13)
+
+
+### Features
+
+* **hook-kit:** warn when an absence claim rests on a single probe medium ([780a9ca](https://github.com/es6kr/skills/commit/780a9ca7fd2196a6a7e23b5c898e5e20d73c24e2))
+
 ## [0.2.1](https://github.com/es6kr/skills/compare/orca-v0.2.0...orca-v0.2.1) (2026-09-08)
 
 
