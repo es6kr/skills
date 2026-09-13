@@ -91,3 +91,23 @@ run_guard() {
 @test "ALLOW_PROD_BRANCH_OPS=1 prefix still overrides" {
   [ "$(run_guard 'ALLOW_PROD_BRANCH_OPS=1 git worktree add .worktrees/m master')" = "0" ]
 }
+
+# --- regression: the -b test must not read flags from another segment -------
+#
+# Scoping the guard to "does -b appear anywhere in the command" let an unrelated
+# trailing segment supply the flag. The command below checks the protected
+# branch out into a worktree, but the guard saw the -b in the printf segment,
+# entered the branch-creation path, found no protected name after -b, and then
+# skipped the protected-checkout test because it lives in the elif.
+
+@test "trailing -b in an unrelated segment does not disarm the checkout check" {
+  [ "$(run_guard 'git worktree add .worktrees/m master && printf "%s" -b x')" = "2" ]
+}
+
+@test "trailing -b in a semicolon segment does not disarm the checkout check" {
+  [ "$(run_guard 'git worktree add .worktrees/m master; echo -b x')" = "2" ]
+}
+
+@test "a -b flag belonging to the worktree-add segment is still honoured" {
+  [ "$(run_guard 'git worktree add .worktrees/x -b feat/x master && echo done')" = "0" ]
+}

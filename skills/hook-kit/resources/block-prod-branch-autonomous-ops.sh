@@ -90,12 +90,19 @@ fi
 #    protected name is the argument right after -b/-B, allow otherwise. Without
 #    -b/-B the command checks the protected branch out into a worktree, which
 #    stays blocked.
-if echo "$COMMAND" | grep -qE "git[[:space:]]+worktree[[:space:]]+add[[:space:]]"; then
-  if echo "$COMMAND" | grep -qE "[[:space:]]-[bB][[:space:]]"; then
-    if echo "$COMMAND" | grep -qE "[[:space:]]-[bB][[:space:]]+$BRANCHES(\$|[[:space:]])"; then
+#    The -b test must look ONLY inside the worktree-add segment. Scanning the
+#    whole command let an unrelated later segment supply the flag
+#    (`... && printf '%s\\n' -b x`), which entered the branch-creation path,
+#    found no protected name after -b, and then skipped the protected-checkout
+#    check because it sits in the elif. Cut the segment at the first command
+#    separator before testing.
+WT_SEGMENT=$(printf '%s' "$COMMAND" | grep -oE "git[[:space:]]+worktree[[:space:]]+add[[:space:]][^;|&]*" | head -1)
+if [ -n "$WT_SEGMENT" ]; then
+  if printf '%s' "$WT_SEGMENT" | grep -qE "[[:space:]]-[bB][[:space:]]"; then
+    if printf '%s' "$WT_SEGMENT" | grep -qE "[[:space:]]-[bB][[:space:]]+$BRANCHES(\$|[[:space:]])"; then
       BLOCKED_REASON="git worktree add creating protected branch"
     fi
-  elif echo "$COMMAND" | grep -qE "git[[:space:]]+worktree[[:space:]]+add[[:space:]]+.*$BRANCHES(\$|[[:space:]])"; then
+  elif printf '%s' "$WT_SEGMENT" | grep -qE "$BRANCHES(\$|[[:space:]])"; then
     BLOCKED_REASON="git worktree add on protected branch"
   fi
 fi

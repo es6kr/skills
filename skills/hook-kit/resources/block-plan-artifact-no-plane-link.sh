@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse:Write/Edit — Block when a tracked planning artifact is written or
+# PostToolUse:Write/Edit — Block when a tracked planning artifact is written or
 # edited without a Plane browse-URL link.
 #
 # Two surfaces are covered:

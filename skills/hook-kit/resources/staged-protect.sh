@@ -13,7 +13,7 @@ fi
 
 # Exempt if target is inside .worktrees/
 case "$FILE_PATH" in
-  *.worktrees/*|*/.worktrees/*) exit 0 ;;
+  .worktrees/*|*/.worktrees/*) exit 0 ;;
 esac
 
 # Resolve directory of target file

@@ -5,7 +5,12 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_SCRIPT="$SCRIPT_DIR/../resources/staged-protect.sh"
-TEST_ROOT="$SCRIPT_DIR/../../../../.tmp/test-staged-protect-$$"
+# Use a neutral temp dir. Anchoring under the repo is not enough: this repo
+# is normally developed inside ./.worktrees/<name>, so any repo-relative
+# fixture path contains a .worktrees segment and is then exempted by the
+# very guard under test, making T1 unpassable. mktemp has no such segment.
+TEST_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/test-staged-protect-XXXXXX")
+trap 'rm -rf "$TEST_ROOT"' EXIT
 
 mkdir -p "$TEST_ROOT/repo"
 cd "$TEST_ROOT"
@@ -67,6 +72,4 @@ else
   exit 1
 fi
 
-# Cleanup
-rm -rf "$TEST_ROOT"
 echo "All staged-protect tests passed successfully!"
