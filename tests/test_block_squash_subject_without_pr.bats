@@ -75,6 +75,20 @@ gh pr merge 470 -R es6kr/skills --squash'
   [ "$status" -eq 0 ]
 }
 
+# REGRESSION (Windows): Git Bash jq emits CRLF, so the line-continued form above
+# reaches the guard as `--squash \<CR><LF>  --subject ...`. shlex then reads the
+# backslash as escaping the CR rather than joining the lines, `--subject` falls
+# out of the `gh pr merge` segment, and the guard denies a well-formed merge.
+# This fixture injects the CR explicitly so the normalization is pinned on Linux
+# CI too — otherwise the bug is invisible everywhere except a Windows checkout,
+# where it made the repo unpushable.
+@test "REGRESSION: CRLF line continuation (Windows jq) is still allowed" {
+  run bash "$GUARD" <<EOF
+{"tool_name":"Bash","tool_input":{"command":"gh pr merge 470 --squash \\\\\r\n  --subject \"fix(hook-kit): stop matching heredoc data (#470)\""}}
+EOF
+  [ "$status" -eq 0 ]
+}
+
 @test "REGRESSION: merge text inside a quoted heredoc body is not a merge call" {
   _run_guard "python3 - <<'PY'
 fixture = 'gh pr merge 470 --squash'

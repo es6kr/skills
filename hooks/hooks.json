@@ -90,6 +90,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-corpus-prelookup-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
           }
         ]
       }
