@@ -83,8 +83,28 @@ if echo "$COMMAND" | grep -qE "gh[[:space:]]+api[[:space:]].*branches/$BRANCHES"
 fi
 
 # 6. git worktree add ... production
-if echo "$COMMAND" | grep -qE "git[[:space:]]+worktree[[:space:]]+add[[:space:]]+.*$BRANCHES(\$|[[:space:]])"; then
-  BLOCKED_REASON="git worktree add on protected branch"
+#    `-b`/`-B` creates a NEW branch and the protected name that follows the
+#    command is then only the start-point, which is read-only. Branching off
+#    master is routine work, so denying it would push people onto the override
+#    for everyday commands. Judge the created branch instead: block when the
+#    protected name is the argument right after -b/-B, allow otherwise. Without
+#    -b/-B the command checks the protected branch out into a worktree, which
+#    stays blocked.
+#    The -b test must look ONLY inside the worktree-add segment. Scanning the
+#    whole command let an unrelated later segment supply the flag
+#    (`... && printf '%s\\n' -b x`), which entered the branch-creation path,
+#    found no protected name after -b, and then skipped the protected-checkout
+#    check because it sits in the elif. Cut the segment at the first command
+#    separator before testing.
+WT_SEGMENT=$(printf '%s' "$COMMAND" | grep -oE "git[[:space:]]+worktree[[:space:]]+add[[:space:]][^;|&]*" | head -1)
+if [ -n "$WT_SEGMENT" ]; then
+  if printf '%s' "$WT_SEGMENT" | grep -qE "[[:space:]]-[bB][[:space:]]"; then
+    if printf '%s' "$WT_SEGMENT" | grep -qE "[[:space:]]-[bB][[:space:]]+$BRANCHES(\$|[[:space:]])"; then
+      BLOCKED_REASON="git worktree add creating protected branch"
+    fi
+  elif printf '%s' "$WT_SEGMENT" | grep -qE "$BRANCHES(\$|[[:space:]])"; then
+    BLOCKED_REASON="git worktree add on protected branch"
+  fi
 fi
 
 # 7. git update-ref refs/heads/production

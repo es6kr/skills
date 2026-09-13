@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostToolUse:Write/Edit — Warn when a tracked planning artifact is written or
+# PostToolUse:Write/Edit — Block when a tracked planning artifact is written or
 # edited without a Plane browse-URL link.
 #
 # Two surfaces are covered:
@@ -23,6 +23,19 @@
 # `- [ ]` item added to daegunsoftDev/.agents/fix_plan.md with no Plane issue.
 # Hence: surface (B) added here, and registration is a required companion step
 # (a script that is not registered is not a hook).
+#
+# Registered at last: PostToolUse Write|Edit in hooks/hooks.json. Until then the
+# script sat unregistered on disk while the registry row claimed it was active
+# with two PreToolUse registrations — a drift that let the class recur again
+# (see failed-attempts class
+# `duplicate-check-local-only-without-plane-verification-and-in-progress-state`,
+# 3rd recurrence: a plan-*.md artifact and a new fix_plan.md item both landed
+# with no Plane link and nothing fired).
+#
+# The event is PostToolUse, not PreToolUse: surface (A) greps the artifact on
+# disk (`[[ -r "$FILE_PATH" ]]` then `grep "$FILE_PATH"`), so under PreToolUse a
+# Write of a new file exits 0 before the check can mean anything. The registry
+# row's `event: PreToolUse` is the incorrect half of that drift.
 #
 # `plan-agent-deliverable-lifecycle.md` §2 "Plane Issue Integration & Canonical URL
 # Standard Specification (HARD STOP)": Roadmap/Parent-Plan/Sub-Plan frontmatter

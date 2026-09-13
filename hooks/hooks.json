@@ -90,6 +90,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-corpus-prelookup-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
           }
         ]
       }
@@ -153,6 +157,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-send-without-target-ask.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wsl-var-payload.sh"
           }
         ]
       },
@@ -351,6 +359,10 @@
     "Stop": [
       {
         "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-absence-claim-single-probe.sh"
+          },
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-session-rag.sh"
