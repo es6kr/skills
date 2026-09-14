@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/wip-v0.7.0...wip-v0.7.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/wip-v0.6.0...wip-v0.7.0) (2026-09-05)
 
 

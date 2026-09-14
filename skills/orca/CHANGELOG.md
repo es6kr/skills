@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/es6kr/skills/compare/orca-v0.2.0...orca-v0.2.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **orca:** ignore quoted text in split-check guard, accept --worktree=active ([67b34d0](https://github.com/es6kr/skills/commit/67b34d007056b90530f70560f1adaa52fb6b7e4f))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/orca-v0.1.0...orca-v0.2.0) (2026-09-01)
 
 

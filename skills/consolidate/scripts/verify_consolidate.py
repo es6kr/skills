@@ -78,6 +78,38 @@ def titled_as(body: str, slug: str) -> bool:
     return False
 
 
+# A consolidate artifact can be posted as an issue comment OR as a review.
+# internal.md routes the Internal Code Review to the reviews API whenever
+# line-specific Critical/Important findings exist, because only that API carries
+# inline annotations; post.md likewise allows a unified Formal Review POST to
+# carry the Summary. Searching issue comments alone therefore reports a correctly
+# posted artifact as missing, and the expected-row arithmetic below silently
+# drops every finding that artifact carried.
+BOT_LOGIN_RE = re.compile(r"copilot|coderabbit|github-actions|dependabot|\[bot\]", re.IGNORECASE)
+SUPPRESSED_RE = re.compile(r"Suppressed comments\s*\((\d+)\)", re.IGNORECASE)
+
+
+# A findings cell often has to quote a regex, and a literal pipe inside a markdown
+# table cell must be written `\|`. Splitting on every pipe shifts every column after
+# it, so the Status check ends up reading a regex fragment and reports an
+# off-contract value on a table that is actually correct.
+CELL_SPLIT_RE = re.compile(r"(?<!\\)\|")
+
+
+def split_cells(row: str) -> List[str]:
+    """Split a markdown table row on unescaped pipes only."""
+    return [c.strip() for c in CELL_SPLIT_RE.split(row.strip().strip("|"))]
+
+
+def posted_at(item: Dict[str, Any]) -> str:
+    """Timestamp of a posted artifact -- issue comments and reviews name it differently."""
+    return item.get("created_at") or item.get("submitted_at") or ""
+
+
+def is_bot(login: str) -> bool:
+    return bool(BOT_LOGIN_RE.search(login or ""))
+
+
 def looks_like(body: str, *keywords: str) -> bool:
     """Heuristic used only to explain a miss: the title line reads like the artifact
     but carries no link, so the author almost certainly meant it as one."""
@@ -111,12 +143,24 @@ class ConsolidateValidator:
             self.errors.append(f"Failed to fetch PR data from GitHub API: {e}")
             return False
 
+        # Reviews are a second medium for both artifacts and the only place a bot's
+        # suppressed findings or a human reviewer's own review body ever appear.
+        # Fetched separately and tolerantly: a caller that cannot reach this endpoint
+        # should lose the extra coverage, not the whole validation run.
+        try:
+            reviews: List[Dict[str, Any]] = run_gh_api(f"{repo_prefix}pulls/{self.pr_num}/reviews")
+        except Exception:
+            reviews = []
+        if not isinstance(reviews, list):
+            reviews = []
+
         # 2. Extract Internal Code Review and AI Review Summary comments
-        internal_reviews = [c for c in issue_comments if titled_as(c.get("body", ""), INTERNAL_SLUG)]
-        summaries = [c for c in issue_comments if titled_as(c.get("body", ""), SUMMARY_SLUG)]
+        posted_artifacts = sorted(list(issue_comments) + list(reviews), key=posted_at)
+        internal_reviews = [c for c in posted_artifacts if titled_as(c.get("body", ""), INTERNAL_SLUG)]
+        summaries = [c for c in posted_artifacts if titled_as(c.get("body", ""), SUMMARY_SLUG)]
 
         if not internal_reviews:
-            near_miss = [c for c in issue_comments
+            near_miss = [c for c in posted_artifacts
                          if looks_like(c.get("body", ""), "code review")
                          and not titled_as(c.get("body", ""), SUMMARY_SLUG)]
             hint = (f" (comment {near_miss[-1].get('id')} has a Code Review heading but no "
@@ -125,7 +169,7 @@ class ConsolidateValidator:
                 f"Missing Internal Code Review comment -- its title line must carry a "
                 f"[{INTERNAL_SLUG}](...) link{hint}.")
         if not summaries:
-            near_miss = [c for c in issue_comments if looks_like(c.get("body", ""), "summary")]
+            near_miss = [c for c in posted_artifacts if looks_like(c.get("body", ""), "summary")]
             hint = (f" (comment {near_miss[-1].get('id')} has a Summary heading but no "
                     f"[{SUMMARY_SLUG}](...) link in it)") if near_miss else ""
             self.errors.append(
@@ -134,7 +178,7 @@ class ConsolidateValidator:
 
         # A single comment titled as both artifacts collapses the pair the whole
         # workflow rests on; without this the two lists below would resolve to it twice.
-        both = [c for c in issue_comments
+        both = [c for c in posted_artifacts
                 if titled_as(c.get("body", ""), INTERNAL_SLUG)
                 and titled_as(c.get("body", ""), SUMMARY_SLUG)]
         if both:
@@ -149,8 +193,8 @@ class ConsolidateValidator:
         summary = summaries[-1]
 
         # 3. Check chronological ordering
-        internal_created = internal_review.get("created_at", "")
-        summary_created = summary.get("created_at", "")
+        internal_created = posted_at(internal_review)
+        summary_created = posted_at(summary)
         if internal_created > summary_created:
             self.errors.append(
                 f"Chronological order error: Internal Code Review ({internal_created}) was posted after AI Review Summary ({summary_created})."
@@ -173,8 +217,15 @@ class ConsolidateValidator:
             self.warnings.append("AI Review Summary is missing <!-- consolidate:verified --> provenance comment.")
 
         # 6. Check Reviewer Matrix vs actual inline comment authors
+        # An Internal Review posted as a review carries its findings as inline
+        # annotations, which also surface in pulls/<N>/comments. Those are the very
+        # findings already counted as internal findings -- counting them here too
+        # would inflate the expected total and demand a duplicate table row.
+        internal_review_id = internal_review.get("id")
         reviewer_counts: Dict[str, int] = {}
         for ic in inline_comments:
+            if internal_review_id is not None and ic.get("pull_request_review_id") == internal_review_id:
+                continue
             user = ic.get("user", {}).get("login", "unknown")
             # Normalize Copilot / coderabbitai logins
             if "copilot" in user.lower():
@@ -201,24 +252,58 @@ class ConsolidateValidator:
                 self.errors.append(f"Reviewer Matrix missing entry for active reviewer '{rev_key}' ({count} comments).")
 
         # 7. Check Consolidated Findings Table Row Count vs Matrix Total
-        # Count findings in superpowers internal review
+        # Count findings in superpowers internal review. The numbered and
+        # backticked forms are the documented ones, but the heading style is not
+        # actually fixed anywhere -- `#### IR-1 - ...` is just as valid and used to
+        # count as zero, which dropped every internal finding from the expected
+        # total and failed an otherwise correct Summary.
         internal_findings = len(re.findall(r"^####\s+\d+\.", internal_body, re.MULTILINE))
         if internal_findings == 0:
-            # Fallback check for finding headers
             internal_findings = len(re.findall(r"^####\s+`", internal_body, re.MULTILINE))
+        if internal_findings == 0:
+            internal_findings = len(re.findall(r"^####\s+\S", internal_body, re.MULTILINE))
 
-        total_expected_findings = sum(reviewer_counts.values()) + internal_findings
+        # Findings that exist but never appear in pulls/<N>/comments:
+        #   - a bot's suppressed findings, which it lists inside its review body
+        #   - a human reviewer's own review body
+        # Both are real findings a Summary must carry, so both belong in the
+        # expected total. The consolidate artifacts themselves are excluded --
+        # they are accounted for by internal_findings and by the table itself.
+        suppressed_findings = 0
+        human_review_findings = 0
+        for review in reviews:
+            review_body = review.get("body") or ""
+            if titled_as(review_body, INTERNAL_SLUG) or titled_as(review_body, SUMMARY_SLUG):
+                continue
+            login = (review.get("user") or {}).get("login", "")
+            if is_bot(login):
+                for hit in SUPPRESSED_RE.finditer(review_body):
+                    suppressed_findings += int(hit.group(1))
+            elif review_body.strip():
+                human_review_findings += 1
+
+        total_expected_findings = (
+            sum(reviewer_counts.values())
+            + suppressed_findings
+            + human_review_findings
+            + internal_findings
+        )
 
         # Parse rows in Consolidated Findings table
         table_rows = []
         for line in summary_body.splitlines():
             line = line.strip()
             if line.startswith("|") and line.endswith("|"):
-                parts = [p.strip() for p in line.split("|")[1:-1]]
+                parts = split_cells(line)
                 if parts and parts[0].isdigit():
                     table_rows.append(parts)
 
-        print(f"[*] Expected findings: {total_expected_findings} (External: {sum(reviewer_counts.values())}, Internal: {internal_findings}) | Table rows: {len(table_rows)}")
+        print(
+            f"[*] Expected findings: {total_expected_findings} "
+            f"(inline: {sum(reviewer_counts.values())}, suppressed: {suppressed_findings}, "
+            f"human reviews: {human_review_findings}, internal: {internal_findings}) "
+            f"| Table rows: {len(table_rows)}"
+        )
 
         if len(table_rows) != total_expected_findings:
             self.errors.append(
@@ -278,8 +363,8 @@ class ConsolidateValidator:
                 block.append(stripped)
                 continue
             if len(block) >= 3:
-                header = [c.strip() for c in block[0].strip("|").split("|")]
-                rows = [[c.strip() for c in r.strip("|").split("|")] for r in block[2:]]
+                header = split_cells(block[0])
+                rows = [split_cells(r) for r in block[2:]]
                 rows = [r for r in rows if r and r[0].isdigit()]
                 if rows:
                     tables.append((header, rows))

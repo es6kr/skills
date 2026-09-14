@@ -60,7 +60,7 @@ The reason distinguishes true blockers from items that look blocked but are actu
 When an item exists as a workaround for another (usually `[BLOCKED:P*:external]`) item, append a suffix line under the workaround item so the dependency lives at tracker level, not only in plan prose:
 
 ```markdown
-- [ ] [P2:selfable] <workaround action>
+- [BLOCKED:P2:selfable] <workaround action>
   - ↳ workaround-for: <anchor/keyword of the original blocked item>
 ```
 
