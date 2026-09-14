@@ -133,6 +133,7 @@ fix_plan item body content = Action + Why + How (summary) + artefact reference +
 4. Are decision links one line each?
 5. Does the item already reference a research/plan artefact? Read it BEFORE relocating any content — progress/status updates belong in that plan's `## Progress Checklist` (create it if missing), not in a new standalone file
 6. Does the referenced plan have open `[ ]` Progress-Checklist items? If yes, did you surface the immediate next-actions as `- [ ]` sub-checkboxes in the tracker item, rather than leaving a prose-only pointer?
+7. Did the task finalize a plan artefact (`plan-*.md`)? If yes, did you register an audit entry in the tracker's deep-audit section with the full shape SKILL.md's "Plan Generation Complete Deep Audit Registration Gate" requires — `[BLOCKED:P*:selfable]` marker, `audit_status: pending_*` token, and citations of both the plan and research documents?
 
 ### Example — Bad (verbose)
 
