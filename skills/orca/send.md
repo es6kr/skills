@@ -53,13 +53,13 @@ The script always applies these filters, in order:
 For worktree- or branch-scoped filtering, post-filter the script's JSON output on
 `worktreePath` / `branch` — those fields pass through unmodified.
 
-## Step 3 — Disambiguate (HARD STOP)
+## Step 3 — Disambiguate & Pre-Execution Confirmation (HARD STOP)
 
 | Candidate count | Action |
 |---|---|
 | **0** | Stop. Report the filter used and the full unfiltered terminal list. Do not loosen the filter on your own guess. |
-| **1** | Proceed to Step 4. |
-| **2+** | **AskUserQuestion is mandatory.** One option per candidate, each labeled with its `title` and described with the `previewTail`, `worktreePath`, and a relative time from `lastOutputAt`. |
+| **1** | **AskUserQuestion is mandatory (Pre-Execution Target & Payload Approval Gate — HARD STOP).** Even when only 1 candidate matches the filter, you MUST confirm the target with the user before delivery. Present: target `handle`, `title`, `worktreePath`, current live status/preview, and the **exact prompt text to be delivered**. Do NOT proceed directly to `terminal send` without user confirmation (enforced by `block-orca-send-without-target-ask.sh`). |
+| **2+** | **AskUserQuestion is mandatory.** One option per candidate, each labeled with its `title` and described with the `previewTail`, `worktreePath`, and a relative time from `lastOutputAt`. Once the target is selected, confirm the prompt payload. |
 
 **Never auto-select on "most recent activity" or any other heuristic when there are 2+
 candidates.** Live runs of this skill have observed multiple terminals sharing the exact
@@ -68,6 +68,10 @@ same title (e.g. three terminals all titled plainly `Claude Code`, distinguished
 disambiguation, and a wrong guess means an unrelated session starts acting on unrelated
 work. Recovering from that (the wrong session may start editing files or committing) costs
 far more than one extra AskUserQuestion round trip.
+
+Similarly, **never assume a single surviving candidate implies user consent for delivery.**
+A filter match merely proves technical reachability; delivery mutates an active terminal
+and must be confirmed with the user first.
 
 ## Step 4 — Deliver
 
@@ -85,6 +89,21 @@ ORCA terminal send --terminal <handle> --text "<message>" --enter --json
   If a call returns `terminal_handle_stale`, re-run `terminal list` and resolve a fresh
   handle for the same session — don't retry the stale one, and don't guess which new handle
   replaced it without matching on title/worktree again.
+
+### Claude Code Delivery & Session Identity
+- **Do not bundle `/rename` with task prompt**: Claude Code's `/rename` command captures the
+  entire remaining text payload into the title string. Keep `/rename` and task prompts in
+  separate turns.
+- **Collision-Free Session Tracking**: If you need to trace the delivered session's Claude UUID
+  on disk, never guess via `ls -t` (mtime races occur across concurrent sessions). Use the
+  payload resolver:
+  ```bash
+  scripts/resolve-session-id.sh --payload "<delivered-prompt-text>" --json
+  ```
+- **Synchronize UI Tab Title**:
+  ```bash
+  ORCA terminal rename --terminal <handle> --title "<model>-<task-slug>-<sessid8>" --json
+  ```
 
 ## Send vs Orchestration
 
