@@ -18,6 +18,7 @@ Usage:
                  [--set-marker "[x]"] [--append-note "..."] [--dry-run]
   update_item.py --file <tracker> --match "<substring>" --move
                  [--summary "one-line condensed text"] [--dry-run]
+  update_item.py --file <tracker> --match "<substring>" --delete [--dry-run]
   update_item.py --test        # self-test, no tracker required
 
 --move performs a MECHANICAL (non-semantic) version of the fix-plan skill's
@@ -142,14 +143,42 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
 def backup_file(path: str) -> str:
     """Copy `path` to a timestamped `.bak` sibling and return the backup path.
 
-    Mirrors cleanup.py's convention. atomic_write() only guarantees crash
-    safety (temp file + rename); it does not preserve the prior content. The
-    irreversible mutations in this script (--delete) need preservation too,
-    because the trackers this targets are commonly gitignored, leaving no VCS
-    fallback if a --match resolves to the wrong single item.
+    Naming mirrors cleanup.py's convention. atomic_write() only guarantees
+    crash safety (temp file + rename); it does not preserve the prior content.
+    Only --delete needs preservation here: --move keeps the item's text alive
+    in '## Completed', and --set-marker / --append-note edit in place, so
+    --delete is the one mutation with nothing to recover from. The trackers
+    this targets are commonly gitignored, so there is no VCS fallback either.
+
+    The name is claimed with O_CREAT|O_EXCL rather than written straight
+    through, because the timestamp only has 1-second resolution: two deletes
+    landing in the same second would otherwise resolve to the same filename
+    and the second copy would silently overwrite -- and destroy -- the first
+    item's only backup. On a collision the seconds-suffix is disambiguated
+    ('-1', '-2', ...) instead of overwriting.
     """
-    backup_path = f"{path}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
-    shutil.copy2(path, backup_path)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    attempt = 0
+    while True:
+        suffix = "" if attempt == 0 else f"-{attempt}"
+        backup_path = f"{path}.{stamp}{suffix}.bak"
+        try:
+            fd = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            attempt += 1
+            continue
+        break
+    try:
+        with open(path, "rb") as src, os.fdopen(fd, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+        shutil.copystat(path, backup_path)
+    except BaseException:
+        # never leave a half-written backup that a later recovery might trust
+        try:
+            os.unlink(backup_path)
+        except OSError:
+            pass
+        raise
     return backup_path
 
 
@@ -713,14 +742,63 @@ def self_test() -> int:
             after_del = fh.read()
         check("run_update --delete removed the target item", "item A" not in after_del)
         check("run_update --delete left neighboring item C intact", "item C" in after_del)
-        del_backups = [
-            n for n in os.listdir(os.path.dirname(move_path))
-            if n.startswith(os.path.basename(move_path) + ".") and n.endswith(".bak")
-        ]
-        check("run_update --delete wrote a timestamped .bak backup", len(del_backups) >= 1)
+        def _backups_of(target: str) -> list[str]:
+            d = os.path.dirname(target)
+            base = os.path.basename(target) + "."
+            return sorted(
+                os.path.join(d, n) for n in os.listdir(d)
+                if n.startswith(base) and n.endswith(".bak")
+            )
+
+        del_backups = _backups_of(move_path)
+        check("run_update --delete wrote exactly one .bak backup", len(del_backups) == 1)
         if del_backups:
-            with open(os.path.join(os.path.dirname(move_path), del_backups[0]), encoding="utf-8") as fh:
+            with open(del_backups[0], encoding="utf-8") as fh:
                 check("run_update --delete backup still contains the deleted item", "item A" in fh.read())
+
+        # REGRESSION: two deletes inside the same second must not collide.
+        # The backup name only has 1-second resolution, so an unguarded
+        # implementation overwrites -- and destroys -- the first item's only
+        # backup. Both deletes here run in-process, guaranteeing one second.
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as tf:
+            tf.write(
+                "# tracker\n\n## Progress\n\n"
+                "- [ ] collide-one unique-collide\n  - **Why**: a\n  - **How to apply**: b\n\n"
+                "- [ ] collide-two unique-collide\n  - **Why**: c\n  - **How to apply**: d\n"
+            )
+            collide_path = tf.name
+        try:
+            for target in ("collide-one", "collide-two"):
+                ns_c = NS5()
+                ns_c.file = collide_path
+                ns_c.match = target
+                ns_c.set_marker = None
+                ns_c.append_note = None
+                ns_c.dry_run = False
+                ns_c.move = False
+                ns_c.delete = True
+                ns_c.summary = None
+                run_update(ns_c)
+            collide_backups = _backups_of(collide_path)
+            check(
+                "two same-second --delete runs produce two distinct backups",
+                len(collide_backups) == 2,
+            )
+            preserved = set()
+            for b in collide_backups:
+                with open(b, encoding="utf-8") as fh:
+                    body = fh.read()
+                for target in ("collide-one", "collide-two"):
+                    if target in body:
+                        preserved.add(target)
+            check(
+                "neither same-second --delete lost its backed-up item",
+                preserved == {"collide-one", "collide-two"},
+            )
+        finally:
+            for leftover in _backups_of(collide_path) + [collide_path]:
+                if os.path.exists(leftover):
+                    os.unlink(leftover)
 
         # detect_bloated_tasks.py no longer flags the moved item's old '[x]' marker
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
