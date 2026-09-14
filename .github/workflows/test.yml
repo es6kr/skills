@@ -107,6 +107,13 @@ jobs:
             python3 "$t" || FAIL=1
             echo "::endgroup::"
           done
+          # Scripts whose tests live in-file behind a --test flag rather than in
+          # a tests/ file, so the loop above cannot reach them.
+          for t in skills/fix-plan/scripts/update_item.py; do
+            echo "::group::$t --test"
+            python3 "$t" --test || FAIL=1
+            echo "::endgroup::"
+          done
           exit "$FAIL"
 
   frontmatter-lint:

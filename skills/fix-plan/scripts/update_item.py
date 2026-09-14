@@ -36,6 +36,7 @@ Exit codes: 0 = ok, 1 = validation/match failure, 2 = usage error.
 from __future__ import annotations
 
 import argparse
+import datetime
 try:
     import fcntl
 except ImportError:
@@ -44,6 +45,7 @@ import hashlib
 import io
 import os
 import re
+import shutil
 import sys
 import tempfile
 
@@ -135,6 +137,20 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
         block.append(note_line)
 
     return block
+
+
+def backup_file(path: str) -> str:
+    """Copy `path` to a timestamped `.bak` sibling and return the backup path.
+
+    Mirrors cleanup.py's convention. atomic_write() only guarantees crash
+    safety (temp file + rename); it does not preserve the prior content. The
+    irreversible mutations in this script (--delete) need preservation too,
+    because the trackers this targets are commonly gitignored, leaving no VCS
+    fallback if a --match resolves to the wrong single item.
+    """
+    backup_path = f"{path}.{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
+    shutil.copy2(path, backup_path)
+    return backup_path
 
 
 def remove_block(lines: list[str], start: int, end: int) -> list[str]:
@@ -233,7 +249,7 @@ def validate_section_marker(section: str | None, marker: str) -> None:
 
 
 def run_update(args: argparse.Namespace) -> int:
-    has_delete = getattr(args, "delete", False)
+    has_delete = args.delete
     if not args.set_marker and not args.append_note and not args.move and not has_delete:
         raise ValueError("at least one of --set-marker / --append-note / --move / --delete is required")
     if args.move and (args.set_marker or args.append_note or has_delete):
@@ -308,8 +324,10 @@ def run_update(args: argparse.Namespace) -> int:
                 print("--- dry-run: deleted block ---")
                 print("\n".join(removed_block))
                 return 0
+            backup_path = backup_file(args.file)
             atomic_write(args.file, out, prefix=".update_item.")
             print(f"OK: deleted item matching --match {args.match!r} from {args.file}")
+            print(f"Backup created at {backup_path}")
             return 0
 
         if args.set_marker:
@@ -419,7 +437,9 @@ def self_test() -> int:
         tmp_path = tf.name
     try:
         class NS:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns = NS()
         ns.file = tmp_path
         ns.match = "unique-marker-beta"
@@ -470,7 +490,9 @@ def self_test() -> int:
         hold_path = tf.name
     try:
         class NS3:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns3 = NS3()
         ns3.file = hold_path
         ns3.match = "unique-marker-hold"
@@ -499,7 +521,9 @@ def self_test() -> int:
         lock_doc = tf.name
     try:
         class NS4:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns4 = NS4()
         ns4.file = lock_doc
         ns4.match = "unique-marker-alpha"
@@ -529,7 +553,9 @@ def self_test() -> int:
     # missing tracker file
     try:
         class NS2:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns2 = NS2()
         ns2.file = "/nonexistent/path/fix_plan.md"
         ns2.match = "x"
@@ -588,7 +614,9 @@ def self_test() -> int:
         move_path = tf.name
     try:
         class NS5:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns5 = NS5()
         ns5.file = move_path
         ns5.match = "unique-move-target"
@@ -630,6 +658,45 @@ def self_test() -> int:
         check("run_update --move preserved the pre-existing Completed entry", "pre-existing completed line" in after_move)
         check("run_update --move left sibling active items untouched", "item A" in after_move and "item C" in after_move)
 
+        # run_update --delete dry-run: must print the block and write nothing
+        ns_dry = NS5()
+        ns_dry.file = move_path
+        ns_dry.match = "item A"
+        ns_dry.set_marker = None
+        ns_dry.append_note = None
+        ns_dry.dry_run = True
+        ns_dry.move = False
+        ns_dry.delete = True
+        ns_dry.summary = None
+        with open(move_path, encoding="utf-8") as fh:
+            before_dry = fh.read()
+        check("run_update --delete --dry-run returns 0", run_update(ns_dry) == 0)
+        with open(move_path, encoding="utf-8") as fh:
+            check("run_update --delete --dry-run left the file untouched", fh.read() == before_dry)
+
+        # --delete rejects being combined with any other mutation
+        for attr, value, label in (
+            ("set_marker", "[x]", "--set-marker"),
+            ("append_note", "note", "--append-note"),
+            ("move", True, "--move"),
+        ):
+            ns_bad = NS5()
+            ns_bad.file = move_path
+            ns_bad.match = "item A"
+            ns_bad.set_marker = None
+            ns_bad.append_note = None
+            ns_bad.dry_run = False
+            ns_bad.move = False
+            ns_bad.delete = True
+            ns_bad.summary = None
+            setattr(ns_bad, attr, value)
+            try:
+                run_update(ns_bad)
+                rejected = False
+            except ValueError:
+                rejected = True
+            check(f"run_update --delete rejects being combined with {label}", rejected)
+
         # run_update --delete test: remove an active item completely
         ns_del = NS5()
         ns_del.file = move_path
@@ -646,6 +713,14 @@ def self_test() -> int:
             after_del = fh.read()
         check("run_update --delete removed the target item", "item A" not in after_del)
         check("run_update --delete left neighboring item C intact", "item C" in after_del)
+        del_backups = [
+            n for n in os.listdir(os.path.dirname(move_path))
+            if n.startswith(os.path.basename(move_path) + ".") and n.endswith(".bak")
+        ]
+        check("run_update --delete wrote a timestamped .bak backup", len(del_backups) >= 1)
+        if del_backups:
+            with open(os.path.join(os.path.dirname(move_path), del_backups[0]), encoding="utf-8") as fh:
+                check("run_update --delete backup still contains the deleted item", "item A" in fh.read())
 
         # detect_bloated_tasks.py no longer flags the moved item's old '[x]' marker
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -667,7 +742,9 @@ def self_test() -> int:
         before_dry = open(move_dry_path, encoding="utf-8").read()
 
         class NS6:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns6 = NS6()
         ns6.file = move_dry_path
         ns6.match = "unique-move-target"
@@ -688,7 +765,9 @@ def self_test() -> int:
     # --move combined with --set-marker / --append-note is rejected
     try:
         class NS7:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns7 = NS7()
         ns7.file = "/nonexistent/irrelevant.md"
         ns7.match = "x"
@@ -705,7 +784,9 @@ def self_test() -> int:
     # --summary without --move is rejected
     try:
         class NS8:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns8 = NS8()
         ns8.file = "/nonexistent/irrelevant.md"
         ns8.match = "x"
@@ -731,7 +812,9 @@ def self_test() -> int:
         already_path = tf.name
     try:
         class NS9:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns9 = NS9()
         ns9.file = already_path
         ns9.match = "unique-already-completed"
