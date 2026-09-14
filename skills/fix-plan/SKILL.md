@@ -114,6 +114,8 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 
 **Premise re-verification (HARD STOP)**: reading the plan is not enough. Before the first implementation step, re-verify the plan's external premises against primary sources — every issue / PR / release / tracker item the plan cites as a blocker or precondition (`gh pr view` / `gh issue view` / the cited tracker line). A `status: decided|approved` plan may predate the world: a cited external blocker can resolve (or reverse) between authoring and start. This extends [draft.md](./draft.md) Stage 2 step 1's promote-time re-verification to ALL plan-gated starts, not only draft promotes.
 
+**Plan Generation Complete Deep Audit Registration Gate (HARD STOP)**: When the authoring or revision of any plan document (`plan-*.md`) is completed, stopping after file creation or leaving the plan un-routed is strictly prohibited (`HARD STOP`). The agent MUST immediately register an audit request entry in the tracker's `## Deep Tasks` (or `## <Model> Target Tasks`) with marker `[BLOCKED:P2:selfable]` and `audit_status: pending_opus_fable_audit` citing the plan and research documents. Implementation work may not proceed until an independent deep audit by a high-capability model (Fable/Opus) is conducted and approved.
+
 The default pipeline is scoped by the execution role, so a high-capability session is not spent on mechanical bookkeeping — and a bookkeeping session does not attempt deep-analysis passes it is unsuited for.
 
 **Role resolution chain** (first match wins):

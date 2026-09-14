@@ -133,6 +133,7 @@ fix_plan item body content = Action + Why + How (summary) + artefact reference +
 4. Are decision links one line each?
 5. Does the item already reference a research/plan artefact? Read it BEFORE relocating any content — progress/status updates belong in that plan's `## Progress Checklist` (create it if missing), not in a new standalone file
 6. Does the referenced plan have open `[ ]` Progress-Checklist items? If yes, did you surface the immediate next-actions as `- [ ]` sub-checkboxes in the tracker item, rather than leaving a prose-only pointer?
+7. **Plan completion audit registration (HARD STOP)**: When the task produces or finalizes a plan artefact (`plan-*.md`), did you immediately register an audit request entry in `## Deep Tasks` with `audit_status: pending_opus_fable_audit`?
 
 ### Example — Bad (verbose)
 

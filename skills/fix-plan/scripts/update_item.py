@@ -233,10 +233,13 @@ def validate_section_marker(section: str | None, marker: str) -> None:
 
 
 def run_update(args: argparse.Namespace) -> int:
-    if not args.set_marker and not args.append_note and not args.move:
-        raise ValueError("at least one of --set-marker / --append-note / --move is required")
-    if args.move and (args.set_marker or args.append_note):
-        raise ValueError("--move cannot be combined with --set-marker / --append-note")
+    has_delete = getattr(args, "delete", False)
+    if not args.set_marker and not args.append_note and not args.move and not has_delete:
+        raise ValueError("at least one of --set-marker / --append-note / --move / --delete is required")
+    if args.move and (args.set_marker or args.append_note or has_delete):
+        raise ValueError("--move cannot be combined with other mutations")
+    if has_delete and (args.set_marker or args.append_note or args.move):
+        raise ValueError("--delete cannot be combined with other mutations")
     if args.summary is not None and not args.move:
         raise ValueError("--summary only applies together with --move")
     if args.set_marker:
@@ -295,6 +298,18 @@ def run_update(args: argparse.Namespace) -> int:
             atomic_write(args.file, out, prefix=".update_item.")
             print(f"OK: moved item matching --match {args.match!r} into {COMPLETED_SECTION!r} in {args.file}")
             print(completed_line)
+            return 0
+
+        if has_delete:
+            removed_block = lines[start:end]
+            new_lines = remove_block(lines, start, end)
+            out = "\n".join(new_lines)
+            if args.dry_run:
+                print("--- dry-run: deleted block ---")
+                print("\n".join(removed_block))
+                return 0
+            atomic_write(args.file, out, prefix=".update_item.")
+            print(f"OK: deleted item matching --match {args.match!r} from {args.file}")
             return 0
 
         if args.set_marker:
@@ -615,6 +630,23 @@ def self_test() -> int:
         check("run_update --move preserved the pre-existing Completed entry", "pre-existing completed line" in after_move)
         check("run_update --move left sibling active items untouched", "item A" in after_move and "item C" in after_move)
 
+        # run_update --delete test: remove an active item completely
+        ns_del = NS5()
+        ns_del.file = move_path
+        ns_del.match = "item A"
+        ns_del.set_marker = None
+        ns_del.append_note = None
+        ns_del.dry_run = False
+        ns_del.move = False
+        ns_del.delete = True
+        ns_del.summary = None
+        rc_del = run_update(ns_del)
+        check("run_update --delete returns 0", rc_del == 0)
+        with open(move_path, encoding="utf-8") as fh:
+            after_del = fh.read()
+        check("run_update --delete removed the target item", "item A" not in after_del)
+        check("run_update --delete left neighboring item C intact", "item C" in after_del)
+
         # detect_bloated_tasks.py no longer flags the moved item's old '[x]' marker
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from detect_bloated_tasks import detect_bloated_tasks  # noqa: E402
@@ -738,6 +770,11 @@ def main() -> int:
         "--summary",
         help="operator-supplied one-line text to use in '## Completed' instead of the "
         "item's own action text verbatim (only valid together with --move)",
+    )
+    p.add_argument(
+        "--delete",
+        action="store_true",
+        help="delete the matched item and its sub-bullets completely (e.g. for promoted drafts or superseded stubs)",
     )
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
