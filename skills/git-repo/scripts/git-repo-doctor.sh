@@ -56,13 +56,23 @@ add_result() {
 # -----------------------------------------------------------------------------
 # Triggers & Context Detection
 # -----------------------------------------------------------------------------
+# `git ls-files | grep -q` is unsafe under this script's `set -o pipefail`: grep -q
+# exits on its FIRST match, git then writes into a closed pipe and dies on SIGPIPE,
+# and pipefail propagates that non-zero status as the pipeline's status. The `if`
+# therefore reads false on exactly the repositories that DO contain the files —
+# silently skipping every Tier 2 check gated on these flags, with no row emitted to
+# say so. Observed on a 524-file repo (3/3 runs); small repos race past it, which is
+# why it survived. Capture the listing once and match against it with a here-string
+# (not a pipeline, so pipefail does not apply).
+TRACKED_FILES=$(git ls-files 2>/dev/null || true)
+
 HAS_MD=0
-if git ls-files 2>/dev/null | grep -qiE '\.md$'; then
+if grep -qiE '\.md$' <<< "$TRACKED_FILES"; then
   HAS_MD=1
 fi
 
 HAS_SKILLS=0
-if git ls-files 2>/dev/null | grep -q 'SKILL\.md'; then
+if grep -q 'SKILL\.md' <<< "$TRACKED_FILES"; then
   HAS_SKILLS=1
 fi
 
@@ -234,7 +244,8 @@ if [[ $HAS_MD -eq 1 ]]; then
 
   if [[ -d "scripts" ]]; then
     LINT_MANIFEST_SOURCES="${LINT_MANIFEST_SOURCES}scripts/ "
-    if ls scripts 2>/dev/null | grep -qiE 'markdown|mdlint|md-lint|remark'; then
+    # Same SIGPIPE-under-pipefail hazard as the TRACKED_FILES probes above.
+    if grep -qiE 'markdown|mdlint|md-lint|remark' <<< "$(ls scripts 2>/dev/null || true)"; then
       HAS_MD_STYLE_TOOL=1
     fi
   fi

@@ -378,6 +378,58 @@ exit_11=$?
 check "Conditional: COND-MD-STYLE PASS (declared and wired)" 0 "$exit_11" "$out_11"
 rm -rf "$REPO_11"
 
+# -----------------------------------------------------------------------------
+# Test 12: Tier 2 gating must not depend on winning a SIGPIPE race
+#
+# Regression: the HAS_MD / HAS_SKILLS probes used `git ls-files | grep -q`. grep -q
+# exits at its FIRST match, git is then killed writing into the closed pipe (exit
+# 141 = 128+SIGPIPE), and `set -o pipefail` propagates that as the pipeline status —
+# so the flag stayed 0 and EVERY Tier 2 row silently vanished from the report.
+#
+# On a real repo the outcome is a race (observed flipping run-to-run on a 524-file,
+# 18KB listing), so a plain large fixture cannot test it reliably. Instead shim
+# `git` so ls-files emits a match immediately and then keeps writing far past the
+# pipe buffer: the original pipeline loses deterministically, the fixed one — which
+# captures the listing before matching — is unaffected.
+# -----------------------------------------------------------------------------
+REPO_12="$(make_temp_repo)"
+mkdir -p "$REPO_12/.githooks"
+cat > "$REPO_12/.githooks/pre-commit" << 'EOF'
+#!/bin/sh
+lint-frontmatter.sh
+EOF
+chmod +x "$REPO_12/.githooks/pre-commit"
+git_in "$REPO_12" config core.hooksPath .githooks
+
+REAL_GIT="$(command -v git)"
+SHIM_12="$FIXTURE_BASE/shim_12"
+mkdir -p "$SHIM_12"
+cat > "$SHIM_12/git" << EOF
+#!/bin/sh
+for a in "\$@"; do
+  if [ "\$a" = "ls-files" ]; then
+    # Match on the first two lines so grep -q exits immediately, then write ~1.2MB
+    # (>> the 64KB pipe buffer) so the writer is guaranteed to still be going.
+    printf 'aaa.md\n'
+    printf 'skills/alpha/SKILL.md\n'
+    seq 1 40000 | awk '{print "filler/" \$1 "/deep/path/file.txt"}'
+    exit 0
+  fi
+done
+exec "$REAL_GIT" "\$@"
+EOF
+chmod +x "$SHIM_12/git"
+
+out_12=$(PATH="$SHIM_12:$PATH" bash "$SCRIPT" "$REPO_12" 2>&1)
+if grep -q 'COND-MD' <<< "$out_12" && grep -q 'COND-SKILL' <<< "$out_12"; then
+  echo "PASS  Conditional: Tier 2 rows survive a SIGPIPE-forcing ls-files"
+else
+  echo "FAIL  Conditional: Tier 2 rows dropped under SIGPIPE (pipefail regression)"
+  echo "OUTPUT: $out_12"
+  FAIL=1
+fi
+rm -rf "$REPO_12" "$SHIM_12"
+
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "ALL TESTS PASSED"
