@@ -18,6 +18,7 @@ Usage:
                  [--set-marker "[x]"] [--append-note "..."] [--dry-run]
   update_item.py --file <tracker> --match "<substring>" --move
                  [--summary "one-line condensed text"] [--dry-run]
+  update_item.py --file <tracker> --match "<substring>" --delete [--dry-run]
   update_item.py --test        # self-test, no tracker required
 
 --move performs a MECHANICAL (non-semantic) version of the fix-plan skill's
@@ -36,6 +37,7 @@ Exit codes: 0 = ok, 1 = validation/match failure, 2 = usage error.
 from __future__ import annotations
 
 import argparse
+import datetime
 try:
     import fcntl
 except ImportError:
@@ -44,6 +46,7 @@ import hashlib
 import io
 import os
 import re
+import shutil
 import sys
 import tempfile
 
@@ -135,6 +138,48 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
         block.append(note_line)
 
     return block
+
+
+def backup_file(path: str) -> str:
+    """Copy `path` to a timestamped `.bak` sibling and return the backup path.
+
+    Naming mirrors cleanup.py's convention. atomic_write() only guarantees
+    crash safety (temp file + rename); it does not preserve the prior content.
+    Only --delete needs preservation here: --move keeps the item's text alive
+    in '## Completed', and --set-marker / --append-note edit in place, so
+    --delete is the one mutation with nothing to recover from. The trackers
+    this targets are commonly gitignored, so there is no VCS fallback either.
+
+    The name is claimed with O_CREAT|O_EXCL rather than written straight
+    through, because the timestamp only has 1-second resolution: two deletes
+    landing in the same second would otherwise resolve to the same filename
+    and the second copy would silently overwrite -- and destroy -- the first
+    item's only backup. On a collision the seconds-suffix is disambiguated
+    ('-1', '-2', ...) instead of overwriting.
+    """
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    attempt = 0
+    while True:
+        suffix = "" if attempt == 0 else f"-{attempt}"
+        backup_path = f"{path}.{stamp}{suffix}.bak"
+        try:
+            fd = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            attempt += 1
+            continue
+        break
+    try:
+        with open(path, "rb") as src, os.fdopen(fd, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+        shutil.copystat(path, backup_path)
+    except BaseException:
+        # never leave a half-written backup that a later recovery might trust
+        try:
+            os.unlink(backup_path)
+        except OSError:
+            pass
+        raise
+    return backup_path
 
 
 def remove_block(lines: list[str], start: int, end: int) -> list[str]:
@@ -233,10 +278,13 @@ def validate_section_marker(section: str | None, marker: str) -> None:
 
 
 def run_update(args: argparse.Namespace) -> int:
-    if not args.set_marker and not args.append_note and not args.move:
-        raise ValueError("at least one of --set-marker / --append-note / --move is required")
-    if args.move and (args.set_marker or args.append_note):
-        raise ValueError("--move cannot be combined with --set-marker / --append-note")
+    has_delete = args.delete
+    if not args.set_marker and not args.append_note and not args.move and not has_delete:
+        raise ValueError("at least one of --set-marker / --append-note / --move / --delete is required")
+    if args.move and (args.set_marker or args.append_note or has_delete):
+        raise ValueError("--move cannot be combined with other mutations")
+    if has_delete and (args.set_marker or args.append_note or args.move):
+        raise ValueError("--delete cannot be combined with other mutations")
     if args.summary is not None and not args.move:
         raise ValueError("--summary only applies together with --move")
     if args.set_marker:
@@ -295,6 +343,20 @@ def run_update(args: argparse.Namespace) -> int:
             atomic_write(args.file, out, prefix=".update_item.")
             print(f"OK: moved item matching --match {args.match!r} into {COMPLETED_SECTION!r} in {args.file}")
             print(completed_line)
+            return 0
+
+        if has_delete:
+            removed_block = lines[start:end]
+            new_lines = remove_block(lines, start, end)
+            out = "\n".join(new_lines)
+            if args.dry_run:
+                print("--- dry-run: deleted block ---")
+                print("\n".join(removed_block))
+                return 0
+            backup_path = backup_file(args.file)
+            atomic_write(args.file, out, prefix=".update_item.")
+            print(f"OK: deleted item matching --match {args.match!r} from {args.file}")
+            print(f"Backup created at {backup_path}")
             return 0
 
         if args.set_marker:
@@ -404,7 +466,9 @@ def self_test() -> int:
         tmp_path = tf.name
     try:
         class NS:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns = NS()
         ns.file = tmp_path
         ns.match = "unique-marker-beta"
@@ -455,7 +519,9 @@ def self_test() -> int:
         hold_path = tf.name
     try:
         class NS3:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns3 = NS3()
         ns3.file = hold_path
         ns3.match = "unique-marker-hold"
@@ -484,7 +550,9 @@ def self_test() -> int:
         lock_doc = tf.name
     try:
         class NS4:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns4 = NS4()
         ns4.file = lock_doc
         ns4.match = "unique-marker-alpha"
@@ -514,7 +582,9 @@ def self_test() -> int:
     # missing tracker file
     try:
         class NS2:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns2 = NS2()
         ns2.file = "/nonexistent/path/fix_plan.md"
         ns2.match = "x"
@@ -573,7 +643,9 @@ def self_test() -> int:
         move_path = tf.name
     try:
         class NS5:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns5 = NS5()
         ns5.file = move_path
         ns5.match = "unique-move-target"
@@ -615,6 +687,119 @@ def self_test() -> int:
         check("run_update --move preserved the pre-existing Completed entry", "pre-existing completed line" in after_move)
         check("run_update --move left sibling active items untouched", "item A" in after_move and "item C" in after_move)
 
+        # run_update --delete dry-run: must print the block and write nothing
+        ns_dry = NS5()
+        ns_dry.file = move_path
+        ns_dry.match = "item A"
+        ns_dry.set_marker = None
+        ns_dry.append_note = None
+        ns_dry.dry_run = True
+        ns_dry.move = False
+        ns_dry.delete = True
+        ns_dry.summary = None
+        with open(move_path, encoding="utf-8") as fh:
+            before_dry = fh.read()
+        check("run_update --delete --dry-run returns 0", run_update(ns_dry) == 0)
+        with open(move_path, encoding="utf-8") as fh:
+            check("run_update --delete --dry-run left the file untouched", fh.read() == before_dry)
+
+        # --delete rejects being combined with any other mutation
+        for attr, value, label in (
+            ("set_marker", "[x]", "--set-marker"),
+            ("append_note", "note", "--append-note"),
+            ("move", True, "--move"),
+        ):
+            ns_bad = NS5()
+            ns_bad.file = move_path
+            ns_bad.match = "item A"
+            ns_bad.set_marker = None
+            ns_bad.append_note = None
+            ns_bad.dry_run = False
+            ns_bad.move = False
+            ns_bad.delete = True
+            ns_bad.summary = None
+            setattr(ns_bad, attr, value)
+            try:
+                run_update(ns_bad)
+                rejected = False
+            except ValueError:
+                rejected = True
+            check(f"run_update --delete rejects being combined with {label}", rejected)
+
+        # run_update --delete test: remove an active item completely
+        ns_del = NS5()
+        ns_del.file = move_path
+        ns_del.match = "item A"
+        ns_del.set_marker = None
+        ns_del.append_note = None
+        ns_del.dry_run = False
+        ns_del.move = False
+        ns_del.delete = True
+        ns_del.summary = None
+        rc_del = run_update(ns_del)
+        check("run_update --delete returns 0", rc_del == 0)
+        with open(move_path, encoding="utf-8") as fh:
+            after_del = fh.read()
+        check("run_update --delete removed the target item", "item A" not in after_del)
+        check("run_update --delete left neighboring item C intact", "item C" in after_del)
+        def _backups_of(target: str) -> list[str]:
+            d = os.path.dirname(target)
+            base = os.path.basename(target) + "."
+            return sorted(
+                os.path.join(d, n) for n in os.listdir(d)
+                if n.startswith(base) and n.endswith(".bak")
+            )
+
+        del_backups = _backups_of(move_path)
+        check("run_update --delete wrote exactly one .bak backup", len(del_backups) == 1)
+        if del_backups:
+            with open(del_backups[0], encoding="utf-8") as fh:
+                check("run_update --delete backup still contains the deleted item", "item A" in fh.read())
+
+        # REGRESSION: two deletes inside the same second must not collide.
+        # The backup name only has 1-second resolution, so an unguarded
+        # implementation overwrites -- and destroys -- the first item's only
+        # backup. Both deletes here run in-process, guaranteeing one second.
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as tf:
+            tf.write(
+                "# tracker\n\n## Progress\n\n"
+                "- [ ] collide-one unique-collide\n  - **Why**: a\n  - **How to apply**: b\n\n"
+                "- [ ] collide-two unique-collide\n  - **Why**: c\n  - **How to apply**: d\n"
+            )
+            collide_path = tf.name
+        try:
+            for target in ("collide-one", "collide-two"):
+                ns_c = NS5()
+                ns_c.file = collide_path
+                ns_c.match = target
+                ns_c.set_marker = None
+                ns_c.append_note = None
+                ns_c.dry_run = False
+                ns_c.move = False
+                ns_c.delete = True
+                ns_c.summary = None
+                run_update(ns_c)
+            collide_backups = _backups_of(collide_path)
+            check(
+                "two same-second --delete runs produce two distinct backups",
+                len(collide_backups) == 2,
+            )
+            preserved = set()
+            for b in collide_backups:
+                with open(b, encoding="utf-8") as fh:
+                    body = fh.read()
+                for target in ("collide-one", "collide-two"):
+                    if target in body:
+                        preserved.add(target)
+            check(
+                "neither same-second --delete lost its backed-up item",
+                preserved == {"collide-one", "collide-two"},
+            )
+        finally:
+            for leftover in _backups_of(collide_path) + [collide_path]:
+                if os.path.exists(leftover):
+                    os.unlink(leftover)
+
         # detect_bloated_tasks.py no longer flags the moved item's old '[x]' marker
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from detect_bloated_tasks import detect_bloated_tasks  # noqa: E402
@@ -635,7 +820,9 @@ def self_test() -> int:
         before_dry = open(move_dry_path, encoding="utf-8").read()
 
         class NS6:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns6 = NS6()
         ns6.file = move_dry_path
         ns6.match = "unique-move-target"
@@ -656,7 +843,9 @@ def self_test() -> int:
     # --move combined with --set-marker / --append-note is rejected
     try:
         class NS7:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns7 = NS7()
         ns7.file = "/nonexistent/irrelevant.md"
         ns7.match = "x"
@@ -673,7 +862,9 @@ def self_test() -> int:
     # --summary without --move is rejected
     try:
         class NS8:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns8 = NS8()
         ns8.file = "/nonexistent/irrelevant.md"
         ns8.match = "x"
@@ -699,7 +890,9 @@ def self_test() -> int:
         already_path = tf.name
     try:
         class NS9:
-            pass
+            # mirrors the argparse default so run_update can read args.delete
+            # directly, exactly as it does for the sibling mutation flags
+            delete = False
         ns9 = NS9()
         ns9.file = already_path
         ns9.match = "unique-already-completed"
@@ -738,6 +931,11 @@ def main() -> int:
         "--summary",
         help="operator-supplied one-line text to use in '## Completed' instead of the "
         "item's own action text verbatim (only valid together with --move)",
+    )
+    p.add_argument(
+        "--delete",
+        action="store_true",
+        help="delete the matched item and its sub-bullets completely (e.g. for promoted drafts or superseded stubs)",
     )
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
