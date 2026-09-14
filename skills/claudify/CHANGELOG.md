@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/claudify-v0.9.0...claudify-v0.10.0) (2026-09-13)
+
+
+### Features
+
+* commit-tag package-count guard + hook-kit relocations (promotes develop batch to main) ([a9a5282](https://github.com/es6kr/skills/commit/a9a5282489301412405a2f1024a396ba17da1e48))
+
+
+### Bug Fixes
+
+* **claudify:** stop naming the private companion repo in improve.md ([b24038c](https://github.com/es6kr/skills/commit/b24038c0c10cc156ee8947d90b070102181b7082))
+* **hook-kit:** relocate hook-registry.yaml and its tooling to es6kr/claude-plugins ([6407d6c](https://github.com/es6kr/skills/commit/6407d6cc3f7c26ded22b1812e322ad37131b74f4))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/claudify-v0.8.0...claudify-v0.9.0) (2026-09-05)
 
 
