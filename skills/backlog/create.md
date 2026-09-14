@@ -83,3 +83,12 @@ Returns structured JSON output:
 ```
 
 After creation, attach the returned `url` to the tracker item: `→ Plane (<url>)`.
+
+## Canonical Plane Browse URL Format (HARD STOP)
+
+When referencing, creating, updating, or reporting Plane issues or intake items in chat reports, checklists (`fix_plan.md`, `task.md`), walkthroughs, or PR descriptions, never expose internal API paths containing intermediate project UUIDs (`.../projects/<proj_id>/issues/<issue_id>`). Always format links using the canonical standard browse URL: `https://<plane-host>/<workspace_slug>/browse/<IDENTIFIER>-<SEQ>` (or `.../issues/<issue-id>` for direct issue UUID).
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | `https://plane.dgs.ai.kr/dgs/projects/<uuid>/issues/<uuid>` long internal API/project URL | `https://plane.dgs.ai.kr/dgs/browse/<IDENTIFIER>-<SEQ>` standard canonical browse URL |
+| 2 | Bare text UUID or sequence number without clickable web URL | Clickable markdown link (`[INFRA-77](https://plane.dgs.ai.kr/dgs/browse/INFRA-77)`) with complete browse URL |
