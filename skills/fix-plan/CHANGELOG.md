@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/es6kr/skills/compare/fix-plan-v0.13.0...fix-plan-v0.13.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **fix-plan:** add --delete to update_item.py and codify plan audit gate ([aa6fd97](https://github.com/es6kr/skills/commit/aa6fd97dbf41eaf03c6efff99fe82d4dbb622dfe))
+
 ## [0.13.0](https://github.com/es6kr/skills/compare/fix-plan-v0.12.1...fix-plan-v0.13.0) (2026-09-13)
 
 
