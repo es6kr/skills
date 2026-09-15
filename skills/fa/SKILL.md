@@ -50,6 +50,13 @@ This covers the whole store — the HOT body, `archive/`, and `rag-pending/` ali
 `FA_DATA_DIR` for one of them and hardcoding the others splits the store in half, so a
 configured run would classify one file while recurrence checks and archive moves read another.
 
+**Environment-routed writes**: `$FA_STORE/failed-attempts.md` is the fallback medium, not the
+only one. When the running environment exposes a native, project-independent memory system
+(currently: Claude Code + Serena MCP → `write_memory("global/fa/<class-slug>", ...)`), new FA
+entries go there instead — one memory per class, appended on recurrence. See
+[retrospect.md](./retrospect.md) Step 4-2's detection table for the full routing matrix
+(Hermes and OpenClaw are detected but not yet wired — they still fall through to the file).
+
 ## Procedure
 
 1. **Recurrence pre-check** — run the Stage 0 (RAG) + Stage 1 (grep) procedure exactly as
