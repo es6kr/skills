@@ -97,6 +97,37 @@ configured run would classify one file while recurrence checks and archive moves
    | 2 | Record the violation, then ask the user whether to correct the artifact | Correct it, then report what changed. Ask only when the correction itself needs a decision the user alone can make |
    | 3 | Treat "recorded" as "handled" when the artifact is still wrong | The record and the correction are separate deliverables — a record alone leaves the defect in place |
 
+   **Content edit vs. new-mechanism authorship (HARD STOP — track the latter as a task)**: the
+   permission above covers *editing the content of an artifact that already exists* (a comment's
+   text, a tracker line, a file's prose). It does NOT cover *designing or implementing a new
+   mechanism* — a hook registration, a new script, a new detection rule — even when that
+   mechanism's purpose is to fix the very defect just recorded. `/fix`'s Step 0 guarantees
+   task tracking for exactly this category of work so that an interrupted turn leaves a
+   resumable trace. `fa` has no such step by design (it stays lightweight for content edits),
+   so when an in-turn correction escalates past a content edit into new-mechanism authorship,
+   `fa` must register it via a task before starting the work — mirroring `/fix`'s guarantee
+   without adopting its full 5-Why ceremony.
+
+   **Environment-appropriate medium (mandatory fallback chain — do not skip tracking because
+   the first tool is unavailable)**:
+   - **Claude Code**: `TaskCreate` first. If unavailable this turn, `TodoWrite`. If both are
+     unavailable, the `claude-task` CLI fallback (`todowrite` skill's `claude-task` topic —
+     persists outside the session) exactly as `/fix` Step 0 documents. **Never** the session
+     scratchpad directory as the tracking medium — its path can change across a session/compact
+     boundary, silently dropping content and defeating the whole point of tracking.
+   - **Antigravity**: the `task.md` artifact convention — a standard markdown checkbox line is
+     sufficient; the full `/fix` ceremony is not required, only the durable record.
+   - The fallback chain itself is not optional — "the primary tool was unavailable" is a reason
+     to move to the next medium in the chain, never a reason to skip tracking altogether.
+
+   | # | Don't | Do |
+   |---|-------|-----|
+   | 1 | Register a new Stop hook / write a new verification script under the "correct the existing artifact" permission, with no task tracking it | Before authoring the new mechanism, `TaskCreate` a task for it (even a single one) so the work is resumable if the turn breaks |
+   | 2 | Reason "it's still just this turn's correction, so no task needed" | The content-edit/new-mechanism line is the test, not "which turn it happens in". A hook registration is new-mechanism regardless of when it happens |
+   | 3 | Skip tracking because the fix is small (one hooks.json entry) | Size is irrelevant — the guarantee is about resumability, not effort. A one-line hook registration left mid-edit is just as unrecoverable as a large one |
+   | 4 | `TaskCreate` unavailable → conclude "no way to track it here" and proceed untracked | Fall through the chain: `TodoWrite` → `claude-task` CLI (Claude Code) or `task.md` (Antigravity). The chain has no untracked terminal state |
+   | 5 | Use the session scratchpad directory as the fallback medium because it's "just this session anyway" | Scratchpad paths are ephemeral by design and can change across a session/compact boundary, silently dropping their contents — not a valid fallback rung |
+
 ## Skip conditions
 
 [retrospect.md](./retrospect.md) Steps 5 (skill-malfunction scan) and 6 (FA Prune mandatory
