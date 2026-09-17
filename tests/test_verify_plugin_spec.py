@@ -199,3 +199,36 @@ class TestRealRepoManifestsConform:
 
     def test_real_repo_conforms(self, capsys):
         assert verify_plugin_spec.main() == 0, capsys.readouterr().err
+
+
+class TestMarketplaceThreeTierArchitecture:
+    """Enforce the 3-Tier Marketplace Bundle Architecture from llm-wiki/pages/reference/es6kr-skills-repo.md."""
+
+    def test_marketplace_has_three_bundles_and_labs_contains_slug_squats(self):
+        marketplace_path = REPO_ROOT / ".claude-plugin" / "marketplace.json"
+        assert marketplace_path.exists()
+        data = json.loads(marketplace_path.read_text(encoding="utf-8"))
+        plugins = {p["name"]: p for p in data.get("plugins", [])}
+
+        assert set(plugins.keys()) == {"es6kr", "task", "labs"}, (
+            f"Expected plugins ['es6kr', 'task', 'labs'], got {list(plugins.keys())}"
+        )
+
+        labs_skills = set(plugins["labs"].get("skills", []))
+        expected_labs = {
+            "./skills/backlog",
+            "./skills/harness",
+            "./skills/orca",
+            "./skills/choco",
+            "./skills/forge",
+            "./skills/omz",
+            "./skills/code-workflow",
+        }
+        assert expected_labs.issubset(labs_skills), (
+            f"Expected labs to contain {expected_labs}, but got {labs_skills}"
+        )
+
+        # Core bundle must not contain labs skills
+        core_skills = set(plugins["es6kr"].get("skills", []))
+        overlap = core_skills.intersection(expected_labs)
+        assert not overlap, f"Core bundle 'es6kr' must not contain slug-squatting skills: {overlap}"
