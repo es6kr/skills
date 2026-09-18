@@ -96,6 +96,15 @@
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-plan-artifact-no-plane-link.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/task-plan/resources/artifact-sibling-existence-guard.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [

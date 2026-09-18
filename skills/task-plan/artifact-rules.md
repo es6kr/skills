@@ -25,3 +25,14 @@ When the target destination path for an artifact or export is ambiguous:
 - Never speculatively copy or write to multiple candidate paths simultaneously.
 - Unilateral multi-copying pollutes git trees and violates the Single Source of Truth (SSOT).
 - Always enumerate candidate destination paths and invoke `AskUserQuestion` / `ask_question` to obtain explicit confirmation before executing file operations.
+
+---
+
+## 4. Artifact Sibling Existence Guard (PostToolUse:Write)
+
+When creating a new plan, research, or roadmap artifact via Write:
+- `artifact-sibling-existence-guard.sh` scans the target directory for sibling artifacts sharing 2 or more subject tokens (ignoring stopwords and 8-character hex session IDs).
+- **Canonical-First Discipline**: When a document on the same topic already exists, update it in place (`replace_file_content` / `Edit`) rather than adding a parallel fragmented artifact.
+- **Directory Enumeration Exemption**: If the session transcript confirms that the author already inspected the target directory (via glob, listing, or grep) prior to writing, the warning is suppressed.
+- **Warning-Only Semantics**: This guard emits an advisory warning upon write completion to encourage canonical document consolidation and prevent corpus fragmentation.
+

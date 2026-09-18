@@ -38,3 +38,14 @@ SKILL_DIR="$REPO_ROOT/skills/task-plan"
   run grep -qi "User Review Gate" "$SKILL_DIR/review.md"
   [ "$status" -eq 0 ]
 }
+
+@test "task-plan: artifact-sibling-existence-guard.sh exists and is executable" {
+  [ -f "$SKILL_DIR/resources/artifact-sibling-existence-guard.sh" ]
+  [ -x "$SKILL_DIR/resources/artifact-sibling-existence-guard.sh" ]
+}
+
+@test "task-plan: artifact-rules.md specifies sibling existence guard" {
+  run grep -qi "Artifact Sibling Existence Guard" "$SKILL_DIR/artifact-rules.md"
+  [ "$status" -eq 0 ]
+}
+
