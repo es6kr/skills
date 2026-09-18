@@ -5,6 +5,14 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2](https://github.com/es6kr/skills/compare/backlog-v0.3.1...backlog-v0.3.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+* **skills:** document canonical Do/Don't tables for Plane URLs, plan sync, and pre-merge reviews ([7069da8](https://github.com/es6kr/skills/commit/7069da85bb11bdcf0da8d9dc93619eeafc972dd2))
+
 ## [0.3.1](https://github.com/es6kr/skills/compare/backlog-v0.3.0...backlog-v0.3.1) (2026-09-08)
 
 

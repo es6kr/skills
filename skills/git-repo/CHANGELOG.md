@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/es6kr/skills/compare/git-repo-v0.11.0...git-repo-v0.11.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+* **git-repo:** stop SIGPIPE from silently disabling every Tier 2 doctor check ([#484](https://github.com/es6kr/skills/issues/484)) ([ab5a64d](https://github.com/es6kr/skills/commit/ab5a64d6c25cf7ab560c4e9b47c860bac94d7fc2))
+
 ## [0.11.0](https://github.com/es6kr/skills/compare/git-repo-v0.10.1...git-repo-v0.11.0) (2026-09-06)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/es6kr/skills/compare/docxport-v0.2.0...docxport-v0.2.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+
 ## [0.2.0](https://github.com/es6kr/skills/compare/docxport-v0.1.0...docxport-v0.2.0) (2026-08-29)
 
 
