@@ -397,9 +397,13 @@ def main():
         if not scan_root.exists():
             print(f"Error: scan path does not exist: {scan_root}", file=sys.stderr)
             sys.exit(1)
-        for item in scan_root.glob("**/"):
-            if (item / ".git").exists():
-                target_repos.append(item)
+        seen_repos = set()
+        for git_dir in scan_root.rglob(".git"):
+            if git_dir.is_dir():
+                repo_path = git_dir.parent.resolve()
+                if repo_path not in seen_repos:
+                    seen_repos.add(repo_path)
+                    target_repos.append(repo_path)
     else:
         target_path = Path(args.repo_path or args.path).resolve()
         target_repos.append(target_path)
