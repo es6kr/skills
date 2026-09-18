@@ -47,7 +47,7 @@ DEFAULT_PROFILE = {
     "plane_token_env": "PLANE_API_KEY",
     "qdrant_url": "http://localhost:6333",
     "qdrant_wiki_collection": "wiki",
-    "qdrant_memory_collection": "claude-memory",
+    "qdrant_memory_collection": os.environ.get("WSCFG_RAG_GLOBAL_COLLECTION_MEMORY") or os.environ.get("AGENT_MEMORY_COLLECTION") or os.environ.get("RAG_COLLECTION") or "agent-memory",
     "qdrant_task_collection": "fix-plan",
     "llm_wiki_path": "",
     "default_project": "default",

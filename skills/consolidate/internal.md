@@ -338,6 +338,20 @@ Right after Step 4 Classify, before Step 5 Summary posting. If the classificatio
 
 Detailed rule: see `skills/github-flow/pr.md` Step 8 "UI Change PR — MANDATORY" section (in this repo; installed locally as `~/.claude/skills/github-flow/pr.md`).
 
+## Pre-Merge Code Review Existence Verification & Dual Fallback Gate (HARD STOP)
+
+1. **Prohibit Merge Proposals Without Substantive Review**: CI checks passing (green) or external bot (CodeRabbit, etc.) rate-limit/offline skips must NEVER be treated as completed code review.
+2. **Mandatory Pre-Merge Review Verification**: Before proposing PR merge via `AskUserQuestion` or executing `gh pr merge`, verify that real review evidence exists (`reviews` list, `reviewDecision: "APPROVED"`, or AI Review Summary comment).
+3. **Mandatory Dual Fallback (superpowers + coderabbit CLI) & Consolidate Execution**: When external bot review is 0 findings or offline, executing BOTH (1) **superpowers review** (`requesting-code-review` / `code-reviewer` subagent dispatch) and (2) **coderabbit CLI review** (`code-review` / `coderabbit review --plain`) is MANDATORY. Then, execute the official `consolidate` skill (`/consolidate pr`, `consolidate:internal`) to aggregate and classify findings.
+4. **Prohibit Verbal/Ad-hoc Review Fabrication**: Fabricating self-review tables or verbal claims in chat text without physically running `consolidate` is strictly prohibited.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Proposing `(Recommended) Merge ...` based solely on green CI or CodeRabbit rate-limit skip without review | Verify physical presence of `reviews` and `reviewDecision`, executing internal reviews first if absent |
+| 2 | Presenting merge confirmation ask when review findings or AI Review Summary comment are missing | Complete independent code reviews, post the summary comment, and propose merge based on findings |
+| 3 | Claiming "thorough post-review complete" verbally in chat after inspecting `git show` without running `consolidate` | Physically execute the `consolidate` skill (or `clawo consolidate`) to complete formal review triage |
+| 4 | Running only one of superpowers or coderabbit CLI when external bot review is absent | Execute BOTH superpowers subagents and coderabbit CLI reviews to thoroughly synthesize findings |
+
 ## Next
 
 → Internal Code Review comment posted + UI capture actionable verified → `classify.md` (Step 4 Analyze and Classify)
