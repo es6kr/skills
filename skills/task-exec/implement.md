@@ -12,7 +12,7 @@ flowchart LR
     Green --> Refactor["5. Refactor & Code-Discipline"]
 ```
 
-### The 5 TDD Steps:
+### The 6 TDD Steps:
 1. **Red Test Authoring**: Author test cases before touching product source code. Define the expected behavior or reproduce the reported bug.
 2. **Empirical Failure Confirmation**: Execute the test suite and confirm that tests fail for the expected reason (`failures=M`).
 3. **Isolated Red Commit**: Stage ONLY test files (`tests/*`) and commit with `test: add failing tests for <scope> (red)`.

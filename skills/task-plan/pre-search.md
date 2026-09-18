@@ -13,9 +13,9 @@ Bypassing pre-search leads to duplicate documents, conflicting architecture dire
 Always follow this sequence when researching a task:
 
 1. **Local Generated Deliverables**: Check `.agents/docs/generated/` and `.agents/docs/` for recent plans and research (`roadmap-*.md`, `plan-*.md`, `research-*.md`).
-2. **Qdrant Vector Memory & RAG**: Query semantic memory across past sessions:
+2. **Qdrant Vector Memory & RAG**: Query semantic memory across past sessions using MCP vector search tools (e.g. `mcp__qdrant__search`) or an external workspace helper script if configured:
    ```bash
-   python3 scripts/qdrant-search.py --semantic "<task-keywords>" --limit 5
+   python3 scripts/qdrant-search.py --semantic "<task-keywords>" --limit 5  # (if workspace helper exists)
    ```
 3. **LLM Wiki**: Check the local wiki index (`llm-wiki/index.md` or `pages/`) for authoritative domain summaries.
 4. **Codebase Grep / Symbol Search**: Verify whether the target capability or interface is already partially implemented.

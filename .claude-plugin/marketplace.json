@@ -52,7 +52,10 @@
       "skills": [
         "./skills/next",
         "./skills/wip",
-        "./skills/fix"
+        "./skills/fix",
+        "./skills/task-plan",
+        "./skills/task-exec",
+        "./skills/task-flow"
       ],
       "strict": true,
       "version": "0.1.1"

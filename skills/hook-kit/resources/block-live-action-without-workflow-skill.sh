@@ -120,6 +120,9 @@ if [ "${1:-}" = "--test" ]; then
   T_CURL_REQ=$(make_transcript tracker)
   test_case_bash "curl --request POST + tracker read + no skill call" 2 \
     'curl -s --request POST https://api.example.com' "$T_CURL_REQ"
+  T_CURL_REQ_EQ=$(make_transcript tracker)
+  test_case_bash "curl --request=POST + tracker read + no skill call" 2 \
+    'curl -s --request=POST https://api.example.com' "$T_CURL_REQ_EQ"
   T_TASK=$(make_transcript tracker-task)
   test_case_bash "kubectl apply + task.md read + no skill call" 2 \
     "kubectl apply -f authentik.yaml" "$T_TASK"
@@ -142,6 +145,12 @@ if [ "${1:-}" = "--test" ]; then
   T6=$(make_transcript tracker skill:code-workflow)
   test_case_bash "risky command + tracker read + Skill(code-workflow) called" 0 \
     "terraform apply" "$T6"
+  T_TASK_FLOW=$(make_transcript tracker skill:task-flow)
+  test_case_bash "risky command + tracker read + Skill(task-flow) called" 0 \
+    "terraform apply" "$T_TASK_FLOW"
+  T_TASK_EXEC=$(make_transcript tracker skill:task-exec)
+  test_case_bash "risky command + tracker read + Skill(task-exec) called" 0 \
+    "terraform apply" "$T_TASK_EXEC"
   T7=$(make_transcript tracker skill:es6kr:code-workflow)
   test_case_tool "browser_navigate + tracker read + Skill(code-workflow) called (namespaced)" 0 \
     "mcp__playwright__browser_navigate" "$T7"
@@ -166,7 +175,7 @@ RISKY=0
 if [ "$TOOL_NAME" = "Bash" ]; then
   COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
   if printf '%s' "$COMMAND" | grep -qiE \
-    'kubectl[[:space:]]+(apply|create|delete|patch|replace|exec)|terraform[[:space:]]+apply|docker[[:space:]]+(exec|rm|stop|kill|run)|git[[:space:]]+push|gh[[:space:]]+(pr[[:space:]]+merge|issue[[:space:]]+close|release)|curl[^|]*(-X[[:space:]]*|--request[[:space:]]+)['"'"'"]?(POST|PUT|PATCH|DELETE)|curl[^|]*(--data|-d([[:space:]=]|['"'"'"]))|ak[[:space:]]+shell|vault[[:space:]]+kv[[:space:]]+put|kubectl[[:space:]]+create[[:space:]]+secret|wmux[[:space:]]+browser[[:space:]]+(open|click|type|fill)|browser[[:space:]]+(click|type|fill)'; then
+    'kubectl[[:space:]]+(apply|create|delete|patch|replace|exec)|terraform[[:space:]]+apply|docker[[:space:]]+(exec|rm|stop|kill|run)|git[[:space:]]+push|gh[[:space:]]+(pr[[:space:]]+merge|issue[[:space:]]+close|release)|curl[^|]*(-X[[:space:]]*|--request[[:space:]=]+)['"'"'"]?(POST|PUT|PATCH|DELETE)|curl[^|]*(--data|-d([[:space:]=]|['"'"'"]))|ak[[:space:]]+shell|vault[[:space:]]+kv[[:space:]]+put|kubectl[[:space:]]+create[[:space:]]+secret|wmux[[:space:]]+browser[[:space:]]+(open|click|type|fill)|browser[[:space:]]+(click|type|fill)'; then
     RISKY=1
   fi
 elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(navigate|click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then
@@ -177,27 +186,23 @@ fi
 TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] || exit 0
 
-# --- 2. Was a workspace tracker file Read this session? (scope narrowing) ---
-TRACKER_SEEN=0
-while IFS= read -r line; do
-  fp=$(printf '%s' "$line" | jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use" and .name=="Read") | .input.file_path // empty' 2>/dev/null)
-  if printf '%s' "$fp" | grep -qiE '(^|/)(fix_plan|checklist|task)\.md$'; then
-    TRACKER_SEEN=1
-    break
-  fi
-done < "$TRANSCRIPT"
-[ "$TRACKER_SEEN" = "1" ] || exit 0
+# --- 2. Scope narrowing & workflow skill gate via single-pass transcript parse ---
+TRANSCRIPT_MATCHES=$(jq -r '
+  select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") |
+  if .name == "Read" and (.input.file_path // "" | test("(^|/)(fix_plan|checklist|task)\\.md$"; "i")) then
+    "TRACKER"
+  elif .name == "Skill" and ((.input.skill // .input.name // "") | test("(code-workflow|task-flow|task-exec)"; "i")) then
+    "SKILL"
+  else
+    empty
+  end
+' "$TRANSCRIPT" 2>/dev/null || true)
 
-# --- 3. Has Skill("code-workflow") been invoked? ---
-SKILL_SEEN=0
-while IFS= read -r line; do
-  sk=$(printf '%s' "$line" | jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use" and .name=="Skill") | (.input.skill // .input.name // empty)' 2>/dev/null)
-  if printf '%s' "$sk" | grep -qiE 'code-workflow'; then
-    SKILL_SEEN=1
-    break
-  fi
-done < "$TRANSCRIPT"
-[ "$SKILL_SEEN" = "1" ] && exit 0
+# If no tracker file was read this session, allow.
+printf '%s\n' "$TRANSCRIPT_MATCHES" | grep -q '^TRACKER$' || exit 0
+
+# If a workflow skill was already invoked this session, allow.
+printf '%s\n' "$TRANSCRIPT_MATCHES" | grep -q '^SKILL$' && exit 0
 
 {
   echo "DENIED: live/mutating action ($TOOL_NAME) on a tracker-driven task without a workflow-skill gate."
@@ -205,14 +210,14 @@ done < "$TRANSCRIPT"
   echo "Why blocked:"
   echo "  - A workspace tracker file (fix_plan.md/checklist.md/task.md) was read this"
   echo "    session, and this call would take a state-mutating or hard-to-reverse"
-  echo "    action, but no Skill(\"code-workflow\") call has happened yet in this session."
+  echo "    action, but no workflow skill (Skill(\"task-flow\"), Skill(\"task-exec\"), or Skill(\"code-workflow\")) call has happened yet in this session."
   echo "  - This class of mistake (ad hoc live execution on a complex/irreversible"
   echo "    tracker item, bypassing Research->Plan->User Review->Implement) has"
   echo "    recurred 4 times; see failed-attempts.md"
   echo "    \"risky-complex-task-live-commands-without-code-workflow-plan\"."
   echo ""
   echo "Required action before retrying:"
-  echo "  1. Invoke Skill(\"code-workflow\") for this tracker item"
+  echo "  1. Invoke Skill(\"task-flow\") (or Skill(\"task-exec\") / Skill(\"code-workflow\")) for this tracker item"
   echo "     (reuse any existing research doc as Prior Knowledge)."
   echo "  2. Get the resulting plan through User Review."
   echo "  3. Only then retry this live action."

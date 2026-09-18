@@ -164,7 +164,8 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh",
+            "timeout": 10
           }
         ]
       },
@@ -173,7 +174,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh",
+            "timeout": 10
           }
         ]
       },

@@ -228,6 +228,19 @@ class TestMarketplaceThreeTierArchitecture:
             f"Expected labs to contain {expected_labs}, but got {labs_skills}"
         )
 
+        task_skills = set(plugins["task"].get("skills", []))
+        expected_task = {
+            "./skills/next",
+            "./skills/wip",
+            "./skills/fix",
+            "./skills/task-plan",
+            "./skills/task-exec",
+            "./skills/task-flow",
+        }
+        assert expected_task.issubset(task_skills), (
+            f"Expected task bundle to contain {expected_task}, but got {task_skills}"
+        )
+
         # Core bundle must not contain labs skills
         core_skills = set(plugins["es6kr"].get("skills", []))
         overlap = core_skills.intersection(expected_labs)
