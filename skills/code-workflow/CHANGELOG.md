@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/code-workflow-v0.9.1...code-workflow-v0.10.0) (2026-09-18)
+
+
+### Features
+
+* **code-workflow:** warn when a new artifact duplicates a same-topic sibling ([3404dd6](https://github.com/es6kr/skills/commit/3404dd6f6583bffe31d3243fec4da2ce5f882676))
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+
 ## [0.9.1](https://github.com/es6kr/skills/compare/code-workflow-v0.9.0...code-workflow-v0.9.1) (2026-09-08)
 
 

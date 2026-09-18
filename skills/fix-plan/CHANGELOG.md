@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0](https://github.com/es6kr/skills/compare/fix-plan-v0.13.0...fix-plan-v0.14.0) (2026-09-18)
+
+
+### Features
+
+* **fix-plan:** add archive_pipeline_log.py script for Pipeline Execution Log rotation ([f550841](https://github.com/es6kr/skills/commit/f550841de81f5fda64bd55b7e97958e5a419e0a2))
+
+
+### Bug Fixes
+
+* address code review feedback ([8c1c058](https://github.com/es6kr/skills/commit/8c1c05896c99983a401d4a725ce3cc2cf005e524))
+* **fix-plan:** add --delete to update_item.py and codify plan audit gate ([aa6fd97](https://github.com/es6kr/skills/commit/aa6fd97dbf41eaf03c6efff99fe82d4dbb622dfe))
+* **fix-plan:** add in-place sub-bullet append to add_item.py ([cc0a6af](https://github.com/es6kr/skills/commit/cc0a6af7718e9bcd9d699c69bfea4f912ce6a2a7))
+* **fix-plan:** align default memory collection resolution with works-config ([3f84946](https://github.com/es6kr/skills/commit/3f84946da6a23379ebe18cf05716ceb88d9b8a48))
+* **skills:** document canonical Do/Don't tables for Plane URLs, plan sync, and pre-merge reviews ([7069da8](https://github.com/es6kr/skills/commit/7069da85bb11bdcf0da8d9dc93619eeafc972dd2))
+
 ## [0.13.0](https://github.com/es6kr/skills/compare/fix-plan-v0.12.1...fix-plan-v0.13.0) (2026-09-13)
 
 

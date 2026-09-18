@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/es6kr/skills/compare/session-v0.11.1...session-v0.12.0) (2026-09-18)
+
+
+### Features
+
+* **hooks:** block wrap-up-adjacent /rename candidates missing sessid8 schema ([#501](https://github.com/es6kr/skills/issues/501)) ([9a69554](https://github.com/es6kr/skills/commit/9a69554afc33ebeb0ab4668c675f92271b005bd5))
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+* **session:** scope move-session cwd rewrite to the cwd field ([#497](https://github.com/es6kr/skills/issues/497)) ([068441a](https://github.com/es6kr/skills/commit/068441a4f381e1df888d6196e7e1bcde644886f7))
+
 ## [0.11.1](https://github.com/es6kr/skills/compare/session-v0.11.0...session-v0.11.1) (2026-09-06)
 
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/github-flow-v0.10.2...github-flow-v0.11.0) (2026-09-18)
+
+
+### Features
+
+* **task-plan,github-flow:** adopt artifact sibling guard in task-plan and prohibit multi-commit squash ([9938985](https://github.com/es6kr/skills/commit/9938985161fe1e0ddae934980b3c9307e7dfd5f4))
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+* **github-flow:** prohibit squash merge on multi-commit PRs in skills and plugins repos ([8db57f8](https://github.com/es6kr/skills/commit/8db57f8fe76357bda3f3d26fed7e4c253bfffbb3))
+
 ## [0.10.2](https://github.com/es6kr/skills/compare/github-flow-v0.10.1...github-flow-v0.10.2) (2026-09-08)
 
 
