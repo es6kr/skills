@@ -408,6 +408,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-walkthrough.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-rename-schema-when-wrapup-adjacent.sh"
           }
         ]
       }
