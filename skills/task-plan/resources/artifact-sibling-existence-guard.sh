@@ -22,7 +22,7 @@
 # hundred artifacts, and spawning processes per file makes the hook slower than
 # the write it guards (measured: minutes, on a 690-file directory).
 #
-# Responsible skill: code-workflow (resources holds the source). Install: ~/.claude/hooks/
+# Responsible skill: task-plan (resources holds the source). Install: ~/.claude/hooks/
 # Recurrence target: failed-attempts.md "duplicate-artifact-creation-instead-of-canonical-update"
 #
 # Warning only — the artifact write already happened and is not reverted.

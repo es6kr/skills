@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/code-workflow/resources/artifact-sibling-existence-guard.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/task-plan/resources/artifact-sibling-existence-guard.sh"
           }
         ]
       }
