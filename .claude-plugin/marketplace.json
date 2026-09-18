@@ -18,25 +18,19 @@
         "./skills/brief",
         "./skills/cc-plugin",
         "./skills/chezmoi",
-        "./skills/choco",
         "./skills/claudify",
         "./skills/cleanup",
-        "./skills/code-workflow",
         "./skills/commit-tidy",
         "./skills/consolidate",
         "./skills/docxport",
         "./skills/dotfile",
         "./skills/fa",
         "./skills/fix-plan",
-        "./skills/forge",
         "./skills/git-repo",
         "./skills/github-flow",
         "./skills/github-repo",
-        "./skills/harness",
         "./skills/hook-kit",
         "./skills/mcp-config",
-        "./skills/omz",
-        "./skills/backlog",
         "./skills/repo",
         "./skills/session",
         "./skills/skill-kit",
@@ -58,7 +52,30 @@
       "skills": [
         "./skills/next",
         "./skills/wip",
-        "./skills/fix"
+        "./skills/fix",
+        "./skills/task-plan",
+        "./skills/task-exec",
+        "./skills/task-flow"
+      ],
+      "strict": true,
+      "version": "0.1.1"
+    },
+    {
+      "author": {
+        "email": "drumrobot43@gmail.com",
+        "name": "es6.kr"
+      },
+      "description": "Auxiliary, slug-squatting, external SSOT fallback, and deprecated skills (backlog, harness, orca, choco, forge, omz, code-workflow)",
+      "name": "labs",
+      "source": "./",
+      "skills": [
+        "./skills/backlog",
+        "./skills/harness",
+        "./skills/orca",
+        "./skills/choco",
+        "./skills/forge",
+        "./skills/omz",
+        "./skills/code-workflow"
       ],
       "strict": true,
       "version": "0.1.1"
