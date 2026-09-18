@@ -161,11 +161,19 @@ def split_keep_archive(lines, log_lines, entries_metadata, keep_count=None, keep
     """
     # Compute cutoff
     if keep_count is not None:
-        # Keep the N most recent entries
-        cutoff_idx = max(0, len(log_lines) - keep_count)
-        keep_lines = log_lines[cutoff_idx:]
-        archive_lines = log_lines[:cutoff_idx]
-        kept_indices = set(range(cutoff_idx, len(log_lines)))
+        # Separate real entries from archive pointer lines
+        real_indices = [i for i, (_, _, is_archive) in enumerate(entries_metadata) if not is_archive]
+        archive_pointer_indices = [i for i, (_, _, is_archive) in enumerate(entries_metadata) if is_archive]
+
+        # Keep the N most recent real entries
+        cutoff_idx = max(0, len(real_indices) - keep_count)
+        kept_real_indices = set(real_indices[cutoff_idx:])
+
+        # Archive pointers are always kept
+        kept_indices = set(archive_pointer_indices) | kept_real_indices
+
+        keep_lines = [log_lines[i] for i in range(len(log_lines)) if i in kept_indices]
+        archive_lines = [log_lines[i] for i in range(len(log_lines)) if i not in kept_indices]
     else:
         cutoff = compute_cutoff_date(entries_metadata, keep_since)
         keep_lines = []
@@ -222,10 +230,13 @@ def generate_archive_filename(fix_plan_path, min_date, max_date):
         relative_path_for_pointer: Relative path string from fix_plan.md location to archive
     """
     fix_plan_dir = fix_plan_path.parent
-    workspace_root = fix_plan_dir.parent  # Go up from .agents or equivalent
+    if fix_plan_dir.name in [".agents", ".claude"]:
+        workspace_root = fix_plan_dir.parent
+        archive_dir = workspace_root / "docs" / "generated"
+    else:
+        archive_dir = fix_plan_dir / "docs" / "generated"
 
     # Create archive in docs/generated under workspace root
-    archive_dir = workspace_root / "docs" / "generated"
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     filename = f"fix_plan-pipeline-log-archive-{min_date}_{max_date}.md"
@@ -233,12 +244,11 @@ def generate_archive_filename(fix_plan_path, min_date, max_date):
 
     # Compute relative path from fix_plan.md location to archive
     try:
-        relative_path = archive_path.relative_to(fix_plan_dir)
+        relative_path = os.path.relpath(archive_path, fix_plan_dir)
     except ValueError:
-        # Fallback: use relative path from workspace root
-        relative_path = archive_path.relative_to(workspace_root)
+        relative_path = str(archive_path)
 
-    return archive_path, str(relative_path)
+    return archive_path, str(relative_path).replace("\\", "/")
 
 
 def create_archive_file(archive_path, archived_lines, min_date, max_date):
@@ -263,23 +273,39 @@ See the live log in fix_plan.md for current entries and pointer location.
     archive_path.write_text(content, encoding="utf-8")
 
 
-def generate_archive_pointer(min_date, max_date, archive_path_relative):
+def generate_archive_pointer(min_date, max_date, archive_path_relative, count=None):
     """Generate a single pointer bullet to replace archived entries.
 
     Args:
         min_date: Earliest date in archive
         max_date: Latest date in archive
         archive_path_relative: Relative path from fix_plan.md location to archive file
+        count: Number of entries archived
 
     Returns: Pointer line string
     """
-    n = "entries"  # Will be filled in by caller
+    n = count if count is not None else "entries"
     return (f"- **Archived pipeline log ({min_date} ~ {max_date})**: "
             f"<{n} entries archived> → {archive_path_relative}")
 
 
 def main():
     args = parse_args()
+
+    if args.keep_count is not None and args.keep_count < 0:
+        print("ERROR: --keep-count must be non-negative.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.keep_since is not None:
+        try:
+            datetime.strptime(args.keep_since, "%Y-%m-%d")
+        except ValueError:
+            print(
+                f"ERROR: Invalid date format for --keep-since: {args.keep_since!r}. "
+                "Expected YYYY-MM-DD.",
+                file=sys.stderr
+            )
+            sys.exit(1)
 
     # Resolve target file
     if args.file:
@@ -378,7 +404,9 @@ def main():
     print(f"[Created] {archive_path}")
 
     # Generate pointer and update fix_plan.md
-    pointer = generate_archive_pointer(min_date, max_date, str(archive_path_relative))
+    pointer = generate_archive_pointer(
+        min_date, max_date, str(archive_path_relative), count=len(archive_lines)
+    )
 
     # Rebuild the file: lines before log section + updated log section + lines after
     new_lines = (

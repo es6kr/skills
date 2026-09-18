@@ -65,9 +65,8 @@ fi
 
 # Was there a walkthrough-artifact write anywhere in this session's
 # transcript? Match Write/Edit tool_use blocks whose file_path basename
-# contains "walkthrough" (case-insensitive). A plain grep on the raw JSONL
-# is enough — file_path is always inline JSON, never wrapped.
-if grep -qiE '"(file_path|filePath)"[[:space:]]*:[[:space:]]*"[^"]*walkthrough[^"]*"' "$TRANSCRIPT_PATH" 2>/dev/null; then
+# contains "walkthrough" (case-insensitive).
+if jq -e 'select(.message.content != null) | .message.content[]? | select(.type=="tool_use" and (.name=="Write" or .name=="Edit" or .name=="write_to_file" or .name=="replace_file_content")) | select((.input.file_path // .input.filePath // .input.TargetFile // "") | test("walkthrough"; "i"))' "$TRANSCRIPT_PATH" >/dev/null 2>&1; then
   exit 0
 fi
 

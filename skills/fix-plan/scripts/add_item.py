@@ -279,31 +279,28 @@ def run_append_sub(args: argparse.Namespace) -> int:
         print(f"ERROR: tracker not found: {args.file}", file=sys.stderr)
         return 1
 
-    with io.open(args.file, "r+", encoding="utf-8") as fh:
-        try:
-            fcntl.flock(fh, fcntl.LOCK_EX)
+    with _TrackerLock(args.file):
+        with io.open(args.file, "r", encoding="utf-8") as fh:
             src = fh.read()
-            out = append_subs(src, args.match, args.append_sub)
+        out = append_subs(src, args.match, args.append_sub)
 
-            if out == src:
-                print(f"SKIP: all sub-bullets already present on {args.match!r} (idempotent no-op)")
-                return 0
+        if out == src:
+            print(f"SKIP: all sub-bullets already present on {args.match!r} (idempotent no-op)")
+            return 0
 
-            if args.dry_run:
-                lines = out.split("\n")
-                start, end = find_item_block(lines, args.match)
-                print("--- dry-run: item after append ---")
-                print("\n".join(lines[start:end]))
-                return 0
-
-            atomic_write(args.file, out)
-            print(f"OK: appended {len(args.append_sub)} sub-bullet(s) to {args.match!r} in {args.file}")
+        if args.dry_run:
             lines = out.split("\n")
             start, end = find_item_block(lines, args.match)
+            print("--- dry-run: item after append ---")
             print("\n".join(lines[start:end]))
             return 0
-        finally:
-            fcntl.flock(fh, fcntl.LOCK_UN)
+
+        atomic_write(args.file, out)
+        print(f"OK: appended {len(args.append_sub)} sub-bullet(s) to {args.match!r} in {args.file}")
+        lines = out.split("\n")
+        start, end = find_item_block(lines, args.match)
+        print("\n".join(lines[start:end]))
+        return 0
 
 
 def atomic_write(path: str, text: str, prefix: str = ".add_item.") -> None:
@@ -487,6 +484,22 @@ def self_test() -> int:
         check("append rejects embedded newlines", False)
     except ValueError:
         check("append rejects embedded newlines", True)
+
+
+    # End-to-end run_append_sub with _TrackerLock
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as tf:
+        tf.write(tracker)
+        tf_name = tf.name
+    try:
+        ns = argparse.Namespace(file=tf_name, match="P0 first task", append_sub=["**test**: end-to-end lock"], dry_run=False)
+        rc = run_append_sub(ns)
+        check("run_append_sub returns 0", rc == 0)
+        with open(tf_name, "r", encoding="utf-8") as rf:
+            content = rf.read()
+        check("run_append_sub wrote content", "**test**: end-to-end lock" in content)
+    finally:
+        if os.path.exists(tf_name):
+            os.unlink(tf_name)
 
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1

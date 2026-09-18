@@ -33,7 +33,7 @@ def _load(name: str, path: Path):
 @pytest.fixture(scope="module")
 def mod():
     if not SCRIPT.is_file():
-        pytest.skip(f"{SCRIPT} not present")
+        pytest.fail(f"Required script is missing: {SCRIPT}")
     return _load("move_session_under_test", SCRIPT)
 
 

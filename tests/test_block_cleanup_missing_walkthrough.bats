@@ -29,6 +29,7 @@ EOF
 
 @test "guard script exists and is executable" {
   [ -f "$GUARD" ]
+  [ -x "$GUARD" ]
 }
 
 @test "cleanup-completion report with no walkthrough write anywhere in transcript is blocked" {
