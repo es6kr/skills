@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.13.0](https://github.com/es6kr/skills/compare/fix-plan-v0.12.1...fix-plan-v0.13.0) (2026-09-13)
+
+
+### Features
+
+* commit-tag package-count guard + hook-kit relocations (promotes develop batch to main) ([a9a5282](https://github.com/es6kr/skills/commit/a9a5282489301412405a2f1024a396ba17da1e48))
+
+
+### Bug Fixes
+
+* **fix-plan:** align add_item.py's default section, add Windows-safe lock, fix priority.md example ([2f811f2](https://github.com/es6kr/skills/commit/2f811f2fc8250cceb57259c3880a0bd9f8c0655c))
+* **fix-plan:** default add_item backlog section to ## TODO ([#473](https://github.com/es6kr/skills/issues/473)) ([a032d78](https://github.com/es6kr/skills/commit/a032d789b4669e2a4d98c5712640dcfca6d1bf4c))
+* **fix-plan:** first-edit timebox, premise re-verification gate, workaround linkage notation ([#472](https://github.com/es6kr/skills/issues/472)) ([cdca046](https://github.com/es6kr/skills/commit/cdca04649a41b335ab668f6eabf7780ea391492d))
+* **fix-plan:** make Plan Drafts role ownership explicit in Per-profile table ([#475](https://github.com/es6kr/skills/issues/475)) ([6c6127f](https://github.com/es6kr/skills/commit/6c6127f6cb90ff7c42775359ded6d14379d86e66))
+
+## [0.12.1](https://github.com/es6kr/skills/compare/fix-plan-v0.12.0...fix-plan-v0.12.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **fix-plan:** add a mechanical --move mode to update_item.py ([#459](https://github.com/es6kr/skills/issues/459)) ([e198675](https://github.com/es6kr/skills/commit/e1986758f1edecf72e3db1075cde0110da337876))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.12.0](https://github.com/es6kr/skills/compare/fix-plan-v0.11.1...fix-plan-v0.12.0) (2026-09-06)
 
 

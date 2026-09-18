@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/es6kr/skills/compare/todowrite-v0.9.0...todowrite-v0.9.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+* **todowrite:** use POSIX word boundaries in the PR-number extraction grep ([7307fd2](https://github.com/es6kr/skills/commit/7307fd2e66c608effa411590ca2edf7c01d4e0a9))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/todowrite-v0.8.2...todowrite-v0.9.0) (2026-09-05)
 
 

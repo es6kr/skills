@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/cleanup-v0.5.1...cleanup-v0.6.0) (2026-09-13)
+
+
+### Features
+
+* commit-tag package-count guard + hook-kit relocations (promotes develop batch to main) ([a9a5282](https://github.com/es6kr/skills/commit/a9a5282489301412405a2f1024a396ba17da1e48))
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([a8fba6d](https://github.com/es6kr/skills/commit/a8fba6dfd950fceb339e53a7feae3354b361bad2))
+* **cleanup:** stop naming the private companion repo + fix hardcoded walkthrough path ([25d05ba](https://github.com/es6kr/skills/commit/25d05bad00aea9aba10af49aacbf23f403b3ac66))
+* **hook-kit:** relocate hook-registry.yaml and its tooling to es6kr/claude-plugins ([6407d6c](https://github.com/es6kr/skills/commit/6407d6cc3f7c26ded22b1812e322ad37131b74f4))
+
+## [0.5.1](https://github.com/es6kr/skills/compare/cleanup-v0.5.0...cleanup-v0.5.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **cleanup:** require the full &lt;model&gt;-&lt;topic&gt;-&lt;sessid8&gt; shape for /rename ([2f1f3b2](https://github.com/es6kr/skills/commit/2f1f3b277525d0efca8fd6fd862e7e8698861ed5))
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/cleanup-v0.4.0...cleanup-v0.5.0) (2026-09-06)
 
 

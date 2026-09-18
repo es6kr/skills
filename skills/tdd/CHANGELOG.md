@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.4](https://github.com/es6kr/skills/compare/tdd-v0.3.3...tdd-v0.3.4) (2026-09-08)
+
+
+### Bug Fixes
+
+* **tdd:** scope the Red-only commit ban to shared branches ([fc2e6ec](https://github.com/es6kr/skills/commit/fc2e6ecdd1906c41d47955226e247aeb03a6f367))
+* **tdd:** scope the Red-only commit ban to shared branches ([5203b78](https://github.com/es6kr/skills/commit/5203b78a4c2a9fb9ba9d7e5d1a8242718cbe1e07))
+* **tdd:** scope the unqualified commit-rules header to shared/pushed branches ([112f8f4](https://github.com/es6kr/skills/commit/112f8f46459a022556cc496e5221ff16734af5de))
+
 ## [0.3.3](https://github.com/es6kr/skills/compare/tdd-v0.3.2...tdd-v0.3.3) (2026-08-17)
 
 
