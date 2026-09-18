@@ -161,6 +161,21 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-wsl-var-payload.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__playwright__browser_navigate|mcp__playwright__browser_click|mcp__playwright__browser_type|mcp__playwright__browser_fill_form|mcp__playwright__browser_press_key|mcp__playwright__browser_select_option|mcp__playwright__browser_drag|mcp__playwright__browser_drop|mcp__playwright__browser_file_upload|mcp__playwright__browser_handle_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh",
+            "timeout": 10
           }
         ]
       },
