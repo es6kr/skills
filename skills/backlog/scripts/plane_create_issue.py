@@ -56,7 +56,7 @@ for _shared_dir in _shared_script_dirs():
 # Single source of truth for profile resolution. Importing it eagerly is
 # deliberate: a missing resolver must fail loudly rather than silently degrade
 # into a run that targets whichever workspace the environment happens to name.
-from plane_client import resolve_profile, normalize_priority  # noqa: E402
+from plane_client import resolve_profile, normalize_priority, format_browse_url, fetch_project_identifier  # noqa: E402
 
 
 def parse_inline_tiptap(text: str) -> list:
@@ -297,6 +297,8 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
             issue_id = data.get("id")
             seq_id = data.get("sequence_id")
             issue_url = f"{plane_host}/{workspace_slug}/projects/{prj_id}/issues/{issue_id}"
+            identifier = fetch_project_identifier(plane_host, workspace_slug, token, prj_id)
+            browse_url = format_browse_url(plane_host, workspace_slug, identifier, seq_id) if identifier else None
 
             return {
                 "success": True,
@@ -305,6 +307,7 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
                 "sequence_id": seq_id,
                 "title": title,
                 "url": issue_url,
+                "browse_url": browse_url,
                 "intake": False
             }
     except urllib.error.HTTPError as e:
@@ -343,6 +346,8 @@ def _create_intake_via_rest_api(plane_host, workspace_slug, prj_id, headers, tok
     issue_ref = data.get("issue")
     issue_id = detail.get("id") or (issue_ref if isinstance(issue_ref, str) else None) or data.get("id")
     seq_id = detail.get("sequence_id") or data.get("sequence_id")
+    identifier = fetch_project_identifier(plane_host, workspace_slug, token, prj_id)
+    browse_url = format_browse_url(plane_host, workspace_slug, identifier, seq_id) if identifier else None
     return {
         "success": True,
         "method": "REST API (intake)",
@@ -350,6 +355,7 @@ def _create_intake_via_rest_api(plane_host, workspace_slug, prj_id, headers, tok
         "sequence_id": seq_id,
         "title": title,
         "url": f"{plane_host}/{workspace_slug}/projects/{prj_id}/issues/{issue_id}",
+        "browse_url": browse_url,
         "intake": True,
     }
 
@@ -382,6 +388,7 @@ if existing:
         "sequence_id": existing.sequence_id,
         "title": existing.name,
         "url": f"{plane_host}/{workspace_slug}/projects/{{prj.id}}/issues/{{existing.id}}",
+        "browse_url": f"{plane_host}/{workspace_slug}/browse/{{prj.identifier}}-{{existing.sequence_id}}",
         "intake": {str(is_intake)}
     }}
     print("RESULT_JSON:" + json.dumps(res))
@@ -559,6 +566,7 @@ res = {{
     "sequence_id": issue.sequence_id,
     "title": issue.name,
     "url": f"{plane_host}/{workspace_slug}/projects/{{prj.id}}/issues/{{issue.id}}",
+    "browse_url": f"{plane_host}/{workspace_slug}/browse/{{prj.identifier}}-{{issue.sequence_id}}",
     "intake": {str(is_intake)}
 }}
 print("RESULT_JSON:" + json.dumps(res))
@@ -658,7 +666,7 @@ def main():
         if res.get("success"):
             print(f"✅ Created Plane Issue [{res.get('sequence_id')}] via {res.get('method')}")
             print(f"   Title: {res.get('title')}")
-            print(f"   URL:   {res.get('url')}")
+            print(f"   URL:   {res.get('browse_url') or res.get('url')}")
         else:
             print(f"❌ Failed to create issue: {res.get('reason')}")
             sys.exit(1)

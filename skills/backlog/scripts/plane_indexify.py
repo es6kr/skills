@@ -242,7 +242,11 @@ def main(argv=None):
                 "end": block["end"],
                 "old_block": lines[block["start"] : block["end"] + 1],
                 "new_line": build_index_line(
-                    block, best, identifiers[project_id], client.issue_url(project_id, best["id"]), args.note
+                    block,
+                    best,
+                    identifiers[project_id],
+                    client.browse_url(identifiers[project_id], best.get("sequence_id")),
+                    args.note,
                 ),
                 "score": round(best_score, 2),
             }
