@@ -140,6 +140,14 @@ PYEOF
   check ALLOW "$(mk 'how to proceed' 'do not retag; split the commits instead' 'x')"
   # "squash ... before merging" word order (not just "squash merge")
   check ALLOW "$(mk 'squash these commits before merging the PR?' 'yes' 'x')"
+  # regression (issue #505): citing a guard's own filename must not trip the
+  # guard even though the filename's substring happens to be a RETAG_VERBS
+  # token -- both backtick-quoted and bare forms
+  check ALLOW "$(mk 'how to proceed' 'x' 'see `block-squash-subject-without-pr.sh`')"
+  check ALLOW "$(mk 'how to proceed' 'x' 'the guard file is block-squash-subject-without-pr.sh')"
+  # regression (issue #505): citing a test-result line for an identifier that
+  # contains a RETAG_VERBS token must not trip the guard either
+  check ALLOW "$(mk 'how to proceed' 'x' 'bats squash-subject 19/19')"
 
   # --- condition 3: per-commit file enumeration in the turn clears the gate ---
   check ALLOW "$(mk 'how to proceed' 'reword to feat:' 'x')" \
@@ -214,6 +222,22 @@ NEGATION_VERBS='(do ?n.?t|do not|never|avoid|without|skip)'
 # onward and is a non-standard extension even there. Every match below is
 # case-sensitive against this pre-folded copy.
 ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT" | tr '[:upper:]' '[:lower:]')
+
+# A payload routinely CITES an identifier that happens to contain a
+# RETAG_VERBS token as a substring -- a guard's own filename
+# (block-squash-subject-without-pr.sh) or a test-result line
+# (bats squash-subject 19/19) -- without proposing any tag change. Strip
+# those citation shapes before verb matching so citing them does not trip the
+# guard. Plain prose intent ("let's squash these commits") is untouched
+# because it lacks the citation markers these patterns require.
+#   1. backtick-quoted spans -- this repo's Markdown convention for citing
+#      filenames/commands/test output
+ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/`[^`]*`//g')
+#   2. filename-shaped tokens that reach the matcher without backticks --
+#      hyphenated basename + a known script extension
+ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_]+(-[a-z0-9_]+)*\.(sh|py|js|ts)//g')
+#   3. "<identifier> N/N" test-result notation (e.g. "squash-subject 19/19")
+ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_-]+[[:space:]]+[0-9]+\/[0-9]+//g')
 
 # A squash-MERGE is a different concern (it collapses several commits' types
 # into the PR title) and has its own rule and guard. Only local history

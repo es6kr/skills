@@ -180,6 +180,14 @@ If `--interactive` is off, proceed directly to the medium-decided POST (determin
 ```
 Do not write `code-reviewer` as plain text; use the link format above. The `<!-- consolidate:verified -->` HTML comment on the second line is an invisible machine-readable provenance marker: it renders as nothing on GitHub but lets the `block-noncompliant-review-comment` guard (client hook + server Action) confirm the comment came through consolidate even if the `requesting-code-review` link text is ever reworded.
 
+**Bot-layer content in the body drops the suffix (HARD STOP — 3rd recurrence of mixing bot-layer content into this artifact)**: the `— [requesting-code-review](...)` suffix is a provenance claim — "this artifact is the superpowers requesting-code-review framework's own output." If the body includes ANY bot-layer finding (CodeRabbit CLI local substitute, or any other bot-layer engine), as its own section OR merged into the findings list with a `Source` label — the suffix is false and must be dropped. Use a plain title instead: `## Internal Code Review (CodeRabbit CLI + superpowers code-reviewer)` (name the actual engines that contributed). The `<!-- consolidate:verified -->` marker still applies regardless of title wording.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Keep the `[requesting-code-review]` suffix while merging a CodeRabbit CLI (bot-layer substitute) finding into the same findings list, distinguished only by a `Source` column | Drop the suffix; title names the actual contributing engines |
+| 2 | Assume this only applies to the "add a separate CodeRabbit CLI section" pattern (the 2nd recurrence's exact shape) | Applies whenever bot-layer content appears anywhere in the body — a merged/unified findings list is the same violation with different formatting |
+| 3 | Leave a previously-posted review's title unfixed after discovering bot-layer content was included | Update the review body via `gh api -X PUT repos/{owner}/{repo}/pulls/{N}/reviews/{review_id}` (reviews ARE PATCH/PUT-able for body text, unlike the state) |
+
 #### Caller-supplied custom title contract (HARD STOP)
 
 When the consolidate caller passes a custom title for this review (e.g. args "rename Internal Review → Code Review" / "title it Superpowers Review"), the retitle applies **only to this Code Review comment's heading text** — the `— [requesting-code-review](...)` link suffix stays. The retitle does **NOT** merge this comment into the Summary, and does **NOT** change the separate AI Review Summary (Step 7) title.

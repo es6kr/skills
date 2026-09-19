@@ -74,15 +74,16 @@ Returns structured JSON output:
 {
   "success": true,
   "method": "REST API" | "K3s Django Shell Fallback",
-  "id": "86db2a42-172e-4413-98a2-9f5f704104e8",
+  "id": "<issue-uuid>",
   "sequence_id": 8,
-  "title": "[es6kr/skills] Roll out PR 282, 283, 286 and live-verify",
-  "url": "https://plane.es6.kr/es6kr/projects/4b4d8bfc-5e5d-495b-bd4c-301fe89e5bb0/issues/86db2a42-172e-4413-98a2-9f5f704104e8",
+  "title": "Issue title",
+  "url": "https://<plane-host>/<workspace-slug>/projects/<project-uuid>/issues/<issue-uuid>",
+  "browse_url": "https://<plane-host>/<workspace-slug>/browse/<IDENTIFIER>-8",
   "intake": true
 }
 ```
 
-After creation, attach the returned `url` to the tracker item: `→ Plane (<url>)`.
+**`url` vs `browse_url` — use `browse_url` for anything a person reads or clicks.** `url` is the raw API-shaped link (workspace slug + project UUID + issue UUID) — Plane resolves it, but a reader can't tell what it points to from the UUIDs alone. `browse_url` is the short `<IDENTIFIER>-<SEQ>` form and is what belongs in tracker items, chat reports, and issue/PR comments. After creation, attach the returned `browse_url` to the tracker item: `→ Plane (<browse_url>)`. `browse_url` is `null` only if the project-identifier lookup failed (rare, best-effort) — fall back to `url` in that case, but treat it as a signal something's off, not the normal path.
 
 ## Canonical Plane Browse URL Format (HARD STOP)
 

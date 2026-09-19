@@ -14,14 +14,23 @@
 #   1. Sync component dirs (skills/ agents/ commands/ hooks/ plugins/) source -> clone
 #   2. Upsert source's marketplace.json plugin entries into the clone (by name; clone-only kept)
 #   3. chmod +x synced hook scripts
-#   4. (optional) enable the plugin in settings.json (with backup)
-#   5. Print the 4-step plugin-activation verification + reload reminder
+#   4. Sync the same component dirs into each cached plugin's version dir under
+#      ~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>/ (see Notes)
+#   5. (optional) enable the plugin in settings.json (with backup)
+#   6. Print the 4-step plugin-activation verification + reload reminder
 #
 # Notes:
 #   - Additive sync (rsync --delete only when rsync is present). Removed source files
 #     are NOT pruned from the clone unless rsync is available.
 #   - Direct clone edits are a TEST shortcut. A later GitHub re-sync overwrites them.
 #     Commit/push the source repo to make changes durable.
+#   - Step 1-3 only touch the marketplace CLONE (~/.claude/plugins/marketplaces/<name>/).
+#     An already-running session loads skills from the plugin CACHE
+#     (~/.claude/plugins/cache/<name>/<plugin>/<version>/) instead, which the clone sync
+#     never reaches — a change "reflected" by this script can still appear stale to that
+#     session. Step 4 closes that gap by mirroring the same component dirs into every
+#     already-cached plugin version dir. It intentionally skips plugin/version
+#     combinations that have no existing cache dir (nothing to keep in sync there yet).
 
 set -euo pipefail
 
@@ -48,17 +57,20 @@ CLONE_MP="$CLONE/.claude-plugin/marketplace.json"
 [ -f "$CLONE_MP" ] || { echo "[dev-reflect] clone has no marketplace.json: $CLONE_MP" >&2; exit 1; }
 command -v jq >/dev/null || { echo "[dev-reflect] jq required" >&2; exit 1; }
 
-run() { if [ "$DRYRUN" = 1 ]; then echo "DRY: $*"; else eval "$*"; fi; }
+# Executes its arguments directly (never eval) so that untrusted values (e.g.
+# PLUGIN_NAME sourced from --source's own marketplace.json) can never be
+# re-parsed as shell syntax, regardless of what characters they contain.
+run() { if [ "$DRYRUN" = 1 ]; then echo "DRY: $*"; else "$@"; fi; }
 
 # 1. Sync component dirs
 HAVE_RSYNC=0; command -v rsync >/dev/null && HAVE_RSYNC=1
 for dir in skills agents commands hooks plugins; do
   [ -d "$SOURCE/$dir" ] || continue
   if [ "$HAVE_RSYNC" = 1 ]; then
-    run "rsync -a --delete \"$SOURCE/$dir/\" \"$CLONE/$dir/\""
+    run rsync -a --delete "$SOURCE/$dir/" "$CLONE/$dir/"
   else
-    run "mkdir -p \"$CLONE/$dir\""
-    run "command cp -r \"$SOURCE/$dir/.\" \"$CLONE/$dir/\""
+    run mkdir -p "$CLONE/$dir"
+    run command cp -r "$SOURCE/$dir/." "$CLONE/$dir/"
   fi
   echo "[dev-reflect] synced $dir/"
 done
@@ -84,7 +96,32 @@ if [ "$DRYRUN" != 1 ]; then
     -exec chmod +x {} \; || true
 fi
 
-# 4. Optional: enable plugin in settings.json
+# 4. Sync into already-cached plugin version dirs (marketplace clone alone is not
+#    what an active session loads from — see the Notes block above)
+while IFS= read -r PLUGIN_NAME; do
+  [ -n "$PLUGIN_NAME" ] || continue
+  PLUGIN_CACHE_BASE="$HOME/.claude/plugins/cache/$MARKETPLACE/$PLUGIN_NAME"
+  [ -d "$PLUGIN_CACHE_BASE" ] || continue
+  for CACHE_DIR in "$PLUGIN_CACHE_BASE"/*; do
+    [ -d "$CACHE_DIR" ] || continue
+    for dir in skills agents commands hooks plugins; do
+      [ -d "$SOURCE/$dir" ] || continue
+      if [ "$HAVE_RSYNC" = 1 ]; then
+        run rsync -a --delete "$SOURCE/$dir/" "$CACHE_DIR/$dir/"
+      else
+        run mkdir -p "$CACHE_DIR/$dir"
+        run command cp -r "$SOURCE/$dir/." "$CACHE_DIR/$dir/"
+      fi
+    done
+    if [ "$DRYRUN" != 1 ]; then
+      find "$CACHE_DIR/skills" "$CACHE_DIR/hooks" "$CACHE_DIR/plugins" -type f -name '*.sh' 2>/dev/null \
+        -exec chmod +x {} \; || true
+    fi
+    echo "[dev-reflect] synced plugin cache: $CACHE_DIR"
+  done
+done <<< "$(jq -r '.plugins[].name' "$SRC_MP")"
+
+# 5. Optional: enable plugin in settings.json
 if [ -n "$ENABLE" ]; then
   S="$HOME/.claude/settings.json"
   KEY="$ENABLE@$MARKETPLACE"
@@ -100,7 +137,7 @@ if [ -n "$ENABLE" ]; then
   fi
 fi
 
-# 5. Verification report
+# 6. Verification report
 cat <<EOF
 
 [dev-reflect] Reflected to clone: $CLONE

@@ -35,7 +35,12 @@ from pathlib import Path
 # Instance-specific values come from the environment — no personal endpoint
 # ships in published source. Override via --url / env as needed.
 DEFAULT_URL = os.environ.get("RAG_URL", "http://localhost:6333")
-DEFAULT_COLLECTION = os.environ.get("RAG_COLLECTION", "claude-memory")
+DEFAULT_COLLECTION = (
+    os.environ.get("AGENT_MEMORY_COLLECTION")
+    or os.environ.get("RAG_COLLECTION")
+    or os.environ.get("WSCFG_RAG_GLOBAL_COLLECTION_MEMORY")
+    or "agent-memory"
+)
 DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 DEFAULT_CACHE = str(Path.home() / ".cache/fastembed-qdrant-mcp")
 VECTOR_NAME = os.environ.get("RAG_VECTOR_NAME", "fast-paraphrase-multilingual-minilm-l12-v2")

@@ -10,12 +10,79 @@ INJECT="$SELFDIR/context-usage-inject.sh"
 
 TRANSCRIPT="$1"
 if [ -z "$TRANSCRIPT" ]; then
-  # Fallback: check ANTIGRAVITY log or latest Claude Code transcript
-  if [ -n "$ANTIGRAVITY_AGENT" ] || [ -d "$HOME/.gemini/antigravity-cli/brain" ]; then
-    TRANSCRIPT=$(find "$HOME/.gemini/antigravity-cli/brain" -name "transcript.jsonl" -type f -exec stat -f "%m %N" {} + 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+  # Claude Code encodes a workspace's cwd into its project dir name by
+  # replacing every '/' and '.' character in the absolute cwd with '-'.
+  # Try THIS workspace's own project dir first, before any Antigravity check:
+  # a cwd-scoped match is the strongest signal of "this call belongs to a
+  # Claude Code session for this specific workspace", and it must outrank a
+  # mere "the Antigravity brain dir exists somewhere on this machine" check --
+  # on any machine where both harnesses have ever run, that existence check
+  # is true unconditionally and previously stole precedence away from Claude
+  # Code every time, regardless of which harness actually invoked this script.
+  find_newest_transcript() {
+    local search_dir="$1"
+    local name_pat="$2"
+    local maxdepth="${3:-}"
+    [ -d "$search_dir" ] || return 0
+
+    if stat -f "%m" /dev/null >/dev/null 2>&1; then
+      if [ -n "$maxdepth" ]; then
+        find "$search_dir" -maxdepth "$maxdepth" -name "$name_pat" -type f -exec stat -f "%m %N" {} + 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-
+      else
+        find "$search_dir" -name "$name_pat" -type f -exec stat -f "%m %N" {} + 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-
+      fi
+    elif stat -c "%Y" /dev/null >/dev/null 2>&1; then
+      if [ -n "$maxdepth" ]; then
+        find "$search_dir" -maxdepth "$maxdepth" -name "$name_pat" -type f -exec stat -c "%Y %n" {} + 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-
+      else
+        find "$search_dir" -name "$name_pat" -type f -exec stat -c "%Y %n" {} + 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-
+      fi
+    else
+      python3 -c "
+import os, sys, glob
+sdir, pat, md = sys.argv[1], sys.argv[2], sys.argv[3]
+matched = []
+if md:
+    try:
+        for f in os.listdir(sdir):
+            if glob.fnmatch.fnmatch(f, pat):
+                p = os.path.join(sdir, f)
+                if os.path.isfile(p):
+                    matched.append(p)
+    except OSError:
+        pass
+else:
+    for root, _, files in os.walk(sdir):
+        for f in files:
+            if glob.fnmatch.fnmatch(f, pat):
+                matched.append(os.path.join(root, f))
+if matched:
+    print(max(matched, key=os.path.getmtime))
+" "$search_dir" "$name_pat" "$maxdepth" 2>/dev/null
+    fi
+  }
+
+  if [ -d "$HOME/.claude/projects" ]; then
+    PROJECT_KEY=$(printf '%s' "$PWD" | tr '/.' '-')
+    PROJECT_DIR="$HOME/.claude/projects/$PROJECT_KEY"
+    if [ -d "$PROJECT_DIR" ]; then
+      TRANSCRIPT=$(find_newest_transcript "$PROJECT_DIR" "*.jsonl" 1)
+    fi
   fi
+  # Fallback: check ANTIGRAVITY log
+  if [ -z "$TRANSCRIPT" ] && { [ -n "$ANTIGRAVITY_AGENT" ] || [ -d "$HOME/.gemini/antigravity-cli/brain" ]; }; then
+    TRANSCRIPT=$(find_newest_transcript "$HOME/.gemini/antigravity-cli/brain" "transcript.jsonl")
+  fi
+  # Last-resort global Claude Code search -- only when this workspace has no
+  # project dir yet (e.g. a brand-new cwd) AND no Antigravity transcript was
+  # found either. Globbing across every project under ~/.claude/projects
+  # picks whichever session (this machine or another, synced in via
+  # Syncthing) happens to have the newest mtime globally -- with many
+  # concurrent sessions across workspaces/machines that is effectively a
+  # coin flip, and it silently reports a completely unrelated session's
+  # usage as this caller's own, so it is the last resort, not the default.
   if [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
-    TRANSCRIPT=$(find "$HOME/.claude/projects" -name "*.jsonl" -type f -exec stat -f "%m %N" {} + 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+    TRANSCRIPT=$(find_newest_transcript "$HOME/.claude/projects" "*.jsonl")
   fi
 fi
 
