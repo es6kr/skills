@@ -140,6 +140,14 @@ PYEOF
   check ALLOW "$(mk 'how to proceed' 'do not retag; split the commits instead' 'x')"
   # "squash ... before merging" word order (not just "squash merge")
   check ALLOW "$(mk 'squash these commits before merging the PR?' 'yes' 'x')"
+  # regression (issue #505): citing a guard's own filename must not trip the
+  # guard even though the filename's substring happens to be a RETAG_VERBS
+  # token -- both backtick-quoted and bare forms
+  check ALLOW "$(mk 'how to proceed' 'x' 'see `block-squash-subject-without-pr.sh`')"
+  check ALLOW "$(mk 'how to proceed' 'x' 'the guard file is block-squash-subject-without-pr.sh')"
+  # regression (issue #505): citing a test-result line for an identifier that
+  # contains a RETAG_VERBS token must not trip the guard either
+  check ALLOW "$(mk 'how to proceed' 'x' 'bats squash-subject 19/19')"
 
   # --- condition 3: per-commit file enumeration in the turn clears the gate ---
   check ALLOW "$(mk 'how to proceed' 'reword to feat:' 'x')" \
