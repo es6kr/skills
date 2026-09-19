@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.5](https://github.com/es6kr/skills/compare/consolidate-v0.6.4...consolidate-v0.6.5) (2026-09-18)
+
+
+### Bug Fixes
+
+* **consolidate:** drop requesting-code-review suffix when bot-layer content is mixed in ([#498](https://github.com/es6kr/skills/issues/498)) ([66fb1be](https://github.com/es6kr/skills/commit/66fb1bedc768544415a808b2d33d96feeee0a3ea))
+
 ## [0.6.4](https://github.com/es6kr/skills/compare/consolidate-v0.6.3...consolidate-v0.6.4) (2026-09-18)
 
 
