@@ -19,7 +19,7 @@ class SkillSpector:
 
     # Security rule regexes
     SEC_01_PIPE_SHELL = re.compile(
-        r"(?:curl|wget)\s+[^\n|]+\|\s*(?:ba)?sh", re.IGNORECASE
+        r"(?:curl|wget)\s+[^\n|]+\|\s*(?:\S*/)?(?:env\s+)?(?:ba)?sh\b", re.IGNORECASE
     )
     SEC_02_SECRETS = re.compile(
         r"(?:ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{82}|AKIA[0-9A-Z]{16}|bearer\s+[a-zA-Z0-9_\-\.]{20,})",
@@ -96,33 +96,55 @@ class SkillSpector:
         body = parts[2]
 
         fm_dict: Dict[str, Any] = {}
-        current_key: Optional[str] = None
         current_dict: Optional[Dict[str, Any]] = None
 
-        for line in fm_text.splitlines():
+        lines = fm_text.splitlines()
+        i = 0
+        n = len(lines)
+        while i < n:
+            line = lines[i]
             line_str = line.strip()
             if not line_str or line_str.startswith("#"):
+                i += 1
                 continue
 
             if line.startswith("  ") and current_dict is not None and ":" in line_str:
                 sub_k, sub_v = line_str.split(":", 1)
-                current_dict[sub_k.strip()] = sub_v.strip()
+                current_dict[sub_k.strip()] = self._strip_quotes(sub_v.strip())
+                i += 1
                 continue
 
             if ":" in line_str:
                 k, v = line_str.split(":", 1)
                 k = k.strip()
                 v = v.strip()
+                if v in ("|", ">", "|-", ">-", "|+", ">+"):
+                    # Block scalar: collect subsequent more-indented (or blank) lines
+                    block_lines: List[str] = []
+                    i += 1
+                    while i < n and (not lines[i].strip() or lines[i].startswith((" ", "\t"))):
+                        if lines[i].strip():
+                            block_lines.append(lines[i].strip())
+                        i += 1
+                    joiner = "\n" if v.startswith("|") else " "
+                    fm_dict[k] = joiner.join(block_lines)
+                    current_dict = None
+                    continue
                 if not v:
-                    current_key = k
                     current_dict = {}
                     fm_dict[k] = current_dict
                 else:
-                    fm_dict[k] = v
-                    current_key = None
+                    fm_dict[k] = self._strip_quotes(v)
                     current_dict = None
+            i += 1
 
         return fm_dict, body
+
+    @staticmethod
+    def _strip_quotes(v: str) -> str:
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+            return v[1:-1]
+        return v
 
     def _validate_frontmatter(
         self, fm: Dict[str, Any], errors: List[str], warnings: List[str]
@@ -204,6 +226,15 @@ def main():
                     results.append(linter.scan_skill(str(s.parent)))
             else:
                 results.append(linter.scan_skill(str(p)))
+        else:
+            results.append(
+                {
+                    "skill": str(p),
+                    "valid": False,
+                    "errors": [f"Path does not exist or contains no SKILL.md: {p}"],
+                    "warnings": [],
+                }
+            )
 
     if args.json:
         print(json.dumps(results, indent=2))

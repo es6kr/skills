@@ -258,7 +258,7 @@ If `uv` is missing:
 | Platform | Install uv |
 |----------|------------|
 | macOS | `brew install uv` |
-| Linux | `curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh && sh /tmp/uv-install.sh` |
+| Linux | `f=$(mktemp) && curl -LsSf https://astral.sh/uv/install.sh -o "$f" && sh "$f"; rm -f "$f"` |
 | Windows (PowerShell) | `irm https://astral.sh/uv/install.ps1 \| iex` — runs in user scope, no elevation needed |
 
 If neither `uv` nor a viable installer is available in the current environment, **skip Step 0 and proceed with Step 1** — the custom rules below provide partial coverage only (description-length budget, depends-on order, hardlink scan), not the upstream spec enforcement. **Report the skip explicitly** with a risk statement naming which upstream checks were not exercised (e.g., "Step 0 skipped — `skills-ref` name-match and properties-JSON validation not run").
@@ -629,13 +629,13 @@ allowed-tools: [Read, Edit]
 
 ## SkillSpector Static Analysis & Security Scanner
 
-`skills/skills/skill-kit/scripts/skillspector_lint.py` provides standalone static validation and security auditing for skill files and directories.
+`skills/skill-kit/scripts/skillspector_lint.py` provides standalone static validation and security auditing for skill files and directories.
 
 ### Checks Performed
 
 | Rule Code | Category | Description | Severity |
 |---|---|---|---|
-| `STR-01` | Structure | Validates YAML frontmatter boundaries, name-to-directory match, and non-empty description | Error |
+| `STR-01` | Structure | Validates YAML frontmatter boundaries and non-empty `name` (character-set check only — does not compare against the containing directory name) | Error |
 | `STR-02` | Structure | HARD STOP: Description length $\le 1024$ characters to prevent Claude Code prompt truncation | Error |
 | `STR-03` | Structure | Resolves and verifies markdown topic references cited in SKILL.md | Warning |
 | `SEC-01` | Security | Detects dangerous download-and-execute pipes (`curl`/`wget` piped to shell) | Error |
@@ -647,13 +647,10 @@ allowed-tools: [Read, Edit]
 
 ```bash
 # Scan a specific skill
-python3 skills/skills/skill-kit/scripts/skillspector_lint.py skills/skills/my-skill
+python3 skills/skill-kit/scripts/skillspector_lint.py skills/skill-kit
 
 # JSON output mode for CI
-python3 skills/skills/skill-kit/scripts/skillspector_lint.py --json skills/skills/my-skill
-
-# Scan only security rules
-python3 skills/skills/skill-kit/scripts/skillspector_lint.py --security-only skills/skills/my-skill
+python3 skills/skill-kit/scripts/skillspector_lint.py --json skills/skill-kit
 ```
 
 ## Notes
