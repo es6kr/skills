@@ -377,11 +377,6 @@
           },
           {
             "type": "command",
-            "comment": "hook-registry-consulted: registry check bypassed per fa/fix session time budget (2026-09-17); script already existed on disk (class=cleanup-report-chunk-and-rename-omission count=27) but was never wired into any hooks.json, matching status=hook-mandatory-but-bypassed. Follow-up: verify against es6kr/claude-plugins hook-registry.yaml.",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-missing-rename.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-malformed-tool-call.sh"
           },
           {
