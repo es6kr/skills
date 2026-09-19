@@ -14,7 +14,7 @@ description: |
   "install the orca skills into openclaw/antigravity", "Orca worktree", "Orca terminal send".
 metadata:
   author: es6kr
-  version: "0.1.0"
+  version: "0.3.0"
 ---
 
 # Orca Session Management
@@ -85,6 +85,19 @@ Every command in this skill that talks to another terminal must first know which
 is itself, to avoid ever targeting its own pane. Orca exports `ORCA_PANE_KEY` as
 `<tabId>:<leafId>` inside every managed terminal. If it is unset, this session is not running
 inside an Orca-managed terminal and `send` must refuse to run (see [send.md](./send.md)).
+
+## Core Terminal Lifecycle & Layout Operations
+
+While `send.md` and `launch.md` detail higher-level handoff workflows, Orca CLI provides
+direct pane and tab manipulation commands:
+
+| Command | Purpose | Example |
+|---|---|---|
+| `split` | Split active pane into paired panes | `ORCA terminal split --terminal <handle> --direction vertical --command "<cmd>" --json` |
+| `rename` | Update the UI tab title | `ORCA terminal rename --terminal <handle> --title "<title>" --json` |
+| `switch` | Focus/switch UI view to terminal | `ORCA terminal switch --terminal <handle> --json` |
+| `close` | Gracefully terminate a terminal/tab | `ORCA terminal close --terminal <handle> --json` |
+| `wait` | Await condition (e.g. idle prompt) | `ORCA terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json` |
 
 ## Topic Dependencies
 
