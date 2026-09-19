@@ -59,5 +59,39 @@ class TestBrowseUrl(unittest.TestCase):
         self.assertIn("/issues/22222222-2222-2222-2222-222222222222", url)
 
 
+class TestListProjects(unittest.TestCase):
+    def test_list_projects_handles_bare_list_response(self):
+        client = make_client()
+        client.request = lambda path: [{"id": "p1", "identifier": "P1"}]
+        projects = client.list_projects()
+        self.assertEqual(projects, [{"id": "p1", "identifier": "P1"}])
+
+    def test_list_projects_paginates_cursor(self):
+        client = make_client()
+        calls = []
+
+        def fake_request(path):
+            calls.append(path)
+            if "cursor=100:0:0" in path:
+                return {
+                    "results": [{"id": "p1", "identifier": "P1"}],
+                    "next_cursor": "100:1:0",
+                    "next_page_results": True,
+                }
+            return {
+                "results": [{"id": "p2", "identifier": "P2"}],
+                "next_cursor": None,
+                "next_page_results": False,
+            }
+
+        client.request = fake_request
+        projects = client.list_projects()
+        self.assertEqual(len(projects), 2)
+        self.assertEqual(projects[0]["identifier"], "P1")
+        self.assertEqual(projects[1]["identifier"], "P2")
+        self.assertEqual(len(calls), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -33,6 +33,8 @@ def parse_frontmatter(content: str) -> Tuple[Optional[str], str]:
     프론트매터가 없으면 (None, content)를 반환합니다.
     """
     if content.startswith("---\n"):
+        if content.startswith("---\n---\n"):
+            return "", content[8:]
         end_idx = content.find("\n---\n", 4)
         if end_idx != -1:
             fm_text = content[4:end_idx]
@@ -41,6 +43,8 @@ def parse_frontmatter(content: str) -> Tuple[Optional[str], str]:
         elif content.endswith("\n---"):
             fm_text = content[4:-4]
             return fm_text, ""
+        elif content == "---\n---":
+            return "", ""
     return None, content
 
 
@@ -198,6 +202,21 @@ def main():
     print(f"Base URL:    {args.base_url}")
     print(f"Dry-run:     {args.dry_run}")
     print(f"File Count:  {len(args.files)}\n")
+
+    # Check for duplicate target basenames across input files
+    seen_basenames = {}
+    duplicates = []
+    for f in args.files:
+        bn = os.path.basename(f)
+        if bn in seen_basenames:
+            duplicates.append((bn, seen_basenames[bn], f))
+        else:
+            seen_basenames[bn] = f
+    if duplicates:
+        print("ERROR: Duplicate destination filenames detected across source arguments:", file=sys.stderr)
+        for bn, first, second in duplicates:
+            print(f"  - `{bn}`: '{first}' and '{second}'", file=sys.stderr)
+        sys.exit(2)
 
     results = []
     for f in args.files:

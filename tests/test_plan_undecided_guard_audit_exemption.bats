@@ -63,6 +63,18 @@ recommend A vs B, decision required.'
   [ "$result" -eq 2 ]
 }
 
+@test "Edit with audit heading AND undecided markers outside audit section still fires" {
+  body='## Audit — 2026-09-19
+
+Re-reviewed the prior Trade-offs table; recommend keeping the original choice.
+
+## Open Questions
+
+Option A vs Option B — TBD, decision required before proceeding.'
+  result="$(run_guard "Edit" "/repo/docs/generated/plan-foo.md" "new_string" "$body")"
+  [ "$result" -eq 2 ]
+}
+
 # --- non-plan path is always a no-op -------------------------------------
 
 @test "non-plan file path is always allowed regardless of content" {
@@ -72,3 +84,4 @@ recommend A vs B, decision required.'
   result="$(run_guard "Edit" "/repo/README.md" "new_string" "$body")"
   [ "$result" -eq 0 ]
 }
+

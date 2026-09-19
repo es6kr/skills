@@ -41,6 +41,17 @@ class TestSyncSharedArtifacts(unittest.TestCase):
         self.assertIsNone(fm)
         self.assertEqual(body, content)
 
+    def test_parse_frontmatter_empty_fm(self):
+        content = "---\n---\n# Heading\nBody text"
+        fm, body = parse_frontmatter(content)
+        self.assertEqual(fm, "")
+        self.assertEqual(body, "# Heading\nBody text")
+
+        content2 = "---\n---"
+        fm2, body2 = parse_frontmatter(content2)
+        self.assertEqual(fm2, "")
+        self.assertEqual(body2, "")
+
     def test_upsert_frontmatter_existing(self):
         fm = "title: Doc\ncollabmd_url: https://old.url\nstatus: draft"
         new_fm = upsert_frontmatter_fields(

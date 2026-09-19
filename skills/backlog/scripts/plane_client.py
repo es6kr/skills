@@ -262,14 +262,27 @@ class PlaneClient:
         )
 
     def list_projects(self):
-        """Return every project in the workspace (id, identifier, name, ...).
+        """Return every project in the workspace (id, identifier, name, ...), following pagination.
 
         Used to resolve a short project code (e.g. "ES6KR") to its project_id
         before an identifier-based lookup — see plane_verify_identifier.py.
         Not cached: the project list is small and rarely called in a loop.
         """
-        page = self.request("workspaces/%s/projects/" % self.profile["workspace_slug"])
-        return page.get("results", page if isinstance(page, list) else [])
+        projects = []
+        cursor = "%d:0:0" % PAGE_SIZE
+        while True:
+            page = self.request(
+                "workspaces/%s/projects/?cursor=%s" % (self.profile["workspace_slug"], cursor)
+            )
+            if isinstance(page, list):
+                return page
+            results = page.get("results", [])
+            projects.extend(results)
+            next_cursor = page.get("next_cursor")
+            if not next_cursor or not page.get("next_page_results"):
+                break
+            cursor = next_cursor
+        return projects
 
     def list_issues(self, project_id, use_cache=True):
         """Return every issue of a project, following pagination.

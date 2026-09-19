@@ -66,13 +66,28 @@ esac
 # Scoped to Edit: a Write is a full-file replace where other genuinely-
 # undecided content could still exist outside the audit section, so it stays
 # subject to the full scan.
-# The Korean audit-heading keyword is a bash $'\uXXXX' Unicode escape rather
-# than a literal character so this ASCII-only source stays compliant with
-# this repo's English-only convention (block-korean-text pre-commit hook) —
-# it decodes to the two-syllable word for "audit/review" (U+AC10 U+C0AC).
-AUDIT_HEADING_KO=$'\uAC10\uC0AC'
-if [ "$TOOL_NAME" = "Edit" ] && printf '%s' "$BODY" | grep -qE "^#{2,}[[:space:]].*($AUDIT_HEADING_KO|Audit)"; then
-  exit 0
+# For Edit, only the lines within the audit section (from the audit heading
+# up to the next Markdown heading) are stripped before undecided-marker detection,
+# so mixed edits adding both an audit section and live undecided markers are
+# still caught.
+# The Korean audit-heading keyword uses printf $'\xea\xb0\x90\xec\x82\xac' (UTF-8 bytes)
+# rather than literal Hangul so this ASCII-only source stays compliant with
+# this repo's English-only convention (block-korean-text pre-commit hook).
+AUDIT_HEADING_KO=$'\xea\xb0\x90\xec\x82\xac'
+SCAN_BODY="$BODY"
+if [ "$TOOL_NAME" = "Edit" ]; then
+  SCAN_BODY=$(printf '%s\n' "$BODY" | awk -v ko="$AUDIT_HEADING_KO" '
+    BEGIN { in_audit = 0 }
+    /^#{2,}[[:space:]]/ {
+      if ($0 ~ ko || $0 ~ /Audit/) {
+        in_audit = 1
+        next
+      } else {
+        in_audit = 0
+      }
+    }
+    !in_audit { print }
+  ')
 fi
 
 # Undecided-marker detection (2 kinds):
@@ -94,7 +109,7 @@ if [ -z "${PATTERN:-}" ]; then
   PATTERN='___|\bTBD\b|decision required|deferred| vs |recommend|[Tt]rade-?offs?|[Aa]lternatives|\|[[:space:]]*Chosen|Pros[[:space:]]*\|.*Cons'
 fi
 
-MATCHES=$(echo "$BODY" | grep -nEi "$PATTERN" 2>/dev/null | head -8)
+MATCHES=$(printf '%s\n' "$SCAN_BODY" | grep -nEi "$PATTERN" 2>/dev/null | head -8)
 
 # Drop code-reference lines before reporting.
 # A line that cites source locations (`file.ts:120-127`, `L45`) is describing WHERE

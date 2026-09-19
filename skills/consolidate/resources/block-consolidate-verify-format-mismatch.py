@@ -106,8 +106,21 @@ def extract_bodies(command: str) -> list[str]:
 
     for i, tok in enumerate(tokens):
         nxt = tokens[i + 1] if i + 1 < len(tokens) else ""
-        if tok in ("--body-file", "-F") and nxt:
+        if tok == "--body-file" and nxt:
             read_file(nxt)
+        elif tok == "-F" and nxt:
+            if nxt.startswith("body=@"):
+                read_file(nxt[len("body=@"):])
+            elif nxt.startswith("body="):
+                bodies.append(nxt[len("body="):])
+            elif "=" in nxt:
+                pass  # other key=value parameters (e.g. -F commit_id=...)
+            else:
+                read_file(nxt)
+        elif tok.startswith("-Fbody=@"):
+            read_file(tok[len("-Fbody=@"):])
+        elif tok.startswith("-Fbody="):
+            bodies.append(tok[len("-Fbody="):])
         elif tok == "--input" and nxt:
             try:
                 with open(nxt, encoding="utf-8") as fh:
@@ -122,6 +135,8 @@ def extract_bodies(command: str) -> list[str]:
             bodies.append(nxt)
         elif tok == "-f" and nxt.startswith("body="):
             bodies.append(nxt[len("body="):])
+        elif tok.startswith("-fbody="):
+            bodies.append(tok[len("-fbody="):])
         elif tok.startswith("--body="):
             bodies.append(tok[len("--body="):])
     return bodies
@@ -156,8 +171,8 @@ def check_internal_review_headings(body: str) -> str | None:
     None."""
     if INTERNAL_MARKER not in body:
         return None
-    if HEADING_RE.search(body):
-        return None  # at least one heading-shaped finding exists — OK
+    if NUMBERED_HEADING_RE.search(body):
+        return None  # at least one numbered heading finding exists — OK
     if not TOPLEVEL_NUMBERED_ITEM_RE.search(body):
         return None  # no findings at all (e.g. "no actionable findings") — OK
     sample = TOPLEVEL_NUMBERED_ITEM_RE.search(body)

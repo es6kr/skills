@@ -95,12 +95,11 @@ fi
 
 # 4. Sync into already-cached plugin version dirs (marketplace clone alone is not
 #    what an active session loads from — see the Notes block above)
-SRC_PLUGIN_JSON="$SOURCE/.claude-plugin/plugin.json"
-if [ -f "$SRC_PLUGIN_JSON" ]; then
-  VERSION="$(jq -r '.version' "$SRC_PLUGIN_JSON")"
-  while IFS= read -r PLUGIN_NAME; do
-    [ -n "$PLUGIN_NAME" ] || continue
-    CACHE_DIR="$HOME/.claude/plugins/cache/$MARKETPLACE/$PLUGIN_NAME/$VERSION"
+while IFS= read -r PLUGIN_NAME; do
+  [ -n "$PLUGIN_NAME" ] || continue
+  PLUGIN_CACHE_BASE="$HOME/.claude/plugins/cache/$MARKETPLACE/$PLUGIN_NAME"
+  [ -d "$PLUGIN_CACHE_BASE" ] || continue
+  for CACHE_DIR in "$PLUGIN_CACHE_BASE"/*; do
     [ -d "$CACHE_DIR" ] || continue
     for dir in skills agents commands hooks plugins; do
       [ -d "$SOURCE/$dir" ] || continue
@@ -116,10 +115,8 @@ if [ -f "$SRC_PLUGIN_JSON" ]; then
         -exec chmod +x {} \; || true
     fi
     echo "[dev-reflect] synced plugin cache: $CACHE_DIR"
-  done <<< "$(jq -r '.plugins[].name' "$SRC_MP")"
-else
-  echo "[dev-reflect] WARNING: no $SRC_PLUGIN_JSON — skipping plugin cache sync (version unknown)" >&2
-fi
+  done
+done <<< "$(jq -r '.plugins[].name' "$SRC_MP")"
 
 # 5. Optional: enable plugin in settings.json
 if [ -n "$ENABLE" ]; then
