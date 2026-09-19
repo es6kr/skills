@@ -113,8 +113,12 @@ check_date_in_skill_rule() {
     *) return 0 ;;
   esac
 
+  # Path-based exemption: case-history data files are locale logs, not skill
+  # procedural body. rag-pending/ holds FA entries queued for RAG import when
+  # the receiver is unreachable -- fa/retrospect.md mandates a date-stamped
+  # frontmatter on those, so blocking them makes the queue unwritable.
   case "$FILE_PATH" in
-    */cleanup/data/failed-attempts.md|*/cleanup/data/archive/*.md|*/cleanup/data/failed-hooks.md)
+    */cleanup/data/failed-attempts.md|*/cleanup/data/archive/*.md|*/cleanup/data/failed-hooks.md|*/cleanup/data/rag-pending/*.md)
       return 0
       ;;
   esac
