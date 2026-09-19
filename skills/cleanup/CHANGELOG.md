@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/cleanup-v0.6.0...cleanup-v0.7.0) (2026-09-18)
+
+
+### Features
+
+* **cleanup:** block cleanup completion reports missing a walkthrough ([#494](https://github.com/es6kr/skills/issues/494)) ([b89b82c](https://github.com/es6kr/skills/commit/b89b82c63fa5299c266d4ee0cca840401e81a593))
+* **hooks:** block wrap-up-adjacent /rename candidates missing sessid8 schema ([#501](https://github.com/es6kr/skills/issues/501)) ([9a69554](https://github.com/es6kr/skills/commit/9a69554afc33ebeb0ab4668c675f92271b005bd5))
+
+
+### Bug Fixes
+
+* address code review feedback ([8c1c058](https://github.com/es6kr/skills/commit/8c1c05896c99983a401d4a725ce3cc2cf005e524))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/cleanup-v0.5.1...cleanup-v0.6.0) (2026-09-13)
 
 

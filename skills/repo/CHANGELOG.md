@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/es6kr/skills/compare/repo-v0.3.2...repo-v0.3.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+
 ## [0.3.2](https://github.com/es6kr/skills/compare/repo-v0.3.1...repo-v0.3.2) (2026-08-17)
 
 

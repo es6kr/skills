@@ -478,6 +478,13 @@ Signal that merge-commit is the policy: a release-please manifest/config in the 
 
 **This pre-check is condition 6 of the "Self-check for the merge-option AskUserQuestion" gate below, not a separate optional step.** Composing a squash-merge option after satisfying only CI/Test Plan/AI Review Summary/Mergeable (conditions 1-4) without re-running this check is a HARD STOP violation — a release-please/changesets repo with a multi-commit PR against an accumulation branch needs `--merge` even when the other four conditions all look green.
 
+#### Skills and Plugins Repositories Squash Prohibition Gate (HARD STOP)
+
+In repositories managing skills or plugins (e.g. `es6kr/skills`, `es6kr/claude-plugins`):
+- **Squash Merge Recommendation Prohibited**: Recommending or executing a squash merge (`gh pr merge --squash`) is strictly prohibited (`HARD STOP`) because release automation (`semantic-release` / changelog generators) parses individual Conventional Commits across packages to determine package release versions and changelog entries. Squashing collapses distinct package-level commits into a single commit, corrupting release tags and changelog generation.
+- **Strict Exception (1 Real Commit)**: A PR containing **exactly 1 real commit** excluding merge commits (`git log --no-merges ... | wc -l == 1`). If and only if there is a single real commit, squash merge may be recommended/used.
+- **Multi-Commit PRs (`real_commits >= 2`)**: The agent MUST recommend and execute **`Merge commit` (`gh pr merge <N> --merge`)** to preserve granular Conventional Commit history.
+
 ### Commit-count / distinctness gate (HARD STOP — before defaulting to squash)
 
 **"Squash Merge (recommended)" below is the default only for PRs whose commits are not independently meaningful.** A PR with 3+ commits spanning genuinely distinct concerns (e.g. separate hook registrations, separate bug fixes bundled together, separate feature slices) loses that per-concern traceability when squashed — the option description must disclose this trade-off, not silently default to squash.

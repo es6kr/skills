@@ -84,7 +84,7 @@ exit_code=0
 # Tracked-skill filter — mirrors check-hangul.py. Untracked local-only skills
 # (in-development, personal, or not yet published) are exempt from this
 # publish-time gate because they are not yet publishing surface.
-declare -A TRACKED_SET=()
+TRACKED_LIST=""
 if tracked_out=$(git ls-files "$SKILLS_DIR" 2>/dev/null); then
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
@@ -94,11 +94,11 @@ if tracked_out=$(git ls-files "$SKILLS_DIR" 2>/dev/null); then
       *)               continue ;;
     esac
     head="${rel%%/*}"
-    [[ -n "$head" ]] && TRACKED_SET[$head]=1
+    [[ -n "$head" ]] && TRACKED_LIST="$TRACKED_LIST $head "
   done <<< "$tracked_out"
 fi
 filter_active=0
-[[ ${#TRACKED_SET[@]} -gt 0 ]] && filter_active=1
+[[ -n "$TRACKED_LIST" ]] && filter_active=1
 
 for dir in "$SKILLS_DIR"/*/; do
   [[ -d "$dir" ]] || continue
@@ -107,7 +107,7 @@ for dir in "$SKILLS_DIR"/*/; do
 
   # Skip untracked skills when the filter is active. If git is unavailable or
   # nothing is tracked (fresh repo), fall back to scanning everything.
-  if [[ $filter_active -eq 1 && -z "${TRACKED_SET[$name]:-}" ]]; then
+  if [[ $filter_active -eq 1 && ! "$TRACKED_LIST" =~ [[:space:]]"$name"[[:space:]] ]]; then
     continue
   fi
 

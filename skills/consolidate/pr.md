@@ -38,6 +38,32 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 
 Entry order: Step 1 → 2 → **2.3** (duplicate-review check, three axes — submitted human reviews + pending requests + foreign AI Summary; ask before proceeding on any hit) → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
+### The index above is an execution list, not a reading suggestion (HARD STOP)
+
+**Every topic named in the Workflow Index is a step you must actually open before acting on
+the step it covers.** This file describes Steps 1-2.7 inline and then hands off; it does not
+contain the procedures the other topics own. Reaching a correct outcome without opening them
+is not evidence that their gates were satisfied — it only means the guess happened to match.
+
+The specific way this fails: a line inside this file tells you where to go next (e.g. Step
+2.4's "on unavailable → automatically route to Internal Review Fallback (Step 3.5)"). That
+line resolves **which branch** to take. It does not resolve **what to do once you are there** —
+that belongs to the topic the index points at (here, `internal.md` Step 3.5.0, which decides
+the review engine). Treating a routing line as a terminal instruction skips the topic that
+owns the decision.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Read this file, find a line that names the next action, and act on it without opening the topic that owns that step | A routing line selects a branch; the destination topic owns the procedure. Open it |
+| 2 | Treat the topic-dispatch hook's named file as the full reading requirement | The hook names one entry file. This index names the rest — the hook does not enumerate them for you |
+| 3 | Conclude the gate was satisfied because the outcome matched the rule | Outcome-matching is not gate-execution. The next PR with different inputs will diverge |
+| 4 | Skip a topic because its step "clearly does not apply here" | Applicability is decided by the criteria inside that topic, not from this page |
+
+**Self-check (before every step transition in this workflow)**: which topic owns the step I am
+entering? Have I opened that file in this session? If not, open it before acting — including
+when a line in this file already told me what to do.
+
+
 ## Step 1: Identify PR
 
 If no PR number given, detect from current branch:

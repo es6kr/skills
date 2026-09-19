@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.4](https://github.com/es6kr/skills/compare/consolidate-v0.6.3...consolidate-v0.6.4) (2026-09-18)
+
+
+### Bug Fixes
+
+* **cleanup:** make the session-end report table self-sufficient ([#487](https://github.com/es6kr/skills/issues/487)) ([c4a0255](https://github.com/es6kr/skills/commit/c4a02557fb8de3b32cf337c549f62535dabf824b))
+* **consolidate:** count every finding source in verify_consolidate ([f12825a](https://github.com/es6kr/skills/commit/f12825aa4dc186fc6d4529d6f62fbfde524573f1))
+* **consolidate:** count every finding source in verify_consolidate ([2860dd0](https://github.com/es6kr/skills/commit/2860dd0c9dc8837d26c660da9b5ec6687fc4f80e))
+* **consolidate:** make the Workflow Index a traversal gate, not a reading suggestion ([#482](https://github.com/es6kr/skills/issues/482)) ([2d7bbad](https://github.com/es6kr/skills/commit/2d7bbada5775ed090e61ae9af171fa3e37d2de45))
+* **consolidate:** resolve git cat-file against -R repo instead of process cwd ([049614d](https://github.com/es6kr/skills/commit/049614d4c9213356250ccdc096c8ff38140d0e29))
+* **skills:** document canonical Do/Don't tables for Plane URLs, plan sync, and pre-merge reviews ([7069da8](https://github.com/es6kr/skills/commit/7069da85bb11bdcf0da8d9dc93619eeafc972dd2))
+
 ## [0.6.3](https://github.com/es6kr/skills/compare/consolidate-v0.6.2...consolidate-v0.6.3) (2026-09-05)
 
 

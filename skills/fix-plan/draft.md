@@ -142,3 +142,26 @@ Then remove the `## Plan Drafts` entry. **Order**: archive the file first, remov
 - [priority.md](./priority.md) — `[BLOCKED]` for external-blocked items
 - [issue-drafts.md](./issue-drafts.md) — parallel draft-file lifecycle
 - `code-workflow` (`steps` topic) — promote target: research → plan → user review
+
+## Plan Artifact CollabMD Sync & Plane Comment Linkage (HARD STOP)
+
+When authoring or updating architecture and planning artifacts (`plan-*.md`), stopping after writing to local workspace directories (`.agents/docs/generated/`) is strictly prohibited.
+1. **Security Isolation & CollabMD Sync Path Compliance**: Because `.agents/docs/generated/` is reserved for raw AI generation isolation, authoritative deliverables intended for CollabMD (`plan-*.md`, etc.) MUST be copied or placed in the secure sharing path **`.agents/docs/shared/`** so they are synchronized via Syncthing to the collaborative editor/viewer (CollabMD, `https://collabmd.dgs.ai.kr`), and the frontmatter must declare `collabmd_url` (`https://collabmd.dgs.ai.kr/#file=daegunsoftdev-agents-docs/<filename>`).
+2. **Parent Plane Issue Comment Linkage**: Prompt instructions prohibiting Plane issue mutations ("read-only research/planning") forbid modifying issue state or description, NOT posting reference comments. Agents MUST use `plane_create_comment.py` to post a comment to the corresponding parent Plane issue containing the CollabMD viewer link, local artifact path, executive summary, and audit status, ensuring end-to-end traceability in Plane SSOT.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Leave plan artifacts only in `.agents/docs/generated/` causing CollabMD `file not found` | Place in `.agents/docs/shared/` per security isolation policy, verify CollabMD URL, and link in Plane comment |
+| 2 | Conflate "prohibit Plane issue mutations" with posting artifact reference links | Distinguish state/body mutations from reference comment posting, completing comment linkage |
+
+## Plan & Research Artifact Mandatory Frontmatter Schema & Creation Date (HARD STOP)
+
+When authoring or revising architecture, plan, or research artifacts (`plan-*.md`, `research-*.md`), omitting mandatory YAML frontmatter metadata or using non-standard keys (such as bare `date:`) is strictly forbidden.
+1. **Canonical Frontmatter Schema Compliance**: Every plan and research artifact MUST begin with standard YAML frontmatter containing the mandatory field **`created: <YYYY-MM-DD>`** (initial creation date). Replacing `created` with arbitrary keys like `date` is prohibited.
+2. **Revision & Modification Tracking**: When modifying or augmenting an existing plan or research document, agents MUST preserve the original `created` date, update **`last_modified: <YYYY-MM-DD>`**, and prepend a document metadata banner (`> **Document Metadata**: Initial created date / Last modified date / Status`) at the top of the body.
+3. **Proactive Creation Date Declaration in Reports**: When presenting, quoting, or reporting plan/research deliverables in chat or checklists, agents MUST explicitly declare whether the document is newly authored or an existing document along with its initial creation date, preventing ambiguity over document history and provenance.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Use non-standard `date:` key or omit creation timestamp | Mandate `created: <YYYY-MM-DD>` in frontmatter, appending `last_modified` upon revision |
+| 2 | Present existing plans ambiguously without stating age/creation date | Proactively declare document provenance (new vs existing with original creation date) in chat reports |
