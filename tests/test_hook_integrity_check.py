@@ -221,3 +221,171 @@ def test_missing_config_message_names_the_searched_scopes(tmp_path, monkeypatch)
     assert reasons, "a genuinely absent config should still be reported"
     assert str(workspace) in reasons[0]
     assert "Global hooks.json config not found" != reasons[0]
+
+
+# --- Reverse axis: source hooks.json registered, installed cache missing it --
+#
+# Regression class under test (fix_plan.md daegunsoftDev/.agents, 2026-08-29
+# registration): the forward checks above only see ONE hooks.json (workspace
+# or home config) and only ask "does the registered script exist on disk".
+# They cannot see the actual 2026-08 incident: a marketplace SOURCE
+# plugins/<p>/hooks/hooks.json gained a new Stop/UserPromptSubmit
+# registration, but the INSTALLED CACHE hooks.json under
+# ~/.claude/plugins/cache/<mp>/<p>/<version>/ was never resynced, so that
+# registration was simultaneously absent from BOTH "registered" and "file
+# exists" -- ghost detection (which requires a registration to exist first)
+# never fires. These tests define the new reverse axis: diff a marketplace's
+# source hooks.json registrations against its installed cache counterpart.
+
+
+def _write_hooks_json(path, hooks_data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(hooks_data), encoding="utf-8")
+
+
+def test_iter_marketplace_hooks_files_detects_layout1_root(tmp_path):
+    """Layout 1: single-plugin marketplace with a root hooks/hooks.json."""
+    mp = tmp_path / "marketplaces" / "solo-mp"
+    _write_hooks_json(mp / "hooks" / "hooks.json", {"hooks": {}})
+
+    found = list(mod._iter_marketplace_hooks_files(str(tmp_path / "marketplaces")))
+
+    assert found == [("solo-mp", None, str(mp / "hooks" / "hooks.json"))]
+
+
+def test_iter_marketplace_hooks_files_detects_layout2_nested(tmp_path):
+    """Layout 2: multi-plugin marketplace, hooks.json nested per plugin."""
+    mp = tmp_path / "marketplaces" / "multi-mp"
+    _write_hooks_json(mp / "plugins" / "ask-user" / "hooks" / "hooks.json", {"hooks": {}})
+    _write_hooks_json(mp / "plugins" / "other" / "hooks" / "hooks.json", {"hooks": {}})
+
+    found = list(mod._iter_marketplace_hooks_files(str(tmp_path / "marketplaces")))
+
+    assert sorted(found) == sorted([
+        ("multi-mp", "ask-user", str(mp / "plugins" / "ask-user" / "hooks" / "hooks.json")),
+        ("multi-mp", "other", str(mp / "plugins" / "other" / "hooks" / "hooks.json")),
+    ])
+
+
+def test_find_cache_hooks_json_picks_highest_version(tmp_path):
+    cache = tmp_path / "cache"
+    _write_hooks_json(cache / "dgs" / "ask-user" / "0.1.0" / "hooks" / "hooks.json", {"hooks": {}})
+    _write_hooks_json(cache / "dgs" / "ask-user" / "0.2.0" / "hooks" / "hooks.json", {"hooks": {}})
+
+    resolved = mod._find_cache_hooks_json(str(cache), "dgs", "ask-user")
+
+    assert resolved == str(cache / "dgs" / "ask-user" / "0.2.0" / "hooks" / "hooks.json")
+
+
+def test_find_cache_hooks_json_none_when_plugin_never_installed(tmp_path):
+    cache = tmp_path / "cache"
+    cache.mkdir()
+
+    resolved = mod._find_cache_hooks_json(str(cache), "dgs", "never-installed")
+
+    assert resolved is None
+
+
+def test_hook_registration_keys_extracts_nested_schema():
+    hooks_data = {
+        "hooks": {
+            "Stop": [
+                {"matcher": "", "hooks": [
+                    {"type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/next-trigger.sh\""},
+                ]},
+            ],
+            "PreToolUse": [
+                {"matcher": "AskUserQuestion", "hooks": [
+                    {"type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/ask-guard.sh\""},
+                ]},
+            ],
+        }
+    }
+    keys = mod._hook_registration_keys_from_data(hooks_data)
+
+    assert keys == {
+        ("Stop", "", "next-trigger.sh"),
+        ("PreToolUse", "AskUserQuestion", "ask-guard.sh"),
+    }
+
+
+def test_check_source_cache_sync_flags_registration_missing_from_cache(tmp_path):
+    """The exact 2026-08-29 incident, reproduced: source gains a new Stop
+    registration (block-ask-without-preflight-check.js); the cache install
+    still only has the old registration set. This must be reported as
+    unsynced -- not silently invisible like the forward ghost check."""
+    marketplaces = tmp_path / "marketplaces"
+    cache = tmp_path / "cache"
+
+    _write_hooks_json(
+        marketplaces / "dgs-skills" / "plugins" / "ask-user" / "hooks" / "hooks.json",
+        {
+            "hooks": {
+                "PreToolUse": [
+                    {"matcher": "AskUserQuestion", "hooks": [
+                        {"type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/block-ask-without-preflight-check.js\""},
+                        {"type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/ask-guard.sh\""},
+                    ]},
+                ],
+            }
+        },
+    )
+    # Cache install predates the block-ask-without-preflight-check.js addition.
+    _write_hooks_json(
+        cache / "dgs-skills" / "ask-user" / "0.1.0" / "hooks" / "hooks.json",
+        {
+            "hooks": {
+                "PreToolUse": [
+                    {"matcher": "AskUserQuestion", "hooks": [
+                        {"type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/ask-guard.sh\""},
+                    ]},
+                ],
+            }
+        },
+    )
+
+    unsynced = mod.check_source_cache_sync(str(marketplaces), str(cache))
+
+    assert len(unsynced) == 1
+    entry = unsynced[0]
+    assert entry["marketplace"] == "dgs-skills"
+    assert entry["plugin"] == "ask-user"
+    assert entry["event"] == "PreToolUse"
+    assert entry["matcher"] == "AskUserQuestion"
+    assert entry["script"] == "block-ask-without-preflight-check.js"
+
+
+def test_check_source_cache_sync_clean_when_registrations_match(tmp_path):
+    marketplaces = tmp_path / "marketplaces"
+    cache = tmp_path / "cache"
+    hooks_data = {
+        "hooks": {
+            "Stop": [
+                {"hooks": [{"type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/next-trigger.sh\""}]},
+            ],
+        }
+    }
+    _write_hooks_json(marketplaces / "dgs-skills" / "plugins" / "ask-user" / "hooks" / "hooks.json", hooks_data)
+    _write_hooks_json(cache / "dgs-skills" / "ask-user" / "0.1.0" / "hooks" / "hooks.json", hooks_data)
+
+    unsynced = mod.check_source_cache_sync(str(marketplaces), str(cache))
+
+    assert unsynced == []
+
+
+def test_check_source_cache_sync_reports_when_plugin_never_installed(tmp_path):
+    """Source registers hooks for a plugin with no cache install at all --
+    the whole registration set is unsynced, not silently skipped."""
+    marketplaces = tmp_path / "marketplaces"
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    _write_hooks_json(
+        marketplaces / "solo-mp" / "hooks" / "hooks.json",
+        {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "/x/never-installed.sh"}]}]}},
+    )
+
+    unsynced = mod.check_source_cache_sync(str(marketplaces), str(cache))
+
+    assert len(unsynced) == 1
+    assert unsynced[0]["cache"] == "(no cache install found)"
+    assert unsynced[0]["script"] == "never-installed.sh"
