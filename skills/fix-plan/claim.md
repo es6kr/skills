@@ -86,6 +86,20 @@ Before working an item that already carries a `[CLAIMED]` tag:
 4. Is the item `[ ]` or `[BLOCKED:*:selfable]`? — never claim `[x]` or `:external`
 5. Did I save / commit the claim edit before starting the actual work?
 
+## Assignment vs Lease (`[ASSIGNED:<target>]` vs `[CLAIMED:<sid>:<ts>]`)
+
+A claim (`[CLAIMED]`) is a **dynamic runtime lease** stamped by an active session that is physically executing the task right now. In contrast, an assignment (`[ASSIGNED]`) designates the **intended executor or owner** (an AI agent or a team member) before execution begins:
+
+| Tag | Purpose | Format | Example |
+|---|---|---|---|
+| `[CLAIMED:<sid>:<ts>]` | Active runtime execution lock | Session ID + timestamp | `[CLAIMED:c3163b80:2026-09-19T23:15]` |
+| `[ASSIGNED:agent:<name>]` | Delegated AI agent | `agent:<agent-name>` | `[ASSIGNED:agent:fable]`, `[ASSIGNED:agent:task-exec]` |
+| `[ASSIGNED:user:<name>]` | Assigned team member | `user:<username>` | `[ASSIGNED:user:alice]`, `[ASSIGNED:user:bob]` |
+
+### Workspace-Aware Assignment Rules
+- **Solo / Agentic Workspaces**: Assign to specialized AI agents (`agent:research`, `agent:push`, `agent:task-exec`, `agent:ralph`, etc.). The PM delegates rather than executing everything in a single thread.
+- **Collaborative / Team Workspaces**: Assign to team members (`user:<name>`) and sync to the issue tracker `assignees` field. The PM balances team workload and facilitates human-agent collaboration.
+
 ## See also
 
 - [format.md](./format.md) — marker syntax; `[CLAIMED]` is a suffix annotation, not a checkbox state
