@@ -57,17 +57,20 @@ CLONE_MP="$CLONE/.claude-plugin/marketplace.json"
 [ -f "$CLONE_MP" ] || { echo "[dev-reflect] clone has no marketplace.json: $CLONE_MP" >&2; exit 1; }
 command -v jq >/dev/null || { echo "[dev-reflect] jq required" >&2; exit 1; }
 
-run() { if [ "$DRYRUN" = 1 ]; then echo "DRY: $*"; else eval "$*"; fi; }
+# Executes its arguments directly (never eval) so that untrusted values (e.g.
+# PLUGIN_NAME sourced from --source's own marketplace.json) can never be
+# re-parsed as shell syntax, regardless of what characters they contain.
+run() { if [ "$DRYRUN" = 1 ]; then echo "DRY: $*"; else "$@"; fi; }
 
 # 1. Sync component dirs
 HAVE_RSYNC=0; command -v rsync >/dev/null && HAVE_RSYNC=1
 for dir in skills agents commands hooks plugins; do
   [ -d "$SOURCE/$dir" ] || continue
   if [ "$HAVE_RSYNC" = 1 ]; then
-    run "rsync -a --delete \"$SOURCE/$dir/\" \"$CLONE/$dir/\""
+    run rsync -a --delete "$SOURCE/$dir/" "$CLONE/$dir/"
   else
-    run "mkdir -p \"$CLONE/$dir\""
-    run "command cp -r \"$SOURCE/$dir/.\" \"$CLONE/$dir/\""
+    run mkdir -p "$CLONE/$dir"
+    run command cp -r "$SOURCE/$dir/." "$CLONE/$dir/"
   fi
   echo "[dev-reflect] synced $dir/"
 done
@@ -104,10 +107,10 @@ while IFS= read -r PLUGIN_NAME; do
     for dir in skills agents commands hooks plugins; do
       [ -d "$SOURCE/$dir" ] || continue
       if [ "$HAVE_RSYNC" = 1 ]; then
-        run "rsync -a --delete \"$SOURCE/$dir/\" \"$CACHE_DIR/$dir/\""
+        run rsync -a --delete "$SOURCE/$dir/" "$CACHE_DIR/$dir/"
       else
-        run "mkdir -p \"$CACHE_DIR/$dir\""
-        run "command cp -r \"$SOURCE/$dir/.\" \"$CACHE_DIR/$dir/\""
+        run mkdir -p "$CACHE_DIR/$dir"
+        run command cp -r "$SOURCE/$dir/." "$CACHE_DIR/$dir/"
       fi
     done
     if [ "$DRYRUN" != 1 ]; then
