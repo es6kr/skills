@@ -14,14 +14,23 @@
 #   1. Sync component dirs (skills/ agents/ commands/ hooks/ plugins/) source -> clone
 #   2. Upsert source's marketplace.json plugin entries into the clone (by name; clone-only kept)
 #   3. chmod +x synced hook scripts
-#   4. (optional) enable the plugin in settings.json (with backup)
-#   5. Print the 4-step plugin-activation verification + reload reminder
+#   4. Sync the same component dirs into each cached plugin's version dir under
+#      ~/.claude/plugins/cache/<marketplace>/<plugin-name>/<version>/ (see Notes)
+#   5. (optional) enable the plugin in settings.json (with backup)
+#   6. Print the 4-step plugin-activation verification + reload reminder
 #
 # Notes:
 #   - Additive sync (rsync --delete only when rsync is present). Removed source files
 #     are NOT pruned from the clone unless rsync is available.
 #   - Direct clone edits are a TEST shortcut. A later GitHub re-sync overwrites them.
 #     Commit/push the source repo to make changes durable.
+#   - Step 1-3 only touch the marketplace CLONE (~/.claude/plugins/marketplaces/<name>/).
+#     An already-running session loads skills from the plugin CACHE
+#     (~/.claude/plugins/cache/<name>/<plugin>/<version>/) instead, which the clone sync
+#     never reaches — a change "reflected" by this script can still appear stale to that
+#     session. Step 4 closes that gap by mirroring the same component dirs into every
+#     already-cached plugin version dir. It intentionally skips plugin/version
+#     combinations that have no existing cache dir (nothing to keep in sync there yet).
 
 set -euo pipefail
 
@@ -84,7 +93,35 @@ if [ "$DRYRUN" != 1 ]; then
     -exec chmod +x {} \; || true
 fi
 
-# 4. Optional: enable plugin in settings.json
+# 4. Sync into already-cached plugin version dirs (marketplace clone alone is not
+#    what an active session loads from — see the Notes block above)
+SRC_PLUGIN_JSON="$SOURCE/.claude-plugin/plugin.json"
+if [ -f "$SRC_PLUGIN_JSON" ]; then
+  VERSION="$(jq -r '.version' "$SRC_PLUGIN_JSON")"
+  while IFS= read -r PLUGIN_NAME; do
+    [ -n "$PLUGIN_NAME" ] || continue
+    CACHE_DIR="$HOME/.claude/plugins/cache/$MARKETPLACE/$PLUGIN_NAME/$VERSION"
+    [ -d "$CACHE_DIR" ] || continue
+    for dir in skills agents commands hooks plugins; do
+      [ -d "$SOURCE/$dir" ] || continue
+      if [ "$HAVE_RSYNC" = 1 ]; then
+        run "rsync -a --delete \"$SOURCE/$dir/\" \"$CACHE_DIR/$dir/\""
+      else
+        run "mkdir -p \"$CACHE_DIR/$dir\""
+        run "command cp -r \"$SOURCE/$dir/.\" \"$CACHE_DIR/$dir/\""
+      fi
+    done
+    if [ "$DRYRUN" != 1 ]; then
+      find "$CACHE_DIR/skills" "$CACHE_DIR/hooks" "$CACHE_DIR/plugins" -type f -name '*.sh' 2>/dev/null \
+        -exec chmod +x {} \; || true
+    fi
+    echo "[dev-reflect] synced plugin cache: $CACHE_DIR"
+  done <<< "$(jq -r '.plugins[].name' "$SRC_MP")"
+else
+  echo "[dev-reflect] WARNING: no $SRC_PLUGIN_JSON — skipping plugin cache sync (version unknown)" >&2
+fi
+
+# 5. Optional: enable plugin in settings.json
 if [ -n "$ENABLE" ]; then
   S="$HOME/.claude/settings.json"
   KEY="$ENABLE@$MARKETPLACE"
@@ -100,7 +137,7 @@ if [ -n "$ENABLE" ]; then
   fi
 fi
 
-# 5. Verification report
+# 6. Verification report
 cat <<EOF
 
 [dev-reflect] Reflected to clone: $CLONE
