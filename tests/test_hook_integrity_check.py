@@ -389,3 +389,82 @@ def test_check_source_cache_sync_reports_when_plugin_never_installed(tmp_path):
     assert len(unsynced) == 1
     assert unsynced[0]["cache"] == "(no cache install found)"
     assert unsynced[0]["script"] == "never-installed.sh"
+
+
+def test_marketplace_declared_name_reads_marketplace_json(tmp_path):
+    mp_path = tmp_path / "dgs-skills"
+    (mp_path / ".claude-plugin").mkdir(parents=True)
+    (mp_path / ".claude-plugin" / "marketplace.json").write_text(
+        json.dumps({"name": "dgs", "plugins": []}), encoding="utf-8"
+    )
+
+    assert mod._marketplace_declared_name(str(mp_path)) == "dgs"
+
+
+def test_marketplace_declared_name_falls_back_to_dir_name_when_absent(tmp_path):
+    mp_path = tmp_path / "solo-mp"
+    mp_path.mkdir()
+
+    assert mod._marketplace_declared_name(str(mp_path)) == "solo-mp"
+
+
+def test_check_source_cache_sync_uses_declared_name_not_directory_name(tmp_path):
+    """Real dgs-skills shape: the marketplace directory under
+    ~/.claude/plugins/marketplaces/ is named "dgs-skills" (a symlink target
+    basename), but marketplace.json's own "name" field -- the name the
+    installed cache is actually keyed by -- is "dgs". Resolving cache paths
+    from the directory name ("dgs-skills") instead of the declared name
+    ("dgs") finds nothing and false-flags every registration as unsynced
+    even when the cache is fully current."""
+    marketplaces = tmp_path / "marketplaces"
+    cache = tmp_path / "cache"
+
+    mp_dir = marketplaces / "dgs-skills"
+    (mp_dir / ".claude-plugin").mkdir(parents=True)
+    (mp_dir / ".claude-plugin" / "marketplace.json").write_text(
+        json.dumps({"name": "dgs", "plugins": []}), encoding="utf-8"
+    )
+    hooks_data = {
+        "hooks": {
+            "PreToolUse": [
+                {"matcher": "AskUserQuestion", "hooks": [
+                    {"type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/block-ask-without-preflight-check.js\""},
+                ]},
+            ],
+        }
+    }
+    _write_hooks_json(mp_dir / "plugins" / "ask-user" / "hooks" / "hooks.json", hooks_data)
+    # Cache is keyed by the DECLARED marketplace name ("dgs"), not the
+    # directory name ("dgs-skills") -- this mirrors the real cache layout.
+    _write_hooks_json(cache / "dgs" / "ask-user" / "0.1.0" / "hooks" / "hooks.json", hooks_data)
+
+    unsynced = mod.check_source_cache_sync(str(marketplaces), str(cache))
+
+    assert unsynced == []
+
+
+def test_check_source_cache_sync_layout1_unions_across_declared_plugin_dirs(tmp_path):
+    """Real es6kr-skills shape: marketplace.json declares multiple plugins
+    (es6kr, task, labs) that all share the SAME root source ("source": "./"),
+    so there is one root hooks/hooks.json but the installed cache splits it
+    into cache/<marketplace>/<plugin-name>/<version>/ per declared plugin --
+    never cache/<marketplace>/<marketplace>/. A naive single-path guess
+    (plugin dir == marketplace name) finds nothing and false-flags every
+    registration as unsynced even though every declared plugin's cache is
+    fully up to date. The sync check must union registrations across every
+    installed plugin subdirectory for a layout-1 marketplace."""
+    marketplaces = tmp_path / "marketplaces"
+    cache = tmp_path / "cache"
+    hooks_data = {
+        "hooks": {
+            "Stop": [{"hooks": [{"type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/next-trigger.sh\""}]}],
+        }
+    }
+    _write_hooks_json(marketplaces / "es6kr-skills" / "hooks" / "hooks.json", hooks_data)
+    # Installed under "es6kr" and "task" plugin dirs -- never "es6kr-skills".
+    _write_hooks_json(cache / "es6kr-skills" / "es6kr" / "0.1.1" / "hooks" / "hooks.json", hooks_data)
+    _write_hooks_json(cache / "es6kr-skills" / "task" / "0.1.1" / "hooks" / "hooks.json", {"hooks": {}})
+
+    unsynced = mod.check_source_cache_sync(str(marketplaces), str(cache))
+
+    assert unsynced == []
