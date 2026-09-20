@@ -174,6 +174,9 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
 
             env = dict(os.environ)
             env["HOME"] = home
+            env.pop("ANTIGRAVITY_AGENT", None)
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
             res = subprocess.run(
                 ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
             )
@@ -211,6 +214,7 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
             env = dict(os.environ)
             env["HOME"] = home
             env.pop("ANTIGRAVITY_AGENT", None)
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
             res = subprocess.run(
                 ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
             )

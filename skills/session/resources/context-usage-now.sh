@@ -62,18 +62,39 @@ if matched:
     fi
   }
 
-  if [ -d "$HOME/.claude/projects" ]; then
+  # 1. Antigravity Environment Check:
+  # When running under an active Antigravity session (ANTIGRAVITY_AGENT or
+  # ANTIGRAVITY_CONVERSATION_ID is explicitly set in the environment),
+  # Antigravity MUST take absolute precedence over any stale Claude Code
+  # project directory that happens to exist for the same workspace cwd.
+  if [ -n "$ANTIGRAVITY_AGENT" ] || [ -n "$ANTIGRAVITY_CONVERSATION_ID" ]; then
+    local_agy_brain="${ANTIGRAVITY_APP_DATA_DIR:-$HOME/.gemini/antigravity-cli}/brain"
+    if [ -n "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -d "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID" ]; then
+      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID" "transcript.jsonl")
+    elif [ -d "$local_agy_brain" ]; then
+      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl")
+    fi
+  fi
+
+  # 2. Claude Code Project Directory Check:
+  # Try THIS workspace's own project dir next:
+  # a cwd-scoped match is the strongest signal of "this call belongs to a
+  # Claude Code session for this specific workspace", outranking unconfigured
+  # background Antigravity directory checks.
+  if [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
     PROJECT_KEY=$(printf '%s' "$PWD" | tr '/.' '-')
     PROJECT_DIR="$HOME/.claude/projects/$PROJECT_KEY"
     if [ -d "$PROJECT_DIR" ]; then
       TRANSCRIPT=$(find_newest_transcript "$PROJECT_DIR" "*.jsonl" 1)
     fi
   fi
-  # Fallback: check ANTIGRAVITY log
-  if [ -z "$TRANSCRIPT" ] && { [ -n "$ANTIGRAVITY_AGENT" ] || [ -d "$HOME/.gemini/antigravity-cli/brain" ]; }; then
+
+  # 3. Fallback: unconfigured Antigravity check
+  if [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.gemini/antigravity-cli/brain" ]; then
     TRANSCRIPT=$(find_newest_transcript "$HOME/.gemini/antigravity-cli/brain" "transcript.jsonl")
   fi
-  # Last-resort global Claude Code search -- only when this workspace has no
+
+  # 4. Last-resort global Claude Code search -- only when this workspace has no
   # project dir yet (e.g. a brand-new cwd) AND no Antigravity transcript was
   # found either. Globbing across every project under ~/.claude/projects
   # picks whichever session (this machine or another, synced in via
