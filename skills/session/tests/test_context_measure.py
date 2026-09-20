@@ -176,7 +176,7 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
             env["HOME"] = home
             env.pop("ANTIGRAVITY_AGENT", None)
             env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
-            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            env.pop("ANTIGRAVITY_APP_DATA_DIR", None)
             res = subprocess.run(
                 ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
             )
@@ -215,6 +215,7 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
             env["HOME"] = home
             env.pop("ANTIGRAVITY_AGENT", None)
             env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            env.pop("ANTIGRAVITY_APP_DATA_DIR", None)
             res = subprocess.run(
                 ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
             )
@@ -237,7 +238,8 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
 
             # Antigravity active session
             conv_id = "test-conv-1234"
-            brain_dir = pathlib.Path(home) / ".gemini" / "antigravity-cli" / "brain" / conv_id
+            app_dir = pathlib.Path(home) / ".gemini" / "antigravity-cli"
+            brain_dir = app_dir / "brain" / conv_id
             brain_dir.mkdir(parents=True)
             agy_transcript = brain_dir / "transcript.jsonl"
             with open(agy_transcript, "w") as f:
@@ -248,6 +250,7 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
 
             env = dict(os.environ)
             env["HOME"] = home
+            env["ANTIGRAVITY_APP_DATA_DIR"] = str(app_dir)
             env["ANTIGRAVITY_AGENT"] = "1"
             env["ANTIGRAVITY_CONVERSATION_ID"] = conv_id
             res = subprocess.run(
@@ -256,6 +259,52 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
             self.assertEqual(res.returncode, 0, res.stderr)
             self.assertIn("/ 1000k tokens", res.stdout)
             self.assertNotIn("(45.0%)", res.stdout)
+
+    def test_antigravity_agent_flag_alone_searches_brain_dir(self):
+        """When ANTIGRAVITY_AGENT=1 without CONVERSATION_ID, searches newest transcript in brain."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            workspace = os.path.realpath(workspace)
+            app_dir = pathlib.Path(home) / ".gemini" / "antigravity-cli"
+            brain_dir = app_dir / "brain" / "conv-auto" / ".system_generated" / "logs"
+            brain_dir.mkdir(parents=True)
+            agy_transcript = brain_dir / "transcript.jsonl"
+            with open(agy_transcript, "w") as f:
+                f.write(json.dumps({
+                    "step_index": 0, "source": "MODEL", "type": "PLANNER_RESPONSE",
+                    "content": "X" * 3500,
+                }) + "\n")
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env["ANTIGRAVITY_APP_DATA_DIR"] = str(app_dir)
+            env["ANTIGRAVITY_AGENT"] = "1"
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("/ 1000k tokens", res.stdout)
+
+    def test_active_antigravity_does_not_fall_through_to_claude_code(self):
+        """When Antigravity is active but has no transcript, it must fail rather than masquerading as Claude Code."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            workspace = os.path.realpath(workspace)
+            projects_dir = pathlib.Path(home) / ".claude" / "projects"
+            project_key = workspace.replace("/", "-").replace(".", "-")
+            own_dir = projects_dir / project_key
+            own_dir.mkdir(parents=True)
+            self._write_transcript(own_dir / "session.jsonl", 10000)
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env["ANTIGRAVITY_APP_DATA_DIR"] = str(pathlib.Path(home) / "non-existent")
+            env["ANTIGRAVITY_AGENT"] = "1"
+            env["ANTIGRAVITY_CONVERSATION_ID"] = "missing-conv"
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertNotEqual(res.returncode, 0)
+            self.assertIn("transcript file not found", res.stderr)
 
     def test_falls_back_to_global_search_when_workspace_dir_absent(self):
         with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
@@ -267,13 +316,18 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
 
             env = dict(os.environ)
             env["HOME"] = home
+            env.pop("ANTIGRAVITY_AGENT", None)
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            env.pop("ANTIGRAVITY_APP_DATA_DIR", None)
             # `workspace` itself has no matching entry under projects_dir.
             res = subprocess.run(
                 ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
             )
             self.assertEqual(res.returncode, 0, res.stderr)
             self.assertIn("Context usage:", res.stdout)
+            self.assertIn("/ 200k tokens", res.stdout)
 
 
 if __name__ == "__main__":
     unittest.main()
+

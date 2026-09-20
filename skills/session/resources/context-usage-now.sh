@@ -62,26 +62,36 @@ if matched:
     fi
   }
 
+  raw_agy_app_dir="${ANTIGRAVITY_APP_DATA_DIR:-$HOME/.gemini/antigravity-cli}"
+  norm_agy_app_dir="${raw_agy_app_dir//\\//}"
+  local_agy_brain="$norm_agy_app_dir/brain"
+
+  is_agy_active=0
+  if [ -n "$ANTIGRAVITY_AGENT" ] || [ -n "$ANTIGRAVITY_CONVERSATION_ID" ]; then
+    is_agy_active=1
+  fi
+
   # 1. Antigravity Environment Check:
   # When running under an active Antigravity session (ANTIGRAVITY_AGENT or
   # ANTIGRAVITY_CONVERSATION_ID is explicitly set in the environment),
   # Antigravity MUST take absolute precedence over any stale Claude Code
   # project directory that happens to exist for the same workspace cwd.
-  if [ -n "$ANTIGRAVITY_AGENT" ] || [ -n "$ANTIGRAVITY_CONVERSATION_ID" ]; then
-    local_agy_brain="${ANTIGRAVITY_APP_DATA_DIR:-$HOME/.gemini/antigravity-cli}/brain"
-    if [ -n "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -d "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID" ]; then
-      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID" "transcript.jsonl")
+  if [ "$is_agy_active" -eq 1 ]; then
+    if [ -n "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -f "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID/.system_generated/logs/transcript.jsonl" ]; then
+      TRANSCRIPT="$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID/.system_generated/logs/transcript.jsonl"
+    elif [ -n "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -d "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID" ]; then
+      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain/$ANTIGRAVITY_CONVERSATION_ID" "transcript.jsonl" 4)
     elif [ -d "$local_agy_brain" ]; then
-      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl")
+      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl" 4)
     fi
   fi
 
   # 2. Claude Code Project Directory Check:
-  # Try THIS workspace's own project dir next:
+  # Try THIS workspace's own project dir next (only if Antigravity is not active):
   # a cwd-scoped match is the strongest signal of "this call belongs to a
   # Claude Code session for this specific workspace", outranking unconfigured
   # background Antigravity directory checks.
-  if [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
+  if [ "$is_agy_active" -eq 0 ] && [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
     PROJECT_KEY=$(printf '%s' "$PWD" | tr '/.' '-')
     PROJECT_DIR="$HOME/.claude/projects/$PROJECT_KEY"
     if [ -d "$PROJECT_DIR" ]; then
@@ -90,19 +100,14 @@ if matched:
   fi
 
   # 3. Fallback: unconfigured Antigravity check
-  if [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.gemini/antigravity-cli/brain" ]; then
-    TRANSCRIPT=$(find_newest_transcript "$HOME/.gemini/antigravity-cli/brain" "transcript.jsonl")
+  if [ -z "$TRANSCRIPT" ] && [ -d "$local_agy_brain" ]; then
+    TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl" 4)
   fi
 
   # 4. Last-resort global Claude Code search -- only when this workspace has no
   # project dir yet (e.g. a brand-new cwd) AND no Antigravity transcript was
-  # found either. Globbing across every project under ~/.claude/projects
-  # picks whichever session (this machine or another, synced in via
-  # Syncthing) happens to have the newest mtime globally -- with many
-  # concurrent sessions across workspaces/machines that is effectively a
-  # coin flip, and it silently reports a completely unrelated session's
-  # usage as this caller's own, so it is the last resort, not the default.
-  if [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
+  # found either. Only allowed if Antigravity is not active.
+  if [ "$is_agy_active" -eq 0 ] && [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
     TRANSCRIPT=$(find_newest_transcript "$HOME/.claude/projects" "*.jsonl")
   fi
 fi
