@@ -62,4 +62,39 @@ else
   echo "PASS nonexistent payload exits non-zero"
 fi
 
+# --- Case 5: Ambiguous match (same payload in 2 sessions) errors instead of guessing ---
+UUID_DUP_A="aaaaaaaa-1111-1111-1111-111111111111"
+UUID_DUP_B="bbbbbbbb-2222-2222-2222-222222222222"
+cat > "$PROJECT_DIR/$UUID_DUP_A.jsonl" <<EOF
+{"type":"user","message":{"role":"user","content":"duplicate-payload-marker"},"created_at":"2026-09-14T14:30:00Z"}
+EOF
+cat > "$PROJECT_DIR/$UUID_DUP_B.jsonl" <<EOF
+{"type":"user","message":{"role":"user","content":"duplicate-payload-marker"},"created_at":"2026-09-14T14:31:00Z"}
+EOF
+# Make B newer so a naive "ls -t" fallback would silently pick it -- the resolver must
+# reject the ambiguity instead, regardless of which file is newest.
+touch -t 202609141431 "$PROJECT_DIR/$UUID_DUP_B.jsonl"
+touch -t 202609141430 "$PROJECT_DIR/$UUID_DUP_A.jsonl"
+if ambiguous_out=$(./resolve-session-id.sh --payload "duplicate-payload-marker" --project-dir "$PROJECT_DIR" --timeout-secs 0 2>&1); then
+  echo "FAIL ambiguous payload should exit non-zero, got: $ambiguous_out"
+  fail=1
+elif printf '%s' "$ambiguous_out" | grep -q 'Ambiguous payload match'; then
+  echo "PASS ambiguous payload match errors instead of guessing via mtime"
+else
+  echo "FAIL ambiguous payload error message missing 'Ambiguous payload match', got: $ambiguous_out"
+  fail=1
+fi
+rm -f "$PROJECT_DIR/$UUID_DUP_A.jsonl" "$PROJECT_DIR/$UUID_DUP_B.jsonl"
+
+# --- Case 6: Regex metacharacters in payload are matched literally, not as a pattern ---
+UUID_LITERAL="cccccccc-3333-3333-3333-333333333333"
+cat > "$PROJECT_DIR/$UUID_LITERAL.jsonl" <<EOF
+{"type":"user","message":{"role":"user","content":"/fix-plan [pm]"},"created_at":"2026-09-14T14:32:00Z"}
+EOF
+# "[pm]" is a regex character class if TARGET_TEXT is used unescaped -- it must match
+# only the literal bracketed substring, not "p" or "m" individually.
+out_literal=$(./resolve-session-id.sh --payload "/fix-plan [pm]" --project-dir "$PROJECT_DIR")
+assert_eq "Regex metacharacters in payload matched as a literal fixed string" "$UUID_LITERAL" "$out_literal"
+rm -f "$PROJECT_DIR/$UUID_LITERAL.jsonl"
+
 exit $fail

@@ -103,15 +103,29 @@ start_time=$(date +%s)
 matched_file=""
 
 while true; do
-  # Find all candidate JSONLs containing TARGET_TEXT (exclude sync-conflict files)
-  # When multiple JSONLs match, sort by modification time to pick the one most recently updated with the payload
-  matches=$(grep -rl "$TARGET_TEXT" "$PROJECT_DIR"/*.jsonl 2>/dev/null | grep -v 'sync-conflict' || true)
-  if [[ -n "$matches" ]]; then
-    # If multiple files contain the text (e.g. reused prompt), pick the newest among matches
-    matched_file=$(ls -t $matches 2>/dev/null | head -1 || true)
-    if [[ -n "$matched_file" ]]; then
-      break
+  # Find all candidate JSONLs containing TARGET_TEXT as a literal fixed string
+  # (exclude sync-conflict files). Ambiguous matches are a hard error, not a
+  # mtime-based guess -- multiple sessions containing the same payload text
+  # must be disambiguated by the caller via a unique --marker, never silently
+  # resolved to "whichever file is newest" (that reintroduces the exact race
+  # this resolver exists to eliminate).
+  matches=$(grep -Frl -- "$TARGET_TEXT" "$PROJECT_DIR"/*.jsonl 2>/dev/null | grep -vF 'sync-conflict' || true)
+  match_count=$(printf '%s\n' "$matches" | grep -c . || true)
+
+  if [[ "$match_count" -eq 1 ]]; then
+    matched_file="$matches"
+    break
+  elif [[ "$match_count" -gt 1 ]]; then
+    if (( EMIT_JSON )); then
+      echo "{\"ok\":false,\"error\":\"Ambiguous payload match: $match_count session files contain the same text. Use --marker with a unique per-delivery value to disambiguate.\"}"
+    else
+      {
+        echo "Error: Ambiguous payload match ($match_count session files contain the same text)."
+        echo "Use --marker with a unique per-delivery value to disambiguate. Candidates:"
+        echo "$matches"
+      } >&2
     fi
+    exit 1
   fi
 
   now=$(date +%s)
