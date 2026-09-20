@@ -91,8 +91,14 @@ MSG
 # Check 0b: Block direct Edit/Write on non-canonical plugin cache files
 # ============================================================================
 check_plugin_cache_edit() {
-  case "$FILE_PATH" in
-    */.claude/plugins/cache/*) ;;
+  case "${TOOL_NAME:-}" in
+    Edit|Write|write_to_file) ;;
+    *) return 0 ;;
+  esac
+
+  local norm_path="${FILE_PATH//\\//}"
+  case "$norm_path" in
+    */.claude/plugins/cache/*|.claude/plugins/cache/*) ;;
     *) return 0 ;;
   esac
 
@@ -104,9 +110,9 @@ check_plugin_cache_edit() {
   # Extract marketplace and relative path if possible
   # Pattern: .../.claude/plugins/cache/<marketplace>/<plugin>/<version>/<rest>
   local canonical_hint=""
-  if [[ "$FILE_PATH" =~ \/\.claude\/plugins\/cache\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.*) ]]; then
-    local marketplace="${BASH_REMATCH[1]}"
-    local rest="${BASH_REMATCH[4]}"
+  if [[ "$norm_path" =~ (\/|^)\.claude\/plugins\/cache\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.*) ]]; then
+    local marketplace="${BASH_REMATCH[2]}"
+    local rest="${BASH_REMATCH[5]}"
     canonical_hint="~/.claude/plugins/marketplaces/${marketplace}/${rest}"
   else
     canonical_hint="~/.claude/plugins/marketplaces/<marketplace>/..."

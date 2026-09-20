@@ -60,5 +60,53 @@ class TestEditGuardCache(unittest.TestCase):
         # Should not be blocked by cache guard
         self.assertNotIn("non-canonical plugin cache", err)
 
+    def test_block_cache_edit_windows_path(self):
+        payload = {
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": r"C:\Users\david\.claude\plugins\cache\es6kr-skills\es6kr\0.1.0\skills\fix\SKILL.md",
+                "new_string": "some modifications"
+            }
+        }
+        rc, out, err = self.run_guard(payload)
+        self.assertEqual(rc, 2)
+        self.assertIn("DENIED: editing a non-canonical plugin cache file is prohibited", err)
+        self.assertIn("~/.claude/plugins/marketplaces/es6kr-skills/", err)
+
+    def test_block_cache_edit_relative_path(self):
+        payload = {
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": ".claude/plugins/cache/es6kr-skills/es6kr/0.1.0/skills/fix/SKILL.md",
+                "new_string": "some modifications"
+            }
+        }
+        rc, out, err = self.run_guard(payload)
+        self.assertEqual(rc, 2)
+        self.assertIn("DENIED: editing a non-canonical plugin cache file is prohibited", err)
+
+    def test_block_cache_write_tool(self):
+        payload = {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/home/dgs/.claude/plugins/cache/es6kr-skills/es6kr/0.1.0/skills/fix/SKILL.md",
+                "content": "new full file content"
+            }
+        }
+        rc, out, err = self.run_guard(payload)
+        self.assertEqual(rc, 2)
+        self.assertIn("DENIED: editing a non-canonical plugin cache file is prohibited", err)
+
+    def test_allow_read_tool(self):
+        payload = {
+            "tool_name": "Read",
+            "tool_input": {
+                "file_path": "/home/dgs/.claude/plugins/cache/es6kr-skills/es6kr/0.1.0/skills/fix/SKILL.md"
+            }
+        }
+        rc, out, err = self.run_guard(payload)
+        self.assertEqual(rc, 0)
+        self.assertNotIn("DENIED", err)
+
 if __name__ == "__main__":
     unittest.main()
