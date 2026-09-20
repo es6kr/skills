@@ -50,44 +50,68 @@ a registration needs to be undone, say so plainly and point at the Orca app's ow
 management UI (not verified by this skill) rather than editing Orca's internal state files
 directly.
 
-## Independent new worktree (default)
+## Launch Strategy: Split-First (Default / Recommended)
 
+In interactive multi-agent workflows, prefer splitting an existing active pane over creating
+uncontrolled new tabs or independent worktrees. This preserves screen layout, keeps context
+visible, and avoids worktree disk bloat.
+
+### Tier 1 (Default): Vertical Split in Active Workspace
 ```bash
-ORCA worktree create --repo id:<repoId> --name <task-name> --no-parent --agent <agent> --prompt "<task brief>" --json
+ORCA terminal split --terminal <current-handle> --direction vertical --command "<agent>" --json
 ```
+- Defaults to `--direction vertical` for side-by-side agent pairing.
+- Pre-flight check: Always inspect `orca terminal list --json` first to identify the active pane handle. (Enforced by `block-orca-new-tab-without-split-check.sh`).
 
-Use `--no-parent` and omit `--base-branch` for independent top-level launches unless the
-user explicitly asks for stacked work, "branch from current", or a specific base — put any
-current-branch context into the prompt text instead. `--repo` can be omitted only when the
-calling shell's cwd is already inside an Orca-managed worktree that Orca can infer the repo
-from; when in doubt, pass it explicitly.
-
-The result's `worktree.id` is `<repoId>::<worktreePath>` — copy the whole value into any
-follow-up command; a truncated `repoId` alone does not identify the worktree.
-
-## Existing worktree, new terminal
-
+### Tier 2: New Terminal Tab in Active Worktree
 ```bash
 ORCA terminal create --worktree active --command "<agent>" --json
 ```
+- Use when the current window layout is already dense and an additional tab is preferred without branching out into a new git worktree.
 
-Don't run this for an agent you already launched via `worktree create --agent` in the same
-worktree — that agent already has its first terminal. `terminal create` is for adding an
-*additional* session alongside an existing one.
+### Tier 3: Independent Isolated Worktree
+```bash
+ORCA worktree create --repo id:<repoId> --name <task-name> --no-parent --agent <agent> --prompt "<task brief>" --json
+```
+- Use **only** when physical git worktree / branch isolation is explicitly requested by the user or strictly required for independent build artifacts/branch switches.
+- Prefix with `ORCA_NEW_WORKSPACE_APPROVED=1` if running autonomously after user approval to satisfy the split-check guard.
+
+## Post-Init Session Identity & Rename Protocol
+
+When spawning Claude Code sessions (`--command "claude"` or `claude --model ...`):
+1. **The Chicken-and-Egg Reality**: At initial launch (Welcome screen, `Ctx: 0`), Claude Code has NOT yet created its `.jsonl` transcript file on disk. The physical `sessionId` cannot be extracted before the first prompt is submitted. Never guess, fabricate, or reuse an old UUID!
+2. **Step 1 — Launch & Idle Wait**:
+   ```bash
+   ORCA terminal split --terminal <current-handle> --direction vertical --command "claude --model <model>" --json
+   ORCA terminal wait --terminal <new-handle> --for tui-idle --timeout-ms 60000 --json
+   ```
+3. **Step 2 — Deliver Initial Task Prompt**:
+   ```bash
+   ORCA terminal send --terminal <new-handle> --text "<task prompt>" --enter --json
+   ```
+4. **Step 3 — Collision-Free Session ID Resolution**:
+   Once the prompt is delivered and Claude begins processing, resolve the deterministic session ID via payload matching:
+   ```bash
+   sessid=$(scripts/resolve-session-id.sh --payload "<task prompt>" --project-dir ~/.claude/projects/<key>)
+   sessid8="${sessid:0:8}"
+   ```
+5. **Step 4 — Synchronize UI Title & Session Rename**:
+   ```bash
+   ORCA terminal rename --terminal <new-handle> --title "<model>-<task-slug>-<sessid8>" --json
+   ```
+   If renaming inside Claude Code TUI, deliver `/rename <model>-<task-slug>-<sessid8>` as a dedicated single line with `--enter`.
 
 ## Custom model / effort flags an agent's `--agent` shorthand doesn't accept
 
 `worktree create --agent codex --prompt ...` launches Codex with its defaults; it does not
-forward Codex-specific flags like `--model` or `-c model_reasoning_effort=...`. For a request
-like "gpt-5.5 xhigh", use the two-step path instead:
+forward Codex-specific flags like `--model` or `-c model_reasoning_effort=...`. For custom
+flags, use the explicit command pattern with split or create:
 
 ```bash
-ORCA worktree create --name <task-name> --no-parent --json
-ORCA terminal create --worktree id:<repoId>::<newWorktreePath> --title <task-name> --command 'codex --model gpt-5.5 -c model_reasoning_effort="xhigh"' --json
-ORCA terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-ORCA terminal send --terminal <handle> --text "<task brief>" --enter --json
+ORCA terminal split --terminal <handle> --direction vertical --command 'codex --model gpt-5.5 -c model_reasoning_effort="xhigh"' --json
+ORCA terminal wait --terminal <new-handle> --for tui-idle --timeout-ms 60000 --json
+ORCA terminal send --terminal <new-handle> --text "<task brief>" --enter --json
 ```
 
-Target the returned `startupTerminal.handle` (or the freshly created terminal's handle) only
-— if Orca restarts, omits the handle, or a later call returns `terminal_handle_stale`,
-reacquire with `terminal list` before continuing.
+Target the returned `handle` only — if Orca restarts, omits the handle, or a later call returns
+`terminal_handle_stale`, reacquire with `terminal list` before continuing.
