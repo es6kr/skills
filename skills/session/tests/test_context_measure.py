@@ -126,5 +126,115 @@ class TestContextMeasure(unittest.TestCase):
         os.remove(f.name)
 
 
+class TestContextUsageNowFallbackScoping(unittest.TestCase):
+    """No-argument invocation used to fall back to 'most recently modified
+    jsonl under all of ~/.claude/projects' -- with many concurrent sessions
+    across workspaces/machines (Syncthing-synced project dirs included) that
+    silently reports a completely unrelated session's usage as the caller's
+    own. The fallback must be scoped to the calling workspace's own project
+    dir (derived from cwd the same way Claude Code names it) before it ever
+    considers files outside that dir."""
+
+    def _write_transcript(self, path, input_tokens):
+        with open(path, "w") as f:
+            f.write(json.dumps({
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-3-7-sonnet",
+                    "usage": {
+                        "input_tokens": input_tokens,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0,
+                    },
+                },
+            }) + "\n")
+
+    def test_scopes_fallback_to_calling_workspace_over_newer_decoy(self):
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            # bash resolves $PWD to the physical path (e.g. macOS
+            # /var/folders/... -> /private/var/folders/...), so the project
+            # key must be derived from the same realpath the script will see.
+            workspace = os.path.realpath(workspace)
+            projects_dir = pathlib.Path(home) / ".claude" / "projects"
+            project_key = workspace.replace("/", "-").replace(".", "-")
+            own_dir = projects_dir / project_key
+            own_dir.mkdir(parents=True)
+            own_jsonl = own_dir / "own-session.jsonl"
+            self._write_transcript(own_jsonl, 1000)  # 0.5% of a 200k window
+
+            # A decoy from a *different* workspace, touched more recently --
+            # this is what used to win the unscoped global mtime race.
+            decoy_dir = projects_dir / "-some-other-workspace"
+            decoy_dir.mkdir(parents=True)
+            decoy_jsonl = decoy_dir / "decoy-session.jsonl"
+            self._write_transcript(decoy_jsonl, 90000)  # 45% of a 200k window
+            future = pathlib.Path(str(own_jsonl)).stat().st_mtime + 3600
+            os.utime(decoy_jsonl, (future, future))
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            # Must reflect own-session.jsonl (0.5%), not the newer decoy (45%).
+            self.assertIn("(0.5%)", res.stdout)
+            self.assertNotIn("(45.0%)", res.stdout)
+
+    def test_claude_code_workspace_match_outranks_antigravity_dir_existence(self):
+        """On any machine where Antigravity has ever run, $HOME/.gemini/antigravity-cli/brain
+        exists unconditionally -- that mere existence check used to steal
+        precedence away from Claude Code on every bare invocation, regardless
+        of which harness actually called this script. A workspace-scoped
+        Claude Code match must win over it."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            workspace = os.path.realpath(workspace)
+            projects_dir = pathlib.Path(home) / ".claude" / "projects"
+            project_key = workspace.replace("/", "-").replace(".", "-")
+            own_dir = projects_dir / project_key
+            own_dir.mkdir(parents=True)
+            own_jsonl = own_dir / "own-session.jsonl"
+            self._write_transcript(own_jsonl, 1000)  # 0.5% of a 200k window
+
+            # Antigravity has "been used" on this machine -- the dir exists --
+            # but this invocation is not an Antigravity call.
+            brain_dir = pathlib.Path(home) / ".gemini" / "antigravity-cli" / "brain" / "some-agent" / "logs"
+            brain_dir.mkdir(parents=True)
+            antigravity_transcript = brain_dir / "transcript.jsonl"
+            with open(antigravity_transcript, "w") as f:
+                f.write(json.dumps({
+                    "step_index": 0, "source": "MODEL", "type": "PLANNER_RESPONSE",
+                    "content": "X" * 400000,  # large -> would read as a big percentage
+                }) + "\n")
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env.pop("ANTIGRAVITY_AGENT", None)
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("(0.5%)", res.stdout)
+            self.assertIn("/ 200k tokens", res.stdout)
+
+    def test_falls_back_to_global_search_when_workspace_dir_absent(self):
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            projects_dir = pathlib.Path(home) / ".claude" / "projects"
+            only_dir = projects_dir / "-some-other-workspace"
+            only_dir.mkdir(parents=True)
+            only_jsonl = only_dir / "only-session.jsonl"
+            self._write_transcript(only_jsonl, 2000)
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            # `workspace` itself has no matching entry under projects_dir.
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("Context usage:", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

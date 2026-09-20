@@ -102,7 +102,12 @@ jobs:
           set -u
           FAIL=0
           for t in skills/fix-plan/tests/test_workspace_profile.py \
-                   skills/session/scripts/test-repair-compact-boundary.py; do
+                   skills/session/scripts/test-repair-compact-boundary.py \
+                   skills/backlog/scripts/test_plane_verify_identifier.py \
+                   skills/backlog/scripts/test_plane_client_browse_url.py \
+                   skills/backlog/scripts/test_plane_create_issue_browse_url.py \
+                   skills/fix-plan/scripts/test_sync_shared_artifacts.py \
+                   skills/session/tests/test_context_measure.py; do
             echo "::group::$t"
             python3 "$t" || FAIL=1
             echo "::endgroup::"

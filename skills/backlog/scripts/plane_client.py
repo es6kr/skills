@@ -168,6 +168,43 @@ def html_to_text(raw):
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+def format_browse_url(plane_host, workspace_slug, identifier, sequence_id):
+    """Human-facing URL: https://<host>/<workspace_slug>/browse/<IDENTIFIER>-<SEQ>.
+
+    Module-level so callers that never instantiate ``PlaneClient`` (e.g.
+    scripts that hand-roll their own urllib requests) can still produce the
+    standard reporting URL instead of a project-UUID-nested API URL. See
+    ``PlaneClient.browse_url`` for the instance-method form.
+    """
+    return "%s/%s/browse/%s-%s" % (
+        plane_host.rstrip("/"),
+        workspace_slug,
+        identifier,
+        sequence_id,
+    )
+
+
+def fetch_project_identifier(plane_host, workspace_slug, token, project_id, user_agent=None):
+    """One-off GET for a project's short code (e.g. "INFRA") given its UUID.
+
+    Standalone (no ``PlaneClient`` instance) for callers — like
+    ``plane_create_issue.py``'s REST path — that build requests with their own
+    ``urllib.request`` calls rather than through the class. Returns ``None`` on
+    any failure; callers should fall back to the raw ``issue_url`` in that case
+    rather than raising, since this is only needed to build a nicer report URL.
+    """
+    url = "%s/api/v1/workspaces/%s/projects/%s/" % (plane_host.rstrip("/"), workspace_slug, project_id)
+    headers = {"User-Agent": user_agent or UA}
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    req.add_unredirected_header("x-api-key", token)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data.get("identifier")
+    except Exception:
+        return None
+
+
 class PlaneError(RuntimeError):
     pass
 
@@ -224,6 +261,29 @@ class PlaneClient:
             suffix.lstrip("/"),
         )
 
+    def list_projects(self):
+        """Return every project in the workspace (id, identifier, name, ...), following pagination.
+
+        Used to resolve a short project code (e.g. "ES6KR") to its project_id
+        before an identifier-based lookup — see plane_verify_identifier.py.
+        Not cached: the project list is small and rarely called in a loop.
+        """
+        projects = []
+        cursor = "%d:0:0" % PAGE_SIZE
+        while True:
+            page = self.request(
+                "workspaces/%s/projects/?cursor=%s" % (self.profile["workspace_slug"], cursor)
+            )
+            if isinstance(page, list):
+                return page
+            results = page.get("results", [])
+            projects.extend(results)
+            next_cursor = page.get("next_cursor")
+            if not next_cursor or not page.get("next_page_results"):
+                break
+            cursor = next_cursor
+        return projects
+
     def list_issues(self, project_id, use_cache=True):
         """Return every issue of a project, following pagination.
 
@@ -270,11 +330,29 @@ class PlaneClient:
         )
 
     def issue_url(self, project_id, issue_id):
+        """Internal API-shaped URL (project UUID + issue UUID).
+
+        Not for human-facing reports or chat/comment output — Plane resolves
+        this fine, but it embeds implementation UUIDs a reader can't act on.
+        Use ``browse_url`` wherever the link is meant to be read or clicked.
+        """
         return "%s/%s/projects/%s/issues/%s" % (
             self.profile["plane_host"],
             self.profile["workspace_slug"],
             project_id,
             issue_id,
+        )
+
+    def browse_url(self, identifier, sequence_id):
+        """Human-facing URL: https://<host>/<workspace_slug>/browse/<IDENTIFIER>-<SEQ>.
+
+        ``identifier`` is the project's short code (e.g. "INFRA"), ``sequence_id``
+        the issue's per-project sequence number (e.g. 62) — both already present
+        on any issue/project payload this client returns. Use this, not
+        ``issue_url``, for anything a person will read or click.
+        """
+        return format_browse_url(
+            self.profile["plane_host"], self.profile["workspace_slug"], identifier, sequence_id
         )
 
     # -------------------------------------------------------------------- cache
