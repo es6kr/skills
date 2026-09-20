@@ -59,6 +59,7 @@ When running in Antigravity (Gemini), backend hooks are limited. You MUST:
 1. **Explicitly state current context usage % & token estimate** in the `AskUserQuestion` question text header (e.g. `[Context Usage: XX% (~YYK tokens)]`). In Antigravity (Gemini), token count MUST be physically computed from transcript JSONL bytes (`tokens = transcript_file_bytes / 3.5`), NOT arbitrarily guessed or fabricated. Context usage % MUST be calculated based on the **1M token capacity (1,000,000 tokens)**: `pct = (tokens / 1,000,000) * 100`. (e.g., ~140KB transcript = ~40,000 tokens = ~4%).
 2. **Mandatory `/cleanup` Recommendation Gate**: If context usage >= 40% (>=400K tokens in Antigravity or transcript log size indicates high usage), set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 in `AskUserQuestion`. **HARD STOP**: If context usage is strictly less than 40% (<400K tokens), attaching the `(Recommended)` tag to `/cleanup` is STRICTLY FORBIDDEN; tag the primary domain/technical follow-up action as `(Recommended)` instead.
 3. **Mandatory Session Cleanup Execution (HARD STOP)**: When the user selects any option whose label denotes session cleanup (`/cleanup`, or its session-language equivalent), the agent MUST NOT conclude the turn with a plain text wrap-up message alone. The agent MUST immediately register cleanup tasks in `task.md` / `TaskList` and execute the `cleanup` skill protocol (via `Skill("cleanup")` or environment-appropriate autoloader such as `view_file` with `IsSkillFile: true` under Antigravity).
+4. **Mandatory Physical `cleanup` Skill Call Before Post-Work Wrapup (HARD STOP)**: When entering a wrap-up or post-completion state, replacing the formal `cleanup` skill pipeline with ad-hoc text summaries or scattered individual script calls is strictly prohibited. The agent MUST physically invoke `Skill("cleanup")` or environment-appropriate autoloader (`view_file` on `cleanup/SKILL.md` with `IsSkillFile: true` under Antigravity) to execute the 5-step pipeline (`cleanup/run.md`) before finalizing session wrapup or advancing to `/next` recommendations.
 
 | # | Don't | Do |
 |---|---|---|
@@ -66,6 +67,7 @@ When running in Antigravity (Gemini), backend hooks are limited. You MUST:
 | 2 | Recommend forward work options without `/cleanup` when context usage >= 40% | Set `(Recommended) Session cleanup and retrospective (/cleanup)` as option #1 when usage >= 40% |
 | 3 | Attach `(Recommended)` tag to `/cleanup` when context usage is below 40% | Attach `(Recommended)` to `/cleanup` ONLY when usage >= 40%; when < 40%, attach `(Recommended)` to the primary technical follow-up task |
 | 4 | Conclude with text greeting when user selects a session-cleanup option (`/cleanup` or its session-language equivalent) | Immediately register cleanup tasks and execute `cleanup` skill protocol (`Skill("cleanup")` or `view_file IsSkillFile:true`) |
+| 5 | Output ad-hoc text wrapup or jump to `/next` without invoking the formal `cleanup` skill pipeline | Physically invoke `Skill("cleanup")` (or `view_file IsSkillFile:true`) to execute the full 5-step cleanup pipeline |
 
 ### How to skip (procedure)
 
