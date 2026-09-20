@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.6](https://github.com/es6kr/skills/compare/tdd-v0.3.5...tdd-v0.3.6) (2026-09-20)
+
+
+### Bug Fixes
+
+* **tdd:** remove topic filename references from frontmatter description ([490b57c](https://github.com/es6kr/skills/commit/490b57ca38139ea50e2ade7e6a3d41dc84b8c310))
+
 ## [0.3.5](https://github.com/es6kr/skills/compare/tdd-v0.3.4...tdd-v0.3.5) (2026-09-18)
 
 

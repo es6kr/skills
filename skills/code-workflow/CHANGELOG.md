@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/es6kr/skills/compare/code-workflow-v0.10.0...code-workflow-v0.10.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* address code review feedback ([0c08bfb](https://github.com/es6kr/skills/commit/0c08bfbf2b5b737fdce685c8f15ead56c64290f4))
+* **code-workflow:** exempt audit-annotation appends from plan-undecided-guard ([#507](https://github.com/es6kr/skills/issues/507)) ([bdaa8d3](https://github.com/es6kr/skills/commit/bdaa8d3d82fe993f58d013bba6df9904f10a6471))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/code-workflow-v0.9.1...code-workflow-v0.10.0) (2026-09-18)
 
 

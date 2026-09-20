@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.5](https://github.com/es6kr/skills/compare/consolidate-v0.6.4...consolidate-v0.6.5) (2026-09-20)
+
+
+### Bug Fixes
+
+* address code review feedback ([0c08bfb](https://github.com/es6kr/skills/commit/0c08bfbf2b5b737fdce685c8f15ead56c64290f4))
+* **consolidate:** drop requesting-code-review suffix when bot-layer content is mixed in ([#498](https://github.com/es6kr/skills/issues/498)) ([66fb1be](https://github.com/es6kr/skills/commit/66fb1bedc768544415a808b2d33d96feeee0a3ea))
+* **consolidate:** guard verify_consolidate.py format contract at POST time ([#500](https://github.com/es6kr/skills/issues/500)) ([941023a](https://github.com/es6kr/skills/commit/941023a5fb36becfdc484017b8cde128078f07a9))
+
 ## [0.6.4](https://github.com/es6kr/skills/compare/consolidate-v0.6.3...consolidate-v0.6.4) (2026-09-18)
 
 

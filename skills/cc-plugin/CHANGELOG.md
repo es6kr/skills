@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.2](https://github.com/es6kr/skills/compare/cc-plugin-v0.7.1...cc-plugin-v0.7.2) (2026-09-20)
+
+
+### Bug Fixes
+
+* address code review feedback ([0c08bfb](https://github.com/es6kr/skills/commit/0c08bfbf2b5b737fdce685c8f15ead56c64290f4))
+* **cc-plugin:** eliminate eval-based command injection in dev-reflect.sh ([097aafe](https://github.com/es6kr/skills/commit/097aafea4adcdf39df8c4825d69ea83a66fbd4fa))
+* **cc-plugin:** sync dev-reflect.sh changes into cached plugin version dirs ([#510](https://github.com/es6kr/skills/issues/510)) ([28824f6](https://github.com/es6kr/skills/commit/28824f643b32ab05b766cdf99ddb626ffc5e3f95))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/cc-plugin-v0.7.0...cc-plugin-v0.7.1) (2026-09-18)
 
 

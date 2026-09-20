@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/skill-kit-v0.8.1...skill-kit-v0.9.0) (2026-09-20)
+
+
+### Features
+
+* **skill-kit:** implement SkillSpector static linter and security scanner (green) ([720d0f3](https://github.com/es6kr/skills/commit/720d0f314295da4b098cc4727e93352653aab17d))
+
+
+### Bug Fixes
+
+* **skill-kit:** document SkillSpector static analysis and security scanner in lint.md ([#514](https://github.com/es6kr/skills/issues/514)) ([fe60edb](https://github.com/es6kr/skills/commit/fe60edbe17715d1b4eb83b7148757f4808527768))
+* **skill-kit:** fix SkillSpector detection gaps and correct its own doc ([0c43ca3](https://github.com/es6kr/skills/commit/0c43ca3b7be8ec99afd231ca0a575a210025ca8c))
+* **skill-kit:** replace pipe to shell pattern with safe installer download in lint.md ([4bd5371](https://github.com/es6kr/skills/commit/4bd53719572fed09b8a1a7a97ba2b9536c74c0b2))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/skill-kit-v0.8.0...skill-kit-v0.8.1) (2026-09-18)
 
 

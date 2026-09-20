@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/es6kr/skills/compare/github-flow-v0.11.0...github-flow-v0.11.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **github-flow:** document the batch-script secret-echo gotcha for token injection ([91e3205](https://github.com/es6kr/skills/commit/91e320570dca3acfa9925f3a4afcb532e786d423))
+
 ## [0.11.0](https://github.com/es6kr/skills/compare/github-flow-v0.10.2...github-flow-v0.11.0) (2026-09-18)
 
 

@@ -5,6 +5,19 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/es6kr/skills/compare/backlog-v0.3.2...backlog-v0.4.0) (2026-09-20)
+
+
+### Features
+
+* **backlog:** add plane_verify_identifier.py to catch wrong-key references ([#508](https://github.com/es6kr/skills/issues/508)) ([704af59](https://github.com/es6kr/skills/commit/704af59599ed2d848e540f963b8fbc9bccd83d1f))
+
+
+### Bug Fixes
+
+* address code review feedback ([0c08bfb](https://github.com/es6kr/skills/commit/0c08bfbf2b5b737fdce685c8f15ead56c64290f4))
+* **backlog:** add browse_url helper and use it in Plane issue reporting paths ([91ee0ce](https://github.com/es6kr/skills/commit/91ee0ce0a9580283725491ffb08a4013429fdb54))
+
 ## [0.3.2](https://github.com/es6kr/skills/compare/backlog-v0.3.1...backlog-v0.3.2) (2026-09-18)
 
 
