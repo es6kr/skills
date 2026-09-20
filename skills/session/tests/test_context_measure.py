@@ -412,10 +412,46 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
                 ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
             )
             self.assertEqual(res.returncode, 0, res.stderr)
-            # Post-compaction is ~10k tokens (10.0k / 1000k tokens (1.0%)).
-            # Pre-compaction would have made it >210k tokens (~21%).
-            # The output must reflect only the post-compaction active tokens (~10k), not ~210k!
-            self.assertIn("~10.0k / 1000k tokens", res.stdout)
+            # Post-compaction: 35k characters / 2.5 = 14k tokens + default 53k baseline = ~67k tokens (6.7%).
+            # Pre-compaction would have made it >330k tokens (~33%).
+            # The output must reflect only the post-compaction active tokens + baseline (~67k), not >330k!
+            self.assertIn("~67.0k / 1000k tokens (6.7%)", res.stdout)
+
+    def test_antigravity_system_baseline_and_tool_calls_density(self):
+        """Verify that Antigravity includes default system overhead (53k tokens)
+        and includes tool_calls arguments with 2.5 chars/token density."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            conv_id = "test-conv-density-1234"
+            brain_dir = pathlib.Path(home) / ".gemini" / "antigravity-cli" / "brain" / conv_id / ".system_generated" / "logs"
+            brain_dir.mkdir(parents=True)
+            agy_transcript = brain_dir / "transcript.jsonl"
+
+            # 5,000 chars in content -> 2,000 tokens (at 2.5 chars/token)
+            # 7,500 chars in tool_calls arguments -> 3,000 tokens (at 2.5 chars/token)
+            # Baseline: 53,000 tokens
+            # Total expected: 53k + 2k + 3k = 58k tokens (58.0k / 1000k tokens (5.8%))
+            with open(agy_transcript, "w", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT",
+                    "content": "A" * 5000
+                }) + "\n")
+                f.write(json.dumps({
+                    "step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE",
+                    "content": "",
+                    "tool_calls": [{"name": "run_command", "args": {"cmd": "B" * 7450}}]
+                }) + "\n")
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env["ANTIGRAVITY_AGENT"] = "1"
+            env["ANTIGRAVITY_CONVERSATION_ID"] = conv_id
+            env["ANTIGRAVITY_APP_DATA_DIR"] = str(pathlib.Path(home) / ".gemini" / "antigravity-cli")
+
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("~58.0k / 1000k tokens (5.8%)", res.stdout)
 
 
 if __name__ == "__main__":
