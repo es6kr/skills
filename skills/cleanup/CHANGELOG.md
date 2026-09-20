@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/cleanup-v0.7.0...cleanup-v0.7.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **cleanup:** ensure block-rename-schema-when-wrapup-adjacent is executable ([#516](https://github.com/es6kr/skills/issues/516)) ([7c688d1](https://github.com/es6kr/skills/commit/7c688d18a24710e3bd719fc43389e276185178e1))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/cleanup-v0.6.0...cleanup-v0.7.0) (2026-09-18)
 
 

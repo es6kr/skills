@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.2](https://github.com/es6kr/skills/compare/fa-v0.4.1...fa-v0.4.2) (2026-09-20)
+
+
+### Bug Fixes
+
+* **fa,hooks:** wire block-cleanup-missing-rename.sh + require task tracking for new-mechanism fixes ([7ebb769](https://github.com/es6kr/skills/commit/7ebb769b45448f4337faca06c4c0fd097038e044))
+* **fa:** resolve default memory collection from standard environment hierarchy ([6e212fb](https://github.com/es6kr/skills/commit/6e212fb9bcd2556a4d81a234b65b48a56f299cf1))
+
 ## [0.4.1](https://github.com/es6kr/skills/compare/fa-v0.4.0...fa-v0.4.1) (2026-09-18)
 
 

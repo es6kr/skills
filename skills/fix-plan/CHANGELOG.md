@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/es6kr/skills/compare/fix-plan-v0.14.0...fix-plan-v0.15.0) (2026-09-20)
+
+
+### Features
+
+* **fix-plan:** add sync_shared_artifacts.py for CollabMD frontmatter upsert and sync ([a866685](https://github.com/es6kr/skills/commit/a8666857a83b056a692560a77bfe8d93e7f891c0))
+
+
+### Bug Fixes
+
+* address code review feedback ([0c08bfb](https://github.com/es6kr/skills/commit/0c08bfbf2b5b737fdce685c8f15ead56c64290f4))
+
 ## [0.14.0](https://github.com/es6kr/skills/compare/fix-plan-v0.13.0...fix-plan-v0.14.0) (2026-09-18)
 
 

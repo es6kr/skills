@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/es6kr/skills/compare/session-v0.12.0...session-v0.12.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* address code review feedback ([0c08bfb](https://github.com/es6kr/skills/commit/0c08bfbf2b5b737fdce685c8f15ead56c64290f4))
+* **session:** scope context-usage-now.sh fallback to the calling workspace ([#512](https://github.com/es6kr/skills/issues/512)) ([31485f9](https://github.com/es6kr/skills/commit/31485f9ef83481756d378cfceeb0935b136578b1))
+
 ## [0.12.0](https://github.com/es6kr/skills/compare/session-v0.11.1...session-v0.12.0) (2026-09-18)
 
 
