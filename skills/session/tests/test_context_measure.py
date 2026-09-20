@@ -370,6 +370,53 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
             self.assertIn("/ 1000k tokens", res.stdout)
             self.assertNotIn("695.0k", res.stdout)
 
+    def test_antigravity_compaction_boundary_resets_active_context(self):
+        """When an Antigravity transcript contains a compaction event (SYSTEM CHECKPOINT
+        with '# Resuming from a compaction'), context measurement must measure only
+        steps from that compaction point onward, discarding pre-compaction steps."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            conv_id = "test-conv-compaction-1234"
+            brain_dir = pathlib.Path(home) / ".gemini" / "antigravity-cli" / "brain" / conv_id / ".system_generated" / "logs"
+            brain_dir.mkdir(parents=True)
+            agy_transcript = brain_dir / "transcript.jsonl"
+
+            # Pre-compaction: 700k characters (~200k tokens)
+            pre_chars = "A" * 700000
+            # Post-compaction: 35k characters (~10k tokens)
+            post_chars = "B" * 35000
+
+            with open(agy_transcript, "w", encoding="utf-8") as f:
+                # 1. Pre-compaction large step
+                f.write(json.dumps({
+                    "step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT",
+                    "content": pre_chars
+                }) + "\n")
+                # 2. Antigravity compaction marker (SYSTEM CHECKPOINT)
+                f.write(json.dumps({
+                    "step_index": 1, "source": "SYSTEM", "type": "CHECKPOINT",
+                    "content": "# Resuming from a compaction\n\nYou are continuing work on the task..."
+                }) + "\n")
+                # 3. Post-compaction active step
+                f.write(json.dumps({
+                    "step_index": 2, "source": "USER_EXPLICIT", "type": "USER_INPUT",
+                    "content": post_chars
+                }) + "\n")
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env["ANTIGRAVITY_AGENT"] = "1"
+            env["ANTIGRAVITY_CONVERSATION_ID"] = conv_id
+            env["ANTIGRAVITY_APP_DATA_DIR"] = str(pathlib.Path(home) / ".gemini" / "antigravity-cli")
+
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            # Post-compaction is ~10k tokens (10.0k / 1000k tokens (1.0%)).
+            # Pre-compaction would have made it >210k tokens (~21%).
+            # The output must reflect only the post-compaction active tokens (~10k), not ~210k!
+            self.assertIn("~10.0k / 1000k tokens", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
