@@ -52,7 +52,8 @@ try:
                 is_antigravity = True
                 content = entry.get("content", "") or ""
                 # True compaction marker from system/user harness (never model assistant text)
-                if src in ("SYSTEM", "USER_EXPLICIT", "USER") and "<CONTEXT_SUMMARY>" in content:
+                if (src == "SYSTEM" and (entry.get("type") == "CHECKPOINT" or "# Resuming from a compaction" in content)) or \
+                   (src in ("SYSTEM", "USER_EXPLICIT", "USER") and "<CONTEXT_SUMMARY>" in content):
                     agy_active_steps = [entry]
                 else:
                     agy_active_steps.append(entry)
