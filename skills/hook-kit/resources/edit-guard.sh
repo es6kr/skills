@@ -87,6 +87,50 @@ MSG
   fi
 }
 
+# ============================================================================
+# Check 0b: Block direct Edit/Write on non-canonical plugin cache files
+# ============================================================================
+check_plugin_cache_edit() {
+  case "$FILE_PATH" in
+    */.claude/plugins/cache/*) ;;
+    *) return 0 ;;
+  esac
+
+  # Allow explicit override keyword for testing or emergency cache surgery
+  if [[ "$NEW_CONTENT" =~ intentional-cache-edit ]]; then
+    return 0
+  fi
+
+  # Extract marketplace and relative path if possible
+  # Pattern: .../.claude/plugins/cache/<marketplace>/<plugin>/<version>/<rest>
+  local canonical_hint=""
+  if [[ "$FILE_PATH" =~ \/\.claude\/plugins\/cache\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.*) ]]; then
+    local marketplace="${BASH_REMATCH[1]}"
+    local rest="${BASH_REMATCH[4]}"
+    canonical_hint="~/.claude/plugins/marketplaces/${marketplace}/${rest}"
+  else
+    canonical_hint="~/.claude/plugins/marketplaces/<marketplace>/..."
+  fi
+
+  cat >&2 <<MSG
+DENIED: editing a non-canonical plugin cache file is prohibited (HARD STOP).
+
+Target file: $FILE_PATH
+
+Why blocked:
+  - Plugin cache files under ~/.claude/plugins/cache/ are ephemeral, read-only mirrors populated during plugin installation.
+  - Direct edits to cache files are wiped on the next plugin update/reinstall and bypass git version control.
+  - You MUST edit the canonical file in the source repository or marketplace directory instead:
+    $canonical_hint
+
+Required action:
+  - Edit the canonical source file in the git repository or marketplace clone ($canonical_hint).
+  - Use dev-reflect or plugin reload to update the runtime cache.
+  - To bypass in an emergency or test fixture, include 'intentional-cache-edit' in the replacement content.
+MSG
+  exit 2
+}
+
 # Lazy SKILL_ROOT resolution (only when a skill scope check runs)
 SKILL_ROOT=""
 SKILL_ROOT_RESOLVED=0
@@ -662,6 +706,7 @@ MSG
 
 # Execute checks in cost order (no-I/O → file I/O → transcript I/O)
 check_write_file_overwrite
+check_plugin_cache_edit
 check_date_in_skill_rule
 check_skill_language_mismatch
 check_vendor_in_generic_skill
