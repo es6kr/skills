@@ -133,6 +133,52 @@ The `pm` role's default pipeline (see `SKILL.md` "Default invocation") runs this
 | 3 | Silently drop a node for a resolved item without reporting it | Report removed/relabeled/proposed counts, same as priority's sync-resolution reporting |
 | 4 | Fix a stale document path only where it was first noticed (the Node Plan Mappings line) and stop | Grep the whole tracker file for the same stale path string and correct every citation, including the backing item's own `Why` / `Options` body |
 
+## Pinned-mission liveness check (pm-role default-pipeline step 5, continued)
+
+Runs immediately after the flowchart-sync procedure above, same `pm`-role scoping, same "mechanical drift check, not a full re-authoring pass" spirit. No-op on a tracker that has no pinned header block.
+
+**Problem this solves**: a tracker's pinned header block (`> 📌 ...` at the top of `fix_plan.md`/`checklist.md`) often names a top-priority mission and prose-cites the backing items that must finish before it. That prose citation rots silently — a cited item can complete weeks before anyone notices the pinned block still calls the mission "in progress," or a cited item's own title can drift out from under the citation entirely. This step makes that citation mechanically checkable instead of trusting prose to stay accurate.
+
+### Citation convention (opt-in)
+
+Append an HTML comment to a pinned bullet line that already has a `**bold label**`:
+
+```markdown
+> - **Loop governance adoption**: ... <!-- pinned-backing: todo:"loop-verifier PoC Green", todo:"governance remaining 2 types" -->
+```
+
+- `todo:"<substring>"` — the citation lives in `## TODO` (or has moved to `## Completed`)
+- `deep:"<substring>"` — the citation lives in `## Deep Tasks` (or has moved to `## Completed`)
+- Multiple citations are comma-separated inside one marker; a mission is only a resolved candidate when **all** of its citations resolve.
+
+A pinned bullet with no marker is reported `unmonitored` and never becomes a candidate — **there is no fuzzy-text fallback**. Guessing citations from prose risks a false "this mission is done" claim, which is worse than under-reporting. Adopt the marker line by line as pinned entries are next edited; this is a new convention, not a retroactive requirement.
+
+### Procedure
+
+1. Run `python3 <fix-plan skill>/scripts/pinned_liveness_check.py <tracker-path> [--roadmap-doc=<path>] --json` — reuses the tracker text already in hand from this same pipeline run; no external network calls.
+2. For each mission the script reports `resolved`, do **not** auto-write the pinned block. Surface via `AskUserQuestion`: "Pinned mission '<label>' looks resolved (all cited backing items are `[x]`/Completed) — refresh the pinned block?" with:
+   - the script's `next_mission_candidate` (sourced from a caller-supplied `--roadmap-doc`, falling back to the highest-priority open `## Deep Tasks` entry) as one option, when present
+   - "keep pinned as-is / mark resolved without a new mission" as another option
+   - an open-ended "let me name a different next mission" option
+3. Report `M pinned entries checked, K resolved-candidate(s) surfaced, N unmonitored` before the run's overall report closes — same reporting contract as the flowchart-sync and priority steps.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Auto-rewrite the pinned block when the script reports `resolved` | Always confirm via `AskUserQuestion` first — promoting a mission is a user decision, mirroring [draft.md](./draft.md)'s "`[BLOCKED]` not `[ ]`" rationale |
+| 2 | Treat an `unmonitored` (no-marker) pinned entry as evidence the mission is still open | `unmonitored` means "not checked," not "open." It is neither a positive nor a negative signal |
+| 3 | Guess at a citation from surrounding prose when no marker is present | No fuzzy fallback by design — add the marker instead, then re-run |
+| 4 | Treat a citation whose substring is not found anywhere as resolved | The script reports it `unknown`; the mission's overall status is `unknown`, never `resolved`, until every citation is found and checked |
+| 5 | Re-poll GitHub/Plane inside this step to check a `pr:`-style citation | v1 supports `todo:`/`deep:` citations only — a PR-backed TODO item is already auto-`[x]`'d by the `sync` step earlier in this same pipeline run, so its completion flows through the `todo:` citation transitively |
+
+### Self-check
+
+1. Does the tracker have a pinned header block at all? If not, this step is a no-op — do not create one solely to run this check.
+2. Did the run reuse this same pipeline's already-computed Sync/Priority state (no new external polling)?
+3. Was every `resolved`-status mission surfaced via `AskUserQuestion`, never auto-written?
+4. Was the `M checked / K resolved / N unmonitored` count reported before the run closes?
+
 ## Rules (HARD STOP)
 
 | # | Don't (forbidden) | Do (correct alternative) |
@@ -151,3 +197,4 @@ The `pm` role's default pipeline (see `SKILL.md` "Default invocation") runs this
 4. Are dependency-free items split into balanced priority columns with **invisible** ordering edges (`~~~`), rather than left as horizontal roots or forced into one over-tall single column?
 5. (pm-role runs only) Was every `[P*]`-labeled node cross-referenced against its tracker item's current `[BLOCKED:P*:reason]` tag this run, and was the relabeled/removed/proposed count reported?
 6. If a Node Plan Mappings document path was just corrected, was the whole tracker file grepped for the same stale path string, and were any other citations (e.g. the backing item's `Why` / `Options` body) corrected too?
+7. (pm-role runs only) Was `pinned_liveness_check.py` run against the tracker, and was every `resolved`-status pinned mission surfaced via `AskUserQuestion` rather than auto-written? See "Pinned-mission liveness check" above.

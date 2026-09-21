@@ -107,6 +107,7 @@ jobs:
                    skills/backlog/scripts/test_plane_client_browse_url.py \
                    skills/backlog/scripts/test_plane_create_issue_browse_url.py \
                    skills/fix-plan/scripts/test_sync_shared_artifacts.py \
+                   skills/fix-plan/scripts/test_pinned_liveness_check.py \
                    skills/session/tests/test_context_measure.py; do
             echo "::group::$t"
             python3 "$t" || FAIL=1
