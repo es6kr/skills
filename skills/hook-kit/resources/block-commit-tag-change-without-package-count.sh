@@ -148,6 +148,12 @@ PYEOF
   # regression (issue #505): citing a test-result line for an identifier that
   # contains a RETAG_VERBS token must not trip the guard either
   check ALLOW "$(mk 'how to proceed' 'x' 'bats squash-subject 19/19')"
+  # regression (found live, 2026-09-21): citing a git ref whose own name
+  # contains a RETAG_VERBS token. Branch names are the third identifier shape
+  # (after filenames and test-result lines) that carries such a token without
+  # proposing anything, and the one an ask is most likely to quote verbatim.
+  check ALLOW "$(mk 'how to proceed' 'x' 'branch fix/plane-k3s-ns-and-retag-prose-fp has 5 commits')"
+  check ALLOW "$(mk 'which branch?' 'origin/feat/squash-guard-tests' 'x')"
   # regression (5th recurrence, 2026-09-21): merge-STRATEGY prose that merely
   # names squash as the option NOT taken. The pre-existing merge-context
   # stripper only recognised two-word bindings ("squash merge", "--squash"),
@@ -251,6 +257,11 @@ ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/`[^`]*`//g')
 ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_]+(-[a-z0-9_]+)*\.(sh|py|js|ts)//g')
 #   3. "<identifier> N/N" test-result notation (e.g. "squash-subject 19/19")
 ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_-]+[[:space:]]+[0-9]+\/[0-9]+//g')
+#   4. git refs -- a branch named after the very thing it fixes carries the
+#      token in its own name ("fix/...-retag-prose-fp"), and an ask that asks
+#      where to send a branch quotes that name verbatim. Anchored on a
+#      conventional branch prefix so it strips refs, not arbitrary slashes.
+ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's#(feat|fix|hotfix|chore|refactor|perf|test|ci|build|style|docs|release|wip)/[a-z0-9._/-]+##g')
 
 # A squash-MERGE is a different concern (it collapses several commits' types
 # into the PR title) and has its own rule and guard. Only local history
