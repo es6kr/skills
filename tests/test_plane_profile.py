@@ -319,3 +319,38 @@ def test_v2_profile_carries_k3s_workload_override(scripts_on_path):
         "k3s_workload was dropped in the v2 -> flat translation, so a profile "
         "cannot override the hardcoded deployment name the fallback exec's into"
     )
+
+
+def test_resolve_profile_carries_k3s_target_keys(scripts_on_path, monkeypatch):
+    """The K3s fallback reads its exec target off the resolved profile.
+
+    resolve_profile() rebuilds a fresh dict from a fixed key list, so a key it
+    does not name is dropped even when the workspace profile defines it. The
+    fallback then falls back to its built-in defaults and fails against exactly
+    the cluster layout the profile was written to correct -- with the profile
+    looking correctly configured the whole time.
+    """
+    import workspace_profile
+    import plane_client
+
+    monkeypatch.setattr(
+        workspace_profile,
+        "get_profile",
+        lambda target_path=None: {
+            "plane_host": "https://plane.invalid",
+            "workspace_slug": "acme",
+            "default_project": "acme-project",
+            "plane_token": "test-token",
+            "k3s_namespace": "plane",
+            "k3s_workload": "deploy/plane-api",
+        },
+    )
+
+    profile = plane_client.resolve_profile("/tmp")
+
+    assert profile["plane_host"] == "https://plane.invalid"
+    assert profile.get("k3s_namespace") == "plane", (
+        "k3s_namespace never reaches the fallback, so declaring it in the "
+        "workspace profile has no effect"
+    )
+    assert profile.get("k3s_workload") == "deploy/plane-api"
