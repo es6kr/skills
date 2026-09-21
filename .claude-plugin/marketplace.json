@@ -15,7 +15,6 @@
       "name": "es6kr",
       "source": "./",
       "skills": [
-        "./skills/backlog",
         "./skills/brief",
         "./skills/cc-plugin",
         "./skills/chezmoi",
@@ -26,7 +25,6 @@
         "./skills/docxport",
         "./skills/dotfile",
         "./skills/fa",
-        "./skills/fix",
         "./skills/fix-plan",
         "./skills/git-repo",
         "./skills/github-flow",
@@ -38,8 +36,7 @@
         "./skills/skill-kit",
         "./skills/tdd",
         "./skills/todowrite",
-        "./skills/web-browser",
-        "./skills/wip"
+        "./skills/web-browser"
       ],
       "strict": true,
       "version": "0.1.1"

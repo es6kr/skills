@@ -16,7 +16,7 @@ git worktree list | wc -l
 If total count is **10 or more**:
 - **New worktree creation is BLOCKED.** Do NOT execute `git worktree add`.
 - You MUST either:
-  1. Prune/delete merged & inactive worktrees via `git worktree remove <path>` (or automate safely via `python scripts/prune_merged_worktrees.py [--execute]`).
+  1. Prune/delete merged & inactive worktrees via `git worktree remove <path>`.
   2. Repurpose/reuse an existing inactive/synced worktree via `git checkout -B <new-branch>`.
 
 ### 1. Inventory existing worktrees
@@ -315,36 +315,6 @@ When the worktree count already exceeds the limit and §2's inactive-candidate c
 ### Origin
 
 User decision 2026-05-24 after PR #160 merge cleanup of `agent-abbddf41` worktree (8 total worktrees, 5 inactive after cleanup — at the limit, B chosen). Rule extracted from the trade-off between "rename is cheaper than delete+create" (existing Don't/Do #5) and "unbounded accumulation pollutes the worktree list".
-
-## Automated Merged Worktree Pruning (`prune_merged_worktrees.py`)
-
-When worktrees accumulate across feature branches or PRs, use `scripts/prune_merged_worktrees.py` to identify and safely remove clean worktrees whose branches have been merged into remote upstream/PRs.
-
-### Safety Guarantees (HARD STOP Enforcements)
-
-1. **Operation-state gate**: Skips worktrees in the middle of rebase, merge, cherry-pick, bisect, or unresolved conflict states.
-2. **Cleanliness gate**: Skips dirty worktrees containing unstaged or untracked modifications (`git status --porcelain` non-empty).
-3. **Main worktree preservation**: Never touches the main repository worktree or bare root.
-4. **Multi-vendor merge detection**:
-   - **GitHub**: Checks associated PR state via `gh pr list --head <branch>` and verifies `MERGED` state along with `headRefOid` matching.
-   - **Generic Git fallback**: Checks ancestry via `git merge-base --is-ancestor <branch> <upstream>` when GitHub CLI is unavailable or for non-GitHub remotes.
-5. **Dry-run by default**: Safe read-only inspection unless `--execute` is explicitly passed.
-
-### Usage
-
-```bash
-# Preview clean merged worktrees in current repository (dry-run)
-python skills/git-repo/scripts/prune_merged_worktrees.py
-
-# Execute pruning on current repo
-python skills/git-repo/scripts/prune_merged_worktrees.py --execute
-
-# Execute pruning and delete local branches
-python skills/git-repo/scripts/prune_merged_worktrees.py --execute --delete-branch
-
-# Scan and inspect worktrees across all repos under a directory
-python skills/git-repo/scripts/prune_merged_worktrees.py --scan ~/ghq/github.com/es6kr
-```
 
 ## Pre-commit worktree matrix check (HARD STOP)
 
