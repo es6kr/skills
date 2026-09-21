@@ -50,6 +50,17 @@ done
 
 SRC_MP="$SOURCE/.claude-plugin/marketplace.json"
 CLONE="$HOME/.claude/plugins/marketplaces/$MARKETPLACE"
+if [ ! -d "$CLONE" ] && [ -n "${USERPROFILE:-}" ] && [ -d "$USERPROFILE/.claude/plugins/marketplaces/$MARKETPLACE" ]; then
+  CLONE="$USERPROFILE/.claude/plugins/marketplaces/$MARKETPLACE"
+fi
+if [ ! -d "$CLONE" ]; then
+  for _cand in /mnt/c/Users/*/.claude/plugins/marketplaces/"$MARKETPLACE"; do
+    if [ -d "$_cand" ]; then
+      CLONE="$_cand"
+      break
+    fi
+  done
+fi
 CLONE_MP="$CLONE/.claude-plugin/marketplace.json"
 
 [ -f "$SRC_MP" ]   || { echo "[dev-reflect] not a marketplace source (no $SRC_MP)" >&2; exit 1; }
