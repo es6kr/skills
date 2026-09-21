@@ -144,12 +144,21 @@ def resolve_profile(cwd=None):
         or os.environ.get(token_env)
         or os.environ.get("PLANE_API_KEY")
     )
-    return {
+    resolved = {
         "plane_host": (profile.get("plane_host") or os.environ.get("PLANE_HOST", "")).rstrip("/"),
         "token": token,
         "workspace_slug": profile.get("workspace_slug") or os.environ.get("PLANE_WORKSPACE") or profile.get("workspace_name", ""),
         "default_project": profile.get("default_project") or os.environ.get("PLANE_PROJECT"),
     }
+    # The K3s fallback reads its exec target off this dict. Because the dict is
+    # rebuilt from a fixed key list rather than copied, any cluster-addressing
+    # key not named here is dropped however correctly the workspace profile
+    # declares it — and the fallback then uses its built-in defaults against
+    # the very cluster the profile was written to redirect it away from.
+    for key in ("k3s_namespace", "k3s_workload", "k3s_kubeconfig", "k3s_ssh_host"):
+        if profile.get(key):
+            resolved[key] = profile[key]
+    return resolved
 
 
 def html_to_text(raw):
