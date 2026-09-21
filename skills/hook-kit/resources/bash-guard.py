@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """bash-guard.py — PreToolUse:Bash integrated guard (single-process Python port).
 
 Port of bash-guard.sh. The shell version spawns ~80 processes per pass
