@@ -28,6 +28,22 @@ except Exception:
 try:
     payload = json.loads(os.environ.get("CLAUDE_HOOK_INPUT", "{}"))
     path = payload.get("transcript_path", "")
+    if path and not os.path.isfile(path):
+        if path.startswith("/mnt/") and sys.platform == "win32":
+            parts = path.split("/")
+            if len(parts) > 2:
+                drive = parts[2].upper()
+                rest = "/".join(parts[3:])
+                alt = f"{drive}:/{rest}"
+                if os.path.isfile(alt):
+                    path = alt
+        elif len(path) >= 2 and path[1] == ":" and sys.platform != "win32":
+            drive = path[0].lower()
+            rest = path[2:].replace("\\", "/").lstrip("/")
+            alt = f"/mnt/{drive}/{rest}"
+            if os.path.isfile(alt):
+                path = alt
+
     if not path or not os.path.isfile(path):
         sys.exit(0)
 
@@ -80,12 +96,19 @@ try:
                     marker_since_usage = False
 
     if is_antigravity:
-        content_chars = 0
-        for s in agy_active_steps:
-            content_chars += len(s.get("content", "") or "")
-        
-        base_overhead = int(os.environ.get("ANTIGRAVITY_BASE_TOKENS", os.environ.get("CC_BASE_TOKENS", "0")))
-        content_tokens = round(content_chars / 3.5)
+        # Antigravity context compaction window awareness:
+        # Antigravity truncates/compacts earlier turns into a server-side summary,
+        # keeping the base system overhead (~40k tokens) and the last ~5 active turns.
+        # If the transcript contains many turns, older turns are pruned from the live context.
+        user_indices = [i for i, s in enumerate(agy_active_steps) if s.get("type") == "USER_INPUT"]
+        if len(user_indices) > 5:
+            active_slice = agy_active_steps[user_indices[-5]:]
+        else:
+            active_slice = agy_active_steps
+
+        content_chars = sum(len(s.get("content", "") or "") for s in active_slice)
+        base_overhead = int(os.environ.get("ANTIGRAVITY_BASE_TOKENS", os.environ.get("CC_BASE_TOKENS", "40000")))
+        content_tokens = round(content_chars / 4.5)
         total_tokens = base_overhead + content_tokens
         
         window = int(os.environ.get("CC_CONTEXT_WINDOW", "1000000"))
@@ -95,7 +118,7 @@ try:
 
         print(f"Context usage: ~{used_k}k / {win_k}k tokens ({pct}%)")
         
-        cleanup_pct = float(os.environ.get("CC_CLEANUP_RECOMMEND_PCT", "40.0"))
+        cleanup_pct = float(os.environ.get("CC_CLEANUP_RECOMMEND_PCT", "50.0"))
         if pct >= cleanup_pct:
             print(f"[CLEANUP-GATE] Context usage is at/above threshold ({pct}% >= {cleanup_pct}%). Recommend /cleanup.")
         sys.exit(0)
