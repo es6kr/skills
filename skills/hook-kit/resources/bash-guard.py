@@ -1430,6 +1430,9 @@ def self_test() -> int:
         (False, False, "gh pr merge 123 --merge"),
         (False, False, "ALLOW_SQUASH_MERGE=1 gh pr merge 123 --squash"),
         (False, False, 'echo "gh pr merge --squash is forbidden"'),
+        # ── heredoc writer prose FP guard (cat/tee <<EOF with simple block keyword) ──
+        (False, False, "cat <<'EOF'\nterraform apply -auto-approve\nEOF"),
+        (False, False, "cat <<EOF\ndocker rm my-container\nEOF"),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:
