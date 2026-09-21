@@ -312,3 +312,74 @@ def test_fix_plan_skill_md_does_not_own_plane_scripts():
         "fix-plan SKILL.md must not point at plane_* scripts under its own "
         f"scripts/ dir. Found: {sorted(set(owned))}"
     )
+
+
+# --------------------------- K3s fallback: misconfiguration reported as such
+#
+# Live reality check (2026-09-21, es6.kr cluster): the fallback's built-in
+# default namespace is `plane-ce`, but every Plane deployment actually runs in
+# `plane` -- `plane-ce` holds only the CNPG Postgres pods. So once the REST
+# tier fails, the fallback fails too, and the operator's only clue was
+# kubectl's raw
+#     Error from server (NotFound): deployments.apps "plane-api-wl" not found
+# which names neither the namespace that was searched nor the profile keys
+# that fix it. These guards pin a diagnosis that points at the configuration.
+
+
+@pytest.mark.parametrize("script_path", CREATE_ISSUE_COPIES)
+def test_k3s_fallback_reports_missing_workload_as_misconfiguration(
+    script_path, monkeypatch
+):
+    mod = load_module(
+        script_path, f"pci_nf_{script_path.parent.parent.name.replace('-', '_')}"
+    )
+
+    def fake_run(cmd, **kwargs):
+        raise mod.subprocess.CalledProcessError(
+            1,
+            cmd,
+            output="",
+            stderr='Error from server (NotFound): deployments.apps "plane-api-wl" not found\n',
+        )
+
+    monkeypatch.setattr(mod.shutil, "which", lambda _: "/usr/local/bin/kubectl")
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+    res = mod.create_via_k3s_fallback(dict(PROFILE), "title")
+
+    assert res["success"] is False
+    reason = res["reason"]
+    assert "plane-ce" in reason, "the namespace that was searched must be named"
+    assert "plane-api-wl" in reason, "the workload that was targeted must be named"
+    assert "k3s_namespace" in reason and "k3s_workload" in reason, (
+        "the reason must name the profile keys that override the defaults, "
+        "otherwise the operator cannot act on it"
+    )
+    assert "NotFound" in reason, "kubectl's own words must survive the reframing"
+
+
+@pytest.mark.parametrize("script_path", CREATE_ISSUE_COPIES)
+def test_k3s_fallback_keeps_raw_reason_for_unrelated_errors(script_path, monkeypatch):
+    """Only a missing target is reframed -- other failures must not be mislabelled."""
+    mod = load_module(
+        script_path, f"pci_raw_{script_path.parent.parent.name.replace('-', '_')}"
+    )
+
+    def fake_run(cmd, **kwargs):
+        raise mod.subprocess.CalledProcessError(
+            1,
+            cmd,
+            output="",
+            stderr="error: You must be logged in to the server (Unauthorized)\n",
+        )
+
+    monkeypatch.setattr(mod.shutil, "which", lambda _: "/usr/local/bin/kubectl")
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+    res = mod.create_via_k3s_fallback(dict(PROFILE), "title")
+
+    assert res["success"] is False
+    assert "Unauthorized" in res["reason"]
+    assert "k3s_namespace" not in res["reason"], (
+        "an auth failure must not be reported as a namespace misconfiguration"
+    )

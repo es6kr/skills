@@ -287,3 +287,35 @@ def test_k3s_fallback_script_survives_quote_in_workspace_slug(monkeypatch):
         "single-quoted literal — otherwise its own quote characters break out "
         "of the string and the trailing text runs as Python statements"
     )
+
+
+def test_v2_profile_carries_k3s_workload_override(scripts_on_path):
+    """The K3s fallback's workload override must survive v2 -> flat translation.
+
+    `create_via_k3s_fallback` reads `profile["k3s_workload"]` to pick the
+    deployment it exec's into, and its failure message tells the operator to
+    set that key. If the translation drops it, the documented override is
+    inert and the hardcoded default is the only reachable value -- the same
+    defect class that silently dropped `token_file` and `workspace_slug`.
+    """
+    import workspace_profile
+
+    flat = workspace_profile.v2_profile_to_flat(
+        {
+            "roles": {
+                "backlog": {
+                    "kind": "plane",
+                    "endpoint": "https://plane.invalid",
+                    "k3s_namespace": "plane",
+                    "k3s_workload": "deploy/plane-api",
+                }
+            }
+        },
+        {},
+    )
+
+    assert flat.get("k3s_namespace") == "plane"
+    assert flat.get("k3s_workload") == "deploy/plane-api", (
+        "k3s_workload was dropped in the v2 -> flat translation, so a profile "
+        "cannot override the hardcoded deployment name the fallback exec's into"
+    )
