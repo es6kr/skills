@@ -99,6 +99,10 @@ def v2_profile_to_flat(profile: dict, defaults: dict, global_roles: dict = None)
             flat["token_file"] = backlog["token_file"]
         if "k3s_namespace" in backlog:
             flat["k3s_namespace"] = backlog["k3s_namespace"]
+        # The fallback's failure message tells the operator to set
+        # `k3s_workload`; dropping it here would make that advice a dead end.
+        if "k3s_workload" in backlog:
+            flat["k3s_workload"] = backlog["k3s_workload"]
         if "k3s_kubeconfig" in backlog:
             flat["k3s_kubeconfig"] = backlog["k3s_kubeconfig"]
         if "k3s_ssh_host" in backlog:
