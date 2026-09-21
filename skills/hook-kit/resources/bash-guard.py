@@ -1132,8 +1132,9 @@ def evaluate(
                 "other pending work or re-issue another bounded background call."
             )
 
+    simple_scan = strip_heredoc_bodies(command)
     for pat, msg in SIMPLE_BLOCKS:
-        if re.search(pat, command, IM):
+        if re.search(pat, simple_scan, IM):
             return hard(msg)
 
     scan = git_scan_text(command)
