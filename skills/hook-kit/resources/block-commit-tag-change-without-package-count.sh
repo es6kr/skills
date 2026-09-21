@@ -148,6 +148,19 @@ PYEOF
   # regression (issue #505): citing a test-result line for an identifier that
   # contains a RETAG_VERBS token must not trip the guard either
   check ALLOW "$(mk 'how to proceed' 'x' 'bats squash-subject 19/19')"
+  # regression (5th recurrence, 2026-09-21): merge-STRATEGY prose that merely
+  # names squash as the option NOT taken. The pre-existing merge-context
+  # stripper only recognised two-word bindings ("squash merge", "--squash"),
+  # so a bare `squash` token in ordinary prose fell straight through to
+  # RETAG_VERBS even though the payload recommends against squashing.
+  check ALLOW "$(mk 'how should this land?' 'merge commit' 'squash is discouraged for this repo')"
+  check ALLOW "$(mk 'how should this land?' 'merge commit' 'use merge commit strategy, not squash')"
+  check ALLOW "$(mk 'which merge strategy?' 'merge commit' 'the squash strategy collapses per-commit types')"
+  check ALLOW "$(mk 'which merge strategy?' 'merge commit' 'merge commit rather than squash')"
+  # ... while a bare local-history squash proposal still fires (no merge-
+  # strategy context to strip), so widening the stripper must not cost
+  # coverage of the case this guard exists for.
+  check DENY  "$(mk 'how to proceed' 'squash the last 3 commits locally' 'retag as feat:')"
 
   # --- condition 3: per-commit file enumeration in the turn clears the gate ---
   check ALLOW "$(mk 'how to proceed' 'reword to feat:' 'x')" \
