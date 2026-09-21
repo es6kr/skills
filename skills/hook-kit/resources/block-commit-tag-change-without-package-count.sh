@@ -258,6 +258,18 @@ ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_-]+[[:space:]]+[0-9
 # "squash ... before merging" word order, not just "squash merge") before the
 # verb match so a merge-strategy question does not trip this hook.
 INTENT_TEXT=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/(squash[-[:space:]]*merge|merge[-[:space:]]*--squash|--squash|gh pr merge[^[:space:]]*|squash[^.]{0,40}merg(e|ing))//g')
+# The bindings above only recognise squash when it is welded to a merge token.
+# Ordinary merge-strategy prose names the bare word instead, and every such
+# phrasing below argues about HOW TO MERGE -- several of them argue AGAINST
+# squashing -- so none of them proposes rewriting local history. Each pattern
+# requires its own qualifier, so a bare "squash the last 3 commits" (the case
+# this guard exists for) still reaches the verb match untouched.
+#   a. squash as the subject of a judgement: "squash is discouraged"
+INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E 's/squash(ing)?[[:space:]]+(is|are|was|were)[[:space:]]+(not[[:space:]]+(allowed|permitted|recommended|preferred|used)|discouraged|disallowed|prohibited|forbidden|disabled|banned|unavailable)//g')
+#   b. squash as the option NOT taken: "not squash", "rather than squash"
+INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E 's/(not|no|never|avoid|instead[[:space:]]+of|rather[[:space:]]+than|as[[:space:]]+opposed[[:space:]]+to|versus|vs\.?)[[:space:]]+squash(ing)?//g')
+#   c. squash as a merge-strategy noun: "the squash strategy", "squash option"
+INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E 's/squash[-[:space:]]+(strateg(y|ies)|option|mode)//g')
 # Strip negated rewrite-verb clauses ("do not retag; split the commits") so the
 # guard's own recommended safe remedy does not itself trip the guard.
 INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E "s/${NEGATION_VERBS}[[:space:]]+(retag|re-tag|reword|re-word|squash|amend|rewrite)[^.;]*//g")
