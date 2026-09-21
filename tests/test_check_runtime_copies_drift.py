@@ -301,10 +301,22 @@ def _make_plugins_root(tmp_path):
     return plugins_root
 
 
+def _assume_uv_present(monkeypatch):
+    # These tests assert _run_subprocess is actually reached, which requires
+    # main()'s `uv` availability check to pass first. Whether the real `uv`
+    # binary happens to be on PATH is environment-dependent (present on a dev
+    # machine, absent on the CI pytest runner, which installs only pytest) --
+    # so it must be monkeypatched rather than left to chance. Missing this
+    # made these tests pass locally and fail in CI (main() soft-skipped
+    # before ever calling the monkeypatched _run_subprocess).
+    monkeypatch.setattr(mod.shutil, "which", lambda name: "/usr/bin/uv")
+
+
 def test_main_invokes_verify_with_expected_command_when_relevant_file_touched(tmp_path, monkeypatch):
     plugins_root = _make_plugins_root(tmp_path)
     repo_root = tmp_path / "skills-repo"
     repo_root.mkdir()
+    _assume_uv_present(monkeypatch)
 
     captured_cmd = {}
 
@@ -328,6 +340,7 @@ def test_main_invokes_verify_with_expected_command_when_relevant_file_touched(tm
 
 def test_main_blocks_on_copy_drift_finding(tmp_path, monkeypatch):
     plugins_root = _make_plugins_root(tmp_path)
+    _assume_uv_present(monkeypatch)
     monkeypatch.setattr(
         mod,
         "_run_subprocess",
@@ -345,6 +358,7 @@ def test_main_blocks_on_copy_drift_finding(tmp_path, monkeypatch):
 
 def test_main_blocks_on_partially_removed_finding(tmp_path, monkeypatch):
     plugins_root = _make_plugins_root(tmp_path)
+    _assume_uv_present(monkeypatch)
     monkeypatch.setattr(
         mod,
         "_run_subprocess",
@@ -365,6 +379,7 @@ def test_main_does_not_block_on_unrelated_finding(tmp_path, monkeypatch):
     # copy drift -- an unrelated finding (e.g. ORPHAN_REGISTRATION on a
     # different hook) must not fail this push.
     plugins_root = _make_plugins_root(tmp_path)
+    _assume_uv_present(monkeypatch)
     monkeypatch.setattr(
         mod,
         "_run_subprocess",
@@ -382,6 +397,7 @@ def test_main_does_not_block_on_unrelated_finding(tmp_path, monkeypatch):
 
 def test_main_clean_check_returns_zero(tmp_path, monkeypatch):
     plugins_root = _make_plugins_root(tmp_path)
+    _assume_uv_present(monkeypatch)
     monkeypatch.setattr(
         mod,
         "_run_subprocess",
