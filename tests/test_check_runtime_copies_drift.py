@@ -259,6 +259,29 @@ def test_main_soft_skips_when_verify_script_missing(tmp_path, monkeypatch, capsy
     assert "skipped" in captured.err.lower()
 
 
+def test_main_soft_skips_when_uv_not_on_path(tmp_path, monkeypatch, capsys):
+    plugins_root = tmp_path / "claude-plugins"
+    plugins_root.mkdir()
+    (plugins_root / "hook-registry.yaml").write_text(SAMPLE_REGISTRY, encoding="utf-8")
+    scripts_dir = plugins_root / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "hook_registry_verify.py").write_text("# stub\n", encoding="utf-8")
+
+    called = []
+    monkeypatch.setattr(mod, "_run_subprocess", lambda cmd: called.append(cmd))
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+
+    rc = mod.main(
+        ["--repo-root", str(tmp_path), "--plugins-root", str(plugins_root)],
+        stdin_text="skills/hook-kit/resources/bash-guard.py\n",
+    )
+    assert rc == 0
+    assert called == []
+    captured = capsys.readouterr()
+    assert "skipped" in captured.err.lower()
+    assert "uv" in captured.err.lower()
+
+
 # --- main: the verify tool is actually invoked and its verdict is honoured ----
 
 class _FakeCompletedProcess:
