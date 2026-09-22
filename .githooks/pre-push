@@ -122,6 +122,30 @@ EOF
     exit 1
   fi
 
+  # Hook-registry runtime-copy drift guard — if this push touches a hook file
+  # that hook-registry.yaml (es6kr/claude-plugins, a sibling checkout) declares
+  # as runtime_copies-tracked, verify every declared root still matches before
+  # it ships. Soft-skips (does not block) when this machine has no claude-plugins
+  # checkout, no `uv` on PATH, or no working Python — not everyone has the sibling
+  # repo cloned, and bats/pytest below will surface a genuinely missing Python
+  # more loudly than this optional gate should.
+  DRIFT_PY=""
+  for cand in python3 python; do
+    if command -v "$cand" >/dev/null 2>&1 && "$cand" -c "import sys" >/dev/null 2>&1; then
+      DRIFT_PY="$cand"
+      break
+    fi
+  done
+  if [ -n "$DRIFT_PY" ]; then
+    PLUGINS_ROOT="${HOOK_REGISTRY_PLUGINS_ROOT:-$HOME/ghq/github.com/es6kr/claude-plugins}"
+    if ! git diff --name-only "$SCAN_RANGE" 2>/dev/null | \
+        "$DRIFT_PY" scripts/check-runtime-copies-drift.py \
+          --repo-root "$repo_root" \
+          --plugins-root "$PLUGINS_ROOT"; then
+      exit 1
+    fi
+  fi
+
 done
 if [ "$LOCAL_PUSH_ATTEMPTED" = "1" ] && [ "${PUSH_LOCAL_OVERRIDE:-}" != "1" ]; then
   cat >&2 <<'GUARD_MSG'
