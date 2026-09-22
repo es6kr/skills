@@ -94,6 +94,12 @@ def isolated_workspace(tmp_path, monkeypatch, scripts_on_path):
     monkeypatch.setattr(
         workspace_profile, "CONFIG_FILE_V2", tmp_path / "no-agent-workspace.json"
     )
+    # CONFIG_FILE_AGENTS outranks both of the above — leave it unset and a
+    # live ~/.agents/config.json on the machine running this test silently
+    # wins over the fixture, defeating the isolation this fixture exists for.
+    monkeypatch.setattr(
+        workspace_profile, "CONFIG_FILE_AGENTS", tmp_path / "no-agents-config.json"
+    )
 
     # Environment must not be able to satisfy the assertions on its own.
     for var in (
@@ -153,6 +159,9 @@ def test_workspace_profile_resolves_artifacts_path(tmp_path, monkeypatch, script
 
     monkeypatch.setattr(workspace_profile, "CONFIG_FILE_V2", v2_config_file)
     monkeypatch.setattr(workspace_profile, "CONFIG_FILE", tmp_path / "no-v1.json")
+    monkeypatch.setattr(
+        workspace_profile, "CONFIG_FILE_AGENTS", tmp_path / "no-agents-config.json"
+    )
 
     prof_custom = workspace_profile.get_profile(workspace_name="custom_ws")
     assert prof_custom["artifacts_path"] == "custom/docs/path"
