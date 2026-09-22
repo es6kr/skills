@@ -21,7 +21,7 @@ input=$(cat)
 # be recognized here, or the hook silently never fires for it.
 orca_bin_pattern='orca-ide|orca-dev|orca'
 if [ -n "$ORCA_CLI_COMMAND" ]; then
-  orca_cli_escaped=$(printf '%s' "$ORCA_CLI_COMMAND" | sed 's/[.[\*^$/]/\\&/g')
+  orca_cli_escaped=$(printf '%s' "$ORCA_CLI_COMMAND" | sed 's/[][\.^$*+()?{}|/]/\\&/g')
   orca_bin_pattern="${orca_cli_escaped}|${orca_bin_pattern}"
 fi
 
