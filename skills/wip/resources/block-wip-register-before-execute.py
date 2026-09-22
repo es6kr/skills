@@ -65,14 +65,6 @@ REGISTER_VERBS = os.environ.get(
     "add|write|create|draft|record|register",
 )
 
-try:
-    payload = json.load(sys.stdin)
-except Exception:
-    allow()
-
-CLAUDE_TOOL = payload.get("tool_name", "")
-AG_TOOL = payload.get("toolCall", {}).get("name", "") if isinstance(payload.get("toolCall"), dict) else ""
-
 def find_last_genuine_user_prompt(events):
     """Return (raw_line, event) for the most recent non-tool-result user turn, or None."""
     def is_tool_result(e):
@@ -184,60 +176,77 @@ def was_workflow_or_registration_without_followup(log_path, registered_pattern):
             return False
     return True
 
-if AG_TOOL:
-    # Antigravity runtime. Matcher mirrors ~/.gemini/config/hooks.json's
-    # "Edit|Write|write_to_file|replace_file_content|multi_replace_file_content"
-    if AG_TOOL not in ("Edit", "Write", "write_to_file", "replace_file_content", "multi_replace_file_content"):
+def main():
+    # Runtime flow lives here (not at module top level) so importing this
+    # module never reads stdin or exits — see tests/test_block_wip_register_
+    # import_safety.py. The harness still runs `python3 <file>`, entering via
+    # the __main__ guard below with an identical subprocess contract.
+    try:
+        payload = json.load(sys.stdin)
+    except Exception:
         allow()
-    ag_args = payload.get("toolCall", {}).get("args", {}) or {}
-    target_path = (
-        ag_args.get("path")
-        or ag_args.get("TargetFile")
-        or ag_args.get("file_path")
-        or ""
-    )
-    if str(target_path).endswith("task.md"):
-        # The write IS the registration act - never block it.
-        allow()
-    
-    ag_log_path = (
-        payload.get("transcriptPath")
-        or payload.get("transcript_path")
-        or (payload.get("toolCall", {}) or {}).get("transcriptPath")
-        or find_antigravity_active_log_path()
-        or ""
-    )
-    if ag_log_path and os.path.exists(ag_log_path):
-        try:
-            if was_workflow_or_registration_without_followup(ag_log_path, r"task\.md"):
-                deny_antigravity(
-                    "Tool Call #1 MANDATORY & /wip register-before-execute (HARD STOP): "
-                    "A workflow slash-command (/fix, /fa, /wip, /code-workflow, etc.) was invoked "
-                    "but task.md has not been updated in the current turn. "
-                    "The VERY FIRST tool call MUST update task.md before editing deliverable files. "
-                    "Ref: GEMINI.md 'Tool Call #1 MANDATORY' & wip/antigravity.md Step 2."
-                )
-        except Exception:
-            pass  # fall through to allow()
-    allow()
 
-if CLAUDE_TOOL not in ("Edit", "Write"):
-    allow()
+    claude_tool = payload.get("tool_name", "")
+    ag_tool = payload.get("toolCall", {}).get("name", "") if isinstance(payload.get("toolCall"), dict) else ""
 
-tp = payload.get("transcript_path", "")
-if not tp or not os.path.exists(tp):
-    allow()
-
-try:
-    if was_registration_wip_without_followup(tp, r'"name"\s*:\s*"(TaskCreate|TodoWrite)"'):
-        sys.stderr.write(
-            "/wip register-before-execute (HARD STOP): a registration-mode /wip was invoked "
-            "but no TaskCreate/TodoWrite has run since.\n"
-            "  Register the wip task FIRST (TaskCreate), THEN edit the deliverable.\n"
-            "  Ref: wip SKILL.md Step 1 'Register BEFORE execute'.\n"
+    if ag_tool:
+        # Antigravity runtime. Matcher mirrors ~/.gemini/config/hooks.json's
+        # "Edit|Write|write_to_file|replace_file_content|multi_replace_file_content"
+        if ag_tool not in ("Edit", "Write", "write_to_file", "replace_file_content", "multi_replace_file_content"):
+            allow()
+        ag_args = payload.get("toolCall", {}).get("args", {}) or {}
+        target_path = (
+            ag_args.get("path")
+            or ag_args.get("TargetFile")
+            or ag_args.get("file_path")
+            or ""
         )
-        sys.exit(2)
-except Exception:
+        if str(target_path).endswith("task.md"):
+            # The write IS the registration act - never block it.
+            allow()
+
+        ag_log_path = (
+            payload.get("transcriptPath")
+            or payload.get("transcript_path")
+            or (payload.get("toolCall", {}) or {}).get("transcriptPath")
+            or find_antigravity_active_log_path()
+            or ""
+        )
+        if ag_log_path and os.path.exists(ag_log_path):
+            try:
+                if was_workflow_or_registration_without_followup(ag_log_path, r"task\.md"):
+                    deny_antigravity(
+                        "Tool Call #1 MANDATORY & /wip register-before-execute (HARD STOP): "
+                        "A workflow slash-command (/fix, /fa, /wip, /code-workflow, etc.) was invoked "
+                        "but task.md has not been updated in the current turn. "
+                        "The VERY FIRST tool call MUST update task.md before editing deliverable files. "
+                        "Ref: GEMINI.md 'Tool Call #1 MANDATORY' & wip/antigravity.md Step 2."
+                    )
+            except Exception:
+                pass  # fall through to allow()
+        allow()
+
+    if claude_tool not in ("Edit", "Write"):
+        allow()
+
+    tp = payload.get("transcript_path", "")
+    if not tp or not os.path.exists(tp):
+        allow()
+
+    try:
+        if was_registration_wip_without_followup(tp, r'"name"\s*:\s*"(TaskCreate|TodoWrite)"'):
+            sys.stderr.write(
+                "/wip register-before-execute (HARD STOP): a registration-mode /wip was invoked "
+                "but no TaskCreate/TodoWrite has run since.\n"
+                "  Register the wip task FIRST (TaskCreate), THEN edit the deliverable.\n"
+                "  Ref: wip SKILL.md Step 1 'Register BEFORE execute'.\n"
+            )
+            sys.exit(2)
+    except Exception:
+        allow()
+
     allow()
 
-allow()
+
+if __name__ == "__main__":
+    main()
