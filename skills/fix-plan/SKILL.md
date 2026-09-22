@@ -2,8 +2,8 @@
 name: fix-plan
 description: |
   fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), update (flip marker / append progress note on an existing item), upsert (dup-check → update in place or fall back to add), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
-  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync, scoped by role-profile (--role=pm|deep|impl).
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role", "orca session launch", "fix-plan upsert", "dup check tracker".
+  Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync (incl. pinned-mission liveness check), scoped by role-profile (--role=pm|deep|impl).
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role", "orca session launch", "fix-plan upsert", "dup check tracker", "pinned mission liveness", "pinned-backing".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -32,7 +32,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | claim | Multi-session in-progress lease: `[CLAIMED:<sid>:<ts>]` suffix tag on `[ ]` / `[BLOCKED:*:selfable]` items, claim→refresh→release lifecycle, stale-TTL takeover — prevents two sessions duplicating the same item | [claim.md](./claim.md) |
 | completion-criteria | Definition of done per item output type (`Why` = scope narrative vs `How to apply` = deliverable), marker transition rules, residual-scope split | [completion-criteria.md](./completion-criteria.md) |
 | draft | Record a deferred plan **stub** (purpose + defer reason + resume trigger + expected deliverable) in `## Plan Drafts` when full planning is postponed; promote to `code-workflow` research→plan when the trigger fires. Invoked `/fix-plan draft` | [draft.md](./draft.md) |
-| flowchart | Priority flowchart (Mermaid `graph TD` dependency graph) authoring, clean syntax rules (no inline `%%`), plan document node mapping (`llm-wiki/outputs/`, `.ralph/plan-drafts/`) without `file://` URLs, and the `pm`-role default-pipeline sync procedure (drift check against priority-triage output) | [flowchart.md](./flowchart.md) |
+| flowchart | Priority flowchart (Mermaid `graph TD` dependency graph) authoring, clean syntax rules (no inline `%%`), plan document node mapping (`llm-wiki/outputs/`, `.ralph/plan-drafts/`) without `file://` URLs, the `pm`-role default-pipeline sync procedure (drift check against priority-triage output), and the pinned-mission liveness check (`pinned_liveness_check.py` — cite backing items via `<!-- pinned-backing: todo:"..." -->`, surface a resolved candidate via `AskUserQuestion`, never auto-write) | [flowchart.md](./flowchart.md) |
 | format | Schema: `[ ]` / `[x]` / `[BLOCKED]` markers, Progress/Completed sections, item state changes, section-consistency check | [format.md](./format.md) |
 | issue-drafts | Issue Drafts lifecycle: write → publish → archive (`.bak/`) → delete from fix_plan | [issue-drafts.md](./issue-drafts.md) |
 | model-triage | High-capability model triage: 5 fit categories + anti-fit table + cross-section discovery procedure + dedicated `## <Model> Target Tasks` section operation | [model-triage.md](./model-triage.md) |
@@ -100,7 +100,7 @@ When `/fix-plan` is invoked with **no args**, it must execute the following sequ
 2. **Format**: Verify the schema, markers, and section structure of the tracker.
 3. **Sync**: Poll external GitHub states (`gh pr view` / `gh issue view`) for referenced issues/PRs to auto-resolve completed ones.
 4. **Priority**: Triage and sort the remaining `[BLOCKED]` list based on the synchronized states.
-5. **Flowchart sync**: Compare the `## Flow Chart` section's node labels and dependency edges against the priority tags just produced in step 4 — update any node whose `[P*]` label, or whose backing item's resolved/removed state, has drifted from the live tracker. See [flowchart.md](./flowchart.md) "Sync procedure".
+5. **Flowchart sync**: Compare the `## Flow Chart` section's node labels and dependency edges against the priority tags just produced in step 4 — update any node whose `[P*]` label, or whose backing item's resolved/removed state, has drifted from the live tracker. See [flowchart.md](./flowchart.md) "Sync procedure". Immediately after, run the **pinned-mission liveness check** (same step, `pm` role only): check the tracker's pinned header block for `<!-- pinned-backing: ... -->`-cited missions whose backing items have all resolved, and surface any candidate via `AskUserQuestion` — never auto-write. See [flowchart.md](./flowchart.md) "Pinned-mission liveness check".
 
 **Recency marker maintenance**: upon completing the full pipeline (through step 5, or through the REPEAT cadence check for the `pm` role profile), stamp/update the "last full pipeline run" marker in the tracker's pinned block with the completion timestamp and the role profile used, so Step 0 of a future invocation can find it. If the tracker has no pinned block, skip this — do not create new tracker structure solely for this marker.
 
@@ -132,8 +132,8 @@ The default pipeline is scoped by the execution role, so a high-capability sessi
 
 | Profile | Steps executed | Skipped (reported as remainder) |
 |---------|----------------|--------------------------------|
-| `pm` | move → format → sync → priority → flowchart-sync → **REPEAT cadence check** (run all due REPEAT items) → **Plan Drafts trigger scan** (surface, never author — see [draft.md](./draft.md) "Role ownership") | — |
-| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format, flowchart-sync — surfaced as a delegation remainder for a `pm` session |
+| `pm` | move → format → sync → priority → flowchart-sync (incl. pinned-mission liveness check) → **REPEAT cadence check** (run all due REPEAT items) → **Plan Drafts trigger scan** (surface, never author — see [draft.md](./draft.md) "Role ownership") | — |
+| `deep` | sync (cheap state refresh) → priority (judgment-quality gain) → [model-triage](./model-triage.md) re-discovery + plan-audit candidate scan | move, format, flowchart-sync (incl. pinned-mission liveness check) — surfaced as a delegation remainder for a `pm` session |
 | `impl` | sync → priority → **REPEAT overdue check** (run REPEAT items overdue by 24h+) → **Plan Drafts promote execution** (premise re-verify + `code-workflow` research→plan dispatch for triggered drafts — see [draft.md](./draft.md) "Role ownership"), then surface `selfable` implementation candidates | move, format, model-triage, flowchart-sync |
 | (unresolved) | full pipeline | — |
 
