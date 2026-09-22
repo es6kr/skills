@@ -33,6 +33,7 @@ Top-level sections:
 | `## Progress` | Active and recently-completed items | Always present. Never empty — if no items, keep `(none)` placeholder |
 | `## Completed` | Historical one-line summaries | Temporary holding area. New entries inserted at sort position. **Not unbounded** — older entries are periodically archived to `.bak/` partition files (and index to RAG) and **deleted from the active file** (see [move.md](./move.md) "Completed-section size management"); the live section holds only the current period |
 | `## Hold` (optional) | External-response BLOCKED items separate from active Progress | Used when Progress would otherwise be cluttered with un-actionable items |
+| `## Pipeline Execution Log` (optional) | Recency-ask answer trail read by SKILL.md's "Recency-ask answer reuse" gate | Keep the most recent 3 entries; append new ones with `scripts/add_pipeline_log.py` (prepend + prune) or `scripts/append_pipeline_log.py` (append), both with `--dry-run` support — older entries roll into `.agents/pipeline-execution-log-archive.md` |
 | `## Notes` | Project conventions, project-specific guard rails | Not modified by this skill |
 
 ## Marker syntax
