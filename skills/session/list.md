@@ -7,7 +7,7 @@ List all sessions in the current project (or all projects) with UUID, modificati
 - `/session list` — list all sessions in current project (default)
 - `/session list --all-projects` — list across all projects under `~/.claude/projects/`
 - `/session list --limit 20` — show only the top N most recently modified sessions
-- `/session list --engine antigravity` — list Antigravity (Gemini IDE) sessions instead of Claude Code sessions
+- `/session list --engine antigravity` — list Antigravity sessions instead of Claude Code sessions (both the IDE and CLI runtimes)
 
 Use for quick inspection before running `classify`, `purge`, `search`, or `compress`. Unlike those topics, `list` performs **no validation, classification, or destructive action** — it only enumerates.
 
@@ -81,26 +81,28 @@ Pass `N` to the `LIMIT` variable in the default procedure. Truncates output to t
 
 ### `--engine antigravity` flag
 
-Antigravity (Gemini IDE) sessions live under `~/.gemini/antigravity-ide/brain/<uuid>/`, not `~/.claude/projects/`. Enumerate them the same way, using each session's `transcript.jsonl` mtime/size (the readable, greppable artifact — see `search.md` "Engine Selection"):
+Antigravity sessions live under `~/.gemini/<runtime>/brain/<uuid>/`, not `~/.claude/projects/` — and Antigravity is **two independent runtimes** with separate brain folders: the IDE app (`antigravity-ide`) and the CLI (`antigravity-cli`, invoked as `agy`). Neither shares sessions with the other, so enumerate both and merge:
 
 ```bash
-for dir in ~/.gemini/antigravity-ide/brain/*/; do
-  uuid=$(basename "$dir")
-  t="$dir/.system_generated/logs/transcript.jsonl"
-  [[ -f "$t" ]] || continue
-  ls -l --time-style=full-iso "$t" | awk -v id="$uuid" '{printf "| `%s` | %s %s | %s |\n", id, $6, $7, $5}'
-done | sort -k2 -r
+for root in antigravity-ide antigravity-cli; do
+  for dir in ~/.gemini/$root/brain/*/; do
+    uuid=$(basename "$dir")
+    t="$dir/.system_generated/logs/transcript.jsonl"
+    [[ -f "$t" ]] || continue
+    ls -l --time-style=full-iso "$t" | awk -v id="$uuid" -v r="$root" '{printf "| `%s` | %s | %s %s | %s |\n", id, r, $6, $7, $5}'
+  done
+done | sort -k3 -r
 ```
 
 Output header:
 ```markdown
-| Session UUID | mtime | Size (bytes) |
-|--------------|-------|---------------|
+| Session UUID | Runtime | mtime | Size (bytes) |
+|--------------|---------|-------|---------------|
 ```
 
-A per-session human-readable title hint (when present) is the first-line `# ` header of that session's `task.md` artifact, if one exists at `~/.gemini/antigravity-ide/brain/<uuid>/task.md` — Antigravity does not persist a separate "conversation title" field anywhere in the conversation SQLite DB or the brain folder; `task.md`'s H1 is the closest available proxy, and it reflects the session's most recently active work thread, not necessarily its original topic.
+A per-session human-readable title hint (when present) is the first-line `# ` header of that session's `task.md` artifact, if one exists at `~/.gemini/<runtime>/brain/<uuid>/task.md` — Antigravity does not persist a separate "conversation title" field anywhere in the conversation SQLite DB or the brain folder; `task.md`'s H1 is the closest available proxy, and it reflects the session's most recently active work thread, not necessarily its original topic.
 
-`--all-projects` and `--engine antigravity` are mutually exclusive — Antigravity's brain folder is not partitioned by project the way `~/.claude/projects/` is.
+`--all-projects` and `--engine antigravity` are mutually exclusive — Antigravity's brain folders are not partitioned by project the way `~/.claude/projects/` is.
 
 ## Output Format
 
