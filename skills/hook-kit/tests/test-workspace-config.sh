@@ -138,7 +138,7 @@ cat > "$FIXTURE/v1.json" <<'JSON'
       "llm_wiki_path": "/tmp/wsLegacy/llm-wiki",
       "plane_host": "https://plane.example.invalid",
       "plane_token_env": "WSLEGACY_TOKEN",
-      "qdrant_memory_collection": "claude-memory",
+      "qdrant_memory_collection": "agent-memory-personal",
       "qdrant_url": "http://example.invalid:30333",
       "qdrant_wiki_collection": "legacy-wiki",
       "workspace_name": "wsLegacy"

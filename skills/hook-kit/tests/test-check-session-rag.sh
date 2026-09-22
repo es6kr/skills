@@ -166,7 +166,7 @@ unset FAKE_MCP_MARKER
 cat > "$FIXTURE/script-stored.jsonl" <<'JSONL'
 {"message":{"role":"user","content":[{"type":"text","text":"please run an audit of the hook registrations"}]}}
 {"message":{"role":"assistant","content":[{"type":"tool_use","name":"mcp__qdrant__qdrant-find","input":{}}]}}
-{"message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"uvx --from fastembed --with requests python scripts/qdrant-import.py --session-id abc --collection claude-memory"}}]}}
+{"message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"uvx --from fastembed --with requests python scripts/qdrant-import.py --session-id abc --collection agent-memory-personal"}}]}}
 JSONL
 
 # Neither side went through MCP: stored with the import script, consulted with
