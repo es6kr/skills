@@ -516,6 +516,24 @@ git -C "${W:-$R}" log @{u}..HEAD --oneline           # commits not on the remote
 
 Report the state in the merge ask itself, so the user weighs a fact rather than an assumption.
 
+**Sibling stale-worktree sweep (repo-wide, HARD STOP — 2nd recurrence 2026-09-13)**: the residue check above only covers the PR's *own* source branch. Before finalizing the merge ask, also run `git worktree list` for the repo and check every OTHER branch it points at — not just the one being merged:
+
+```bash
+git -C "$R" worktree list --porcelain | awk '/^branch /{print $2}' | sed 's#refs/heads/##' | while read -r b; do
+  [ "$b" = "$B" ] && continue   # skip the PR's own branch — already checked above
+  merged=$(gh pr list -R <owner>/<repo> --head "$b" --state merged --json number -q '.[0].number')
+  ahead=$(git -C "$R" log origin/<base>.."$b" --oneline | wc -l)
+  echo "$b: merged_pr=${merged:-none} ahead_of_base=$ahead"
+done
+```
+
+A sibling branch is a stale-worktree candidate when `merged_pr` is set (its PR already landed) **or** `ahead_of_base` is 0 (its commits are already contained in the base, whether via this branch or a differently-named duplicate). Report any hits alongside the merge ask — as a *separate* cleanup/reuse callout, not folded into the current PR's own residue verdict — rather than silently leaving them for a future session to rediscover.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Check the PR's own source branch, conclude the residue check is done, and stop | Also sweep every other worktree the repo holds — the PR's branch being clean says nothing about siblings left over from already-merged PRs |
+| 2 | Treat a stale sibling as out of scope because "it's not this PR's branch" | Surface it in the same report; per `git-repo` worktree-reuse conventions its resolution (reclaim/rename/leave) is a separate but adjacent decision the user should see now, not after another session re-discovers it |
+
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | Recommend "Squash merge" without stating the commit count in the option description | Query `gh api --paginate repos/{owner}/{repo}/pulls/<N>/commits \| jq -s 'add \| length'` before composing the option — the bare (non-paginated) form silently caps at the API's default page size (30), undercounting larger PRs; `--paginate` alone still applies `--jq` per page rather than aggregating, so slurp+combine with an external `jq -s`. State the count (e.g. "6 commits") in the description regardless of which method is recommended |
@@ -577,7 +595,7 @@ When creating or merging a promotion PR from `develop` to `main`:
 
 ## Rules
 
-- **Always confirm**: `gh pr checks` right before merging is non-optional. This covers CI freshness only — it does NOT prove the PR itself hasn't already been merged/closed in the gap between an AskUserQuestion approval and the actual `gh pr merge` call (the user, or another process, can act on the same PR concurrently). Immediately before executing `gh pr merge`, also re-run `gh pr view <N> --json state,mergedAt` — treat a state check from earlier in the same turn as stale the moment any AskUserQuestion round-trip has happened since. If `state` is already `MERGED`, stop and report instead of attempting the merge (case history: `failed-attempts.md` "merge-execute-without-re-verifying-current-state").
+- **Always confirm**: `gh pr checks` right before merging is non-optional.
 - **Message quality**: at squash time, write a message that actually reveals the work — not GitHub's default "Merge pull request #..." text.
 - **Post-merge cleanup**: after a successful merge, delete the local branch and check the corresponding `fix_plan.md` item as `[x]`. **Worktree removal requires AskUserQuestion (HARD STOP)** — `git worktree remove` is a destructive action and the `git-repo` skill recommends reusing worktrees for the next PR rather than removing them. After merge, the worktree must be left in place by default; only remove on explicit user instruction. Listing "remove worktree" as a default cleanup step (or executing it autonomously) is forbidden.
   - **Branch deletion after a squash merge is mandatory, not optional (HARD STOP)** — and it is the reason the pre-merge residue check above exists. "Keep the worktree" and "keep the branch" are different decisions: the worktree stays (so it can be reused), the **branch it points at must not**, because after a squash it holds N commits whose squashed equivalent is already on the target with no shared history. Leaving both is what produces a worktree that conflicts on every hunk the next time it rebases.

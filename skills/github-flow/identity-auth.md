@@ -22,6 +22,12 @@
 
 The browser agent is reserved for **situations CLI cannot handle** (e.g., complex GUI configuration, visual layout verification), with user pre-approval.
 
+### IDE Subshell GITHUB_TOKEN override rule (HARD STOP)
+
+In IDE subshell environments (e.g. Antigravity), a dummy or environment-injected `GITHUB_TOKEN` (such as `github_pat_antigravitydummytoken`) may exist in environment variables. `gh` CLI prioritizes `GITHUB_TOKEN` over stored keyring accounts, causing 401 Bad Credentials errors.
+- **Rule**: When executing `gh` CLI commands in subshells where `GITHUB_TOKEN` is present, always use `env -u GITHUB_TOKEN gh ...` (or unset `GITHUB_TOKEN` before calling `gh`) so `gh` uses stored keyring credentials.
+
+
 ## Owner-based commit-author identity mapping (HARD STOP)
 
 **`gh` account mapping applies not only to push / PR auth but also to commit-author identity.** When committing to an org repo (PUBLIC included), if the `gh` active account is a different identity (e.g., leftover from a different repo's work), the commit author gets stamped wrong and the wrong identity becomes permanent in PUBLIC history.
@@ -166,12 +172,16 @@ Acting accounts (DrumRobot / daegunjhy) canonical scope set = `repo,read:org,wor
 
 | # | Don't | Do |
 |---|-------|----|
-| 1 | Add `read:packages` alone on GHCR pull denied | 5-scope combined refresh — avoid repeated browser auth |
+| 1 | Add `read:packages` alone on GHCR pull denied, or `admin:repo_hook` alone for webhook-delivery diagnostics | Combined refresh: the new scope + the full canonical set in one `-s` call — avoid repeated browser auth. Narrow single-scope refreshes cost a full browser device-flow round-trip each time |
 | 2 | `gh auth refresh` manual guide only | Call `web-browser/credential-issue` topic first (auto auth). Manual guide is fallback |
 | 3 | Add scopes outside the matrix (over-grant) | Matrix 5 scopes + explicitly needed extras only |
 | 4 | Skip scope matrix check on new operation | Check matrix every time → if missing, add to this rule |
 | 5 | Run `gh auth login`/`refresh` without `-s` (only grants default `gist,read:org,repo`) | Always specify `-s` 5-scope — missing `workflow` on merge/push blocks `.github/workflows/*` changes |
 | 6 | Copy-paste browser PAT issue/edit URL from a previous case (`scopes=repo,read:org` re-use) | Check "account × required operation" against matrix before each issue — acting account uses `scopes=repo,read:org,workflow,gist,copilot,read:packages` prefill |
+
+### Merge permission ≠ push/comment/PR-create permission (es6kr/skills — HARD STOP)
+
+**`daegunjhy` can push, comment, and create PRs on `es6kr/skills`, but lacks `MergePullRequest` permission** — `gh pr merge` fails with `GraphQL: daegunjhy does not have the correct permissions to execute MergePullRequest (mergePullRequest)` even though every prior operation on the same PR succeeded under that account. `DrumRobot` (the canonical `es6kr` owner account) has merge rights. Before merging on `es6kr/skills`, switch: `GH_TOKEN="$(gh auth token --user DrumRobot)" gh pr merge <N> -R es6kr/skills --merge` (or `gh auth switch --user DrumRobot` first). Don't assume the account that pushed/reviewed successfully also has merge rights — verify per-operation, not per-session.
 
 ### Self-check (before any scope-modifying gh auth command)
 

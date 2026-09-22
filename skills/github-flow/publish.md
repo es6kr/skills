@@ -5,13 +5,13 @@ Package a working-tree change (in-place edit or uncommitted diff) into its own b
 ## When to Use
 
 - The change is a scoped, working-tree edit (not yet its own commit) that needs to land as an independent PR
-- The target repo uses a staging-base branch model (`develop` -> `main`, or any CI-gate-only integration branch) — see `merge.md`'s CI-gate-only exception for how to detect this
+- The target repo uses a staging-base branch model (`next-fix`/`next-feat` → `main`, or any CI-gate-only integration branch) — see `merge.md`'s CI-gate-only exception for how to detect this
 - Repeated 2+ times in a session (e.g., multiple independent skill-file fixes each needing their own PR) — doing this by hand each time is what this topic replaces
 
 ## Procedure
 
 1. **Resolve staging base & branch from base** (not from a possibly-stale local branch):
-   - Check `WSCFG_STAGING_*` (e.g. `develop` for unified staging flow) if `roles.staging` is configured.
+   - Check `WSCFG_STAGING_*` (e.g. `WSCFG_STAGING_NEXT_FIX` for patch fixes, `WSCFG_STAGING_NEXT_FEAT` for features) if `roles.staging` is configured.
    - Run `git fetch origin <staging-base>` → `git branch <topic-branch> origin/<staging-base>`
 2. **Isolate the change into its own worktree** — avoids disturbing the main working tree's other in-progress edits: `git worktree add .worktrees/<topic-branch> <topic-branch>` (per `git-repo/worktree.md` — check for a reusable existing worktree first)
 3. **Bring the change into the worktree**: if it's an existing commit, cherry-pick it; if it's an uncommitted working-tree diff, copy the exact files (`cp <path-in-main-tree> <path-in-worktree>`), verify with `git diff --stat` before committing
@@ -30,6 +30,7 @@ Package a working-tree change (in-place edit or uncommitted diff) into its own b
 | 2 | `cp` a working-tree diff into a new worktree then leave the original uncommitted in the main tree | Step 9 — reset the main tree's copy once the content is safely committed elsewhere, to avoid two divergent copies of the same edit |
 | 3 | Skip step 7 because steps 5-6 already ran cleanly | Step 7 is independent of CI status — it exists specifically for staging-base PRs where CI-gate-only means no other review touchpoint ever showed the content to a human |
 | 4 | Batch multiple unrelated skill-file changes into one branch/PR | One topic-branch per logical change (same split criteria as `commit-tidy`) — keeps each PR's content-review ask (step 7) meaningful |
+| 5 | Create the PR with `--base <X>` without checking it matches the branch's actual fork point from step 1 | Run the fork-point↔PR-base pre-verification (step 1's HARD STOP sub-bullet) before step 5 — catching a mismatch after `gh pr create` means the PR diff already shows every unrelated file between the two bases |
 
 ## Related
 
