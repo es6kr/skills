@@ -16,7 +16,7 @@ reusable across environments. Example config.json:
       "plane_token_env": "MYWORKSPACE_PLANE_API_KEY",
       "qdrant_url": "http://localhost:6333",
       "qdrant_wiki_collection": "myworkspace-wiki",
-      "qdrant_memory_collection": "claude-memory",
+      "qdrant_memory_collection": "agent-memory-personal",
       "qdrant_task_collection": "fix-plan-myworkspace",
       "llm_wiki_path": "/path/to/llm-wiki",
       "default_project": "myworkspace",
