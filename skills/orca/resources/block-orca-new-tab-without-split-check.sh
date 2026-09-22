@@ -7,10 +7,23 @@
 # explicitly opts out.
 #
 # Why: failed-attempts.md class=orca-terminal-split-pane-parameter-omission has
-# recurred 4 times — defaulting to an independent new tab/worktree instead of
-# considering `orca terminal split` into an already-active terminal first.
+# recurred repeatedly — defaulting to an independent new tab/worktree instead
+# of considering `orca terminal split` into an already-active terminal first.
+# Also matches CLI-resolution aliases (orca-ide / orca-dev / $ORCA_CLI_COMMAND)
+# per the orca skill's own "Resolve the CLI" guidance — a bare-`orca`-only
+# match let commands built that way bypass this gate entirely.
 
 input=$(cat)
+
+# The orca skill's own "Resolve the CLI" procedure instructs callers to invoke
+# the resolved binary (orca-ide / orca-dev / $ORCA_CLI_COMMAND's value), not
+# always bare `orca` — a command built by following that guidance must still
+# be recognized here, or the hook silently never fires for it.
+orca_bin_pattern='orca-ide|orca-dev|orca'
+if [ -n "$ORCA_CLI_COMMAND" ]; then
+  orca_cli_escaped=$(printf '%s' "$ORCA_CLI_COMMAND" | sed 's/[][\.^$*+()?{}|/]/\\&/g')
+  orca_bin_pattern="${orca_cli_escaped}|${orca_bin_pattern}"
+fi
 
 command=$(printf '%s' "$input" | python3 -c '
 import json, sys
@@ -50,15 +63,15 @@ marker="${TMPDIR:-/tmp}/orca-terminal-list-checked-${session_key}"
 # marker so a follow-up create/split within the next 30 minutes doesn't
 # re-trigger this gate. This must run BEFORE the create-command matching below,
 # since `terminal list`/`terminal split` never match `terminal create`.
-if echo "$sanitized_command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+terminal[[:space:]]+(list|split)\b'; then
+if echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+(list|split)\b"; then
   touch "$marker" 2>/dev/null
   exit 0
 fi
 
 is_worktree_create=0
 is_terminal_create=0
-echo "$sanitized_command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+worktree[[:space:]]+create\b' && is_worktree_create=1
-echo "$sanitized_command" | grep -qE '(^|[;&|]\s*)orca[[:space:]]+terminal[[:space:]]+create\b' && is_terminal_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
 
 if [ "$is_worktree_create" -eq 0 ] && [ "$is_terminal_create" -eq 0 ]; then
   exit 0
@@ -96,8 +109,8 @@ cat >&2 <<'EOF'
 
 Why blocked:
   - failed-attempts.md class=orca-terminal-split-pane-parameter-omission has
-    recurred 4 times: defaulting to an independent new tab/worktree instead of
-    checking whether the current session already has an active terminal to
+    recurred repeatedly: defaulting to an independent new tab/worktree instead
+    of checking whether the current session already has an active terminal to
     split into.
 
 Required action (pick one):
@@ -109,7 +122,7 @@ Required action (pick one):
      meant to run alongside the current session), prefix the command with
      ORCA_NEW_WORKSPACE_APPROVED=1 so the opt-out is auditable.
 
-Reference: failed-attempts.md class=orca-terminal-split-pane-parameter-omission (4th occurrence).
+Reference: failed-attempts.md class=orca-terminal-split-pane-parameter-omission.
 ============================================================
 EOF
 exit 2
