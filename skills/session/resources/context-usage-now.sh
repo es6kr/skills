@@ -129,8 +129,10 @@ if matched:
     TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl" 4)
   fi
 
-  # 4. Fallback: cross-environment candidate check
-  if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+  # 4. Fallback: cross-environment candidate check (only when Antigravity is
+  # actually signaled active -- otherwise this has no business searching
+  # antigravity-cli brain directories at all, active or not).
+  if [ "$is_agy_active" -eq 1 ] && { [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; }; then
     CANDIDATES=()
     [ -d "$HOME/.gemini/antigravity-cli/brain" ] && CANDIDATES+=("$HOME/.gemini/antigravity-cli/brain")
     [ -n "$USERPROFILE" ] && [ -d "$USERPROFILE/.gemini/antigravity-cli/brain" ] && CANDIDATES+=("$USERPROFILE/.gemini/antigravity-cli/brain")
@@ -139,7 +141,16 @@ if matched:
     done
 
     for bdir in "${CANDIDATES[@]}"; do
-      if [ -d "$bdir" ]; then
+      if [ -n "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -f "$bdir/$ANTIGRAVITY_CONVERSATION_ID/.system_generated/logs/transcript.jsonl" ]; then
+        TRANSCRIPT="$bdir/$ANTIGRAVITY_CONVERSATION_ID/.system_generated/logs/transcript.jsonl"
+        break
+      elif [ -n "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -d "$bdir/$ANTIGRAVITY_CONVERSATION_ID" ]; then
+        FOUND=$(find_newest_transcript "$bdir/$ANTIGRAVITY_CONVERSATION_ID" "transcript.jsonl" 4)
+        if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
+          TRANSCRIPT="$FOUND"
+          break
+        fi
+      elif [ -z "$ANTIGRAVITY_CONVERSATION_ID" ] && [ -d "$bdir" ]; then
         FOUND=$(find_newest_transcript "$bdir" "transcript.jsonl" 4)
         if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
           TRANSCRIPT="$FOUND"
@@ -152,7 +163,7 @@ if matched:
   # 5. Last-resort global Claude Code search -- only when this workspace has no
   # project dir yet (e.g. a brand-new cwd) AND no Antigravity transcript was
   # found either. Only allowed if Antigravity is not active.
-  if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+  if [ "$is_agy_active" -eq 0 ] && { [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; }; then
     CLAUDE_DIRS=("$HOME/.claude/projects")
     [ -n "$USERPROFILE" ] && [ -d "$USERPROFILE/.claude/projects" ] && CLAUDE_DIRS+=("$USERPROFILE/.claude/projects")
     for cdir in /mnt/c/Users/*/.claude/projects; do
