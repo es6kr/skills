@@ -313,7 +313,7 @@ def process_repository(repo_dir: Path, execute: bool = False, delete_branch: boo
         merged = False
         if provider == "github" and slug:
             pr_data = check_github_merged(slug, wt.branch)
-            if pr_data:
+            if pr_data and pr_data.get("headRefOid") == wt.head_sha:
                 merged = True
                 report.is_merged = True
                 report.merge_method = "github"
