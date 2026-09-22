@@ -109,6 +109,70 @@ class TestPruneMergedWorktrees(unittest.TestCase):
         self.assertNotIn("\n[1]:", table)
         self.assertNotIn("https://github.com/es6kr/skills/pull/484 |", table)  # URL not bare in its own column
 
+    def test_process_repository_rejects_sha_mismatch_before_execute(self):
+        """A worktree whose branch name matches an old merged PR, but whose local
+        HEAD has diverged (new commits since that PR merged), must NOT be pruned
+        via the GitHub path -- exact HEAD SHA must match the PR's headRefOid.
+        Regression test for PR #539 review finding (data-loss risk on branch reuse)."""
+        wt = pmw.WorktreeInfo(
+            Path("/repo/.worktrees/reused-branch"),
+            "deadbeef00000000000000000000000000000000",
+            "reused-branch",
+        )
+
+        with patch("prune_merged_worktrees.get_worktrees", return_value=[wt]), \
+             patch("prune_merged_worktrees.check_mid_operation", return_value=(False, "")), \
+             patch("prune_merged_worktrees.check_clean", return_value=True), \
+             patch("prune_merged_worktrees.get_origin_info", return_value=("git@github.com:es6kr/skills.git", "github", "es6kr/skills")), \
+             patch("prune_merged_worktrees.get_default_upstream", return_value=None), \
+             patch("prune_merged_worktrees.check_github_merged", return_value={
+                 "number": 100,
+                 "url": "https://github.com/es6kr/skills/pull/100",
+                 "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",  # differs from wt.head_sha
+             }), \
+             patch("prune_merged_worktrees.run_git") as mock_run_git:
+            mock_run_git.return_value = (0, "/repo", "")  # only the top-level rev-parse should fire
+            reports = pmw.process_repository(Path("/repo"), execute=True, delete_branch=False)
+
+        self.assertEqual(len(reports), 1)
+        report = reports[0]
+        self.assertFalse(report.is_merged, "SHA-mismatched branch must not be classified merged via the GitHub path")
+        self.assertNotEqual(report.action, "Pruned", "must not execute git worktree remove on a diverged worktree")
+        remove_calls = [c for c in mock_run_git.call_args_list if "remove" in c.args[1]]
+        self.assertEqual(remove_calls, [], "git worktree remove must never be invoked for a SHA-mismatched worktree")
+
+    def test_process_repository_prunes_on_execute_when_sha_matches(self):
+        """Exact SHA match + --execute must actually invoke git worktree remove
+        (happy-path counterpart to the mismatch-rejection test above)."""
+        wt = pmw.WorktreeInfo(
+            Path("/repo/.worktrees/merged-branch"),
+            "cafebabe00000000000000000000000000000000",
+            "merged-branch",
+        )
+
+        with patch("prune_merged_worktrees.get_worktrees", return_value=[wt]), \
+             patch("prune_merged_worktrees.check_mid_operation", return_value=(False, "")), \
+             patch("prune_merged_worktrees.check_clean", return_value=True), \
+             patch("prune_merged_worktrees.get_origin_info", return_value=("git@github.com:es6kr/skills.git", "github", "es6kr/skills")), \
+             patch("prune_merged_worktrees.get_default_upstream", return_value=None), \
+             patch("prune_merged_worktrees.check_github_merged", return_value={
+                 "number": 101,
+                 "url": "https://github.com/es6kr/skills/pull/101",
+                 "headRefOid": wt.head_sha,  # exact match
+             }), \
+             patch("prune_merged_worktrees.run_git") as mock_run_git:
+            mock_run_git.side_effect = lambda repo_dir, args: (
+                (0, "/repo", "") if args[:2] == ["rev-parse", "--show-toplevel"] else (0, "", "")
+            )
+            reports = pmw.process_repository(Path("/repo"), execute=True, delete_branch=False)
+
+        self.assertEqual(len(reports), 1)
+        report = reports[0]
+        self.assertTrue(report.is_merged)
+        self.assertEqual(report.action, "Pruned")
+        remove_calls = [c for c in mock_run_git.call_args_list if "remove" in c.args[1]]
+        self.assertEqual(len(remove_calls), 1, "git worktree remove must be invoked exactly once on a matched, execute=True worktree")
+
 
 if __name__ == "__main__":
     unittest.main()
