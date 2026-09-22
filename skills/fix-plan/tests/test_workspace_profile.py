@@ -35,6 +35,14 @@ def check(name, expected, actual):
         print(f"FAIL  {name}\n        expected=[{expected}]\n        actual  =[{actual}]")
 
 
+# Checked before any test below monkeypatches CONFIG_FILE_AGENTS away from
+# its real default.
+check(
+    "T18 CONFIG_FILE_AGENTS constant points at ~/.agents/config.json",
+    str(Path.home() / ".agents" / "config.json"),
+    str(getattr(workspace_profile, "CONFIG_FILE_AGENTS", None)),
+)
+
 CONFIG = {
     "profiles": {
         "wsMulti": {
@@ -53,9 +61,13 @@ tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="u
 json.dump(CONFIG, tmp)
 tmp.close()
 workspace_profile.CONFIG_FILE = Path(tmp.name)
-# Point the v2 location at a path that cannot exist so the v1 cases below are
-# not silently served by whatever real v2 config happens to be on this machine.
+# Point the v2 and agents locations at paths that cannot exist so the v1
+# cases below are not silently served by whatever real config happens to be
+# on this machine. CONFIG_FILE_AGENTS outranks both — the guard exists for
+# it too, or a live ~/.agents/config.json on the running machine leaks into
+# every case below that doesn't explicitly override it.
 setattr(workspace_profile, "CONFIG_FILE_V2", Path(tmp.name + ".absent-v2"))
+setattr(workspace_profile, "CONFIG_FILE_AGENTS", Path(tmp.name + ".absent-agents"))
 
 check(
     "T1 multi-segment cwd_match matches",
@@ -199,12 +211,9 @@ check(
 # (~/.agents/config.json and ~/.config/agent-workspace/config.json) can
 # diverge, and only the latter was ever actually read — an edit to the
 # former had no effect while looking identically valid. CONFIG_FILE_AGENTS
-# must be consulted first, ahead of both older paths.
-check(
-    "T18 CONFIG_FILE_AGENTS constant points at ~/.agents/config.json",
-    str(Path.home() / ".agents" / "config.json"),
-    str(getattr(workspace_profile, "CONFIG_FILE_AGENTS", None)),
-)
+# must be consulted first, ahead of both older paths. (T18, checking the
+# constant's real default, runs earlier in this file — before this section's
+# monkeypatching starts.)
 
 CONFIG_AGENTS_WINS = {
     "profiles": {
