@@ -3,11 +3,13 @@
 Unit tests for `claude-task` CLI tool (`~/.agents/skills/todowrite/resources/claude-task.py`).
 """
 
+import argparse
 import os
 import sys
 import json
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -91,6 +93,56 @@ class TestClaudeTaskCLI(unittest.TestCase):
 
         task_file.unlink()
         self.assertFalse(task_file.exists())
+
+    def _make_prune_args(self, retention_days=3, dry_run=False, purge=False):
+        return argparse.Namespace(
+            dir=str(self.test_dir), session=None, env=None,
+            retention_days=retention_days, dry_run=dry_run, purge=purge,
+        )
+
+    def _write_task(self, task_id, status, age_days=0):
+        data = {"id": task_id, "subject": f"Task {task_id}", "description": "", "activeForm": "", "status": status, "blocks": [], "blockedBy": []}
+        claude_task.save_task(self.test_dir, data)
+        if age_days:
+            task_file = self.test_dir / f"{task_id}.json"
+            old_time = time.time() - (age_days * 86400)
+            os.utime(task_file, (old_time, old_time))
+
+    def test_prune_archives_deleted_immediately(self):
+        self._write_task("1", "deleted")
+        claude_task.cmd_prune(self._make_prune_args())
+
+        self.assertFalse((self.test_dir / "1.json").exists())
+        archived = list(self.test_dir.glob(f"{claude_task.ARCHIVE_SUBDIR}/*/1.json"))
+        self.assertEqual(len(archived), 1)
+
+    def test_prune_archives_old_completed(self):
+        self._write_task("2", "completed", age_days=10)
+        claude_task.cmd_prune(self._make_prune_args(retention_days=3))
+
+        self.assertFalse((self.test_dir / "2.json").exists())
+        archived = list(self.test_dir.glob(f"{claude_task.ARCHIVE_SUBDIR}/*/2.json"))
+        self.assertEqual(len(archived), 1)
+
+    def test_prune_keeps_recent_completed_and_pending(self):
+        self._write_task("3", "completed", age_days=1)
+        self._write_task("4", "pending", age_days=10)
+        self._write_task("5", "in_progress", age_days=10)
+        claude_task.cmd_prune(self._make_prune_args(retention_days=3))
+
+        self.assertTrue((self.test_dir / "3.json").exists())
+        self.assertTrue((self.test_dir / "4.json").exists())
+        self.assertTrue((self.test_dir / "5.json").exists())
+        self.assertFalse((self.test_dir / claude_task.ARCHIVE_SUBDIR).exists())
+
+    def test_prune_dry_run_no_changes(self):
+        self._write_task("6", "deleted")
+        self._write_task("7", "completed", age_days=10)
+        claude_task.cmd_prune(self._make_prune_args(dry_run=True))
+
+        self.assertTrue((self.test_dir / "6.json").exists())
+        self.assertTrue((self.test_dir / "7.json").exists())
+        self.assertFalse((self.test_dir / claude_task.ARCHIVE_SUBDIR).exists())
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,8 +19,9 @@ Provides a standalone CLI tool (`claude-task`) under `todowrite` skill resources
   - `list` (or `ls`): List tasks in table format with ID, subject, activeForm, and status.
   - `show` (or `get`): View detailed JSON content for a specific task.
   - `add` (or `create`): Create a new task with auto-assigned numeric ID.
-  - `update` (or `edit`): Update task status (`in_progress`, `completed`, `deleted`) or subject.
-  - `delete` (or `rm`): Mark task status as `deleted`.
+  - `update` (or `edit`): Update task status (`pending`, `in_progress`, `completed`, `deleted`) or subject. Setting `--status deleted` is a **soft delete** — it only flips the JSON field, it does not remove the file.
+  - `delete` (or `rm`): **Hard delete** — unlinks the task file from disk immediately.
+  - `prune`: Garbage-collect the ledger — archives (default) or purges (`--purge`) `status=deleted` tasks immediately, and `status=completed` tasks past a retention window. See "Lifecycle & Cleanup" below.
   - `dir`: Print resolved Task directory path.
 
 ## CLI Usage Examples
@@ -37,7 +38,28 @@ claude-task --env agent add -s "Implement feature X" -d "Detailed description"
 
 # Update task status
 claude-task --env agent update 1 --status completed
+
+# Preview what would be pruned (no changes)
+claude-task --env agent prune --dry-run
+
+# Archive status=deleted immediately + status=completed older than 7 days
+claude-task --env agent prune --retention-days 7
+
+# Permanently delete instead of archiving
+claude-task --env agent prune --purge
 ```
+
+## Lifecycle & Cleanup
+
+The agent-env ledger (`~/.agents/tasks/default/` and friends) has no session boundary of its own — it is a **single shared, ever-growing directory** used whenever `TaskCreate` is unavailable or the runtime is not Claude Code. Nothing reclaims finished entries unless something runs `prune`.
+
+- **`prune` policy**: `status=deleted` tasks are always eligible; `status=completed` tasks become eligible once they are older than `--retention-days` (default: 3 days, measured from the file's mtime). `pending`/`in_progress` tasks are never touched by `prune` — they may still be real, undecided work.
+- **Default action = archive, not delete**: matching tasks move to `<task_dir>/.archive/<YYYY-MM-DD>/<id>.json`, preserving the JSON for later recovery. Pass `--purge` to permanently delete instead.
+- **Run it periodically** (manually, or from a cron/Ralph loop) against `~/.agents/tasks/default/` to keep the ledger from accumulating hundreds of stale entries.
+
+### Promote before it goes stale — durability hierarchy
+
+`claude-task` is the **least durable** tier in this workflow's persistence chain: **task (claude-task/TaskCreate) → `fix_plan.md` → Plane + Qdrant**, each step to the right surviving longer than the one before it. A `pending`/`in_progress` task that needs to outlive the session it was created in does **not** belong sitting in this ledger indefinitely — it should be promoted to `fix_plan.md` (or the appropriate durable medium per the `todowrite` routing table) as soon as that need is clear. `prune` intentionally leaves `pending`/`in_progress` tasks alone, so promotion is the caller's responsibility, not something this tool does automatically.
 
 ## Usage Discipline
 
