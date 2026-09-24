@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0](https://github.com/es6kr/skills/compare/git-repo-v0.11.1...git-repo-v0.12.0) (2026-09-24)
+
+
+### Features
+
+* **fix-plan:** add pipeline log and hook integrity check scripts ([e93a432](https://github.com/es6kr/skills/commit/e93a4323b54a311fcda6855163ffe14c2c146412))
+* **git-repo:** add prune_merged_worktrees.py script and guide ([37e6f16](https://github.com/es6kr/skills/commit/37e6f16474701606c4819c28ce480117dbc3b940))
+
+
+### Bug Fixes
+
+* **git-repo:** add prune_merged_worktrees.py + 7 accumulated fixes ([3d2ee94](https://github.com/es6kr/skills/commit/3d2ee9425285347d8f7e7698049d6e5769f73f92))
+* **git-repo:** document prune_merged_worktrees.py in the worktree decision tree and Scripts list ([bb979ca](https://github.com/es6kr/skills/commit/bb979ca3dcd1e4c03aa39e594134bff6d4163eba))
+* **git-repo:** refine repo scan logic to accurately detect root git repositories ([f970a45](https://github.com/es6kr/skills/commit/f970a45f9c9cc3464473052de3ee69a51235369b))
+* **git-repo:** require exact HEAD SHA match before pruning a GitHub-merged worktree ([3d9b7fa](https://github.com/es6kr/skills/commit/3d9b7fae427f484640e05a837394a8eb3f9f3736))
+
 ## [0.11.1](https://github.com/es6kr/skills/compare/git-repo-v0.11.0...git-repo-v0.11.1) (2026-09-18)
 
 

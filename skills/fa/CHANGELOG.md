@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.3](https://github.com/es6kr/skills/compare/fa-v0.4.2...fa-v0.4.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **fa:** add cross-class conflict check to retrospect recurrence pre-check ([9764165](https://github.com/es6kr/skills/commit/9764165141ecd3c6fb17682fa87afefd36d8c321))
+* **git-repo:** add prune_merged_worktrees.py + 7 accumulated fixes ([3d2ee94](https://github.com/es6kr/skills/commit/3d2ee9425285347d8f7e7698049d6e5769f73f92))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/fa-v0.4.1...fa-v0.4.2) (2026-09-20)
 
 

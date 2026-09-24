@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3](https://github.com/es6kr/skills/compare/wip-v0.7.2...wip-v0.7.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **todowrite,wip:** clarify session-medium delegation boundary (S6/S7) ([806dcad](https://github.com/es6kr/skills/commit/806dcad0c92a027b9fc89617957510cb52f580ea))
+* **wip:** document defer-to-checklist follows todowrite file-medium convention ([8198e5d](https://github.com/es6kr/skills/commit/8198e5d888fe79bab1c563f319bbe6b98c1c873b))
+
 ## [0.7.2](https://github.com/es6kr/skills/compare/wip-v0.7.1...wip-v0.7.2) (2026-09-18)
 
 
