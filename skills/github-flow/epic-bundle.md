@@ -106,6 +106,37 @@ Each finding's PR carries its own test plan; this Epic closes when every checkli
   ```
   If the `epic` label is missing, create it first (`gh label create epic --color 7B68EE`).
 
+### Step 4.5: Optional Visualization Dispatch (many-PR bundles)
+
+For a bundle spanning many source PRs, the per-PR-section checklist (Step 4) can get hard to scan. Offer a **d3 force-directed render** of the Epic structure as an additional, opt-in deliverable — reusing the same abstract `--render=<skill>:<topic>` dispatch contract already proven by `skill-kit/graph` and `cc-plugin/clustering` (see `skill-kit/portability` Rule B — do NOT hardcode a specific receiver).
+
+**When to offer**: bundle spans ≥4 source PRs, or the user explicitly asks for a visual. Below that threshold the markdown checklist stays clearer and cheaper — this is additive, never a replacement for Step 4's body.
+
+**Schema mapping** (caller transforms Epic data into the receiver's `{groups, skillHubs, topics, links}` schema):
+
+| Epic element | Schema field |
+|---|---|
+| Epic issue | one `skillHubs` node (the hub) |
+| each source PR | a `topics` node, `owner: <Epic hub id>` (auto-generates the membership link) |
+| finding count on that PR | `links[].weight` (clamp to the schema's 1–10 range) |
+| theme summary (Step 2 "Suggested grouping") | `links[].note` |
+
+**Dispatch**:
+
+```bash
+/github-flow epic-bundle <PRs> --render=<receiver-skill>:<receiver-topic>
+```
+
+When the flag is supplied, invoke the receiver with the transformed JSON after Step 4 (Epic body already built) and report the rendered HTML path alongside the issue URL. When omitted, the procedure stops at the markdown Epic body — no visualization step runs.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Default this on for every bundle | Offer it only when the PR count crosses the threshold, or on explicit request — small bundles are cheaper as a checklist |
+| 2 | Hardcode a specific render receiver in this topic body | Use the abstract `--render=<skill>:<topic>` flag — caller chooses the receiver (`skill-kit/portability` Rule B) |
+| 3 | Treat the render as a second SSOT for Epic state | The rendered HTML is a point-in-time snapshot of the Epic body at dispatch time, not a live view — re-dispatch after significant body edits if a fresh render matters |
+
 ### Step 5: Sub-issues (only if "Epic + grouped sub-issues" chosen)
 
 For each child issue, use the **dependencies** topic Sub-issue Procedure (`addSubIssue`) to create the native parent-child relationship — a `- #N` body link alone is not enough.
@@ -144,3 +175,5 @@ For each child issue, use the **dependencies** topic Sub-issue Procedure (`addSu
 - `dependencies.md` — Sub-issue Procedure (`addSubIssue`) for the grouped-sub-issues split
 - `sanitize.md` — HARD STOP personal-data scan before posting
 - `consolidate` next step — emits the auto-suggest that routes here
+- `skill-kit/graph.md` / `cc-plugin/clustering.md` — the `--render=<skill>:<topic>` abstract dispatch contract Step 4.5 reuses
+- `es6kr-graph` — the standalone D3-force receiver this repo already has for the schema in Step 4.5
