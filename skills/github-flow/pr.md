@@ -50,6 +50,24 @@ None of these apply → consolidate is the default, not merely an option alongsi
 
 **Self-check (before every `gh pr create`)**: did I run the overlap check above? If any target file matches an open PR's diff, did I `AskUserQuestion` before creating a second PR? Did I check the "Default weighting" conditions before deciding which option gets Recommended?
 
+### Step -1.5: Is this fix unblocking a specific already-open PR? (HARD STOP — run before Step -1's ask, every time)
+
+Step -1 catches *coincidental* file overlap with an unrelated open PR. This step catches a different, more direct relationship: the fix in hand exists **because** it resolves a problem that is currently blocking a specific already-open PR (its CI is failing on exactly this bug, or the fix was produced while diagnosing that PR's failure). When that relationship holds, the blocked PR's own head branch is almost always the lowest-cost delivery vehicle — cheaper than a new branch plus a new review cycle, and it unblocks the PR in the same push instead of adding a fresh gate in front of it.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Default to a new `fix/*` branch + new PR the moment a fix is ready, without asking whether it's actually resolving an already-open PR's blocking problem | Before branching, ask: is this fix resolving a problem that is currently blocking a specific open PR #N? If yes, name PR #N's head branch as a delivery-vehicle candidate before creating anything new |
+| 2 | Compose the delivery-vehicle `AskUserQuestion` with only "new branch + PR" vs "hold locally, don't push" as options | When a blocking-PR relationship exists, the option set MUST include "push directly to PR #N's head branch" — Recommended by default unless one of the unsafe conditions below applies |
+| 3 | Create the branch/worktree first, then ask "should I push this?" — by then the vehicle choice has already been made | Ask the vehicle-choice question **before** branching or staging anything, not after the branch already exists |
+
+**When direct push to the blocked PR's branch is unsafe** — do not mark it Recommended in these cases:
+- The branch is a protected branch (main/master) whose required-review rules a direct push would bypass.
+- The branch carries live review comments anchored to specific commit SHAs, and the delivery would rewrite history (rebase/force-push) rather than fast-forward — see `git.md`'s prohibition on rebasing a reviewed branch. A plain fast-forward `git push` (no rewrite) does not trigger this concern.
+
+A shared staging branch (e.g. `develop`) that a promotion PR merely tracks as its head, with no anchored review comments on it, is not "protected" in the sense that blocks this — it is the normal target.
+
+**Self-check (before composing any delivery-vehicle `AskUserQuestion`)**: did this fix arise from diagnosing or resolving a specific open PR's failure? If yes, is that PR's head branch in the option set, and is it Recommended unless one of the unsafe conditions above applies?
+
 ### Step 0: Visibility + language decision guard (HARD STOP — run every time, right before PR creation)
 
 **Before writing the PR title and body, always check repository visibility and map the language.**
