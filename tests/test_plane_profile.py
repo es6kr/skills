@@ -94,6 +94,12 @@ def isolated_workspace(tmp_path, monkeypatch, scripts_on_path):
     monkeypatch.setattr(
         workspace_profile, "CONFIG_FILE_V2", tmp_path / "no-agent-workspace.json"
     )
+    # CONFIG_FILE_AGENTS outranks both of the above — leave it unset and a
+    # live ~/.agents/config.json on the machine running this test silently
+    # wins over the fixture, defeating the isolation this fixture exists for.
+    monkeypatch.setattr(
+        workspace_profile, "CONFIG_FILE_AGENTS", tmp_path / "no-agents-config.json"
+    )
 
     # Environment must not be able to satisfy the assertions on its own.
     for var in (
@@ -153,6 +159,9 @@ def test_workspace_profile_resolves_artifacts_path(tmp_path, monkeypatch, script
 
     monkeypatch.setattr(workspace_profile, "CONFIG_FILE_V2", v2_config_file)
     monkeypatch.setattr(workspace_profile, "CONFIG_FILE", tmp_path / "no-v1.json")
+    monkeypatch.setattr(
+        workspace_profile, "CONFIG_FILE_AGENTS", tmp_path / "no-agents-config.json"
+    )
 
     prof_custom = workspace_profile.get_profile(workspace_name="custom_ws")
     assert prof_custom["artifacts_path"] == "custom/docs/path"
@@ -287,6 +296,58 @@ def test_k3s_fallback_script_survives_quote_in_workspace_slug(monkeypatch):
         "single-quoted literal — otherwise its own quote characters break out "
         "of the string and the trailing text runs as Python statements"
     )
+
+
+def test_config_file_agents_path_carries_k3s_keys_through_resolve_profile(
+    tmp_path, monkeypatch, scripts_on_path
+):
+    """A config declared ONLY at ~/.agents/config.json must still reach
+    resolve_profile() with its k3s target keys and plane_host intact.
+
+    Two independently-edited config copies (~/.agents/config.json, the
+    Syncthing-synced canonical copy, and ~/.config/agent-workspace/config.json,
+    its former sole reader) can diverge silently — an edit to the former had
+    no observable effect while looking identically valid. This end-to-end
+    case is new coverage: it exercises the newly-added highest-priority path
+    together with the already-fixed v2_profile_to_flat -> resolve_profile
+    key-carrying chain, a combination no existing test covers.
+    """
+    import workspace_profile
+    import plane_client
+
+    config_file = tmp_path / "agents-config.json"
+    config_file.write_text(
+        json.dumps({
+            "version": 2,
+            "profiles": {
+                "wsAgentsE2E": {
+                    "match": {"path_components": ["wsAgentsE2E"]},
+                    "roles": {
+                        "backlog": {
+                            "kind": "plane",
+                            "endpoint": "https://plane.agents-e2e.invalid",
+                            "k3s_namespace": "plane",
+                            "k3s_workload": "deploy/plane-api-wl",
+                        }
+                    },
+                }
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE_AGENTS", config_file)
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE_V2", tmp_path / "no-agent-workspace.json")
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE", tmp_path / "no-plane-backlog.json")
+
+    profile = plane_client.resolve_profile("/tmp/wsAgentsE2E/repo")
+
+    assert profile["plane_host"] == "https://plane.agents-e2e.invalid"
+    assert profile.get("k3s_namespace") == "plane", (
+        "k3s_namespace declared at ~/.agents/config.json never reached "
+        "resolve_profile() — the new priority path is not wired into the chain"
+    )
+    assert profile.get("k3s_workload") == "deploy/plane-api-wl"
 
 
 def test_v2_profile_carries_k3s_workload_override(scripts_on_path):
