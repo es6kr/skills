@@ -1,7 +1,9 @@
 name: branch-tag-adjudication
 
-# Guards the next-feat / next-fix staging branches: every commit in a PR
-# targeting these branches must obey the tag/branch policy below.
+# Guards main / develop / next-feat / next-fix: every commit in a PR
+# targeting one of these branches, AND every commit landing on one of them
+# via a direct push (see the `push:` trigger below), must obey the tag/branch
+# policy below.
 #
 # Policy summary:
 # - next-feat: feat commits allowed. fix / chore commits allowed when the same
@@ -54,6 +56,19 @@ on:
       - develop
       - next-feat
       - next-fix
+  # Direct pushes to these branches (the narrow cherry-pick-reconcile /
+  # promotion-merge exceptions documented in skills-publishing.md) bypass the
+  # pull_request trigger above entirely, so a mistagged commit landing this
+  # way was never adjudicated until some later PR happened to include it in
+  # its commit range. Gate the push itself so nothing slips through between
+  # promotions. (2026-09-24: commit 77aa86ba reached develop via direct push,
+  # sat unadjudicated for days, and only surfaced when PR #547 promoted it.)
+  push:
+    branches:
+      - main
+      - develop
+      - next-feat
+      - next-fix
 
 permissions:
   contents: read
@@ -70,17 +85,36 @@ jobs:
 
       - id: base
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: echo "base=$BASE_REF" >> "$GITHUB_OUTPUT"
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PUSH_REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "base=$PR_BASE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$PUSH_REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Adjudicate each commit
         env:
+          EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ steps.base.outputs.base }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           FAIL=0
+
+          # On a push event, `before` is the all-zero SHA when the branch
+          # itself was just created (nothing to diff against) or, more
+          # unusually, on a history-rewriting force-push where GitHub can't
+          # resolve a sane prior tip. Either way there is no well-defined
+          # commit range to adjudicate here -- skip rather than error on an
+          # invalid `git log <null-sha>..HEAD` range.
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "Push event with no resolvable prior tip (branch creation or force-push) — nothing to adjudicate."
+            exit 0
+          fi
 
           # Extract conventional commit tag from a subject line.
           # Recognised: feat / fix / perf / refactor / docs / chore / ci / test / style
@@ -127,8 +161,12 @@ jobs:
           # Exclude commits already reachable from origin/main — a base-sync
           # merge (main -> next-feat/next-fix) otherwise drags in main's own
           # history, including old commits with non-conventional subjects.
+          # Skip this exclusion when the push/PR target IS main itself: on a
+          # push event, origin/main (as checked out here) already points at
+          # HEAD_SHA post-push, so `^origin/main` would exclude the entire
+          # range and silently no-op every direct push to main.
           EXCLUDE_MAIN=()
-          if git rev-parse --verify --quiet origin/main >/dev/null; then
+          if [ "$BASE_REF" != "main" ] && git rev-parse --verify --quiet origin/main >/dev/null; then
             EXCLUDE_MAIN=("^origin/main")
           fi
 
