@@ -65,7 +65,7 @@
         "email": "drumrobot43@gmail.com",
         "name": "es6.kr"
       },
-      "description": "Auxiliary, slug-squatting, external SSOT fallback, and deprecated skills (backlog, harness, orca, choco, forge, omz, code-workflow)",
+      "description": "Auxiliary, slug-squatting, external SSOT fallback, and deprecated skills (backlog, harness, orca, choco, forge, omz, code-workflow, ralph)",
       "name": "labs",
       "source": "./",
       "skills": [
@@ -75,7 +75,8 @@
         "./skills/choco",
         "./skills/forge",
         "./skills/omz",
-        "./skills/code-workflow"
+        "./skills/code-workflow",
+        "./skills/ralph"
       ],
       "strict": true,
       "version": "0.1.1"
