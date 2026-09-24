@@ -23,7 +23,7 @@ description: |
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | stall-detect | Detect stalled follow-up steps and invoke /fix | [stall-detect.md](./stall-detect.md) |
-| ask-gates | Step 0.3/0.4/0.5/0.7 ask gates: recording-skip, decision-deferral forced-ask, TaskList primary-source, current-work confirmation | [ask-gates.md](./ask-gates.md) |
+| ask-gates | Step 0.3/0.4/0.45/0.5/0.7 ask gates: recording-skip, decision-deferral forced-ask, invocation-argument priority, TaskList primary-source, current-work confirmation | [ask-gates.md](./ask-gates.md) |
 | suggestion-patterns | Per-context "After X" next-action option templates | [suggestion-patterns.md](./suggestion-patterns.md) |
 
 After task completion, use `AskUserQuestion` to suggest next steps and get user selection.
@@ -102,7 +102,7 @@ If stall detected → topic invokes `/fix`. If no stall → proceed to Step 0.3.
 
 ### Step 0.3–0.7: Ask gates (HARD STOP)
 
-Before composing any next-action ask, pass four gates: **0.3** skip the ask entirely for recording/management topics (fix-plan, archive, todo, session rename); **0.4** if the completion report defers a decision to the user as prose ("let me know and I'll …", "whether to commit/PR is up to you"), that deferral is a decision axis — **force** an `AskUserQuestion` instead of ending on the text; **0.5** call `TaskList` as the primary source for option accuracy (never quote tasks from stale summary memory); **0.7** when the user's current activity is unclear (2+ in_progress tasks, ambiguous scope, handed-off manual work), ask "what are you working on / waiting on" first — separate "in progress" from "waiting on", and prefer free-text via Other over guess options.
+Before composing any next-action ask, pass five gates: **0.3** skip the ask entirely for recording/management topics (fix-plan, archive, todo, session rename); **0.4** if the completion report defers a decision to the user as prose ("let me know and I'll …", "whether to commit/PR is up to you"), that deferral is a decision axis — **force** an `AskUserQuestion` instead of ending on the text; **0.45** if `/next` was invoked with an explicit file/target argument, read it first and adopt its explicit follow-up candidates as top priority — TaskList/fix_plan.md sweeps run only as a supplementary check afterward, never as the default starting point; **0.5** call `TaskList` as the primary source for option accuracy (never quote tasks from stale summary memory); **0.7** when the user's current activity is unclear (2+ in_progress tasks, ambiguous scope, handed-off manual work), ask "what are you working on / waiting on" first — separate "in progress" from "waiting on", and prefer free-text via Other over guess options.
 
 **Read [ask-gates.md](./ask-gates.md) before composing options** — it holds the skip-target topic list, the TaskList primary-source Don't/Do, the current-work confirmation triggers, and the in-progress-vs-waiting-on examples. If Step 0.3 marks the work skip-target → report only, no ask; otherwise proceed to Step 1.
 
@@ -123,6 +123,7 @@ Identify the type of task just completed.
 
 | Source | What to look for |
 |--------|------------------|
+| **Skill invocation argument** (highest priority — see [ask-gates.md](./ask-gates.md) Step 0.45) | If `/next` was called with an explicit file/target argument (a prior session's walkthrough/report, a plan doc, a specific PR/issue), read it first. Its explicit "Unresolved"/"Next session" candidates or Progress Checklist items become the primary option set — TaskList/fix_plan.md become a supplementary "anything missed?" check, not the default starting sweep |
 | Visible TaskList | All pending/in_progress entries (call `TaskList` per Step 0.5) |
 | Just-completed work | Direct follow-ups (commit / push / verify / test / publish) |
 | Open PRs / issues | `gh pr list --search "involves:@me state:open"` / `gh issue list` (when relevant) — **In Antigravity, unapproved PRs must ONLY be offered as clawo delegation options (`[clawo] ... (/clawo consolidate PR #N)`), never as direct main-session tasks (HARD STOP)** |
@@ -138,6 +139,7 @@ Identify the type of task just completed.
 | 2 | "User can pick Other for anything else" rationale for fewer options | Other is for unexpected branches. Explicit options surface options the user might not think of |
 | 3 | Skip Read of suggestion-patterns.md because "I know the patterns" | suggestion-patterns.md is updated with new "After X" templates regularly. Read every time |
 | 4 | Treat just-completed work as the only source | Each candidate discovery source row is a separate enumeration. Cover all rows before stopping |
+| 5 | `/next` receives an explicit file/target argument → proceed straight to a generic TaskList/fix_plan.md-wide sweep (e.g. dumping every `(P0)`/`(P1)` line across unrelated projects) without first reading the argument's own explicit candidates | Read the argument's target first (Step 0.45). Adopt its named follow-up candidates as top priority; run TaskList/fix_plan.md only to confirm nothing else was missed |
 
 #### Premise verification for stale/prior-session candidates (HARD STOP)
 
@@ -154,7 +156,8 @@ Identify the type of task just completed.
 #### Self-check (every time before calling AskUserQuestion)
 
 1. Did I Read `suggestion-patterns.md` this turn? → If no, Read first
-2. Did I enumerate all 8 candidate discovery sources? → If skipped any, revisit before composing
+2. Did I enumerate all 9 candidate discovery sources? → If skipped any, revisit before composing
+2a. Was `/next` invoked with an explicit file/target argument? → If yes, did I read it and adopt its explicit candidates BEFORE running a TaskList/fix_plan.md sweep (see ask-gates.md Step 0.45)?
 3. Do I have 4 options or did I stop at 2-3? → If <4 and candidates remain, add until 4 or exhausted
 4. Are options diverse (different action types: progress task / external follow-up / wrap-up / verify)? → If all 3 are the same family, broaden
 5. Does the completed work carry ≥2 discrete findings the user must disposition? → Per-finding questions first (see suggestion-patterns.md "After analysis / review producing multiple findings"), never one option bundling all findings

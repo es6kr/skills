@@ -136,6 +136,33 @@ When the deferred decision is **"which of N surfaced candidates to start"** (the
 
 Otherwise → proceed to Step 0.5.
 
+## Step 0.45: Invocation-argument priority (HARD STOP)
+
+**If `/next` was invoked with an explicit argument that is itself a file or target (e.g. a prior session's walkthrough/report, a plan doc, a specific PR/issue), read that argument's target FIRST and adopt any explicit follow-up candidates it already names (an "Unresolved" / "Next session" section, a Progress Checklist, an open item list) as the top-priority candidates for this ask.** Step 0.5 (TaskList) and Step 0.6 (fix_plan.md) run **after** this — they become a supplementary "did the argument's document miss anything?" check, not the primary discovery path. Do not run a generic TaskList → fix_plan.md-wide sweep before reading what the invocation itself already pointed at.
+
+### Why
+
+- The invocation argument is the most direct, highest-confidence signal of what the user wants surfaced next — it was often authored specifically for this handoff (a walkthrough's own "Unresolved" / "Next session" section, a plan's own Progress Checklist)
+- A generic Step 0.5/0.6 sweep executed as the *default* path, before checking whether the argument already answered the question, produces bloated, low-precision candidate lists (e.g. dumping every `(P0)`/`(P1)` line across an entire multi-project `fix_plan.md`, most of it unrelated to the argument's actual scope)
+- Once the argument's explicit candidates are adopted, Step 0.5/0.6 still run — but scoped to "anything else missed", not "start from zero and enumerate everything"
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | `/next` receives a file/target argument → proceed straight to Step 0.5 TaskList / Step 0.6 fix_plan.md-wide sweep, ignoring the argument's own content | Read the argument's target first. If it names explicit follow-up candidates, adopt them as the primary option set |
+| 2 | Run Step 0.6's fix_plan.md sweep as a full unfiltered P0/P1 dump when the invocation argument already narrowed the scope | Scope Step 0.5/0.6 to confirming the argument's candidates (e.g. grep the argument's specific keywords/identifiers in fix_plan.md) rather than a blanket priority-sorted dump across unrelated projects |
+| 3 | Treat "the argument is just context, not a candidate source" | An argument that is itself a document with an explicit "next steps"/"unresolved" section IS a candidate source — the highest-priority one |
+| 4 | Skip this step because the argument "doesn't look like a topic name" (only checking against the Topic Dispatch table) | Topic Dispatch (SKILL.md) matches known topic slugs (`stall-detect`, `ask-gates`, `suggestion-patterns`). An argument that isn't a topic slug but IS a readable file/target still triggers this step — the two checks are independent |
+
+### Self-check (before Step 0.5)
+
+1. Was `/next` invoked with an argument? → If no, skip to Step 0.5 as normal
+2. Does the argument match a known topic slug (Topic Dispatch table)? → If yes, that dispatch applies instead (this step doesn't)
+3. Otherwise, is the argument a file/target path? → Read it. Does it contain explicit follow-up candidates (an "Unresolved"/"Next session" section, a Progress Checklist, an open-item list)?
+4. If yes → adopt those as the primary candidate set. Step 0.5/0.6 then run in **scoped confirmation mode** (check the argument's own specifics), not full-sweep mode
+5. If the argument names no explicit candidates → proceed to Step 0.5/0.6 normally (this step does not apply)
+
 ## Step 0.5: TaskList primary-source check (MANDATORY — every time before composing ask options)
 
 **Immediately before calling `AskUserQuestion`, call `TaskList` to directly verify current pending/in_progress tasks.** Do not compose options from context summary / memory / inference of recent work.
