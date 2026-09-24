@@ -84,7 +84,7 @@ Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then 
 
 1. **Cleanup**: immediately delete stale completed/in_progress entries (no user confirmation required)
 2. **Checklist state recovery** (Step 1.5): for tasks whose state cannot be verified from the in-context conversation (post-compact / inherited items), Grep/Read `fix_plan.md` / `checklist.md` to recover their state before asking
-3. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / defer-to-checklist / delete
+3. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / defer-to-checklist / delete. `defer-to-checklist` follows `todowrite`'s `file` medium convention (`fix_plan.md`/`checklist.md`) — write the deferred item there rather than leaving it as an orphaned session task
 4. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
 
 ### Step 1 (alt) — Registration path (Registration mode)

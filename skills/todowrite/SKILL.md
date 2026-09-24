@@ -27,7 +27,7 @@ New TODO arrives
 
 | Topic | Storage | Lifetime | Tool / Guide |
 |-------|---------|----------|--------------|
-| session | TaskCreate/TodoWrite | Session | → `/wip` skill |
+| session | TaskCreate/TodoWrite | Session | Delegation-only — this row routes to the `/wip` skill; `todowrite` does not implement session tracking itself |
 | file | fix_plan.md, TODO.md | While file exists | Write/Edit |
 | issue | GitHub Issues | Permanent | `gh issue create` |
 | conversation-id | — | Always-on | [conversation-id.md](./conversation-id.md) — subject-prefix references in user-visible output. Enforced by `resources/block-tasklist-id-in-conversation.sh` (PreToolUse:AskUserQuestion, registered in `settings.json`) |
