@@ -99,6 +99,8 @@ rebase-audit (active-rebase revert detection)  ──restoration mechanism share
    | `CLOSED` unmerged, or no PR | Stale candidate — confirm with the user before reuse |
 
    For a `MERGED` squashed branch, reuse means re-pointing the worktree at a fresh branch off the updated base (`rename-worktree`) — do **not** rebase or merge the old branch forward, since its commits duplicate content the base already carries in squashed form.
+
+   **Batch cleanup**: `scripts/prune_merged_worktrees.py` automates this same `gh pr list --head` check (with a git-native `merge-base --is-ancestor` fallback when `gh` is unavailable) across every non-main worktree in a repository at once — use it instead of the manual per-worktree steps above when clearing out several stale worktrees. Defaults to `--dry-run`; pass `--execute` to actually remove eligible worktrees, `-d`/`--delete-branch` to also delete the local branch, `--scan <root>` to sweep multiple repositories.
 4. If an inactive worktree exists → **reuse via the `rename-worktree` topic** (rename the directory + metadata, switch branch)
 5. If no inactive worktree exists or the user opts for new → `git worktree add`
 
@@ -233,3 +235,4 @@ Key features:
 - `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
 - `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)
 - `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch; prints manual push/PR commands by default, or pass `--push [--body-file <path>]` to also push and open the draft PR.
+- `skills/git-repo/scripts/prune_merged_worktrees.py` - Detect and safely remove clean worktrees whose branches are already merged (GitHub PR lookup + git-native ancestry fallback); defaults to `--dry-run`. See the "Worktree decision tree" squash-merge caveat above.
