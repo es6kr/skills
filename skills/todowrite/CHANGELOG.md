@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.3](https://github.com/es6kr/skills/compare/todowrite-v0.9.2...todowrite-v0.9.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **todowrite,wip:** clarify session-medium delegation boundary (S6/S7) ([806dcad](https://github.com/es6kr/skills/commit/806dcad0c92a027b9fc89617957510cb52f580ea))
+* **todowrite:** add prune subcommand to claude-task CLI ([#545](https://github.com/es6kr/skills/issues/545)) ([660f03a](https://github.com/es6kr/skills/commit/660f03abdc8792d3d697352ec4346ea044e5c491))
+* **todowrite:** mark session-medium row as delegation-only to /wip ([5bf35b0](https://github.com/es6kr/skills/commit/5bf35b046fd66fa04b115db773458db00a6ac6fd))
+
 ## [0.9.2](https://github.com/es6kr/skills/compare/todowrite-v0.9.1...todowrite-v0.9.2) (2026-09-18)
 
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.16.0](https://github.com/es6kr/skills/compare/fix-plan-v0.15.0...fix-plan-v0.16.0) (2026-09-24)
+
+
+### Features
+
+* **fix-plan:** add hook-integrity source&lt;-&gt;cache reverse sync check ([77aa86b](https://github.com/es6kr/skills/commit/77aa86ba3f9b74a51c3ea02bb9fd0adb58b46660))
+* **fix-plan:** add pipeline log and hook integrity check scripts ([e93a432](https://github.com/es6kr/skills/commit/e93a4323b54a311fcda6855163ffe14c2c146412))
+
+
+### Bug Fixes
+
+* **fix-plan:** add pinned-mission liveness check to flowchart-sync step ([#527](https://github.com/es6kr/skills/issues/527)) ([5c962a7](https://github.com/es6kr/skills/commit/5c962a71ffab690e3844855026ca21d0c141d968))
+* **fix-plan:** add task allocation and channel dispatch stage to pm profile ([342a572](https://github.com/es6kr/skills/commit/342a5726a75da01467b4ada57d41dbd1df305136))
+* **fix-plan:** carry k3s_workload through the v2 profile translation ([73e2994](https://github.com/es6kr/skills/commit/73e29949563689befe23c6f8f999fd8bff86664b))
+* **fix-plan:** document the Pipeline Execution Log section and its writer scripts ([4b42a94](https://github.com/es6kr/skills/commit/4b42a948f9d5cbd06a7362b25c5f910eab783520))
+* **git-repo:** add prune_merged_worktrees.py + 7 accumulated fixes ([3d2ee94](https://github.com/es6kr/skills/commit/3d2ee9425285347d8f7e7698049d6e5769f73f92))
+* make the Plane K3s fallback reach its cluster, and stop the retag guard firing on citations ([ce0abde](https://github.com/es6kr/skills/commit/ce0abded29d992ac89b865e806aed9b531d4909d))
+
 ## [0.15.0](https://github.com/es6kr/skills/compare/fix-plan-v0.14.0...fix-plan-v0.15.0) (2026-09-20)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.2](https://github.com/es6kr/skills/compare/github-flow-v0.11.1...github-flow-v0.11.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **git-repo:** add prune_merged_worktrees.py + 7 accumulated fixes ([3d2ee94](https://github.com/es6kr/skills/commit/3d2ee9425285347d8f7e7698049d6e5769f73f92))
+* **github-flow:** document multi-account and ssh remote publish gotchas ([4a772a8](https://github.com/es6kr/skills/commit/4a772a89adc8302f65da48c85e36588d2792f576))
+
 ## [0.11.1](https://github.com/es6kr/skills/compare/github-flow-v0.11.0...github-flow-v0.11.1) (2026-09-20)
 
 
