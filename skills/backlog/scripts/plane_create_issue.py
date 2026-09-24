@@ -573,6 +573,31 @@ print("RESULT_JSON:" + json.dumps(res))
 """
 
 
+_K3S_MISSING_TARGET = re.compile(r"not\s*found", re.IGNORECASE)
+
+
+def k3s_failure_reason(detail: str, namespace: str, workload: str) -> str:
+    """Turn kubectl's bare NotFound into something the operator can act on.
+
+    kubectl names only the object it could not find — never the namespace it
+    searched, and never where that namespace came from. A workspace profile
+    that omits `k3s_namespace` therefore fails with a line that reads like a
+    broken cluster ("deployments.apps \"plane-api-wl\" not found") when the
+    real cause is that the built-in default points at a different cluster's
+    layout. kubectl's own words are kept so nothing is hidden by the reframing.
+    """
+    detail = (detail or "").strip()
+    if _K3S_MISSING_TARGET.search(detail):
+        return (
+            f"K3s fallback target not found: no {workload} in namespace "
+            f"'{namespace}'. Those are the built-in defaults — set "
+            f"`k3s_namespace` / `k3s_workload` on this workspace's backlog "
+            f"profile to the cluster's actual Plane deployment. "
+            f"kubectl said: {detail}"
+        )
+    return f"K3s execution failed: {detail or 'unknown error'}"
+
+
 def create_via_k3s_fallback(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
     try:
         normalized_priority = normalize_priority(priority) if priority else None
@@ -606,9 +631,12 @@ def create_via_k3s_fallback(profile: dict, title: str, description: str = "", pr
             "reason": "kubectl not available on PATH — skipping K3s fallback",
         }
 
-    # Live cluster reality: the Plane deployment runs in the `plane-ce`
-    # namespace (es6.kr), not `plane` — resolve from the workspace profile
-    # first so other clusters can override without a code change.
+    # These are defaults, not facts about any particular cluster: the two
+    # clusters this runs against disagree (dgs keeps Plane in `plane-ce`,
+    # es6.kr keeps it in `plane` and uses `plane-ce` for the CNPG Postgres
+    # pods only). A cluster whose layout differs from the default must say so
+    # in its workspace profile — and when it has not, the failure below says
+    # exactly that rather than surfacing kubectl's bare NotFound.
     k3s_namespace = profile.get("k3s_namespace") or "plane-ce"
     k3s_workload = profile.get("k3s_workload") or "deploy/plane-api-wl"
 
@@ -626,7 +654,12 @@ def create_via_k3s_fallback(profile: dict, title: str, description: str = "", pr
                 return json.loads(line[len("RESULT_JSON:"):])
         return {"success": False, "reason": f"No RESULT_JSON line output. Stdout: {res.stdout}, Stderr: {res.stderr}"}
     except subprocess.CalledProcessError as e:
-        return {"success": False, "reason": f"K3s execution failed: {e.stderr or e.stdout or str(e)}"}
+        return {
+            "success": False,
+            "reason": k3s_failure_reason(
+                e.stderr or e.stdout or str(e), k3s_namespace, k3s_workload
+            ),
+        }
     except Exception as e:
         return {"success": False, "reason": f"K3s execution failed: {str(e)}"}
 

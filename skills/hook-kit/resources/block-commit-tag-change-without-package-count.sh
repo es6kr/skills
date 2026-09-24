@@ -148,6 +148,25 @@ PYEOF
   # regression (issue #505): citing a test-result line for an identifier that
   # contains a RETAG_VERBS token must not trip the guard either
   check ALLOW "$(mk 'how to proceed' 'x' 'bats squash-subject 19/19')"
+  # regression (found live, 2026-09-21): citing a git ref whose own name
+  # contains a RETAG_VERBS token. Branch names are the third identifier shape
+  # (after filenames and test-result lines) that carries such a token without
+  # proposing anything, and the one an ask is most likely to quote verbatim.
+  check ALLOW "$(mk 'how to proceed' 'x' 'branch fix/plane-k3s-ns-and-retag-prose-fp has 5 commits')"
+  check ALLOW "$(mk 'which branch?' 'origin/feat/squash-guard-tests' 'x')"
+  # regression (5th recurrence, 2026-09-21): merge-STRATEGY prose that merely
+  # names squash as the option NOT taken. The pre-existing merge-context
+  # stripper only recognised two-word bindings ("squash merge", "--squash"),
+  # so a bare `squash` token in ordinary prose fell straight through to
+  # RETAG_VERBS even though the payload recommends against squashing.
+  check ALLOW "$(mk 'how should this land?' 'merge commit' 'squash is discouraged for this repo')"
+  check ALLOW "$(mk 'how should this land?' 'merge commit' 'use merge commit strategy, not squash')"
+  check ALLOW "$(mk 'which merge strategy?' 'merge commit' 'the squash strategy collapses per-commit types')"
+  check ALLOW "$(mk 'which merge strategy?' 'merge commit' 'merge commit rather than squash')"
+  # ... while a bare local-history squash proposal still fires (no merge-
+  # strategy context to strip), so widening the stripper must not cost
+  # coverage of the case this guard exists for.
+  check DENY  "$(mk 'how to proceed' 'squash the last 3 commits locally' 'retag as feat:')"
 
   # --- condition 3: per-commit file enumeration in the turn clears the gate ---
   check ALLOW "$(mk 'how to proceed' 'reword to feat:' 'x')" \
@@ -238,6 +257,11 @@ ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/`[^`]*`//g')
 ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_]+(-[a-z0-9_]+)*\.(sh|py|js|ts)//g')
 #   3. "<identifier> N/N" test-result notation (e.g. "squash-subject 19/19")
 ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_-]+[[:space:]]+[0-9]+\/[0-9]+//g')
+#   4. git refs -- a branch named after the very thing it fixes carries the
+#      token in its own name ("fix/...-retag-prose-fp"), and an ask that asks
+#      where to send a branch quotes that name verbatim. Anchored on a
+#      conventional branch prefix so it strips refs, not arbitrary slashes.
+ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's#(feat|fix|hotfix|chore|refactor|perf|test|ci|build|style|docs|release|wip)/[a-z0-9._/-]+##g')
 
 # A squash-MERGE is a different concern (it collapses several commits' types
 # into the PR title) and has its own rule and guard. Only local history
@@ -245,6 +269,18 @@ ASK_TEXT_LC=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/[a-z0-9_-]+[[:space:]]+[0-9
 # "squash ... before merging" word order, not just "squash merge") before the
 # verb match so a merge-strategy question does not trip this hook.
 INTENT_TEXT=$(printf '%s' "$ASK_TEXT_LC" | sed -E 's/(squash[-[:space:]]*merge|merge[-[:space:]]*--squash|--squash|gh pr merge[^[:space:]]*|squash[^.]{0,40}merg(e|ing))//g')
+# The bindings above only recognise squash when it is welded to a merge token.
+# Ordinary merge-strategy prose names the bare word instead, and every such
+# phrasing below argues about HOW TO MERGE -- several of them argue AGAINST
+# squashing -- so none of them proposes rewriting local history. Each pattern
+# requires its own qualifier, so a bare "squash the last 3 commits" (the case
+# this guard exists for) still reaches the verb match untouched.
+#   a. squash as the subject of a judgement: "squash is discouraged"
+INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E 's/squash(ing)?[[:space:]]+(is|are|was|were)[[:space:]]+(not[[:space:]]+(allowed|permitted|recommended|preferred|used)|discouraged|disallowed|prohibited|forbidden|disabled|banned|unavailable)//g')
+#   b. squash as the option NOT taken: "not squash", "rather than squash"
+INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E 's/(not|no|never|avoid|instead[[:space:]]+of|rather[[:space:]]+than|as[[:space:]]+opposed[[:space:]]+to|versus|vs\.?)[[:space:]]+squash(ing)?//g')
+#   c. squash as a merge-strategy noun: "the squash strategy", "squash option"
+INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E 's/squash[-[:space:]]+(strateg(y|ies)|option|mode)//g')
 # Strip negated rewrite-verb clauses ("do not retag; split the commits") so the
 # guard's own recommended safe remedy does not itself trip the guard.
 INTENT_TEXT=$(printf '%s' "$INTENT_TEXT" | sed -E "s/${NEGATION_VERBS}[[:space:]]+(retag|re-tag|reword|re-word|squash|amend|rewrite)[^.;]*//g")
