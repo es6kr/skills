@@ -86,3 +86,29 @@ Attempt the following steps in order before asking the user:
 4. **Check org membership**: if all three steps above still produce 404, ask the user whether they are a member of the org
 
 **Script-file variant (reusing the token across many `gh` calls, e.g. a batch loop over PR/issue numbers)**: don't capture the token into a variable named with `TOKEN`/`SECRET`/`AUTH`/etc. and then use that same variable inside a script that also contains any output-producing command (`echo`/`printf`/`tee`/...) — even when the output has nothing to do with the token itself. A PreToolUse:Bash secret-echo guard (`block-secret-echo.sh` in the `ask-user` plugin) matches on that combination existing *anywhere* in the command text, not on whether the token variable is actually the thing being printed, so a plain `printf '%s\n' "$result"` elsewhere in the same script file trips it. Name the variable something outside that keyword set (e.g. `DJ_CRED`) and only ever pass it inline as `GH_TOKEN="$DJ_CRED" gh ...` (assignment, never `$GH_TOKEN`/`${GH_TOKEN}` interpolation) — write the whole thing to a script file and run that file via Bash, per the "must be passed via a script file" note above.
+
+## Multi-Account + SSH Remote Publish Gotcha (HARD STOP)
+
+When managing multiple GitHub accounts, switching accounts via `gh auth switch --user <account>` ONLY updates the gh CLI token and the Git credential helper for HTTPS remotes. If the target repository remote is configured with an **SSH URL (`git@github.com:...`)**, Git routes operations through the ambient SSH agent/key (often tied to a personal default key) instead of the switched gh CLI account. This triggers silent authentication mismatch or push failures such as `ERROR: Permission to <org>/<repo>.git denied to <wrong-user>`.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Rely on `gh auth switch` alone while git remote URL is an SSH endpoint (`git@github.com:...`) | Inspect remote URL (`git remote get-url origin`). If SSH, convert to HTTPS or configure account-specific SSH Host aliases |
+| 2 | Try pushing via SSH with the wrong key repeatedly, triggering permission-denied errors | Switch remote to HTTPS: `git remote set-url origin https://github.com/<org>/<repo>.git` and run `gh auth setup-git` to let `gh` authenticate git push seamlessly |
+| 3 | Hardcode personal SSH key as global default without checking repository organization owner | For SSH-only requirements, configure Host aliases in `~/.ssh/config` (`Host github-es6kr`, `IdentityFile ...`) and set remote to `git@github-es6kr:...` |
+
+### Recommended Remediation Procedure (HTTPS Switch)
+
+```bash
+# 1. Switch active gh account to target account
+gh auth switch --user DrumRobot
+
+# 2. Configure git credential helper for gh
+gh auth setup-git
+
+# 3. Convert git remote from SSH to HTTPS
+git remote set-url origin https://github.com/es6kr/skills.git
+
+# 4. Verify push authentication
+git push origin <branch>
+```
