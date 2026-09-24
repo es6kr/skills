@@ -11,6 +11,7 @@ Usage:
   claude-task [--session SESSION] [--dir DIR] add -s SUBJECT [-d DESC] [-a FORM] [--status STATUS] [--blocks ID...] [--blocked-by ID...]
   claude-task [--session SESSION] [--dir DIR] update <id> [--status STATUS] [-s SUBJECT] [-d DESC] [-a FORM] [--add-block ID...] [--add-blocked-by ID...]
   claude-task [--session SESSION] [--dir DIR] delete <id>
+  claude-task [--session SESSION] [--dir DIR] prune [--retention-days N] [--dry-run] [--purge]
   claude-task [--session SESSION] [--dir DIR] dir
 """
 
@@ -18,6 +19,7 @@ import os
 import sys
 import json
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -240,6 +242,54 @@ def cmd_delete(args):
         print(f"Task #{args.id} not found in {task_dir}", file=sys.stderr)
         sys.exit(1)
 
+ARCHIVE_SUBDIR = ".archive"
+
+def cmd_prune(args):
+    task_dir = resolve_task_dir(args.dir, args.session, args.env)
+    now = datetime.now(timezone.utc).timestamp()
+    retention_seconds = args.retention_days * 86400
+
+    candidates: List[tuple] = []
+    for f in sorted(task_dir.glob("*.json")):
+        try:
+            with open(f, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        except Exception:
+            continue
+        status = data.get("status")
+        if status == "deleted":
+            candidates.append((f, "deleted"))
+        elif status == "completed":
+            age = now - f.stat().st_mtime
+            if age >= retention_seconds:
+                candidates.append((f, "completed"))
+
+    if not candidates:
+        print(f"Nothing to prune in {task_dir}")
+        return
+
+    action_verb = "purged" if args.purge else "archived"
+    if args.dry_run:
+        print(f"[dry-run] {len(candidates)} task(s) would be {action_verb} from {task_dir}:")
+        for f, reason in candidates:
+            print(f"  #{f.stem} ({reason})")
+        return
+
+    archive_dir = task_dir / ARCHIVE_SUBDIR / datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if not args.purge:
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+    for f, _reason in candidates:
+        if args.purge:
+            f.unlink()
+        else:
+            f.rename(archive_dir / f.name)
+
+    if args.purge:
+        print(f"Purged {len(candidates)} task(s) from {task_dir}")
+    else:
+        print(f"Archived {len(candidates)} task(s) to {archive_dir}")
+
 def cmd_dir(args):
     task_dir = resolve_task_dir(args.dir, args.session, args.env)
     print(task_dir)
@@ -286,7 +336,7 @@ def parse_args():
     # update
     p_up = subparsers.add_parser("update", aliases=["edit"], parents=[global_parser], help="Update existing task")
     p_up.add_argument("id", help="Task ID")
-    p_up.add_argument("--status", choices=["pending", "in_progress", "completed"])
+    p_up.add_argument("--status", choices=["pending", "in_progress", "completed", "deleted"])
     p_up.add_argument("--subject", "-s")
     p_up.add_argument("--description", "-d")
     p_up.add_argument("--active-form", "-a")
@@ -298,6 +348,13 @@ def parse_args():
     p_del = subparsers.add_parser("delete", aliases=["rm"], parents=[global_parser], help="Delete task")
     p_del.add_argument("id", help="Task ID")
     p_del.set_defaults(func=cmd_delete)
+
+    # prune
+    p_prune = subparsers.add_parser("prune", parents=[global_parser], help="Archive (or purge) status=deleted and stale completed tasks")
+    p_prune.add_argument("--retention-days", type=int, default=3, help="Days to keep completed tasks before archiving (default: 3)")
+    p_prune.add_argument("--dry-run", action="store_true", help="Show what would be pruned without making changes")
+    p_prune.add_argument("--purge", action="store_true", help="Permanently delete instead of archiving to .archive/<date>/")
+    p_prune.set_defaults(func=cmd_prune)
 
     # dir
     p_dir = subparsers.add_parser("dir", parents=[global_parser], help="Show resolved task directory")
