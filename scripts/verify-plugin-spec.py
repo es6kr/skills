@@ -27,6 +27,14 @@ encode but this workspace requires:
     silently skipped (this is deliberately stricter than the "manifest not
     written yet" skip below: a missing directory is never valid, a missing
     plugin.json inside an existing directory can be, during migration)
+  - every plugins/<name>/ directory on disk must be referenced by some
+    marketplace.json entry's "source" (the reverse of the check above). The
+    forward check catches a catalog entry whose directory vanished; this one
+    catches a bundle that was added to the tree and never listed in the
+    catalog. An unlisted bundle is invisible to every harness -- its skills,
+    agents and hooks simply never load -- and because nothing references it,
+    a catalog-driven linter never visits it and CI stays green. That is the
+    exact failure PR #38 shipped with plugins/worker
 """
 import json
 import re
@@ -60,11 +68,13 @@ def validate_manifest(data: dict, path: str) -> list:
 
     if "name" not in data:
         errors.append(f"{path}: missing required field 'name'")
+    elif not isinstance(data["name"], str):
+        errors.append(f"{path}: field 'name' must be a string")
     else:
         name = data["name"]
-        if not isinstance(name, str) or not (1 <= len(name) <= 64) or not NAME_RE.match(name):
+        if len(name) > 64 or not NAME_RE.match(name):
             errors.append(
-                f"{path}: 'name' {name!r} violates spec pattern "
+                f"{path}: name '{name}' does not match Agent Plugins spec "
                 "(1-64 chars, lowercase alphanumeric/./-, no leading/trailing '-', no '--' or '..')"
             )
 
@@ -153,6 +163,38 @@ def check_source_directory_exists(entry: dict) -> list:
     return []
 
 
+def check_orphan_plugin_directories(entries: list) -> list:
+    """Reverse of check_source_directory_exists: every plugins/<name>/ directory
+    must be claimed by a marketplace.json entry.
+
+    Only direct children of plugins/ are considered, and only those that look like
+    a bundle (they contain a plugin.json) -- a scratch directory without a manifest
+    is not yet a plugin and is not this linter's business."""
+    plugins_dir = REPO_ROOT / "plugins"
+    if not plugins_dir.is_dir():
+        return []
+
+    claimed = set()
+    for entry in entries:
+        source = entry.get("source", "./")
+        try:
+            claimed.add((REPO_ROOT / source).resolve())
+        except (OSError, ValueError):
+            continue
+
+    errors = []
+    for candidate in sorted(plugins_dir.iterdir()):
+        if not candidate.is_dir() or not (candidate / "plugin.json").is_file():
+            continue
+        if candidate.resolve() not in claimed:
+            rel = candidate.relative_to(REPO_ROOT)
+            errors.append(
+                f"plugin bundle {str(rel)!r} has a plugin.json but no marketplace.json "
+                f"entry -- nothing loads it. Add an entry with source './{rel}'"
+            )
+    return errors
+
+
 def iter_marketplace_entries():
     marketplace = json.loads(MARKETPLACE_PATH.read_text(encoding="utf-8"))
     return marketplace.get("plugins", [])
@@ -161,7 +203,9 @@ def iter_marketplace_entries():
 def main() -> int:
     errors = []
     checked = 0
-    for entry in iter_marketplace_entries():
+    entries = iter_marketplace_entries()
+    errors.extend(check_orphan_plugin_directories(entries))
+    for entry in entries:
         errors.extend(check_path_containment(entry))
         errors.extend(check_source_directory_exists(entry))
 

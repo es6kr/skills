@@ -21,23 +21,36 @@ For backward compatibility, `/session id <keyword>` is routed to this topic.
 
 ## Engine Selection
 
-This skill's default engine is **Claude Code** (`~/.claude/projects/*.jsonl`). A second engine, **Antigravity (Gemini IDE)**, stores sessions in a different location and format — pass `--engine antigravity` to search there instead. Auto-detect the engine from context when the user references a known Antigravity session UUID (found under `~/.gemini/antigravity-ide/brain/<uuid>/`) even without the flag.
+This skill's default engine is **Claude Code** (`~/.claude/projects/*.jsonl`). A second engine, **Antigravity**, stores sessions in a different location and format — pass `--engine antigravity` to search there instead. Auto-detect the engine from context when the user references a known Antigravity session UUID even without the flag.
 
-| Engine | Session store | Readable transcript |
+**Antigravity is two independent runtimes, each with its own data root — check both when a UUID isn't found in one.** The IDE app and the CLI (invoked as `agy`) never share sessions:
+
+| Runtime | Session store | Readable transcript |
+|---------|---------------|---------------------|
+| Antigravity IDE | `~/.gemini/antigravity-ide/brain/<uuid>/` | `.system_generated/logs/transcript.jsonl` (JSONL, one step per line) |
+| Antigravity CLI (`agy`) | `~/.gemini/antigravity-cli/brain/<uuid>/` | `.system_generated/logs/transcript.jsonl` (same schema, separate root) |
+
+Do not stop at one root and report "session not found" — a UUID absent from `antigravity-ide/` can still exist under `antigravity-cli/` (and vice versa). When the user says "agy" or names the CLI explicitly, try `antigravity-cli/` first.
+
+| Engine (`--engine` flag) | Session store | Readable transcript |
 |--------|---------------|---------------------|
 | `claude` (default) | `~/.claude/projects/<project>/<uuid>.jsonl` | JSONL directly |
-| `antigravity` | `~/.gemini/antigravity-ide/brain/<uuid>/` | `.system_generated/logs/transcript.jsonl` (JSONL, one step per line) |
+| `antigravity` | `~/.gemini/antigravity-ide/brain/<uuid>/` **or** `~/.gemini/antigravity-cli/brain/<uuid>/` (try both) | `.system_generated/logs/transcript.jsonl` (JSONL, one step per line) |
 
 ### Antigravity Search Procedure
 
-Antigravity's `transcript.jsonl` is plain, greppable JSON-per-line (`{"step_index":N,"source":"...","type":"...","created_at":"...","content":"..."}`) — no protobuf decoding needed for the common case. Only fall back to the raw SQLite conversation DB (`~/.gemini/antigravity-ide/conversations/<uuid>.db`, protobuf-encoded blobs) when a keyword hit is expected but absent from `transcript.jsonl` (e.g. tool-call metadata not mirrored into the transcript).
+Antigravity's `transcript.jsonl` is plain, greppable JSON-per-line (`{"step_index":N,"source":"...","type":"...","created_at":"...","content":"..."}`) — no protobuf decoding needed for the common case, and the schema is identical across both runtimes. Only fall back to the raw SQLite conversation DB (`conversations/<uuid>.db`, protobuf-encoded blobs, under either root) when a keyword hit is expected but absent from `transcript.jsonl` (e.g. tool-call metadata not mirrored into the transcript).
 
 ```bash
-# Search a single known session
-grep -n "<keyword>" ~/.gemini/antigravity-ide/brain/<uuid>/.system_generated/logs/transcript.jsonl
+# Search a single known session — try both runtime roots
+for root in antigravity-ide antigravity-cli; do
+  f=~/.gemini/$root/brain/<uuid>/.system_generated/logs/transcript.jsonl
+  [ -f "$f" ] && grep -n "<keyword>" "$f" && echo "(found under $root)"
+done
 
-# Search across all Antigravity brain sessions (unknown session ID)
-for f in ~/.gemini/antigravity-ide/brain/*/.system_generated/logs/transcript.jsonl; do
+# Search across all Antigravity brain sessions (unknown session ID) — both roots
+for f in ~/.gemini/antigravity-ide/brain/*/.system_generated/logs/transcript.jsonl \
+         ~/.gemini/antigravity-cli/brain/*/.system_generated/logs/transcript.jsonl; do
   grep -l "<keyword>" "$f" 2>/dev/null
 done
 
@@ -55,7 +68,7 @@ for line in sys.stdin:
 "
 ```
 
-**Fallback — SQLite conversation DB (rare)**: when `transcript.jsonl` genuinely lacks a signal that must be in the raw session (e.g. exact tool-call arguments, embedded fetched-page HTML), the source DB lives at `~/.gemini/antigravity-ide/conversations/<uuid>.db` (SQLite tables: `steps`, `gen_metadata`, `trajectory_meta`, `trajectory_metadata_blob`, `executor_metadata`, `parent_references`, `battle_mode_infos`). It has no `sqlite3` CLI dependency assumption — read it with `uv run python -c "import sqlite3; ..."` (Windows: `python3` fails via Microsoft Store redirect, per `common.md`). Blob columns are protobuf-encoded; extract readable substrings with a printable/UTF-8 regex scan rather than attempting full protobuf decode:
+**Fallback — SQLite conversation DB (rare)**: when `transcript.jsonl` genuinely lacks a signal that must be in the raw session (e.g. exact tool-call arguments, embedded fetched-page HTML), the source DB lives at `conversations/<uuid>.db` under whichever root the session was found in (`~/.gemini/antigravity-ide/conversations/<uuid>.db` or `~/.gemini/antigravity-cli/conversations/<uuid>.db` — SQLite tables: `steps`, `gen_metadata`, `trajectory_meta`, `trajectory_metadata_blob`, `executor_metadata`, `parent_references`, `battle_mode_infos`). It has no `sqlite3` CLI dependency assumption — read it with `uv run python -c "import sqlite3; ..."` (Windows: `python3` fails via Microsoft Store redirect, per `common.md`). Blob columns are protobuf-encoded; extract readable substrings with a printable/UTF-8 regex scan rather than attempting full protobuf decode:
 
 ```bash
 uv run python -c "

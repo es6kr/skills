@@ -245,3 +245,53 @@ class TestMarketplaceThreeTierArchitecture:
         core_skills = set(plugins["es6kr"].get("skills", []))
         overlap = core_skills.intersection(expected_labs)
         assert not overlap, f"Core bundle 'es6kr' must not contain slug-squatting skills: {overlap}"
+
+
+class TestOrphanPluginDirectories:
+    """Reverse of TestSourceDirectoryExists: a bundle on disk that the catalog
+    never lists. This is the PR #38 failure -- plugins/worker shipped with a
+    plugin.json and no marketplace.json entry, so no harness ever loaded it and
+    no catalog-driven check ever visited it."""
+
+    def _bundle(self, tmp_path, name):
+        d = tmp_path / "plugins" / name
+        d.mkdir(parents=True)
+        (d / "plugin.json").write_text(json.dumps(VALID_MANIFEST), encoding="utf-8")
+        return d
+
+    def test_registered_bundle_ok(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        self._bundle(tmp_path, "listed")
+        entries = [{"name": "listed", "source": "./plugins/listed"}]
+        assert verify_plugin_spec.check_orphan_plugin_directories(entries) == []
+
+    def test_unlisted_bundle_reported(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        self._bundle(tmp_path, "worker")
+        entries = [{"name": "root", "source": "./"}]
+        errors = verify_plugin_spec.check_orphan_plugin_directories(entries)
+        assert len(errors) == 1
+        assert "plugins/worker" in errors[0]
+        assert "nothing loads it" in errors[0]
+
+    def test_root_source_does_not_claim_nested_bundles(self, tmp_path, monkeypatch):
+        """source './' covers the repo root only. It must not be read as claiming
+        plugins/<name>, which is what made the omission look harmless."""
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        self._bundle(tmp_path, "a")
+        self._bundle(tmp_path, "b")
+        entries = [{"name": "root", "source": "./"}]
+        assert len(verify_plugin_spec.check_orphan_plugin_directories(entries)) == 2
+
+    def test_directory_without_manifest_ignored(self, tmp_path, monkeypatch):
+        """A scratch directory under plugins/ is not yet a bundle."""
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        (tmp_path / "plugins" / "scratch").mkdir(parents=True)
+        assert verify_plugin_spec.check_orphan_plugin_directories([]) == []
+
+    def test_no_plugins_dir_is_noop(self, tmp_path, monkeypatch):
+        """Repos without a plugins/ tree (e.g. the sibling copy of this linter)
+        must be unaffected."""
+        monkeypatch.setattr(verify_plugin_spec, "REPO_ROOT", tmp_path)
+        assert verify_plugin_spec.check_orphan_plugin_directories([]) == []
+
