@@ -57,11 +57,15 @@ def resolve(client, project_code, sequence_id):
             "no project with identifier %r in this workspace (known: %s)" % (project_code, known)
         )
 
-    issues = client.list_issues(project["id"])
+    # include_intake=True: an issue sitting in the Triage inbox (created via
+    # plane_create_issue.py's intake default, not yet accepted) is invisible
+    # to the plain issues/ endpoint — omitting this produced false "does not
+    # exist" verdicts for real, just-not-triaged-yet identifiers.
+    issues = client.list_issues(project["id"], include_intake=True)
     issue = next((i for i in issues if i.get("sequence_id") == sequence_id), None)
     if issue is None:
         raise LookupError(
-            "%s-%d does not exist (project %r has %d issues)"
+            "%s-%d does not exist (project %r has %d issues, including intake/Triage)"
             % (project_code, sequence_id, project_code, len(issues))
         )
     return project, issue

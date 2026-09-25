@@ -24,16 +24,20 @@ spec.loader.exec_module(pvi)
 class FakeClient:
     """Duck-typed stand-in for PlaneClient — no network, no profile."""
 
-    def __init__(self, projects, issues_by_project_id):
+    def __init__(self, projects, issues_by_project_id, intake_only_by_project_id=None):
         self._projects = projects
         self._issues_by_project_id = issues_by_project_id
+        self._intake_only_by_project_id = intake_only_by_project_id or {}
         self.profile = {"plane_host": "https://plane.example.com", "workspace_slug": "myws"}
 
     def list_projects(self):
         return self._projects
 
-    def list_issues(self, project_id):
-        return self._issues_by_project_id.get(project_id, [])
+    def list_issues(self, project_id, use_cache=True, include_intake=False):
+        issues = list(self._issues_by_project_id.get(project_id, []))
+        if include_intake:
+            issues += self._intake_only_by_project_id.get(project_id, [])
+        return issues
 
 
 class TestParseIdentifier(unittest.TestCase):
@@ -90,6 +94,30 @@ class TestResolve(unittest.TestCase):
     def test_unknown_sequence_id_raises(self):
         with self.assertRaisesRegex(LookupError, "does not exist"):
             pvi.resolve(self.client, "ES6KR", 999)
+
+
+class TestResolveIntakeVisibility(unittest.TestCase):
+    """A real identifier sitting in Plane's Triage inbox (created via the
+    intake API, not yet accepted) must resolve — not report a false
+    "does not exist". Regression test for SKILL-37: list_issues() alone
+    (the plain issues/ endpoint) never returns intake-stage issues, so
+    resolve() must request include_intake=True."""
+
+    def setUp(self):
+        self.client = FakeClient(
+            projects=[{"id": "proj-1", "identifier": "SKILL"}],
+            issues_by_project_id={"proj-1": []},
+            intake_only_by_project_id={
+                "proj-1": [
+                    {"sequence_id": 37, "name": "intake-stage issue, not yet triaged", "intake_status": -2},
+                ],
+            },
+        )
+
+    def test_intake_only_identifier_resolves(self):
+        project, issue = pvi.resolve(self.client, "SKILL", 37)
+        self.assertEqual(project["id"], "proj-1")
+        self.assertEqual(issue["name"], "intake-stage issue, not yet triaged")
 
 
 class TestMain(unittest.TestCase):
