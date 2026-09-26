@@ -130,6 +130,18 @@ Generates or updates `pages/ops/skill-topology-matrix.md` with:
 - `PAIR_OF_INTERNAL` equivalence table
 - Preserved initial `created` date with updated `last_modified`
 
+### Step 7: GraphRAG Dynamic Context Enrichment
+
+Bridges vector search (`skill-search` / Qdrant) with graph topology to generate enriched agent context:
+
+```bash
+# Enrich a single skill with dependencies, callers, blast radius, and equivalence pair:
+python3 ~/.claude/skills/skill-kit/scripts/enrich_skill_context.py --skill consolidate --format banner
+
+# Output:
+# [Graph Context] Skill: consolidate | Dependencies: [git-repo, github-flow, hook-kit, superpowers] | Blast Radius: 0
+```
+
 Suppresses outside-set edges silently misses bundle decisions — always surface, never drop.
 
 ## Don't / Do
