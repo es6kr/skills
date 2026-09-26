@@ -85,7 +85,16 @@ flowchart TD
 \`\`\`
 ```
 
-### Step 4: Optional d3 force-directed render (dispatch)
+### Step 4: Optional d3 force-directed render (dispatch or standalone)
+
+**Canonical standalone HTML generator:**
+```bash
+# Render self-contained HTML visualizer with search, blast radius highlighting, and weight slider:
+python3 ~/.claude/skills/skill-kit/scripts/render_skill_graph.py --input /tmp/graph.json --output /tmp/graph.html
+
+# Open in browser:
+open /tmp/graph.html
+```
 
 **Caller-supplied dispatch flag** — `--render=<skill>:<topic>` lets the caller decide which receiver owns the d3 template.
 
