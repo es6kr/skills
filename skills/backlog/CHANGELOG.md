@@ -5,6 +5,14 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2](https://github.com/es6kr/skills/compare/backlog-v0.4.1...backlog-v0.4.2) (2026-09-26)
+
+
+### Bug Fixes
+
+* **backlog:** add scope gate for Plane-issue creation vs. local git housekeeping ([#551](https://github.com/es6kr/skills/issues/551)) ([02e32e2](https://github.com/es6kr/skills/commit/02e32e2345225f256e92fa88983b2b30f6b24f3c))
+* **backlog:** make list_issues()/plane_verify_identifier.py see Triage-inbox issues ([#553](https://github.com/es6kr/skills/issues/553)) ([c203652](https://github.com/es6kr/skills/commit/c203652374272f97ef7f0a71fe2d56c8b493717a))
+
 ## [0.4.1](https://github.com/es6kr/skills/compare/backlog-v0.4.0...backlog-v0.4.1) (2026-09-24)
 
 

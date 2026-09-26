@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.11.3](https://github.com/es6kr/skills/compare/github-flow-v0.11.2...github-flow-v0.11.3) (2026-09-26)
+
+
+### Bug Fixes
+
+* **github-flow:** add optional graph-render dispatch for large epic-bundle bundles ([#549](https://github.com/es6kr/skills/issues/549)) ([45e3629](https://github.com/es6kr/skills/commit/45e362987eb52cf35272b484918a22c0fdd8bafc))
+* **github-flow:** add PR-blocking-vehicle check before delivery-vehicle ask ([#550](https://github.com/es6kr/skills/issues/550)) ([89d9812](https://github.com/es6kr/skills/commit/89d98129de5530c7e13f827d5e3f7751b55bab97))
+* **github-flow:** document IDE-subshell token override, merge-permission gap, and worktree sweep ([#546](https://github.com/es6kr/skills/issues/546)) ([ebb366a](https://github.com/es6kr/skills/commit/ebb366a06fde5d1f28b42cbc8d483fc335d3d9d3))
+* **github-flow:** restore pre-merge state recheck in merge.md ([74ae392](https://github.com/es6kr/skills/commit/74ae39229444d0b039bb25bcb34cacea50ac1874))
+
 ## [0.11.2](https://github.com/es6kr/skills/compare/github-flow-v0.11.1...github-flow-v0.11.2) (2026-09-24)
 
 

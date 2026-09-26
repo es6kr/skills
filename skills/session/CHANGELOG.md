@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/es6kr/skills/compare/session-v0.13.0...session-v0.14.0) (2026-09-26)
+
+
+### Features
+
+* **session:** openclaw session mgmt + antigravity context-measurement fixes ([#557](https://github.com/es6kr/skills/issues/557)) ([a2de799](https://github.com/es6kr/skills/commit/a2de79917cb1594fd8865486c971bbaabfc75e05))
+
 ## [0.13.0](https://github.com/es6kr/skills/compare/session-v0.12.1...session-v0.13.0) (2026-09-24)
 
 

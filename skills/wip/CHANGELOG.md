@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/es6kr/skills/compare/wip-v0.7.3...wip-v0.7.4) (2026-09-26)
+
+
+### Bug Fixes
+
+* **wip:** import-safe main() wrapping for block-wip-register hook ([26017da](https://github.com/es6kr/skills/commit/26017daacece6fc517d1948aa0b136393d61a589))
+
 ## [0.7.3](https://github.com/es6kr/skills/compare/wip-v0.7.2...wip-v0.7.3) (2026-09-24)
 
 
