@@ -19,9 +19,13 @@ Extract skill dependency edges (frontmatter `depends-on` + topic body `Skill(...
 
 ## Procedure
 
-### Step 1: Run extract-deps script
+### Step 1: Run extract-deps or extract_skill_graph script
 
 ```bash
+# Canonical Python Labeled Property Graph extractor (recommended):
+python3 ~/.claude/skills/skill-kit/scripts/extract_skill_graph.py --skills-dir ~/.claude/skills --output /tmp/graph.json
+
+# Or per-slug bash script:
 bash ~/.claude/skills/skill-kit/scripts/extract-deps.sh <slug...> > /tmp/edges.json
 ```
 
