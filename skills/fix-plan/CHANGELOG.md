@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.1](https://github.com/es6kr/skills/compare/fix-plan-v0.16.0...fix-plan-v0.16.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **fix-plan:** add [ASSIGNED:&lt;target&gt;] tag to claim.md for workspace-aware task assignment ([#555](https://github.com/es6kr/skills/issues/555)) ([8d3ad37](https://github.com/es6kr/skills/commit/8d3ad37245dc53bae748879f27bcd4db9dbcd72b))
+* sync claude-memory refs to agent-memory-personal collection alias ([5f7fed1](https://github.com/es6kr/skills/commit/5f7fed113de84196df3a74688ea464b5c594d587))
+
 ## [0.16.0](https://github.com/es6kr/skills/compare/fix-plan-v0.15.0...fix-plan-v0.16.0) (2026-09-24)
 
 

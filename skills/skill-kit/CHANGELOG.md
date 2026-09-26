@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/skill-kit-v0.9.0...skill-kit-v0.10.0) (2026-09-26)
+
+
+### Features
+
+* **skill-kit:** add skill topology graph extractor, analyzer, visualizer, wiki sync, and context enricher ([#552](https://github.com/es6kr/skills/issues/552)) ([0472c23](https://github.com/es6kr/skills/commit/0472c2323d0990ddc13669b2b7843171b85e2c7e))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/skill-kit-v0.8.1...skill-kit-v0.9.0) (2026-09-20)
 
 
