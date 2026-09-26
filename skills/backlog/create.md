@@ -6,6 +6,21 @@ Handles physical creation of Plane Issues and Intake Issues via REST API with au
 
 When creating a Plane issue or registering a PlaneBacklog intake item, do not rely on manual browser clicks or unverified text placeholders. Use `plane_create_issue.py` to physically post the issue to the target workspace project.
 
+## Scope Gate — Team-Visible Finding vs. Local-Only Git Housekeeping (HARD STOP)
+
+**Before calling `plane_create_issue.py` for a newly-clarified decision or discovery, classify what it actually is.** Not every decision surfaced mid-session belongs on the shared remote tracker — some content is purely local git bookkeeping that `fix_plan.md` (or the workspace's local checklist) already fully captures, and mirroring it to Plane is redundant duplication with no team-visibility payoff.
+
+**The test**: does this item need cross-session or cross-tool visibility for someone other than the author of the next session in this exact local checkout? Team-visible examples: a script/tool bug, a sync gap between two systems, code sitting at risk of loss, anything another person or a different tool might need to act on. Local-only examples: which local branch to cherry-pick, in what order, when to push an already-agreed commit batch, how to reorganize a personal worktree's history.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Create a Plane issue for every decision axis an `AskUserQuestion` just resolved, on the assumption that "a decision was made, so it needs a tracker entry" | Ask first: is this decision about *content with team-visible value*, or *purely local git housekeeping*? Only the former gets a Plane issue |
+| 2 | Extend an established "discovery → Plane issue" pattern from earlier in the same session onto a different class of finding without re-checking fit | Re-apply the scope test per item, not per session-momentum. A run of correct Plane creations for bug reports does not license the next few to skip the test |
+| 3 | Mirror the same content to both `fix_plan.md` and Plane "just in case" | Local-only content stays in `fix_plan.md` only. Duplicating it onto Plane is not a safety margin — it is noise the next session has to reconcile |
+| 4 | Assume ambiguous cases default to "create the issue, it's cheap" | When ambiguous, ask the user before creating the remote issue rather than defaulting to "every finding gets an issue" |
+
+**Self-check (before every `plane_create_issue.py` call)**: would a person other than "me in the next session working this exact local checkout" ever need to see this on the shared tracker? If no — this is local-only git housekeeping, and it belongs in `fix_plan.md` alone.
+
 ## Execution Procedure
 
 Resolve `BACKLOG_SCRIPTS` once per session:
