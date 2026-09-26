@@ -299,6 +299,142 @@ def summarize_session(
     }
 
 
+def inspect_session(
+    session_id: str,
+    openclaw_root: Optional[Path] = None,
+    limit: int = 30
+) -> Dict[str, Any]:
+    """Inspect an OpenClaw session's completed actions, recent commands, and last state."""
+    root = Path(openclaw_root) if openclaw_root else get_default_openclaw_root()
+    agents_dir = root / "agents"
+    target_file = None
+    target_traj = None
+    target_agent = None
+
+    if agents_dir.exists():
+        for agent_dir in agents_dir.iterdir():
+            if not agent_dir.is_dir():
+                continue
+            cand_jsonl = agent_dir / "sessions" / f"{session_id}.jsonl"
+            cand_traj = agent_dir / "sessions" / f"{session_id}.trajectory.jsonl"
+            if cand_jsonl.exists():
+                target_file = cand_jsonl
+                target_agent = agent_dir.name
+                if cand_traj.exists():
+                    target_traj = cand_traj
+                break
+
+    if not target_file or not target_file.exists():
+        raise FileNotFoundError(f"OpenClaw session file not found for ID: {session_id}")
+
+    session_meta = {}
+    last_user_msg = ""
+    last_assistant_msg = ""
+    user_msgs = []
+
+    with open(target_file, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            try:
+                obj = json.loads(line)
+                obj_type = obj.get("type")
+                if obj_type == "session":
+                    session_meta = {
+                        "id": obj.get("id"),
+                        "cwd": obj.get("cwd"),
+                        "timestamp": format_timestamp(obj.get("timestamp"))
+                    }
+                elif obj_type == "message":
+                    msg = obj.get("message", {})
+                    role = msg.get("role")
+                    content_raw = msg.get("content", "")
+                    text = extract_message_text(content_raw)
+                    if role == "user":
+                        last_user_msg = text
+                        user_msgs.append(text)
+                    elif role == "assistant":
+                        if text:
+                            last_assistant_msg = text
+            except Exception:
+                continue
+
+    tool_actions = []
+    failure_event = None
+    if target_traj and target_traj.exists():
+        pending_calls = {}
+        with open(target_traj, "r", encoding="utf-8", errors="replace") as tf:
+            for line in tf:
+                try:
+                    tobj = json.loads(line)
+                    ttype = tobj.get("type")
+                    ts = tobj.get("ts")
+                    data = tobj.get("data", {})
+
+                    if ttype == "tool.call":
+                        call_id = data.get("toolCallId") or str(len(tool_actions))
+                        name = data.get("name", "unknown")
+                        args = data.get("arguments", {})
+                        cmd = None
+                        if isinstance(args, dict):
+                            cmd = args.get("command") or args.get("path")
+                            if not cmd and "changes" in args and isinstance(args["changes"], list):
+                                paths = [c.get("path") for c in args["changes"] if isinstance(c, dict)]
+                                cmd = f"patch: {', '.join(filter(None, paths))}"
+                        action_item = {
+                            "name": name,
+                            "command": cmd or str(args)[:150],
+                            "cwd": args.get("cwd") if isinstance(args, dict) else session_meta.get("cwd"),
+                            "status": "in_progress",
+                            "exit_code": None,
+                            "timestamp": format_timestamp(ts)
+                        }
+                        pending_calls[call_id] = action_item
+                        tool_actions.append(action_item)
+
+                    elif ttype == "tool.result":
+                        call_id = data.get("toolCallId")
+                        res = data.get("result") or data.get("contentItems")
+                        status = "completed"
+                        exit_code = 0
+                        if isinstance(res, dict):
+                            status = res.get("status", "completed")
+                            exit_code = res.get("exitCode", 0)
+                        elif data.get("status") == "failed" or data.get("reason"):
+                            status = f"failed ({data.get('reason')})"
+                            failure_event = status
+
+                        matched_action = None
+                        if call_id and call_id in pending_calls:
+                            matched_action = pending_calls[call_id]
+                        elif tool_actions:
+                            matched_action = tool_actions[-1]
+
+                        if matched_action:
+                            matched_action["status"] = status
+                            matched_action["exit_code"] = exit_code
+
+                except Exception:
+                    continue
+
+    last_action = tool_actions[-1] if tool_actions else None
+    recent_actions = tool_actions[-limit:] if limit > 0 else tool_actions
+
+    return {
+        "session_id": session_id,
+        "agent_id": target_agent,
+        "cwd": session_meta.get("cwd"),
+        "meta": session_meta,
+        "last_user_message": last_user_msg,
+        "recent_user_messages": user_msgs[-5:],
+        "last_assistant_message": last_assistant_msg,
+        "total_tool_actions": len(tool_actions),
+        "tool_actions": recent_actions,
+        "last_action": last_action,
+        "failure_event": failure_event,
+        "path": str(target_file),
+        "trajectory_path": str(target_traj) if target_traj else None
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="OpenClaw session manager")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -323,6 +459,13 @@ def main():
     p_sum.add_argument("--root", type=str, default=None, help="OpenClaw root directory")
     p_sum.add_argument("--limit", type=int, default=50, help="Max messages to extract")
     p_sum.add_argument("--json", action="store_true", help="Output as JSON")
+
+    # inspect
+    p_ins = subparsers.add_parser("inspect", help="Inspect an OpenClaw session's completed actions and state")
+    p_ins.add_argument("session_id", type=str, help="Session UUID")
+    p_ins.add_argument("--root", type=str, default=None, help="OpenClaw root directory")
+    p_ins.add_argument("--limit", type=int, default=30, help="Max tool actions to show")
+    p_ins.add_argument("--json", action="store_true", help="Output as JSON")
 
     args = parser.parse_args()
     openclaw_root = Path(args.root) if args.root else None
@@ -365,6 +508,36 @@ def main():
                     ts_prefix = f" [{m['timestamp']}]" if m['timestamp'] else ""
                     print(f"**{m['role']}{ts_prefix}**:")
                     print(f"{m['text']}\n")
+        except FileNotFoundError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.command == "inspect":
+        try:
+            ins = inspect_session(session_id=args.session_id, openclaw_root=openclaw_root, limit=args.limit)
+            if args.json:
+                print(json.dumps(ins, indent=2, ensure_ascii=False))
+            else:
+                print(f"## OpenClaw Session Inspection: `{ins['session_id']}`")
+                print(f"- **Agent**: {ins['agent_id']}")
+                print(f"- **CWD**: `{ins['cwd']}`")
+                print(f"- **File**: `{ins['path']}`")
+                if ins['failure_event']:
+                    print(f"- **Last Status/Failure**: ⚠️ `{ins['failure_event']}`")
+                print(f"\n### Last User Request")
+                print(f"> {ins['last_user_message']}\n")
+                print(f"### Recent Tool Actions ({len(ins['tool_actions'])} / {ins['total_tool_actions']})")
+                print("| Timestamp | Tool | Status | Exit | CWD | Command / Details |")
+                print("|-----------|------|--------|------|-----|-------------------|")
+                for act in ins["tool_actions"]:
+                    exit_str = str(act["exit_code"]) if act["exit_code"] is not None else "-"
+                    cmd_str = (act["command"][:80] + "...") if len(act["command"]) > 80 else act["command"]
+                    print(f"| {act['timestamp']} | {act['name']} | {act['status']} | {exit_str} | `{act['cwd']}` | `{cmd_str}` |")
+                if ins['last_action']:
+                    print(f"\n### Last Executed Action")
+                    print(f"- **Tool**: `{ins['last_action']['name']}`")
+                    print(f"- **Status**: `{ins['last_action']['status']}`")
+                    print(f"- **Command**: `{ins['last_action']['command']}`")
         except FileNotFoundError as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)

@@ -100,17 +100,21 @@ Synthesize conversation content and Todo items to produce:
 For OpenClaw sessions stored under `~/.openclaw/agents/<agent_id>/sessions/`:
 
 ```bash
-# Summarize by session UUID (automatically searches across agents)
+# Summarize conversation by session UUID (searches across agents)
 python3 scripts/openclaw_session.py summarize <session_id>
 
 # Limit number of messages
 python3 scripts/openclaw_session.py summarize <session_id> --limit 30
 
+# Inspect completed tool actions, bash commands, and resumption checkpoint
+python3 scripts/openclaw_session.py inspect <session_id> [--limit 30]
+
 # JSON output
-python3 scripts/openclaw_session.py summarize <session_id> --json
+python3 scripts/openclaw_session.py inspect <session_id> --json
 ```
 
-The script extracts user prompts, assistant answers, and tool calls with timestamps.
+The `summarize` command extracts user prompts and assistant answers.
+The `inspect` command extracts tool actions from `*.trajectory.jsonl` (executed commands, cwd, exit code, modified files) to identify exactly what work the agent completed and what remains pending.
 
 ## Notes
 
