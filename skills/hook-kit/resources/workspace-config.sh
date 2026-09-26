@@ -26,8 +26,10 @@
 # unconfigured workspace from a negligent session, and blocks on both.
 #
 # Config resolution:
-#   $AGENT_WORKSPACE_CONFIG        (explicit; no fallback if it is missing)
-#   ~/.config/agent-workspace/config.json    (v2)
+#   $AGENT_WORKSPACE_CONFIG                  (explicit; no fallback if it is missing)
+#   ~/.agents/config.json                    (v2, Syncthing-synced canonical copy)
+#   ~/.config/agent-workspace/config.json    (v2, legacy path — a symlink to the
+#                                             canonical copy once migrated)
 #   ~/.config/plane-backlog/config.json      (v1, translated on the fly)
 #
 # Profile resolution:
@@ -48,7 +50,7 @@ for arg in "$@"; do
   case "$arg" in
     --export|--json) MODE="$arg" ;;
     -h|--help)
-      sed -n '2,41p' "$0"
+      sed -n '2,43p' "$0"
       exit 0
       ;;
     *) TARGET="$arg" ;;
@@ -81,8 +83,11 @@ fi
 if [ -n "${AGENT_WORKSPACE_CONFIG:-}" ]; then
   CONFIG="$AGENT_WORKSPACE_CONFIG"
 else
-  CONFIG="$HOME/.config/agent-workspace/config.json"
-  [ -f "$CONFIG" ] || CONFIG="$HOME/.config/plane-backlog/config.json"
+  CONFIG="$HOME/.agents/config.json"
+  if [ ! -f "$CONFIG" ]; then
+    CONFIG="$HOME/.config/agent-workspace/config.json"
+    [ -f "$CONFIG" ] || CONFIG="$HOME/.config/plane-backlog/config.json"
+  fi
 fi
 
 OUT="$("$PY" - "$CONFIG" "$TARGET" "$MODE" <<'PYEOF' 2>/dev/null

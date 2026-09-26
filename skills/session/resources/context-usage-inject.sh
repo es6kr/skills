@@ -52,7 +52,8 @@ try:
                 is_antigravity = True
                 content = entry.get("content", "") or ""
                 # True compaction marker from system/user harness (never model assistant text)
-                if src in ("SYSTEM", "USER_EXPLICIT", "USER") and "<CONTEXT_SUMMARY>" in content:
+                if (src == "SYSTEM" and (entry.get("type") == "CHECKPOINT" or "# Resuming from a compaction" in content)) or \
+                   (src in ("SYSTEM", "USER_EXPLICIT", "USER") and "<CONTEXT_SUMMARY>" in content):
                     agy_active_steps = [entry]
                 else:
                     agy_active_steps.append(entry)
@@ -83,11 +84,17 @@ try:
         content_chars = 0
         for s in agy_active_steps:
             content_chars += len(s.get("content", "") or "")
-        
-        base_overhead = int(os.environ.get("ANTIGRAVITY_BASE_TOKENS", os.environ.get("CC_BASE_TOKENS", "0")))
-        content_tokens = round(content_chars / 3.5)
+            tool_calls = s.get("tool_calls")
+            if tool_calls:
+                content_chars += len(json.dumps(tool_calls, ensure_ascii=False))
+
+        # Default Antigravity baseline overhead (System prompt, tool schemas, skills): ~53k tokens
+        base_overhead = int(os.environ.get("ANTIGRAVITY_BASE_TOKENS", os.environ.get("CC_BASE_TOKENS", "53000")))
+        # Code, tool arguments, and structured logs have higher token density in Gemini BPE (~2.5 chars/token)
+        chars_per_token = float(os.environ.get("ANTIGRAVITY_CHARS_PER_TOKEN", "2.5"))
+        content_tokens = round(content_chars / chars_per_token)
         total_tokens = base_overhead + content_tokens
-        
+
         window = int(os.environ.get("CC_CONTEXT_WINDOW", "1000000"))
         pct = round((total_tokens / window) * 100, 1)
         used_k = round(total_tokens / 1000, 1)

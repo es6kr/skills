@@ -293,17 +293,46 @@ class PlaneClient:
             cursor = next_cursor
         return projects
 
-    def list_issues(self, project_id, use_cache=True):
+    def list_issues(self, project_id, use_cache=True, include_intake=False):
         """Return every issue of a project, following pagination.
 
         One batched listing replaces the per-issue GET loop that made bulk
         reconciliation hit the rate limit.
+
+        Plane's `issues/` endpoint only returns issues that have already
+        cleared the intake/Triage inbox — an issue created via the intake
+        API (``plane_create_issue.py``'s default) sits invisibly in
+        ``intake-issues/`` until someone accepts it, so callers that need
+        "does this identifier exist" semantics (e.g.
+        ``plane_verify_identifier.py``) must pass ``include_intake=True`` or
+        they get a false "does not exist" for anything still in Triage.
+        Intake results are fetched fresh on every call (not merged into the
+        ``issues/`` on-disk cache — a separate cache key would risk serving
+        a stale intake-merged list from a plain call, or vice versa) and
+        deduplicated against the base list by ``id``.
         """
         if use_cache:
             cached = self._cache_get(project_id)
             if cached is not None:
-                return cached
+                issues = cached
+            else:
+                issues = self._fetch_issues_page(project_id)
+                self._cache_put(project_id, issues)
+        else:
+            issues = self._fetch_issues_page(project_id)
 
+        if not include_intake:
+            return issues
+
+        seen_ids = {i.get("id") for i in issues}
+        merged = list(issues)
+        for intake_issue in self.list_intake_issues(project_id):
+            if intake_issue.get("id") not in seen_ids:
+                merged.append(intake_issue)
+                seen_ids.add(intake_issue.get("id"))
+        return merged
+
+    def _fetch_issues_page(self, project_id):
         issues = []
         cursor = "%d:0:0" % PAGE_SIZE
         while True:
@@ -314,9 +343,34 @@ class PlaneClient:
             if not next_cursor or not page.get("next_page_results"):
                 break
             cursor = next_cursor
+        return issues
 
-        if use_cache:
-            self._cache_put(project_id, issues)
+    def list_intake_issues(self, project_id):
+        """Return every issue still sitting in the intake/Triage inbox,
+        normalized to look like a regular ``issues/`` entry (unwraps the
+        ``issue_detail`` field Plane's intake-issues endpoint nests the
+        actual issue under) plus an added ``intake_status`` field
+        (Plane's intake status codes: -2 pending, -1 rejected, 0 snoozed,
+        1 accepted, 2 duplicate)."""
+        entries = []
+        cursor = "%d:0:0" % PAGE_SIZE
+        while True:
+            page = self.request(self._project_path(project_id, "intake-issues/?cursor=%s" % cursor))
+            results = page.get("results", page if isinstance(page, list) else [])
+            entries.extend(results)
+            next_cursor = page.get("next_cursor") if isinstance(page, dict) else None
+            if not next_cursor or not page.get("next_page_results"):
+                break
+            cursor = next_cursor
+
+        issues = []
+        for entry in entries:
+            detail = entry.get("issue_detail")
+            if not isinstance(detail, dict):
+                continue
+            issue = dict(detail)
+            issue["intake_status"] = entry.get("status")
+            issues.append(issue)
         return issues
 
     def list_states(self, project_id):

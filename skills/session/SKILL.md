@@ -173,6 +173,7 @@ Calls `mcp__claude-sessions-mcp__compress_session` directly (registers the MCP s
 /session list --all-projects        # summary across all projects
 /session list --limit 20            # top N by mtime
 /session list --engine antigravity  # list Antigravity sessions instead (IDE + CLI/agy runtimes)
+/session list --engine openclaw     # list OpenClaw sessions across agents
 ```
 
 Non-destructive enumeration. For categorization or cleanup, use `classify` or `purge` instead.
@@ -199,6 +200,7 @@ Non-destructive enumeration. For categorization or cleanup, use `classify` or `p
 /session search Makefile remove                  # find sessions by keyword
 /session search --today ansible/Makefile          # only sessions modified today
 /session search --engine antigravity <keyword>    # search Antigravity sessions instead (IDE + CLI/agy runtimes)
+/session search --engine openclaw <keyword>       # search OpenClaw sessions across agents
 /session id <keyword>                             # legacy alias — routed to search
 ```
 

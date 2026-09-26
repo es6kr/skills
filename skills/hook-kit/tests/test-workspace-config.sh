@@ -138,7 +138,7 @@ cat > "$FIXTURE/v1.json" <<'JSON'
       "llm_wiki_path": "/tmp/wsLegacy/llm-wiki",
       "plane_host": "https://plane.example.invalid",
       "plane_token_env": "WSLEGACY_TOKEN",
-      "qdrant_memory_collection": "claude-memory",
+      "qdrant_memory_collection": "agent-memory-personal",
       "qdrant_url": "http://example.invalid:30333",
       "qdrant_wiki_collection": "legacy-wiki",
       "workspace_name": "wsLegacy"
@@ -213,5 +213,75 @@ check "T30 staging main from profile"           "main"                   "${WSCF
 
 load "/tmp/wsB/repo"
 check "T31 unset staging degrades to none"      "none"                   "${WSCFG_STAGING_KIND:-}"
+
+# --- ~/.agents/config.json priority (Syncthing-synced canonical copy) --
+# Regression under test: two independently-edited config copies
+# (~/.agents/config.json and ~/.config/agent-workspace/config.json) can
+# diverge, and only the latter was ever actually read — an edit to the
+# former had no effect while looking identically valid. ~/.agents/config.json
+# must be consulted first, ahead of both older paths, when
+# AGENT_WORKSPACE_CONFIG is unset.
+unset AGENT_WORKSPACE_CONFIG
+
+FAKE_HOME="$FIXTURE/fake-home"
+mkdir -p "$FAKE_HOME/.agents" "$FAKE_HOME/.config/agent-workspace" "$FAKE_HOME/.config/plane-backlog"
+
+cat > "$FAKE_HOME/.agents/config.json" <<'JSON'
+{
+  "version": 2,
+  "defaults": { "backlog": { "kind": "none" }, "rag": { "kind": "none" } },
+  "profiles": {
+    "wsPriority": {
+      "match": { "path_components": ["wsPriority"] },
+      "roles": { "rag": { "kind": "qdrant", "endpoint": "http://agents-wins.invalid:1" } }
+    }
+  }
+}
+JSON
+
+cat > "$FAKE_HOME/.config/agent-workspace/config.json" <<'JSON'
+{
+  "version": 2,
+  "defaults": { "backlog": { "kind": "none" }, "rag": { "kind": "none" } },
+  "profiles": {
+    "wsPriority": {
+      "match": { "path_components": ["wsPriority"] },
+      "roles": { "rag": { "kind": "qdrant", "endpoint": "http://v2-loses.invalid:2" } }
+    }
+  }
+}
+JSON
+
+cat > "$FAKE_HOME/.config/plane-backlog/config.json" <<'JSON'
+{
+  "profiles": {
+    "wsPriority": {
+      "cwd_match": ["wsPriority"],
+      "qdrant_url": "http://v1-loses.invalid:3",
+      "workspace_name": "wsPriority"
+    }
+  }
+}
+JSON
+
+load_with_home() { # target_path fake_home
+  reset_env
+  eval "$(HOME="$2" "$SHIM" --export "$1" 2>/dev/null)" || true
+}
+
+load_with_home "/tmp/wsPriority/repo" "$FAKE_HOME"
+check "T32 ~/.agents/config.json outranks ~/.config/agent-workspace" \
+  "http://agents-wins.invalid:1" "${WSCFG_RAG_ENDPOINT:-}"
+
+rm -f "$FAKE_HOME/.agents/config.json"
+load_with_home "/tmp/wsPriority/repo" "$FAKE_HOME"
+check "T33 falls back to ~/.config/agent-workspace when ~/.agents absent" \
+  "http://v2-loses.invalid:2" "${WSCFG_RAG_ENDPOINT:-}"
+
+rm -rf "$FAKE_HOME/.config/agent-workspace"
+load_with_home "/tmp/wsPriority/repo" "$FAKE_HOME"
+check "T34 falls back to plane-backlog v1 when both v2 paths absent" \
+  "http://v1-loses.invalid:3" "${WSCFG_RAG_ENDPOINT:-}"
+
 printf -- '---\npass=%d fail=%d\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

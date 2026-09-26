@@ -16,7 +16,7 @@ reusable across environments. Example config.json:
       "plane_token_env": "MYWORKSPACE_PLANE_API_KEY",
       "qdrant_url": "http://localhost:6333",
       "qdrant_wiki_collection": "myworkspace-wiki",
-      "qdrant_memory_collection": "claude-memory",
+      "qdrant_memory_collection": "agent-memory-personal",
       "qdrant_task_collection": "fix-plan-myworkspace",
       "llm_wiki_path": "/path/to/llm-wiki",
       "default_project": "myworkspace",
@@ -38,8 +38,14 @@ from pathlib import Path
 # still read the v1-shaped flat keys, so v2 is translated down to them here —
 # a v2 file that reached consumers untranslated would look like an empty
 # profile and hand every caller the placeholder defaults.
+#
+# CONFIG_FILE_AGENTS is the Syncthing-synced canonical copy and outranks
+# CONFIG_FILE_V2 (its former sole reader). Two independently-edited copies
+# can diverge silently: an edit at CONFIG_FILE_AGENTS had no effect while
+# looking identically valid, because only CONFIG_FILE_V2 was ever read.
 CONFIG_FILE = Path.home() / ".config" / "plane-backlog" / "config.json"
 CONFIG_FILE_V2 = Path.home() / ".config" / "agent-workspace" / "config.json"
+CONFIG_FILE_AGENTS = Path.home() / ".agents" / "config.json"
 
 DEFAULT_PROFILE = {
     "workspace_name": "default",
@@ -161,11 +167,8 @@ def load_user_config():
         if not p.exists():
             print(f"Warning: AGENT_WORKSPACE_CONFIG path does not exist: {p}", file=sys.stderr)
         paths = [p]
-    elif CONFIG_FILE != Path.home() / ".config" / "plane-backlog" / "config.json":
-        # Test monkeypatching target
-        paths = [CONFIG_FILE_V2, CONFIG_FILE]
     else:
-        paths = [CONFIG_FILE_V2, CONFIG_FILE]
+        paths = [CONFIG_FILE_AGENTS, CONFIG_FILE_V2, CONFIG_FILE]
 
     for path in paths:
         if not path.exists():

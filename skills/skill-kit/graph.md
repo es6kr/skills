@@ -19,9 +19,13 @@ Extract skill dependency edges (frontmatter `depends-on` + topic body `Skill(...
 
 ## Procedure
 
-### Step 1: Run extract-deps script
+### Step 1: Run extract-deps or extract_skill_graph script
 
 ```bash
+# Canonical Python Labeled Property Graph extractor (recommended):
+python3 ~/.claude/skills/skill-kit/scripts/extract_skill_graph.py --skills-dir ~/.claude/skills --output /tmp/graph.json
+
+# Or per-slug bash script:
 bash ~/.claude/skills/skill-kit/scripts/extract-deps.sh <slug...> > /tmp/edges.json
 ```
 
@@ -35,6 +39,19 @@ The script:
 4. Filters common false positives (GitHub API URL words like `issues`/`orgs`/`pulls`, generic frontmatter keys, shell paths).
 5. Dedups (`source > target`) across frontmatter + body so a target referenced both ways emits once.
 6. Emits `{nodes, edges}` JSON to stdout. Each edge carries `{source, target, kind, source_file}` where `kind ∈ {"depends-on", "solid", "outside"}`.
+
+### Step 1b: Analyze graph topology (cycles, blast radius, clustering)
+
+```bash
+# Detect cycles (exits with code 1 if cycles are found for CI gates):
+python3 ~/.claude/skills/skill-kit/scripts/skill_graph_analyzer.py --input /tmp/graph.json --cycles
+
+# Calculate blast radius for a target skill before refactoring:
+python3 ~/.claude/skills/skill-kit/scripts/skill_graph_analyzer.py --input /tmp/graph.json --blast-radius tdd
+
+# Community clustering recommendations for plugin bundling:
+python3 ~/.claude/skills/skill-kit/scripts/skill_graph_analyzer.py --input /tmp/graph.json --clusters
+```
 
 **Why both Skill() AND slash?** Frontmatter `depends-on` is the declared contract but body coupling often outweighs it. Real-world example: `consolidate` declares `depends-on: [superpowers, git-repo]` yet has very-strong body coupling with `github-flow` (`github-flow/merge.md` invokes `Skill("consolidate", "pr-review")` as MANDATORY; `consolidate/next.md` routes to `/github-flow epic-bundle`). Without body-ref extraction, the resulting graph silently misses the strongest edge.
 
@@ -68,7 +85,16 @@ flowchart TD
 \`\`\`
 ```
 
-### Step 4: Optional d3 force-directed render (dispatch)
+### Step 4: Optional d3 force-directed render (dispatch or standalone)
+
+**Canonical standalone HTML generator:**
+```bash
+# Render self-contained HTML visualizer with search, blast radius highlighting, and weight slider:
+python3 ~/.claude/skills/skill-kit/scripts/render_skill_graph.py --input /tmp/graph.json --output /tmp/graph.html
+
+# Open in browser:
+open /tmp/graph.html
+```
 
 **Caller-supplied dispatch flag** — `--render=<skill>:<topic>` lets the caller decide which receiver owns the d3 template.
 
@@ -90,7 +116,33 @@ Edges where `source ∈ input set` and `target ∉ input set` are **outside-set 
 | git-repo → commit-tidy | git-repo (frontmatter depends-on) | vendor / pin / drop |
 ```
 
-Suppressing outside-set edges silently misses bundle decisions — always surface, never drop.
+### Step 6: Sync to LLM-Wiki (Dual-SSOT Bridge)
+
+Auto-project computed topological metrics, cycle audits, and blast radius rankings into the knowledge layer:
+
+```bash
+python3 ~/.claude/skills/skill-kit/scripts/sync_wiki_graph.py --input /tmp/graph.json --wiki-dir ~/ghq/github.com/es6kr/llm-wiki
+```
+
+Generates or updates `pages/ops/skill-topology-matrix.md` with:
+- Summary counts (nodes, edges, cycles, clusters)
+- High-impact skills ranking by blast radius
+- `PAIR_OF_INTERNAL` equivalence table
+- Preserved initial `created` date with updated `last_modified`
+
+### Step 7: GraphRAG Dynamic Context Enrichment
+
+Bridges vector search (`skill-search` / Qdrant) with graph topology to generate enriched agent context:
+
+```bash
+# Enrich a single skill with dependencies, callers, blast radius, and equivalence pair:
+python3 ~/.claude/skills/skill-kit/scripts/enrich_skill_context.py --skill consolidate --format banner
+
+# Output:
+# [Graph Context] Skill: consolidate | Dependencies: [git-repo, github-flow, hook-kit, superpowers] | Blast Radius: 0
+```
+
+Suppresses outside-set edges silently misses bundle decisions — always surface, never drop.
 
 ## Don't / Do
 

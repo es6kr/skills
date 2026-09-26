@@ -282,6 +282,16 @@
         }
       ]
     },
+    "skills/ralph": {
+      "package-name": "ralph",
+      "component": "ralph",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "SKILL.md"
+        }
+      ]
+    },
     "skills/repo": {
       "package-name": "repo",
       "component": "repo",

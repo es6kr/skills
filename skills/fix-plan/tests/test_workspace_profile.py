@@ -35,6 +35,14 @@ def check(name, expected, actual):
         print(f"FAIL  {name}\n        expected=[{expected}]\n        actual  =[{actual}]")
 
 
+# Checked before any test below monkeypatches CONFIG_FILE_AGENTS away from
+# its real default.
+check(
+    "T18 CONFIG_FILE_AGENTS constant points at ~/.agents/config.json",
+    str(Path.home() / ".agents" / "config.json"),
+    str(getattr(workspace_profile, "CONFIG_FILE_AGENTS", None)),
+)
+
 CONFIG = {
     "profiles": {
         "wsMulti": {
@@ -53,9 +61,13 @@ tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="u
 json.dump(CONFIG, tmp)
 tmp.close()
 workspace_profile.CONFIG_FILE = Path(tmp.name)
-# Point the v2 location at a path that cannot exist so the v1 cases below are
-# not silently served by whatever real v2 config happens to be on this machine.
+# Point the v2 and agents locations at paths that cannot exist so the v1
+# cases below are not silently served by whatever real config happens to be
+# on this machine. CONFIG_FILE_AGENTS outranks both — the guard exists for
+# it too, or a live ~/.agents/config.json on the running machine leaks into
+# every case below that doesn't explicitly override it.
 setattr(workspace_profile, "CONFIG_FILE_V2", Path(tmp.name + ".absent-v2"))
+setattr(workspace_profile, "CONFIG_FILE_AGENTS", Path(tmp.name + ".absent-agents"))
 
 check(
     "T1 multi-segment cwd_match matches",
@@ -191,6 +203,106 @@ check(
     "T14 falls back to v1 when v2 absent",
     "wsMulti",
     workspace_profile.detect_workspace("/Users/x/ghq/github.com/wsMulti/repo"),
+)
+
+# --- CONFIG_FILE_AGENTS priority (~/.agents/config.json, the Syncthing-synced
+# canonical copy) ---------------------------------------------------------
+# Regression under test: two independently-edited config copies
+# (~/.agents/config.json and ~/.config/agent-workspace/config.json) can
+# diverge, and only the latter was ever actually read — an edit to the
+# former had no effect while looking identically valid. CONFIG_FILE_AGENTS
+# must be consulted first, ahead of both older paths. (T18, checking the
+# constant's real default, runs earlier in this file — before this section's
+# monkeypatching starts.)
+
+CONFIG_AGENTS_WINS = {
+    "profiles": {
+        "wsAgents": {
+            "cwd_match": ["wsAgentsPriority"],
+            "qdrant_url": "http://agents-wins.invalid:1",
+            "workspace_name": "wsAgents",
+        },
+    }
+}
+tmp_agents = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+json.dump(CONFIG_AGENTS_WINS, tmp_agents)
+tmp_agents.close()
+
+CONFIG_V2_LOSES = {
+    "profiles": {
+        "wsAgents": {
+            "cwd_match": ["wsAgentsPriority"],
+            "qdrant_url": "http://v2-loses.invalid:2",
+            "workspace_name": "wsAgents",
+        },
+    }
+}
+tmp_v2_loses = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+json.dump(CONFIG_V2_LOSES, tmp_v2_loses)
+tmp_v2_loses.close()
+
+setattr(workspace_profile, "CONFIG_FILE_AGENTS", Path(tmp_agents.name))
+setattr(workspace_profile, "CONFIG_FILE_V2", Path(tmp_v2_loses.name))
+check(
+    "T19 CONFIG_FILE_AGENTS outranks CONFIG_FILE_V2 when both exist",
+    "http://agents-wins.invalid:1",
+    workspace_profile.get_profile(
+        target_path="/Users/x/wsAgentsPriority/repo"
+    )["qdrant_url"],
+)
+
+# When CONFIG_FILE_AGENTS is absent, the older CONFIG_FILE_V2 path must still
+# be read — the new priority tier is additive, not a replacement.
+setattr(workspace_profile, "CONFIG_FILE_AGENTS", Path(tmp_agents.name + ".absent"))
+check(
+    "T20 falls back to CONFIG_FILE_V2 when CONFIG_FILE_AGENTS absent",
+    "http://v2-loses.invalid:2",
+    workspace_profile.get_profile(
+        target_path="/Users/x/wsAgentsPriority/repo"
+    )["qdrant_url"],
+)
+
+# --- k3s target keys survive the CONFIG_FILE_AGENTS -> flat translation ---
+# A config declared only at the new highest-priority path must still carry
+# k3s_workload / k3s_namespace / plane_host through v2_profile_to_flat, the
+# same defect class that previously dropped token_file and workspace_slug.
+CONFIG_AGENTS_K3S = {
+    "version": 2,
+    "profiles": {
+        "wsAgentsK3s": {
+            "match": {"path_components": ["wsAgentsK3s"]},
+            "roles": {
+                "backlog": {
+                    "kind": "plane",
+                    "endpoint": "https://plane.agents-k3s.invalid",
+                    "k3s_namespace": "plane",
+                    "k3s_workload": "deploy/plane-api-wl",
+                }
+            },
+        }
+    },
+}
+tmp_agents_k3s = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+json.dump(CONFIG_AGENTS_K3S, tmp_agents_k3s)
+tmp_agents_k3s.close()
+
+setattr(workspace_profile, "CONFIG_FILE_AGENTS", Path(tmp_agents_k3s.name))
+setattr(workspace_profile, "CONFIG_FILE_V2", Path(tmp_agents_k3s.name + ".absent-v2"))
+p_agents_k3s = workspace_profile.get_profile(target_path="/tmp/wsAgentsK3s/repo")
+check(
+    "T21 CONFIG_FILE_AGENTS-sourced profile keeps plane_host",
+    "https://plane.agents-k3s.invalid",
+    p_agents_k3s["plane_host"],
+)
+check(
+    "T22 CONFIG_FILE_AGENTS-sourced profile keeps k3s_namespace",
+    "plane",
+    p_agents_k3s.get("k3s_namespace"),
+)
+check(
+    "T23 CONFIG_FILE_AGENTS-sourced profile keeps k3s_workload",
+    "deploy/plane-api-wl",
+    p_agents_k3s.get("k3s_workload"),
 )
 
 print("---")
