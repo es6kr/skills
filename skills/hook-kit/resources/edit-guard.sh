@@ -167,7 +167,7 @@ check_main_checkout_edit_es6kr_skills() {
   [[ -d "$probe_dir" ]] || return 0
 
   local remote_url
-  remote_url="$(git -C "$probe_dir" config --get remote.origin.url 2>/dev/null || true)"
+  remote_url="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX git -C "$probe_dir" config --get remote.origin.url 2>/dev/null || true)"
   [[ "$remote_url" =~ es6kr/skills(\.git)?$ ]] || return 0
 
   # Override keyword for a genuine exception (e.g. emergency maintenance-only
@@ -187,7 +187,7 @@ check_main_checkout_edit_es6kr_skills() {
   esac
 
   local repo_root
-  repo_root="$(git -C "$probe_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+  repo_root="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX git -C "$probe_dir" rev-parse --show-toplevel 2>/dev/null || true)"
 
   cat >&2 <<MSG
 DENIED: direct Edit/Write to the es6kr/skills main checkout (HARD STOP).
