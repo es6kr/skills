@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """bash-guard.py — PreToolUse:Bash integrated guard (single-process Python port).
 
 Port of bash-guard.sh. The shell version spawns ~80 processes per pass
@@ -1131,8 +1132,9 @@ def evaluate(
                 "other pending work or re-issue another bounded background call."
             )
 
+    simple_scan = strip_heredoc_bodies(command)
     for pat, msg in SIMPLE_BLOCKS:
-        if re.search(pat, command, IM):
+        if re.search(pat, simple_scan, IM):
             return hard(msg)
 
     scan = git_scan_text(command)
@@ -1429,6 +1431,9 @@ def self_test() -> int:
         (False, False, "gh pr merge 123 --merge"),
         (False, False, "ALLOW_SQUASH_MERGE=1 gh pr merge 123 --squash"),
         (False, False, 'echo "gh pr merge --squash is forbidden"'),
+        # ── heredoc writer prose FP guard (cat/tee <<EOF with simple block keyword) ──
+        (False, False, "cat <<'EOF'\nterraform apply -auto-approve\nEOF"),
+        (False, False, "cat <<EOF\ndocker rm my-container\nEOF"),
     ]
     passed = failed = 0
     for expect_block, run_bg, cmd in cases:

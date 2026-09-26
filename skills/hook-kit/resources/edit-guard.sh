@@ -137,6 +137,85 @@ MSG
   exit 2
 }
 
+# ============================================================================
+# Check 0c: Block direct Edit/Write to the es6kr/skills main checkout
+# ============================================================================
+# FA class=main-checkout-edit-via-marketplace-symlink-recurrence (3rd occurrence,
+# 2 prior manual-self-check-only attempts failed). es6kr/skills abolished its
+# accumulation-branch workflow: every change must land in a feature branch
+# inside a worktree and reach the repo through a PR (see this repo's CLAUDE.md
+# "es6kr/skills branch workflow" + .claude/rules/skills-publishing.md). The
+# main checkout is read/worktree-holding only. Scope the check to remote
+# origin URL (portable across machines/usernames) rather than a hardcoded
+# ghq path, so it catches both the marketplace-symlink path
+# (~/.claude/plugins/marketplaces/es6kr-skills/...) and the direct ghq path
+# (~/ghq/github.com/es6kr/skills/...) -- both resolve to the same repo root.
+check_main_checkout_edit_es6kr_skills() {
+  case "$TOOL_NAME" in
+    Edit|Write|write_to_file) ;;
+    *) return 0 ;;
+  esac
+  [[ -z "$FILE_PATH" ]] && return 0
+
+  # Walk up to the nearest existing ancestor -- a Write may target a file
+  # that doesn't exist yet, so dirname's result itself might not exist.
+  local probe_dir
+  probe_dir="$(dirname "$FILE_PATH")"
+  while [[ ! -d "$probe_dir" && "$probe_dir" != "/" && "$probe_dir" != "." ]]; do
+    probe_dir="$(dirname "$probe_dir")"
+  done
+  [[ -d "$probe_dir" ]] || return 0
+
+  local remote_url
+  remote_url="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX git -C "$probe_dir" config --get remote.origin.url 2>/dev/null || true)"
+  [[ "$remote_url" =~ es6kr/skills(\.git)?$ ]] || return 0
+
+  # Override keyword for a genuine exception (e.g. emergency maintenance-only
+  # fix explicitly approved out of band) -- mirrors intentional-cache-edit /
+  # intentional-stub-edit elsewhere in this file.
+  echo "$NEW_CONTENT" | grep -q "intentional-main-checkout-edit" && return 0
+
+  # Symlink-resolved physical path -- a worktree directory is a real
+  # directory (not a symlink itself), so this only needs to resolve the one
+  # marketplace-symlink hop at the mount point, not FILE_PATH's own symlinks.
+  local resolved_probe
+  resolved_probe="$(cd "$probe_dir" 2>/dev/null && pwd -P)"
+  [[ -z "$resolved_probe" ]] && return 0
+
+  case "$resolved_probe" in
+    */.worktrees/*|*/.claude/worktrees/*) return 0 ;;
+  esac
+
+  local repo_root
+  repo_root="$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX git -C "$probe_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+
+  cat >&2 <<MSG
+DENIED: direct Edit/Write to the es6kr/skills main checkout (HARD STOP).
+
+Target file: $FILE_PATH
+Resolved to: $resolved_probe
+Repo root:   ${repo_root:-unknown}
+
+Why blocked:
+  - es6kr/skills abolished its accumulation-branch workflow: every change
+    must land in a feature branch inside a worktree and reach the repo
+    through a PR. The main checkout is for reading and holding worktrees
+    only -- it is never pushed directly.
+  - This exact pattern (editing the main checkout via either the
+    marketplace-symlink path or the direct ghq path) has recurred 3 times.
+
+Required action:
+  1. Create or reuse a worktree: 'git -C <repo-root> worktree add ./.worktrees/<name> -b fix/<slug> develop'
+     (or reuse an inactive one -- see the git-repo skill's worktree topic)
+  2. Make this edit inside that worktree instead.
+  3. Genuine exception (rare)? Include the literal token
+     'intentional-main-checkout-edit' in the replacement content.
+
+Reference: failed-attempts.md class main-checkout-edit-via-marketplace-symlink-recurrence.
+MSG
+  exit 2
+}
+
 # Lazy SKILL_ROOT resolution (only when a skill scope check runs)
 SKILL_ROOT=""
 SKILL_ROOT_RESOLVED=0
@@ -713,6 +792,7 @@ MSG
 # Execute checks in cost order (no-I/O → file I/O → transcript I/O)
 check_write_file_overwrite
 check_plugin_cache_edit
+check_main_checkout_edit_es6kr_skills
 check_date_in_skill_rule
 check_skill_language_mismatch
 check_vendor_in_generic_skill
