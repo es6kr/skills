@@ -47,6 +47,17 @@ def mock_openclaw_env(tmp_path):
         for line in session1_lines:
             f.write(json.dumps(line) + "\n")
 
+    # Session 1 trajectory: record tool actions (bash commands)
+    session1_traj = [
+        {"traceSchema": "openclaw-trajectory", "type": "tool.call", "ts": "2026-09-26T00:01:10.000Z", "data": {"name": "bash", "arguments": {"command": "git status", "cwd": "/work/main"}}},
+        {"traceSchema": "openclaw-trajectory", "type": "tool.result", "ts": "2026-09-26T00:01:11.000Z", "data": {"name": "bash", "result": {"status": "completed", "exitCode": 0}}},
+        {"traceSchema": "openclaw-trajectory", "type": "tool.call", "ts": "2026-09-26T00:01:30.000Z", "data": {"name": "bash", "arguments": {"command": "git commit -m 'feat: init'", "cwd": "/work/main"}}},
+        {"traceSchema": "openclaw-trajectory", "type": "tool.result", "ts": "2026-09-26T00:01:31.000Z", "data": {"name": "bash", "result": {"status": "completed", "exitCode": 0}}},
+    ]
+    with open(main_sessions / f"{session1_id}.trajectory.jsonl", "w", encoding="utf-8") as f:
+        for tline in session1_traj:
+            f.write(json.dumps(tline) + "\n")
+
     # Session 2: main agent (reset file and trajectory should be ignored in listing count)
     session2_id = "22222222-2222-2222-2222-222222222222"
     session2_lines = [
@@ -156,3 +167,30 @@ def test_cli_execution(mock_openclaw_env):
     )
     search_data = json.loads(res_search.stdout)
     assert len(search_data) == 2
+
+    # Inspect command
+    res_inspect = subprocess.run(
+        [sys.executable, str(script_path), "inspect", "11111111-1111-1111-1111-111111111111", "--root", str(mock_openclaw_env), "--json"],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    inspect_data = json.loads(res_inspect.stdout)
+    assert len(inspect_data["tool_actions"]) == 2
+    assert inspect_data["last_action"]["command"] == "git commit -m 'feat: init'"
+
+
+def test_inspect_openclaw_session_with_actions(mock_openclaw_env):
+    """Test inspecting an openclaw session to check completed actions/tools for resumption."""
+    inspection = openclaw_session.inspect_session(
+        session_id="11111111-1111-1111-1111-111111111111",
+        openclaw_root=mock_openclaw_env
+    )
+    assert inspection["session_id"] == "11111111-1111-1111-1111-111111111111"
+    assert inspection["agent_id"] == "main"
+    assert len(inspection["tool_actions"]) == 2
+    assert inspection["tool_actions"][0]["name"] == "bash"
+    assert inspection["tool_actions"][0]["command"] == "git status"
+    assert inspection["tool_actions"][1]["command"] == "git commit -m 'feat: init'"
+    assert inspection["last_action"]["command"] == "git commit -m 'feat: init'"
+
