@@ -40,6 +40,19 @@ The script:
 5. Dedups (`source > target`) across frontmatter + body so a target referenced both ways emits once.
 6. Emits `{nodes, edges}` JSON to stdout. Each edge carries `{source, target, kind, source_file}` where `kind ∈ {"depends-on", "solid", "outside"}`.
 
+### Step 1b: Analyze graph topology (cycles, blast radius, clustering)
+
+```bash
+# Detect cycles (exits with code 1 if cycles are found for CI gates):
+python3 ~/.claude/skills/skill-kit/scripts/skill_graph_analyzer.py --input /tmp/graph.json --cycles
+
+# Calculate blast radius for a target skill before refactoring:
+python3 ~/.claude/skills/skill-kit/scripts/skill_graph_analyzer.py --input /tmp/graph.json --blast-radius tdd
+
+# Community clustering recommendations for plugin bundling:
+python3 ~/.claude/skills/skill-kit/scripts/skill_graph_analyzer.py --input /tmp/graph.json --clusters
+```
+
 **Why both Skill() AND slash?** Frontmatter `depends-on` is the declared contract but body coupling often outweighs it. Real-world example: `consolidate` declares `depends-on: [superpowers, git-repo]` yet has very-strong body coupling with `github-flow` (`github-flow/merge.md` invokes `Skill("consolidate", "pr-review")` as MANDATORY; `consolidate/next.md` routes to `/github-flow epic-bundle`). Without body-ref extraction, the resulting graph silently misses the strongest edge.
 
 ### Step 2: Build Edge Table
