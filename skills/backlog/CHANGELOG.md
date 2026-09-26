@@ -5,6 +5,15 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/es6kr/skills/compare/backlog-v0.4.0...backlog-v0.4.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **backlog:** carry the K3s target keys through resolve_profile ([611374f](https://github.com/es6kr/skills/commit/611374f3096ab0d529383f74297371478368face))
+* **backlog:** report a missing K3s fallback target as a profile misconfiguration ([c049e3f](https://github.com/es6kr/skills/commit/c049e3fcb40e5a29f6052432238985805b18f32a))
+* make the Plane K3s fallback reach its cluster, and stop the retag guard firing on citations ([ce0abde](https://github.com/es6kr/skills/commit/ce0abded29d992ac89b865e806aed9b531d4909d))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/backlog-v0.3.2...backlog-v0.4.0) (2026-09-20)
 
 

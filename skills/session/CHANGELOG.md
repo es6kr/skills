@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.13.0](https://github.com/es6kr/skills/compare/session-v0.12.1...session-v0.13.0) (2026-09-24)
+
+
+### Features
+
+* **fix-plan:** add pipeline log and hook integrity check scripts ([e93a432](https://github.com/es6kr/skills/commit/e93a4323b54a311fcda6855163ffe14c2c146412))
+
+
+### Bug Fixes
+
+* **git-repo:** add prune_merged_worktrees.py + 7 accumulated fixes ([3d2ee94](https://github.com/es6kr/skills/commit/3d2ee9425285347d8f7e7698049d6e5769f73f92))
+* **session:** document Antigravity CLI (agy) data root alongside IDE ([#525](https://github.com/es6kr/skills/issues/525)) ([bd4dcf3](https://github.com/es6kr/skills/commit/bd4dcf35499d52fb03e81fd3c0421f9fc799dd08))
+* **session:** make context usage compaction-aware and fix path normalization ([7450ce7](https://github.com/es6kr/skills/commit/7450ce7bdac33c6e2cdfc8e3a1631051b6fe6938))
+* **session:** prioritize Antigravity active session in context-usage-now ([#521](https://github.com/es6kr/skills/issues/521)) ([8f35a1d](https://github.com/es6kr/skills/commit/8f35a1dee9647bd276f84c836c56f5197b93687d))
+* **session:** scope antigravity-brain fallback search by conversation ID and gate it on is_agy_active ([f6929e3](https://github.com/es6kr/skills/commit/f6929e36e50d4a3bb6b32ac71c04e2cc13b336c7))
+
 ## [0.12.1](https://github.com/es6kr/skills/compare/session-v0.12.0...session-v0.12.1) (2026-09-20)
 
 

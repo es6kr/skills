@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.2](https://github.com/es6kr/skills/compare/next-v0.10.1...next-v0.10.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **next:** mandate physical cleanup skill invocation before wrapup ([#513](https://github.com/es6kr/skills/issues/513)) ([4773fe2](https://github.com/es6kr/skills/commit/4773fe2ca7ee01f21f7794cb588df605527f6879))
+* **next:** prioritize explicit invocation-argument candidates over generic sweep ([#543](https://github.com/es6kr/skills/issues/543)) ([4fd3850](https://github.com/es6kr/skills/commit/4fd38502af59bffb9157c03a4351dabbd66dfc2e))
+
 ## [0.10.1](https://github.com/es6kr/skills/compare/next-v0.10.0...next-v0.10.1) (2026-09-18)
 
 

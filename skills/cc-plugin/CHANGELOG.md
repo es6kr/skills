@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/cc-plugin-v0.7.2...cc-plugin-v0.8.0) (2026-09-24)
+
+
+### Features
+
+* **fix-plan:** add pipeline log and hook integrity check scripts ([e93a432](https://github.com/es6kr/skills/commit/e93a4323b54a311fcda6855163ffe14c2c146412))
+
+
+### Bug Fixes
+
+* **cc-plugin:** restore missing skills to es6kr plugin in marketplace manifest ([6ab94b0](https://github.com/es6kr/skills/commit/6ab94b0278d626012be3378d44c634621be1fd8b))
+
 ## [0.7.2](https://github.com/es6kr/skills/compare/cc-plugin-v0.7.1...cc-plugin-v0.7.2) (2026-09-20)
 
 

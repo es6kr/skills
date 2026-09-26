@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/es6kr/skills/compare/orca-v0.3.0...orca-v0.4.0) (2026-09-24)
+
+
+### Features
+
+* **orca:** add block-orca-project-add guard and test suite ([cf99165](https://github.com/es6kr/skills/commit/cf991651372566d939514187f763591a70fa411d))
+* **orca:** split-first launch strategy, collision-free session id resolver, and block-orca-project-add guard ([3971c15](https://github.com/es6kr/skills/commit/3971c151e94042441b79475036c8e53a50122439))
+* **orca:** split-first launch strategy, collision-free session id resolver, and pre-execution ask alignment ([ccafc76](https://github.com/es6kr/skills/commit/ccafc76553e6df636d152a8a1c259038d9dd10b4))
+
+
+### Bug Fixes
+
+* **orca:** match orca-ide/orca-dev/$ORCA_CLI_COMMAND in split-check hook ([6fbdb96](https://github.com/es6kr/skills/commit/6fbdb96a65898476a43430088d448aae4b02117b))
+* **orca:** match orca-ide/orca-dev/$ORCA_CLI_COMMAND in split-check hook ([989fb57](https://github.com/es6kr/skills/commit/989fb57de0678f2f3fc055a239e89c3016e17ee5))
+* **orca:** reject ambiguous session matches instead of guessing via ls -t ([5702ef0](https://github.com/es6kr/skills/commit/5702ef054d63a1ad4aa96d3c242cb9e71473449f))
+* **orca:** widen $ORCA_CLI_COMMAND regex-escape to full ERE metachar set ([054cea3](https://github.com/es6kr/skills/commit/054cea316ae7f51274a29cd1d188056e561f2de9))
+
 ## [0.3.0](https://github.com/es6kr/skills/compare/orca-v0.2.1...orca-v0.3.0) (2026-09-13)
 
 
