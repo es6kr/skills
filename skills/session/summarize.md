@@ -7,6 +7,7 @@ Retrieves and summarizes the conversation content from other Claude Code session
 ```
 /session summarize                 # Select project/session then summarize
 /session summarize <session_id>    # Summarize a specific session
+/session summarize --engine openclaw <session_id> # Summarize an OpenClaw session
 ```
 
 ## Instructions
@@ -90,9 +91,26 @@ Synthesize conversation content and Todo items to produce:
 
 ## Output
 
-1. **Session Overview**: Project name, session ID, date
+1. **Session Overview**: Project name/Agent name, session ID, date
 2. **Conversation Summary**: Key tasks, completed/incomplete items
 3. **Next Steps Suggestion**: Recommendations such as pipeline delivery via import, analysis, etc.
+
+## OpenClaw Sessions (`--engine openclaw`)
+
+For OpenClaw sessions stored under `~/.openclaw/agents/<agent_id>/sessions/`:
+
+```bash
+# Summarize by session UUID (automatically searches across agents)
+python3 scripts/openclaw_session.py summarize <session_id>
+
+# Limit number of messages
+python3 scripts/openclaw_session.py summarize <session_id> --limit 30
+
+# JSON output
+python3 scripts/openclaw_session.py summarize <session_id> --json
+```
+
+The script extracts user prompts, assistant answers, and tool calls with timestamps.
 
 ## Notes
 

@@ -8,6 +8,7 @@ List all sessions in the current project (or all projects) with UUID, modificati
 - `/session list --all-projects` — list across all projects under `~/.claude/projects/`
 - `/session list --limit 20` — show only the top N most recently modified sessions
 - `/session list --engine antigravity` — list Antigravity sessions instead of Claude Code sessions (both the IDE and CLI runtimes)
+- `/session list --engine openclaw [agent_id]` — list OpenClaw sessions across agents under `~/.openclaw/agents/<agent_id>/sessions/`
 
 Use for quick inspection before running `classify`, `purge`, `search`, or `compress`. Unlike those topics, `list` performs **no validation, classification, or destructive action** — it only enumerates.
 
@@ -103,6 +104,35 @@ Output header:
 A per-session human-readable title hint (when present) is the first-line `# ` header of that session's `task.md` artifact, if one exists at `~/.gemini/<runtime>/brain/<uuid>/task.md` — Antigravity does not persist a separate "conversation title" field anywhere in the conversation SQLite DB or the brain folder; `task.md`'s H1 is the closest available proxy, and it reflects the session's most recently active work thread, not necessarily its original topic.
 
 `--all-projects` and `--engine antigravity` are mutually exclusive — Antigravity's brain folders are not partitioned by project the way `~/.claude/projects/` is.
+
+### `--engine openclaw` flag
+
+OpenClaw sessions are organized by agent under `~/.openclaw/agents/<agent_id>/sessions/`. Active session routing is tracked in `sessions.json`.
+
+Use the helper script `openclaw_session.py`:
+
+```bash
+# List across all OpenClaw agents
+python3 scripts/openclaw_session.py list
+
+# Limit output count
+python3 scripts/openclaw_session.py list --limit 20
+
+# Filter by a specific agent (e.g. main, es6kr-project-pm, wiki-ask)
+python3 scripts/openclaw_session.py list --agent main
+
+# Machine-readable JSON output
+python3 scripts/openclaw_session.py list --json
+```
+
+Output header:
+```markdown
+| Session UUID | Agent | Channel | Active | mtime | Size (bytes) | First Prompt |
+|--------------|-------|---------|--------|-------|--------------|--------------|
+```
+
+- Primary session files match `<uuid>.jsonl`. Companion trace files (`*.trajectory.jsonl`), resets (`*.reset.*`), deletions (`*.deleted.*`), and backups are automatically filtered out.
+- The `Active` marker indicates the session is currently mapped as an active conversation target in `~/.openclaw/agents/<agent_id>/sessions/sessions.json`.
 
 ## Output Format
 

@@ -14,14 +14,20 @@ Searches past sessions by keyword and returns matching session IDs, with validat
 /session search <keyword>                  # search current project sessions
 /session search --today <keyword>          # only sessions modified today
 /session search --project <path> <keyword> # search a specific project path
-/session search --engine antigravity <keyword>  # search Antigravity (Gemini IDE) sessions instead
+/session search --engine antigravity <keyword>  # search Antigravity (Gemini IDE/CLI) sessions
+/session search --engine openclaw <keyword>     # search OpenClaw sessions across agents
 ```
 
 For backward compatibility, `/session id <keyword>` is routed to this topic.
 
 ## Engine Selection
 
-This skill's default engine is **Claude Code** (`~/.claude/projects/*.jsonl`). A second engine, **Antigravity**, stores sessions in a different location and format — pass `--engine antigravity` to search there instead. Auto-detect the engine from context when the user references a known Antigravity session UUID even without the flag.
+This skill supports three engines:
+- **Claude Code** (default, `~/.claude/projects/*.jsonl`)
+- **Antigravity** (`~/.gemini/antigravity-ide/brain/` and `~/.gemini/antigravity-cli/brain/`)
+- **OpenClaw** (`~/.openclaw/agents/<agent_id>/sessions/*.jsonl`)
+
+Pass `--engine <engine>` to target a specific runtime. Auto-detect the engine from context when the user references a known session UUID or names the runtime explicitly.
 
 **Antigravity is two independent runtimes, each with its own data root — check both when a UUID isn't found in one.** The IDE app and the CLI (invoked as `agy`) never share sessions:
 
@@ -36,6 +42,7 @@ Do not stop at one root and report "session not found" — a UUID absent from `a
 |--------|---------------|---------------------|
 | `claude` (default) | `~/.claude/projects/<project>/<uuid>.jsonl` | JSONL directly |
 | `antigravity` | `~/.gemini/antigravity-ide/brain/<uuid>/` **or** `~/.gemini/antigravity-cli/brain/<uuid>/` (try both) | `.system_generated/logs/transcript.jsonl` (JSONL, one step per line) |
+| `openclaw` | `~/.openclaw/agents/<agent_id>/sessions/` | `<uuid>.jsonl` (JSONL messages) |
 
 ### Antigravity Search Procedure
 
@@ -85,6 +92,29 @@ print(b'\n'.join(strings).decode('utf-8', errors='replace'))
 If the DB file is locked (Antigravity IDE running, holds an exclusive handle), `sqlite3.connect` raises `unable to open database file` even though the file exists — copy it to a scratch path first (`cp` the `.db` file, no `-wal`/`-shm` needed for read-only string extraction) and query the copy.
 
 Result Validation (below) applies identically regardless of engine — a keyword hit in an Antigravity transcript still needs verb/artifact/action-class classification before being reported as proof of completion.
+
+### OpenClaw Search Procedure
+
+OpenClaw stores conversation messages in `~/.openclaw/agents/<agent_id>/sessions/<uuid>.jsonl`.
+
+Use `openclaw_session.py`:
+
+```bash
+# Search across all OpenClaw agents
+python3 scripts/openclaw_session.py search "<keyword>"
+
+# Search within a specific agent (e.g. main, es6kr-project-pm, wiki-ask)
+python3 scripts/openclaw_session.py search "<keyword>" --agent main
+
+# Machine-readable JSON output
+python3 scripts/openclaw_session.py search "<keyword>" --json
+```
+
+Or direct grep across agent sessions:
+
+```bash
+grep -n "<keyword>" ~/.openclaw/agents/*/sessions/*.jsonl | grep -v "\.trajectory\."
+```
 
 ## Search Procedure
 
