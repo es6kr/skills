@@ -116,7 +116,21 @@ Edges where `source ∈ input set` and `target ∉ input set` are **outside-set 
 | git-repo → commit-tidy | git-repo (frontmatter depends-on) | vendor / pin / drop |
 ```
 
-Suppressing outside-set edges silently misses bundle decisions — always surface, never drop.
+### Step 6: Sync to LLM-Wiki (Dual-SSOT Bridge)
+
+Auto-project computed topological metrics, cycle audits, and blast radius rankings into the knowledge layer:
+
+```bash
+python3 ~/.claude/skills/skill-kit/scripts/sync_wiki_graph.py --input /tmp/graph.json --wiki-dir ~/ghq/github.com/es6kr/llm-wiki
+```
+
+Generates or updates `pages/ops/skill-topology-matrix.md` with:
+- Summary counts (nodes, edges, cycles, clusters)
+- High-impact skills ranking by blast radius
+- `PAIR_OF_INTERNAL` equivalence table
+- Preserved initial `created` date with updated `last_modified`
+
+Suppresses outside-set edges silently misses bundle decisions — always surface, never drop.
 
 ## Don't / Do
 
