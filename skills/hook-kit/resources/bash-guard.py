@@ -33,6 +33,7 @@ this repo — the overlay hook is a no-op when the module can't be imported.
 
 Self-test: python bash-guard.py --test   (runs in-process — no per-case spawn)
 """
+from __future__ import annotations
 import importlib.util
 import json
 import os
@@ -365,13 +366,55 @@ PR_CREATE_PREFILTER = re.compile(r"pr[ \t]+create")
 # heredoc (e.g. a commit message body mentioning "gh pr create" in a sentence)
 # then produces 3 adjacent bare tokens that false-positive-match a real
 # invocation. Strip heredoc bodies before token-scanning for this reason.
-HEREDOC_BLOCK = re.compile(
-    r"<<-?\s*(['\"]?)(\w+)\1.*?\n^\2\s*$", re.MULTILINE | re.DOTALL
+HEREDOC_START = re.compile(
+    r"<<-?\s*(?:(['\"])(?P<q>[a-zA-Z0-9_.-]+)\1|\\(?P<esc>[a-zA-Z0-9_.-]+)|(?P<bare>[a-zA-Z0-9_.-]+))"
 )
+HEREDOC_INTERPRETER_RE = re.compile(
+    r"(?:^|[;&|]\s*)(?:sudo\s+)?(?:bash|sh|zsh|ksh|dash|python[0-9.]*|node|ruby|perl|eval|exec)\b|"
+    r"\|\s*(?:sudo\s+)?(?:bash|sh|zsh|ksh|dash|python[0-9.]*|node|ruby|perl)\b"
+)
+HEREDOC_CMD_SUBST_RE = re.compile(r"\$\([^\)]+\)|`[^`]+`")
 
 
 def strip_heredoc_bodies(command: str) -> str:
-    return HEREDOC_BLOCK.sub("<<HEREDOC", command)
+    """Strip heredoc bodies when inert data, but preserve command substitutions and interpreter feeds."""
+    if HEREDOC_INTERPRETER_RE.search(command):
+        return command
+
+    out: list[str] = []
+    pos = 0
+    while True:
+        m = HEREDOC_START.search(command, pos)
+        if not m:
+            out.append(command[pos:])
+            break
+
+        out.append(command[pos:m.start()])
+        delim = m.group("q") or m.group("esc") or m.group("bare")
+        is_quoted = bool(m.group("q") or m.group("esc"))
+
+        nl = command.find("\n", m.end())
+        if nl == -1:
+            out.append(command[m.start():])
+            break
+
+        end_pat = re.compile(r"\n^" + re.escape(delim) + r"\s*$", re.MULTILINE)
+        end_m = end_pat.search(command, nl)
+        if not end_m:
+            out.append(command[m.start():])
+            break
+
+        body = command[nl + 1:end_m.start()]
+        out.append("<<HEREDOC")
+
+        if not is_quoted:
+            substs = HEREDOC_CMD_SUBST_RE.findall(body)
+            if substs:
+                out.append("\n" + "\n".join(substs))
+
+        pos = end_m.end()
+
+    return "".join(out)
 
 
 def check_pr_create_draft(command: str, transcript_path: str = "") -> str | None:
@@ -1131,8 +1174,9 @@ def evaluate(
                 "other pending work or re-issue another bounded background call."
             )
 
+    simple_scan = strip_heredoc_bodies(command)
     for pat, msg in SIMPLE_BLOCKS:
-        if re.search(pat, command, IM):
+        if re.search(pat, simple_scan, IM):
             return hard(msg)
 
     scan = git_scan_text(command)
@@ -1429,8 +1473,20 @@ def self_test() -> int:
         (False, False, "gh pr merge 123 --merge"),
         (False, False, "ALLOW_SQUASH_MERGE=1 gh pr merge 123 --squash"),
         (False, False, 'echo "gh pr merge --squash is forbidden"'),
+        # ── heredoc writer prose FP guard (cat/tee <<EOF with simple block keyword) ──
+        (False, False, "cat <<'EOF'\nterraform apply -auto-approve\nEOF"),
+        (False, False, "cat <<EOF\ndocker rm my-container\nEOF"),
+        (False, False, "cat <<\\EOF\nterraform apply -auto-approve\nEOF"),
+        (False, False, "cat <<END-JSON\nterraform apply -auto-approve\nEND-JSON"),
+        # ── heredoc execution / expansion security guard (PR #556 review) ──
+        (True, False, "bash <<'EOF'\ndocker rm my-container\nEOF"),
+        (True, False, "cat <<'EOF' | bash\ndocker rm my-container\nEOF"),
+        (True, False, "cat <<EOF\n$(docker rm my-container)\nEOF"),
     ]
     passed = failed = 0
+    if not (__doc__ and "bash-guard.py" in __doc__):
+        failed += 1
+        print("FAIL __doc__ docstring is missing or shadowed")
     for expect_block, run_bg, cmd in cases:
         code, _, _ = evaluate(cmd, run_bg)
         got_block = code in (1, 2)
