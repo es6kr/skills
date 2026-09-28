@@ -352,6 +352,11 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-agent-spawn-without-model.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-agent-redispatch-after-overflow.js",
+            "timeout": 10
           }
         ]
       }
