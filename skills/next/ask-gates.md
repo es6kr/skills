@@ -416,6 +416,15 @@ options: [
 
 After receiving both answers, compose the actual next-action options based on the answered current state + waiting items.
 
+## Step 0.8: Visible Report Pre-condition Gate (HARD STOP)
+
+**Before invoking `AskUserQuestion` or presenting next-action options, verify that all mandatory visible markdown reports (such as Priority Triage candidate tables, 5-Why root cause analyses, or task completion summaries) have been physically emitted into the visible response text.** Calling `AskUserQuestion` or checking off a task as completed while suppressing or omitting the required text report is strictly forbidden.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Check off task as completed and invoke `AskUserQuestion` without emitting the physical report table in visible text | Emit the full physical markdown report table in visible response text BEFORE calling `AskUserQuestion` |
+| 2 | Treat checking `task.md` as equivalent to producing the report | `task.md` tracks progress; visible response text delivers the report to the user. Both are required |
+
 ## Context-usage citation on every next-composed ask (HARD STOP — not scoped to cleanup options)
 
 **Every `AskUserQuestion` this skill composes states the live context-usage percentage in the question text, regardless of whether a cleanup/wrap-up option is being offered.** The `context-usage-stale` guard class (17+ recurrences, hooks `context-usage-inject.sh` + `block-cleanup-option-below-context-gate.sh`) only covers citation accuracy **inside a cleanup option** — it cannot detect a plain next-action ask that omits the number entirely, because a hook sees only the tool-call payload and cannot tell "this ask was composed by `next`" from any other skill's ask. This gate exists precisely to cover that hook-blind spot at the skill-composition layer.

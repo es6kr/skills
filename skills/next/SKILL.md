@@ -131,6 +131,7 @@ Identify the type of task just completed.
 | fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) — **mandatory read when a fix_plan / checklist skill is available** (see "Dependency-gated behaviors"); otherwise an ordinary optional source |
 | Plane | Self-hosted project tracker, if this environment has one configured (check local infra docs for connection details) — check open issues/cycles when the project has one wired up |
 | Session wrap-up | **Only when a session-cleanup skill is available** (see "Dependency-gated behaviors"). `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage at/above the **per-model** threshold (Fable/Mythos 55%, Opus 50%, others 45% — see suggestion-patterns.md "Context-usage gate") |
+| New external-system reference | Was a new tool/service integration just set up this turn (CLI install, credential file, API endpoint)? → "Persist as durable reference" candidate — domain skill first, project memory only if no skill owns the topic (see suggestion-patterns.md "After configuration change") |
 | Other (free text) | Auto-provided by AskUserQuestion |
 
 | # | Don't (forbidden) | Do (correct alternative) |
