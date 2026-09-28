@@ -13,7 +13,9 @@
 #     1. This turn dispatched background work, OR handed a command off to the
 #        user's own terminal — transcript tail carries a background marker
 #        ("Command running in background with ID:" from a Bash
-#        run_in_background, "The agent is now running" from an Agent spawn,
+#        run_in_background, "Command was manually backgrounded by user with
+#        ID:" from the user actually running a "!"-handoff command in their
+#        own terminal, "The agent is now running" from an Agent spawn,
 #        a GitHub Actions run in flight), OR the final assistant text
 #        contains a "! <command>" handoff line (idle-cache-ttl class, shape:
 #        user-!-handoff — the user's own async execution is invisible to this
@@ -89,7 +91,7 @@ if [[ -n "$LAST_TEXT" ]] && printf '%s' "$LAST_TEXT" | grep -qE '^! [^ ]'; then
   BANG_HANDOFF=1
 fi
 
-if ! printf '%s' "$TAIL" | grep -qE 'Command running in background with ID:|Async agent launched successfully|The agent is (now running|working in the background)' \
+if ! printf '%s' "$TAIL" | grep -qE 'Command running in background with ID:|Command was manually backgrounded by user with ID:|Async agent launched successfully|The agent is (now running|working in the background)' \
    && ! printf '%s' "$TAIL" | grep -qEz "$GH_RUN_INFLIGHT_RE" \
    && [[ "$BANG_HANDOFF" -eq 0 ]]; then
   exit 0
