@@ -3,8 +3,8 @@ import sys
 import tempfile
 import unittest
 
-# Add cleanup scripts to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'skills', 'cleanup', 'scripts'))
+# Add fa scripts to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'skills', 'fa', 'scripts'))
 from rotate_improvements import parse_improvements, rotate_file, is_resolved_tag
 
 SAMPLE_IMPROVEMENTS = """# Improvements Ledger
