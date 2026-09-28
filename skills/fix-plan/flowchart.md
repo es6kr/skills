@@ -9,6 +9,17 @@ Standardizes priority flowchart (dependency graph) authoring and plan document m
 - Structuring precedent relationships (`A --> B`) across infrastructure, deployment, and feature plans.
 - Invoked via `/fix-plan flowchart` or when managing task execution roadmaps.
 
+## Placement check — parent tracker precedent (HARD STOP)
+
+**Before creating a NEW `## Flow Chart` section in a project-local/subordinate tracker (a project inside a larger workspace that has its own workspace-root `fix_plan.md`), check whether the workspace-root tracker already has a `## Flow Chart` with a node for the same or a related initiative.** Grep the root tracker's node labels and Node Plan Mappings for the project name or a related plan-document path. If a precedent node exists there for related work (e.g. a sibling initiative in the same subsystem), the **default** is to add the new node to that existing root-level graph — not to spin up a duplicate local Flow Chart. A local Flow Chart is only correct when the workspace root has none, or the initiative is genuinely scoped to that project alone with no cross-workspace counterpart.
+
+This does not affect where the actual checklist items live — `## Priority Tasks` / `## Plan Drafts` entries stay in the project-local tracker; only the Flow Chart *diagram node* follows the root-level precedent, mirroring the existing pattern where a root-level node's "Node Plan Mappings" entry points at the project-local tracker/plan doc.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Default an AskUserQuestion's Recommended option to "create local Flow Chart" based on scope-narrowness alone | Grep the workspace-root tracker's Flow Chart first; if a related-initiative node exists there, make "add to root tracker" the Recommended option |
+| 2 | Treat "narrowest scope = safest default" as a placement heuristic | Precedent in the very document being edited (or its workspace root) overrides a generic narrowness heuristic |
+
 ## Schema & Placement
 
 Placement: At the top of `fix_plan.md` under a `## TODO` section.
