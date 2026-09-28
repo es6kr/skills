@@ -145,10 +145,6 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskcreate-error-unretried.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-noncompliant-review-comment.sh"
           },
           {
@@ -229,10 +225,6 @@
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskcreate-error-unretried.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-language-mismatch.sh"
           }
         ]
@@ -263,10 +255,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-skill-references-rule.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-taskcreate-error-unretried.sh"
           },
           {
             "type": "command",
