@@ -44,7 +44,8 @@ If cleanup calls next, it becomes "select 1 → execute immediately → session 
 1. **Commit session changes** → check for uncommitted changes and commit
 2. **Self-Improve** → mistake analysis + hook/skill review + pattern detection (planned as `/claudify improve`)
 3. **Knowledge Persist** → documentation recommendation + infra check + memory storage (planned as `/claudify persist`)
-4. **Weekly Report** → record work (company projects only)
+4. **Checklist & Backlog Sync** → update completed tasks and sync external trackers via `Skill("backlog")` and helper scripts (`update_item.py`, `plane_sync.py`)
+4.5. **Weekly Report** → record work (company projects only)
 5. **Register next-session work as wip** → delegate to `Skill("wip")` (multi-select task registration, state preservation for compact/rewind)
 
 ### Per-Step Invocation Obligation Self-Check Table (HARD STOP)
@@ -54,6 +55,7 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step | Invocation obligation (automatic) | Ask (user decision) | Auto-invocation condition |
 |------|------------------|------------------|---------------|
 | Step 0 | Call `TaskList` | — | Clean up when TaskList has completed tasks |
+| Step 0.1 (Context & Session Profile) | **Automatic execution — no ask**: run `context-usage-now.sh` or `python skills/session/scripts/profile-session.py --current --compact-summary` | — | **Always** — measures token percentage and evaluates Auto-compact risk (`[LOW]` ~ `[CRITICAL]`) |
 | Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (receiver resolved from the workspace config) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
 | Step 1 | `Skill("commit-tidy")` or `/commit-tidy` | Decide split strategy (internal ask inside the skill) | When there is 1+ uncommitted change |
 | Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) — with `--auto`, upsert every finding to the tracker instead of asking (see the "`--auto` Mode" section) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
@@ -62,7 +64,8 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | **3-C.2 structured discovery chunk (mode B — HARD STOP)** | **Automatic execution — no ask** | — | If the session produced **reusable discoveries/decisions/deployments** (bug root-cause, infra gotcha, a config/URL/MTU/version that took effort to find, an architecture decision), store each as a keyword-searchable chunk via the **RAG receiver's structured-store dispatch (mode B)** — separate from 3-C.1. Session import (3-C.1 mode A) has **weak keyword retrieval**: it preserves turns but does NOT make a finding queryable (e.g. "DinD MTU hang", "dev-36 k3s runner"). Skip ONLY when the session had zero reusable discovery (pure Q&A / trivial edits) — and say so explicitly in the report row |
 | **3-C.3 check for missed active-artifact RAG store** | **Automatic execution — no ask** | — | Glob → identify this-session mtime artifacts → RAG receiver scroll → immediately store missing files. Matches plan/research/analysis/report/postmortem-*.md patterns |
 | **3-C.4 workspace fix_plan-history sync (mode C)** | **Automatic execution — no ask** | — | If this session added `## Completed` entries to `fix_plan.md` AND the current workspace exposes a fix_plan→RAG sync script (per `rag-store.md` "fix_plan.md Completed Item RAG Sync + Delete Obligation"), run it. Session import (3-C.1) and structured chunks (3-C.2) are conversation-shaped; this sync is deliverable-shaped (task/decision history) — neither of the other two modes substitutes for it |
-| Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) — with `--auto`, record to the resolved tracker without asking (see the "`--auto` Mode" section) | When this session has artifacts |
+| **Step 4 (Checklist & Backlog)** | **`Skill("backlog")` or script helper (`update_item.py` / `plane_sync.py`) mandatory** — update completed items and sync external trackers without direct text editing | Decide target tracker (fix_plan / checklist / Plane) if ambiguous | When this session completed tasks or produced backlog items |
+| Step 4.5 (Weekly Report) | Check company project scope and record weekly report | Weekly Report content/skip approval | Company project work |
 | Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) — with `--auto`, upsert all N candidates to the tracker and skip the selection ask; the `Skill("wip")` call itself still happens (see the "`--auto` Mode" section) | **Always** — state preservation for next-session resume at cleanup end |
 | **Step 5 report (HARD STOP — re-read before writing)** | **Before composing the completion report, scroll back to "Step 5 Completion Report Table Mandatory Rows" and copy its row list literally.** That section sits *above* the Step 1-5 procedure bodies, so executing the steps in order never passes through it again — the report then gets assembled from memory, which is exactly how mandatory rows (Session identity, the 3-A LLM Wiki scope-check row, the separate 3-C.1 / 3-C.2 / 3-C.4 rows) are silently dropped | — | **Always** — applies to the cleanup wrap-up table AND any separate session-end report |
 | Step 5.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4.5+5 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
@@ -97,6 +100,7 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | Step | Result |
 |------|------|
 | **Session identity (mandatory)** | **`Session ID: <full-36-UUID>` + Recommend running: `/rename <model>-<topic>-<sessid8>` (2-3 candidates; each = model family token + dominant-work topic + UUID's leading 8 hex; keep the `/rename ...` command in its own code span with no label or colon inside it, so a single copy-paste is directly runnable)** |
+| **Session Profile & Auto-Compact Risk (mandatory row)** | **`[Profile: <steps> steps, <tools> tools | Risk: <LEVEL>]` (automatically evaluated via `context-usage-now.sh` or `python skills/session/scripts/profile-session.py --current --compact-summary`). If Risk is HIGH or CRITICAL, state the top 2-3 most frequent tool call names.** |
 | **Walkthrough & artifacts (mandatory row)** | **A markdown link to this session's walkthrough file + a one-line summary of what it covers, followed by a list of every artifact created or modified this session (PR/commit, docs, tracker, recurrence-log entries, RAG writes).** Author `walkthrough-<topic>-<sessid8>.md` at the path resolved by the "Walkthrough file" subsection below (`$WSCFG_ARTIFACTS_PATH`, then the `.agents/` → `.ralph/` → `docs/` fallbacks) **before** composing this row — the row links the file, it does not stand in for it. Write `none — no deliverable this session` only when the session genuinely produced nothing, and say why. |
 | 0. TaskList | (cleanup result) |
 | 1. Commit | (commit result or skip reason) |
@@ -106,7 +110,8 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | **3-C.1 RAG Store (mandatory row)** | **State which medium actually fired ([rag-store.md](./rag-store.md) Medium Matrix (1)-(4)) — the wording differs by medium, do not reuse one fixed template for all: purpose-built importer (medium 2) → "N JSONL log step entries / turns recorded (session import, receiver: `<importer>`) — session UUID `<uuid>`. M artifacts imported."; generic MCP store used as 3-C.1 substitute (medium 1, no purpose-built importer found) → "1 ad-hoc summary chunk added (receiver: MCP store) — session UUID `<uuid>`. NOT a full session import (no purpose-built importer found)."; medium (4) local pending queue → "❌ FAILED — queued to local pending-import queue (`<queue-file>`), retry task registered."** |
 | **3-C.2 Structured discovery chunk (mode B — mandatory row)** | **M discovery chunks added (receiver structured-store dispatch, mode B) — keys: `<key1>`, … OR "none — no reusable discovery this session". Session import (mode A) alone ≠ knowledge persisted; discoveries need mode B to be searchable.** |
 | **3-C.4 fix_plan-history sync (mode C — mandatory row when `fix_plan.md` gained Completed entries this session)** | **P points synced (workspace `<name>` sync script) OR "none — no new Completed entries this session" OR "no sync script for this workspace".** |
-| 4. Weekly Report | (skip / write result) |
+| **4. Checklist & Backlog (mandatory row)** | **`Skill("backlog")` or script helper (`update_item.py` / `plane_sync.py`) result — updated items & external sync status** |
+| 4.5. Weekly Report | (skip / write result) |
 | 5. **wip task registration (mandatory row)** | **`Skill("wip")` call result — N tasks registered (next-session resume possible). Enumerate candidates** |
 
 **The "3-C.1 RAG Store" row is the top visibility priority — bold/highlighting recommended.** Omission triggers "the user doesn't even know it's missing" → triggers this fix (recurrence accumulation).
@@ -733,9 +738,19 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 
 ---
 
-## Step 4: Checklist Record
+## Step 4: Checklist & Backlog Sync
 
-Record the work performed in this conversation to the checklist. **Always use the checklist medium regardless of project type** — no company/non-company branching.
+Record and synchronize the work performed in this conversation with the checklist and external backlog trackers (`Skill("backlog")`).
+
+### Script Helper Gate & Prohibit Direct Text Edit (HARD STOP)
+
+In Antigravity (Gemini) and interactive sessions, modifying `fix_plan.md` or `checklist.md` directly via raw text editing (`replace_file_content`, `multi_replace_file_content`, `write_to_file`) is **strictly prohibited (`HARD STOP`)**.
+- All checklist mutations (completing items via `--set-marker '[x]'`, moving to Completed via `--move`, appending progress notes via `--append-note`) **MUST** be performed by executing dedicated CLI scripts:
+  - `python skills/fix-plan/scripts/update_item.py --file <path> --match "<keyword>" --set-marker '[x]'`
+  - `python skills/fix-plan/scripts/update_item.py --file <path> --match "<keyword>" --move`
+  - `python skills/fix-plan/scripts/add_item.py`
+  - `Skill("backlog")` / `skills/backlog/scripts/plane_sync.py` (when Plane or secondary tracker is canonical)
+- Bypassing script helpers by performing raw string replacements is a direct rule violation.
 
 ### Checklist file decision order
 
