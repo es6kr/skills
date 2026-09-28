@@ -163,8 +163,28 @@ def apply_prune(file_path, limit=10, prune_all=False):
             insert_pos += 1
         new_lines = new_lines[:insert_pos] + pruned_text_blocks + ["\n"] + new_lines[insert_pos:]
         
-    # Write back
-    Path(file_path).write_text("".join(new_lines), encoding="utf-8")
+    # Write back atomically.
+    #
+    # This function MIGRATES items -- it removes them from the active sections and re-adds them
+    # under ## TODO. An in-place write_text truncates the tracker first, so a failure partway
+    # through loses the items outright rather than merely mangling formatting. The tracker is
+    # also edited concurrently by multiple sessions, so a reader can observe the truncated
+    # window. Temp file in the same directory (same filesystem, so the rename is atomic) and
+    # then os.replace: the original stays untouched until the instant it is swapped.
+    target = Path(file_path)
+    tmp = target.with_name(target.name + f".tmp.{os.getpid()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write("".join(new_lines))
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
     print(f"[{file_path.name}] Successfully migrated {len(to_prune)} P2/P3 items to ## TODO and pruned from active sections.")
 
 

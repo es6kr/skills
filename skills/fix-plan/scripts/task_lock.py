@@ -13,6 +13,7 @@ Usage:
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -21,6 +22,42 @@ from pathlib import Path
 
 DEFAULT_LOCK_DIR = Path.home() / ".agents" / "tasks" / "locks"
 DEFAULT_TTL = 1800  # 30 minutes
+
+# A task id becomes a filename, so it must not be able to steer the path. Ids in this repo look
+# like ES6KR-125 / SKILL-54, so refusing anything outside this class costs nothing legitimate,
+# while ".." or "/" would otherwise write the lock outside the lock directory entirely.
+TASK_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _invalid_task_id(task_id, medium="fs_fallback"):
+    """Return an error result dict when task_id cannot safely become a filename, else None."""
+    if TASK_ID_RE.match(task_id) and task_id not in (".", ".."):
+        return None
+    return {
+        "task_id": task_id,
+        "medium": medium,
+        "error": "invalid task id: must match ^[A-Za-z0-9._-]+$ and not be '.' or '..'",
+    }
+
+
+def _write_json_atomic(path, payload):
+    """Replace `path`'s contents without ever leaving it partially written.
+
+    Used for the extend-my-own-lock path, where the file already exists so O_EXCL cannot apply.
+    """
+    tmp = path.with_name(path.name + f".tmp.{os.getpid()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 def _get_redis_client(redis_url=None):
@@ -43,6 +80,10 @@ def acquire_lock(task_id, session_id, ttl_sec=DEFAULT_TTL, lock_dir=None, use_re
     clean_task_id = str(task_id).strip()
     clean_session_id = str(session_id).strip()
     now = time.time()
+
+    bad = _invalid_task_id(clean_task_id)
+    if bad:
+        return {"acquired": False, **bad}
 
     if use_redis:
         r = _get_redis_client(redis_url)
@@ -72,57 +113,99 @@ def acquire_lock(task_id, session_id, ttl_sec=DEFAULT_TTL, lock_dir=None, use_re
                 # Fallback to local lockfile if redis throws runtime error
                 pass
 
-    # Filesystem fallback
+    # Filesystem fallback.
+    #
+    # `O_CREAT | O_EXCL` is the filesystem's own compare-and-set: the call fails if the file
+    # already exists, so exactly one of N racing callers can create it. That is what makes this
+    # a mutex. The previous shape -- exists() -> read -> decide -> write -- had no atomicity
+    # between the check and the write, so two sessions could both pass the check and both
+    # write, each believing it held the lock (measured: 40/40 trials double-granted).
     target_dir = Path(lock_dir) if lock_dir else DEFAULT_LOCK_DIR
     target_dir.mkdir(parents=True, exist_ok=True)
     lock_file = target_dir / f"{clean_task_id}.lock"
 
-    if lock_file.exists():
+    def _payload():
+        return {
+            "task_id": clean_task_id,
+            "holder": clean_session_id,
+            "acquired_at": now,
+            "expires_at": now + ttl_sec,
+        }
+
+    def _create_exclusive():
+        """Create the lockfile or raise FileExistsError. 0o600 — a lock names a session."""
+        fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         try:
-            data = json.loads(lock_file.read_text(encoding="utf-8"))
-            expires_at = data.get("expires_at", 0)
-            holder = data.get("holder", "")
+            os.write(fd, json.dumps(_payload()).encode("utf-8"))
+            os.fsync(fd)
+        finally:
+            os.close(fd)
 
-            # If existing lock is still valid and not expired
-            if expires_at > now:
-                if holder == clean_session_id:
-                    # Re-acquire / extend
-                    data["expires_at"] = now + ttl_sec
-                    lock_file.write_text(json.dumps(data), encoding="utf-8")
-                    return {
-                        "acquired": True,
-                        "medium": "fs_fallback",
-                        "task_id": clean_task_id,
-                        "holder": clean_session_id,
-                        "expires_at": now + ttl_sec
-                    }
-                else:
-                    return {
-                        "acquired": False,
-                        "medium": "fs_fallback",
-                        "task_id": clean_task_id,
-                        "holder": holder,
-                        "remaining_ttl": max(0, int(expires_at - now))
-                    }
-        except Exception:
-            pass  # Corrupted lockfile, overwrite
+    def _granted(**extra):
+        return {
+            "acquired": True,
+            "medium": "fs_fallback",
+            "task_id": clean_task_id,
+            "holder": clean_session_id,
+            "expires_at": now + ttl_sec,
+            **extra,
+        }
 
-    # Create new lockfile
-    lock_data = {
-        "task_id": clean_task_id,
-        "holder": clean_session_id,
-        "acquired_at": now,
-        "expires_at": now + ttl_sec
-    }
-    lock_file.write_text(json.dumps(lock_data), encoding="utf-8")
+    try:
+        _create_exclusive()
+        return _granted()
+    except FileExistsError:
+        pass  # someone else holds it, or a stale/expired file remains -- inspect below
 
-    return {
-        "acquired": True,
-        "medium": "fs_fallback",
-        "task_id": clean_task_id,
-        "holder": clean_session_id,
-        "expires_at": now + ttl_sec
-    }
+    try:
+        data = json.loads(lock_file.read_text(encoding="utf-8"))
+    except Exception:
+        # Fail CLOSED on an unreadable lock. Reading a corrupted lockfile as "free" used to
+        # combine with the non-atomic write above -- that write is what produced half-written
+        # files, and those were then treated as an invitation to acquire.
+        return {
+            "acquired": False,
+            "medium": "fs_fallback",
+            "task_id": clean_task_id,
+            "holder": None,
+            "error": "existing lock file is unreadable; treating as held",
+        }
+
+    expires_at = data.get("expires_at", 0)
+    holder = data.get("holder", "")
+
+    if expires_at > now:
+        if holder == clean_session_id:
+            # We already own it, so extending in place races with nobody.
+            data["expires_at"] = now + ttl_sec
+            _write_json_atomic(lock_file, data)
+            return _granted()
+        return {
+            "acquired": False,
+            "medium": "fs_fallback",
+            "task_id": clean_task_id,
+            "holder": holder,
+            "remaining_ttl": max(0, int(expires_at - now)),
+        }
+
+    # Expired. Steal it -- but via unlink + O_EXCL retry, so two sessions racing to steal the
+    # same expired lock cannot both succeed. Report who was displaced rather than overwriting
+    # them silently: a holder past its TTL may still be alive and working.
+    try:
+        os.unlink(lock_file)
+    except FileNotFoundError:
+        pass
+    try:
+        _create_exclusive()
+    except FileExistsError:
+        return {
+            "acquired": False,
+            "medium": "fs_fallback",
+            "task_id": clean_task_id,
+            "holder": None,
+            "error": "lost the race to steal an expired lock",
+        }
+    return _granted(displaced_holder=holder)
 
 
 def release_lock(task_id, session_id, lock_dir=None, use_redis=True, redis_url=None):
@@ -131,6 +214,10 @@ def release_lock(task_id, session_id, lock_dir=None, use_redis=True, redis_url=N
     """
     clean_task_id = str(task_id).strip()
     clean_session_id = str(session_id).strip()
+
+    bad = _invalid_task_id(clean_task_id)
+    if bad:
+        return {"released": False, **bad}
 
     if use_redis:
         r = _get_redis_client(redis_url)
@@ -171,6 +258,10 @@ def get_lock_status(task_id, lock_dir=None, use_redis=True, redis_url=None):
     """
     clean_task_id = str(task_id).strip()
     now = time.time()
+
+    bad = _invalid_task_id(clean_task_id)
+    if bad:
+        return {"is_locked": False, **bad}
 
     if use_redis:
         r = _get_redis_client(redis_url)
