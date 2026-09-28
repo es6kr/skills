@@ -83,6 +83,34 @@ The PRIVATE+Free row explains why cloud output may be walkthrough-only — but t
 
 **Worktree (from Step 2.7)**: the PR branch is already checked out into a worktree by `pr.md` Step 2.7. Dispatch the code-reviewer **against that worktree path** so it reads real files (not just `gh pr diff`) and can run tests/build locally. Pass the worktree path in the agent prompt (`Repository: <worktree-path>`). The reviewer should still use `gh pr diff <N>` for the canonical PR diff, but reads file bodies + runs verification in the worktree.
 
+### Pre-dispatch gate — the failure history selects the starting rung (HARD STOP)
+
+The ladder below is **reactive**: it says what to do after a dispatch fails. That wastes a dispatch when the failure is already known to be deterministic in this environment. **Before the first dispatch**, grep the recurrence store for this dispatch's failure class and read the result as a rung selector:
+
+```bash
+grep -rn --include="*.md" -oE "<!-- fa: class=[a-z0-9-]*(dispatch|subagent|agent-spawn)[a-z0-9-]* count=[0-9]+[^>]*-->" \
+  "${FA_DATA_DIR:-$HOME/.claude/skills/cleanup/data}"
+```
+
+| Standing history | Start at |
+|---|---|
+| No matching class, or `count` ≤ 2 | Rung 1 |
+| `count` ≥ 3 and the recorded failure mode matches what you are about to do | **Skip Rung 1 — start at Rung 2, or Rung 3 if Rung 2 is unavailable** |
+| Class has a recorded mitigation you have not applied | Apply it first; then Rung 1 counts as one attempt |
+
+**Established about `Prompt is too long` on this dispatch — do not re-litigate (measured 2026-09-28)**: it reproduces across **both** model tiers, across **both** tool-set sizes (a `Tools: *` agent and an 8-tool agent), with a ~500-byte prompt, and after the subagent merely read one 54KB file. The binding constraint is the **subagent's own context budget** — not caller prompt length, not model tier, not tool-schema size. Two corollaries: passing a long brief by file path instead of inline does **not** help (the bytes move from the prompt into a `Read`, which the subagent still holds), and **per-file payload chunking is a closed direction** (tried and failed twice).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Dispatch first, consult the history only after it fails | Consult first — the history selects the rung |
+| 2 | Note a recorded class as a caveat and dispatch anyway | `count` ≥ 3 with a matching mode is an instruction to skip Rung 1 |
+| 3 | Treat the checklist gate's tracker read as covering this | That gate asks "is this issue tracked?"; this one asks "is the **method I am about to use** recorded as broken?" |
+| 4 | Re-test the tier or tool-set axis to confirm | Both axes are closed above — re-testing spends a dispatch on a known result |
+
+**Self-check (before the first `Agent` dispatch here)**: did I grep for this failure class *this session*; what `count`/`status` returned; does it select Rung 1 or lower; and am I actually starting at the rung it selected?
+
+**Enforcement**: `hook-kit/resources/block-agent-redispatch-after-overflow.js` (PreToolUse:Agent) denies a second dispatch once one has already overflowed in the session. To dispatch while genuinely moving down the ladder, put `[rung-escalated]` in the prompt (a trailing reason is fine in either spelling).
+
 **Fallback procedure:**
 
 1. **Call `Skill("superpowers:requesting-code-review")` (MANDATORY)** — this skill loads the review framework and includes code-reviewer agent dispatch. When the skill returns the review result, proceed to the "Check existing review comment" and "Post/update review comment" sub-steps below (still within Step 3.5).
