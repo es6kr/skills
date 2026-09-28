@@ -6,7 +6,7 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 
 ## Step 3.5.0: Internal-review engine selection (superpowers default; CLI = bot-review substitute only)
 
-**The Internal Review engine is `superpowers:requesting-code-review` (code-reviewer agent) by DEFAULT.** CodeRabbit CLI local is NOT an internal-review engine — it is a **bot-review-layer substitute**, used only when the bot layer produced nothing: **no CodeRabbit cloud review evidence on the PR AND Copilot unavailable/failed**. (User policy — see failed-attempts.md "0-findings".)
+**The Internal Review engine is provided by the `superpowers` plugin (`superpowers:code-reviewer` agent) by DEFAULT.** CodeRabbit CLI local is NOT an internal-review engine — it is a **bot-review-layer substitute**, used only when the bot layer produced nothing: **no CodeRabbit cloud review evidence on the PR AND Copilot unavailable/failed**. (User policy — see failed-attempts.md "0-findings".)
 
 **Two engine layers (do not mix)**:
 
