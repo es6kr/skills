@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ARCHIVED — not registered in settings.json. Superseded by
+# bash-guard.py:check_pr_create_draft (same PreToolUse:Bash matcher, single
+# process). Kept only as pre-port reference / a quick regex sanity check —
+# same status as bash-guard.sh (see install.md). Do NOT add new patterns
+# here; add to bash-guard.py or its local overlay instead.
+#
 # PreToolUse:Bash — Block `gh pr create` that omits `--draft`
 #
 # Trigger: Bash command that actually INVOKES `gh pr create` (three adjacent
