@@ -37,14 +37,15 @@ If cleanup calls next, it becomes "select 1 → execute immediately → session 
 - Example: writing only text like "A deploy pattern is repeating → agentify candidate" and stopping there ❌ → call the `claudify improve` skill to actually detect and propose ✅
 - **Reporting a step as "skipped" in prose without the step's own documented skip condition being met** — e.g. saying "no RAG receiver registered, skipped" when the step's own rule (see "RAG store failure = cleanup failure" below) requires a recovery attempt + FAILED status + retry-task registration, not a silent skip. A step-level "skip" in the completion report is only valid when the exact skip condition text from that step's own section is quoted alongside it.
 
-**Task pre-registration (when Task tools are available)**: before executing Steps 1-5, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report and fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to skip the *tracking mechanism* for them. **Pre-registration creates tasks that Step 0's prune (below) structurally cannot catch** — Step 0 runs once, at entry, and can only see tasks that were already `completed` *before* this cleanup run started. The tasks created by this pre-registration mechanism only reach `completed` status *during* Steps 1-5, after Step 0 has already run — see Step 5.5 "Self-Task Cleanup" for the closing half of this lifecycle.
+**Task pre-registration (when Task tools are available)**: before executing Steps 1-5, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report, then fall back to the **`claude-task` CLI** (`todowrite` skill's `claude-task` topic — `claude-task --env agent add/list/update`, persisting to `~/.agents/tasks/default/`) as the step-tracking medium, mirroring the fix skill's Step 0 fallback — before that, actually attempt one direct `TaskCreate` call (a ToolSearch no-match alone cannot distinguish "disconnected" from "disabled in this context"; only the call's error text can, and the "disabled" case should be reported to the user). Only if the CLI is also unusable, fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to degrade the *tracking mechanism* for them. Untracked step state is exactly what produces duplicated or dropped report media later in the pass (see the "Same-pass duplication rule"). **Pre-registration creates tasks that Step 0's prune (below) structurally cannot catch** — Step 0 runs once, at entry, and can only see tasks that were already `completed` *before* this cleanup run started. The tasks created by this pre-registration mechanism only reach `completed` status *during* Steps 1-5, after Step 0 has already run — see Step 5.5 "Self-Task Cleanup" for the closing half of this lifecycle.
 
 ## Execution Order
 
 1. **Commit session changes** → check for uncommitted changes and commit
 2. **Self-Improve** → mistake analysis + hook/skill review + pattern detection (planned as `/claudify improve`)
 3. **Knowledge Persist** → documentation recommendation + infra check + memory storage (planned as `/claudify persist`)
-4. **Weekly Report** → record work (company projects only)
+4. **Checklist & Backlog Sync** → update completed tasks and sync external trackers via `Skill("backlog")` and helper scripts (`update_item.py`, `plane_sync.py`)
+4.5. **Weekly Report** → record work (company projects only)
 5. **Register next-session work as wip** → delegate to `Skill("wip")` (multi-select task registration, state preservation for compact/rewind)
 
 ### Per-Step Invocation Obligation Self-Check Table (HARD STOP)
@@ -54,16 +55,18 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | Step | Invocation obligation (automatic) | Ask (user decision) | Auto-invocation condition |
 |------|------------------|------------------|---------------|
 | Step 0 | Call `TaskList` | — | Clean up when TaskList has completed tasks |
+| Step 0.1 (Context & Session Profile) | **Automatic execution — no ask**: run `context-usage-now.sh` or `python skills/session/scripts/profile-session.py --current --compact-summary` | — | **Always** — measures token percentage and evaluates Auto-compact risk (`[LOW]` ~ `[CRITICAL]`) |
 | Step 0.5 (4.5 Resume import) | RAG receiver import dispatch (receiver resolved from the workspace config) for each discovered file | — | RAG receiver readyz response + research-*/plan-* discovered |
 | Step 1 | `Skill("commit-tidy")` or `/commit-tidy` | Decide split strategy (internal ask inside the skill) | When there is 1+ uncommitted change |
-| Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) — with `--auto`, upsert every finding to the tracker instead of asking (see the "`--auto` Mode" section) | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
-| Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) — with `--auto`, use the default medium and upsert only genuinely ambiguous candidates (see the "`--auto` Mode" section) | **Always** + auto-import when the RAG receiver readyz responds |
+| Step 2 (Self-Improve) | **`Skill("claudify", "improve")` call mandatory** — retrospect + automation review + pattern detect | How to handle findings (internal Phase 2 ask inside the skill) — with `--auto`, proceed with the documented safe default instead of asking (see "Auto Mode vs. Ralph Mode") | **Always** (regardless of whether the conversation had mistakes/patterns — the skill judges) |
+| Step 3 (Knowledge Persist) | **`Skill("claudify", "persist")` call mandatory** + RAG receiver import dispatch 3-C.1 | Storage location (internal ask inside the skill) — with `--auto`, use the default medium for that content type instead of asking (see "Auto Mode vs. Ralph Mode") | **Always** + auto-import when the RAG receiver readyz responds |
 | **3-C.1 session RAG import** | **Automatic execution — no ask** | — | Immediately import when the RAG receiver readyz responds OK |
 | **3-C.2 structured discovery chunk (mode B — HARD STOP)** | **Automatic execution — no ask** | — | If the session produced **reusable discoveries/decisions/deployments** (bug root-cause, infra gotcha, a config/URL/MTU/version that took effort to find, an architecture decision), store each as a keyword-searchable chunk via the **RAG receiver's structured-store dispatch (mode B)** — separate from 3-C.1. Session import (3-C.1 mode A) has **weak keyword retrieval**: it preserves turns but does NOT make a finding queryable (e.g. "DinD MTU hang", "dev-36 k3s runner"). Skip ONLY when the session had zero reusable discovery (pure Q&A / trivial edits) — and say so explicitly in the report row |
 | **3-C.3 check for missed active-artifact RAG store** | **Automatic execution — no ask** | — | Glob → identify this-session mtime artifacts → RAG receiver scroll → immediately store missing files. Matches plan/research/analysis/report/postmortem-*.md patterns |
 | **3-C.4 workspace fix_plan-history sync (mode C)** | **Automatic execution — no ask** | — | If this session added `## Completed` entries to `fix_plan.md` AND the current workspace exposes a fix_plan→RAG sync script (per `rag-store.md` "fix_plan.md Completed Item RAG Sync + Delete Obligation"), run it. Session import (3-C.1) and structured chunks (3-C.2) are conversation-shaped; this sync is deliverable-shaped (task/decision history) — neither of the other two modes substitutes for it |
-| Step 4 | Identify the checklist file | Decide the medium (user-specified / fix_plan / checklist.md / AskUserQuestion) — with `--auto`, record to the resolved tracker without asking (see the "`--auto` Mode" section) | When this session has artifacts |
-| Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) — with `--auto`, upsert all N candidates to the tracker and skip the selection ask; the `Skill("wip")` call itself still happens (see the "`--auto` Mode" section) | **Always** — state preservation for next-session resume at cleanup end |
+| **Step 4 (Checklist & Backlog)** | **`Skill("backlog")` or script helper (`update_item.py` / `plane_sync.py`) mandatory** — update completed items and sync external trackers without direct text editing | Decide target tracker (fix_plan / checklist / Plane) if ambiguous | When this session completed tasks or produced backlog items |
+| Step 4.5 (Weekly Report) | Check company project scope and record weekly report | Weekly Report content/skip approval | Company project work |
+| Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) — with `--auto`, proceed with the documented safe default instead of asking; the `Skill("wip")` call itself still happens (see "Auto Mode vs. Ralph Mode") | **Always** — state preservation for next-session resume at cleanup end |
 | **Step 5 report (HARD STOP — re-read before writing)** | **Before composing the completion report, scroll back to "Step 5 Completion Report Table Mandatory Rows" and copy its row list literally.** That section sits *above* the Step 1-5 procedure bodies, so executing the steps in order never passes through it again — the report then gets assembled from memory, which is exactly how mandatory rows (Session identity, the 3-A LLM Wiki scope-check row, the separate 3-C.1 / 3-C.2 / 3-C.4 rows) are silently dropped | — | **Always** — applies to the cleanup wrap-up table AND any separate session-end report |
 | Step 5.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4.5+5 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
 
@@ -94,9 +97,24 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 
 The cleanup wrap-up completion-report table **and** the resulting **session-end final report** written after wip task registration (e.g., "## ✅ Session Ended", "End session report", carryover summary) must **always** include the following rows. Applying the rule only to the cleanup wrap-up table but burying it in a 1-line prose entry within a separate session-end report is a visibility gap — the same rule violation.
 
+**Same-pass duplication rule (HARD STOP — mandatory rows repeat, the full matrix does not)**: "must always include the mandatory rows" does NOT mean "re-emit the entire step-by-step table again". When the Step 4.5 comprehensive matrix (or an equivalent full wrap-up table) has already been emitted earlier in the **same** cleanup pass, the subsequent session-end report is composed of exactly three parts:
+
+1. **Always-repeat rows (repeat verbatim — these are visibility anchors, never dedup them away)**: the Session identity row (full UUID + the `/rename` recommendations) and the RAG store rows **with their concrete chunk counts** (3-C.1 session-import N, 3-C.2 discovery-chunk N with keys). These repeat by design so the final visible message carries them even if the earlier table scrolled away.
+2. **Delta rows**: only the steps that completed *after* the earlier table was emitted (typically Step 5 wip-registration result and Step 5.5 self-task prune).
+3. **A one-line reference** to the earlier table for every other row ("full step matrix: see the Step 4.5 report above") — do not re-emit those rows.
+
+Emitting two near-identical full tables minutes apart buries the delta the user actually needs (what changed since the first table) and doubles the scroll cost. The failure this rule targets is symmetric to the omission failures above: the mandatory-row obligations were all written against *omission*, and over-compliance ("repeat everything to be safe") is the opposite defect.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Re-emit the full Step 0-5 table as the session-end report because "mandatory rows apply to both" | Mandatory rows ≠ the whole table. Session-end report = always-repeat rows (Session identity + RAG counts) + post-table delta + one-line reference |
+| 2 | Dedup so aggressively that the session-end report drops the rename recommendation or the RAG chunk counts | Those rows are the always-repeat set — they must appear again verbatim, counts included |
+| 3 | Emit the Step 4.5 matrix, run Step 5 wip, then rebuild the "final report" from scratch as if no table existed yet | Track that the matrix was already emitted this pass (task entry or explicit note) and compose only the delta + always-repeat rows |
+
 | Step | Result |
 |------|------|
 | **Session identity (mandatory)** | **`Session ID: <full-36-UUID>` + Recommend running: `/rename <model>-<topic>-<sessid8>` (2-3 candidates; each = model family token + dominant-work topic + UUID's leading 8 hex; keep the `/rename ...` command in its own code span with no label or colon inside it, so a single copy-paste is directly runnable)** |
+| **Session Profile & Auto-Compact Risk (mandatory row)** | **`[Profile: <steps> steps, <tools> tools | Risk: <LEVEL>]` (automatically evaluated via `context-usage-now.sh` or `python skills/session/scripts/profile-session.py --current --compact-summary`). If Risk is HIGH or CRITICAL, state the top 2-3 most frequent tool call names.** |
 | **Walkthrough & artifacts (mandatory row)** | **A markdown link to this session's walkthrough file + a one-line summary of what it covers, followed by a list of every artifact created or modified this session (PR/commit, docs, tracker, recurrence-log entries, RAG writes).** Author `walkthrough-<topic>-<sessid8>.md` at the path resolved by the "Walkthrough file" subsection below (`$WSCFG_ARTIFACTS_PATH`, then the `.agents/` → `.ralph/` → `docs/` fallbacks) **before** composing this row — the row links the file, it does not stand in for it. Write `none — no deliverable this session` only when the session genuinely produced nothing, and say why. |
 | 0. TaskList | (cleanup result) |
 | 1. Commit | (commit result or skip reason) |
@@ -106,7 +124,8 @@ The cleanup wrap-up completion-report table **and** the resulting **session-end 
 | **3-C.1 RAG Store (mandatory row)** | **State which medium actually fired ([rag-store.md](./rag-store.md) Medium Matrix (1)-(4)) — the wording differs by medium, do not reuse one fixed template for all: purpose-built importer (medium 2) → "N JSONL log step entries / turns recorded (session import, receiver: `<importer>`) — session UUID `<uuid>`. M artifacts imported."; generic MCP store used as 3-C.1 substitute (medium 1, no purpose-built importer found) → "1 ad-hoc summary chunk added (receiver: MCP store) — session UUID `<uuid>`. NOT a full session import (no purpose-built importer found)."; medium (4) local pending queue → "❌ FAILED — queued to local pending-import queue (`<queue-file>`), retry task registered."** |
 | **3-C.2 Structured discovery chunk (mode B — mandatory row)** | **M discovery chunks added (receiver structured-store dispatch, mode B) — keys: `<key1>`, … OR "none — no reusable discovery this session". Session import (mode A) alone ≠ knowledge persisted; discoveries need mode B to be searchable.** |
 | **3-C.4 fix_plan-history sync (mode C — mandatory row when `fix_plan.md` gained Completed entries this session)** | **P points synced (workspace `<name>` sync script) OR "none — no new Completed entries this session" OR "no sync script for this workspace".** |
-| 4. Weekly Report | (skip / write result) |
+| **4. Checklist & Backlog (mandatory row)** | **`Skill("backlog")` or script helper (`update_item.py` / `plane_sync.py`) result — updated items & external sync status** |
+| 4.5. Weekly Report | (skip / write result) |
 | 5. **wip task registration (mandatory row)** | **`Skill("wip")` call result — N tasks registered (next-session resume possible). Enumerate candidates** |
 
 **The "3-C.1 RAG Store" row is the top visibility priority — bold/highlighting recommended.** Omission triggers "the user doesn't even know it's missing" → triggers this fix (recurrence accumulation).
@@ -152,46 +171,31 @@ This generalizes the identical gate already documented for the `check-session-im
 
 **Self-check (on any completion-keyword auto-entry to cleanup)**: (1) explicit user `/cleanup`, or an auto-trigger? (2) if auto-trigger, is live context ≥ the model threshold? (3) if < threshold → light-touch only (address the specific hook concern); do NOT run claudify improve / wip / full report. This gate does not apply when the user typed `/cleanup` explicitly — an explicit request runs the full sequence regardless of context.
 
-## `--auto` Mode (non-interactive: asks become tracker upserts)
+## Auto Mode vs. Ralph Mode (HARD STOP — do not conflate)
 
-`/cleanup --auto` runs the same five steps, but **every user-decision ask is replaced by upserting all of that ask's candidates into the workspace tracker** (`fix_plan.md` / `checklist.md`, resolved exactly as Step 4's "Checklist file decision order" resolves it). The ask does not disappear and it is not silently decided — it becomes a tracker item the user triages later.
+Two distinct modes suppress `AskUserQuestion`, for different reasons, with different restrictions. Picking the wrong one either annoys an attended user with recording-only theater, or lets an unattended loop take actions only a human should approve.
 
-This section exists because `--auto` was being passed on the command line without being defined anywhere in this skill. A caller following the procedure literally still reached `AskUserQuestion` at Steps 2-5, because those steps unconditionally prescribe an ask. Recorded twice before this section was written (FA `auto-mode-flag-undefined-so-interactive-asks-still-fire`, `status=fix-required`) — the first occurrence was logged without applying the documentation change, and the second was the identical recurrence.
+| | **Auto Mode** (`--auto`) | **Ralph Mode** (true autonomous loop) |
+|---|---|---|
+| When it applies | `--auto` typed explicitly, **or** `--ralph` typed in an interactive session where `RALPH_LOOP=1` is NOT set (see remap rule below) | `.ralph/` directory exists **AND** `RALPH_LOOP=1` is set |
+| Who is present | A human is in the session and can see the result immediately — just doesn't want to be interrupted with asks | No human attending this iteration |
+| AskUserQuestion | Suppressed — proceed with the documented safe default for that step instead of asking | Suppressed — record `[NEEDS_REVIEW]` to `.ralph/improvements.md` instead of acting |
+| Direct modification (rules, memory, hook, commit) | **Allowed** — this is a real session, the human will see the diff | **Forbidden** — record only |
+| Skill/agent creation, Agent-tool delegation | **Allowed** | **Forbidden** — record candidates only |
+| Report medium | Normal chat-visible report, same as an interactive run | `.ralph/improvements.md`, since Ralph has no chat to report to |
+| Retry safety net | **None** — no next loop iteration will pick up a skipped step. Skipping here is permanent until someone notices | A skipped step this iteration can be retried next iteration |
 
-**Ask → upsert mapping**:
+**`--ralph`-in-interactive-session remap (HARD STOP)**: when `--ralph` is typed but `RALPH_LOOP=1` is not set, the session is attended — a human just asked cleanup not to interrupt them, not to restrict itself to record-only autonomous-loop behavior. Treat this exactly as **Auto Mode**, not Ralph Mode: suppress asks, but still directly commit/edit/call skills as a normal attended run would, and report to chat as normal. Do not apply Ralph's record-only restrictions here — those exist for the *no-human-present* case, which this is not. `--ralph` remains available for its literal, fully-restricted meaning whenever `.ralph/` + `RALPH_LOOP=1` both hold.
 
-| Step | Ask in normal mode | `--auto` behavior |
-|------|--------------------|-------------------|
-| Step 2 Phase 2 | How to handle improve findings | Upsert each finding as its own tracker item. Do not ask which to apply |
-| Step 3 | Storage location for persisted knowledge | Store to the default medium for that content type; upsert a tracker item for any candidate whose destination is genuinely ambiguous |
-| Step 4 | Which medium records this session's artifacts | Record to the resolved tracker; do not ask the medium |
-| Step 5 | `Skill("wip")` multi-select of next-session candidates | Upsert **all** candidates to the tracker and skip the multi-select ask. The `Skill("wip")` call itself still happens — only its internal selection ask is replaced |
+**If `.ralph/` exists but it's an interactive user session with neither flag given, use normal mode** — AskUserQuestion is used normally. Do not judge based on `.ralph/` existence alone.
 
-Upserted items follow the tracker's own authoring schema (see the `fix-plan` skill's `add` topic: one-sentence Action + `Why` + `How to apply`). Default priority marker is `[P2:selfable]` unless the finding's own severity clearly implies another rank.
-
-**Destructive and irreversible actions are never automated by `--auto` (HARD STOP)**: `git push`, PR creation, any remote state change (issue/PR comment, label, close/reopen, merge), file deletion, and force operations stay **unexecuted**. They are upserted to the tracker as items instead. `--auto` removes the *ask*, not the *authorization requirement* — an unattended run must not be able to publish or destroy anything.
-
-**`--auto` vs Ralph Mode**: both suppress `AskUserQuestion`, but they differ in what they are allowed to do. Ralph Mode additionally **forbids direct modification** (rules, memory, hooks) and records `[NEEDS_REVIEW]` to `improvements.md`, because a Ralph loop has no human in the turn at all. `--auto` is an interactive-session flag: the user is present and has asked for a low-interruption run, so ordinary local edits proceed as in normal mode and only the decision asks are redirected to the tracker. When both apply (`RALPH_LOOP=1` and an explicit `--auto`), Ralph Mode's restrictions win — it is the stricter of the two.
-
-**Self-check (on entering cleanup with `--auto`)**: (1) did the invocation carry `--auto`? (2) if yes, for every step that this file marks as an ask, did I upsert candidates to the tracker instead of calling `AskUserQuestion`? (3) did any destructive action get executed rather than upserted? If (3) is yes, that is a violation of the HARD STOP above.
-
-## Ralph Mode
-
-Ralph cannot use AskUserQuestion, so every step performs **detection + recording to improvements.md only**.
-
-**Detection method**: Ralph mode only when **all** of the following hold:
-1. `.ralph/` directory exists AND
-2. Environment variable `RALPH_LOOP=1` is set
-
-**If `.ralph/` exists but it's an interactive user session, use normal mode** — AskUserQuestion is used normally. Do not judge based on `.ralph/` existence alone.
-
-**Explicit `--ralph` flag in an interactive session (no `RALPH_LOOP=1`) is a distinct case from a true autonomous loop (HARD STOP)**: a true `RALPH_LOOP=1` loop gets a self-healing safety net — a step skipped this iteration can be retried on the next. A user-typed `--ralph` flag in an interactive session has no such next iteration; a step skipped here is skipped for good unless someone notices. Do not apply the two identically — see the RAG-store carve-out below, which applies regardless of which path triggered Ralph Mode.
+**No retry safety net in Auto Mode (HARD STOP)**: unlike a true `RALPH_LOOP=1` loop, Auto Mode (including the `--ralph`-remapped case) has no next iteration — a step skipped now is skipped for good unless someone notices. Do not silently skip a step just because asking is suppressed; use the step's documented default instead. See the RAG-store carve-out below, which applies regardless of which mode triggered ask-suppression.
 
 **Ask-bypass axis vs. passive-persistence axis (HARD STOP — do not conflate)**: Ralph Mode exists because Ralph cannot call `AskUserQuestion` — it restricts only the steps that would otherwise need a user decision (rule/skill/hook edits, agent spawns, automation creation). It does **not** extend to steps that already run with **no ask in normal mode** — the RAG session-chunk store (3-C.1), the structured discovery-chunk store (3-C.2), and the missed-active-artifact store (3-C.3) are all documented above as "Automatic execution — no ask" even outside Ralph Mode. Skipping them under Ralph Mode is a category error: a step that needs no confirmation cannot be made "more autonomous-unsafe" by removing the confirmation channel. These three sub-steps **still run automatically in Ralph Mode** — only their *reporting* medium changes (append the result to `.ralph/improvements.md` instead of a chat-visible report row, since Ralph has no chat to report to). See each sub-step's own "Ralph mode" note below for the corrected behavior.
 
-**Ralph mode behavior rules**:
+**Ralph mode behavior rules (strict `.ralph/` + `RALPH_LOOP=1` case only — Auto Mode does none of this restriction, see the comparison table above)**:
 
-| User session | Ralph mode |
+| Normal session | Ralph mode |
 |------------|-----------|
 | Confirm via AskUserQuestion | Record `[NEEDS_REVIEW]` to `.ralph/improvements.md` |
 | Direct modification (rules, memory, hook) | **Forbidden** — record only |
@@ -216,18 +220,23 @@ Ralph cannot use AskUserQuestion, so every step performs **detection + recording
 
 Before entering cleanup, if there is **work started but not completed in this session**, it must be completed before cleanup.
 
+**Scope (HARD STOP — do not let this guard become a side-quest)**: "unfinished work" here means work whose *decision* was already made by the user (an arrived background-agent result, a pending consolidate/code-workflow step, an already-approved action interrupted mid-execution). It does **not** license chasing that work through an unbounded chain of follow-on actions cleanup itself has no stake in. In particular: **`git push` / PR creation are never part of this guard's scope, and never part of cleanup's own Step 1** (Step 1 is "Commit Session Changes" — commit only; push is a separate, already-governed axis — see `~/.agents/rules/git.md`'s rule against pushing directly to a shared branch, and the general principle that push is always its own decision, gated separately from commit). If completing the unfinished work would require a push, commit locally as far as this guard's scope goes and stop there — push is its own decision, asked (or, in Auto/Ralph Mode, deferred) on its own terms, not folded into this guard's "finish it" resolution.
+   - **If executing the already-approved unfinished work hits a NEW blocker cleanup did not create and has no scope to fix** (e.g., a pre-existing, unrelated repo-wide gate failure) — do not treat resolving that blocker as part of this guard either. Report it and move on to cleanup Step 0; in Auto/Ralph Mode, this ask-suppression applies here too, not just inside Steps 1-5 (see "Auto Mode vs. Ralph Mode" above — the mode's ask-suppression is not scoped to "only Step 1 onward").
+
 **Procedure**:
 1. Check the state of the prior work — whether background agent results have arrived, whether a consolidate/code-workflow intermediate step is pending, etc.
-2. If there is unfinished work, AskUserQuestion:
+2. If there is unfinished work, AskUserQuestion (normal mode) — or apply the mode-appropriate default per "Auto Mode vs. Ralph Mode" above (Auto Mode: complete it directly without asking; Ralph Mode: record `[NEEDS_REVIEW]`, do not complete it):
    - "Finish then cleanup (Recommended)" — complete the unfinished work, then proceed to cleanup
    - "Cleanup first" — carry the unfinished work over to the next session
-3. If the user selects "finish," complete that work first, then re-enter cleanup
+3. If the user selects "finish" (or Auto Mode's default applies), complete that work first — within the scope above — then re-enter cleanup
 
 | # | Don't | Do |
 |---|-------------|-----------------|
-| 1 | Autonomously carry over unfinished work (e.g., an unposted consolidate review comment) to "the next session" | Confirm "finish vs carry over" via AskUserQuestion |
+| 1 | Autonomously carry over unfinished work (e.g., an unposted consolidate review comment) to "the next session" | Confirm "finish vs carry over" via AskUserQuestion (or the mode default) |
 | 2 | Ignore an arrived background agent result and proceed with cleanup | An arrived result means the work can be resumed. Complete it first |
 | 3 | Reason that "cleanup was invoked, so cleanup is top priority" | cleanup is "session tidy-up," not "abandoning unfinished work" |
+| 4 | Fold `git push`/PR creation into "finishing" a commit-shaped piece of unfinished work | Commit is in scope; push is not. Stop at commit, handle push as its own separate decision |
+| 5 | Call `AskUserQuestion` about a new blocker hit while chasing this guard's unfinished work, while running in Auto/Ralph Mode | This guard is bound by the same mode as the rest of cleanup — suppress the ask per the active mode's default, same as any Step 1-5 ask would be |
 
 **Skip condition**: skip if there is no unfinished work
 
@@ -275,7 +284,7 @@ When a workspace has adopted Plane as its canonical backlog (its local `fix_plan
 
 ## Step 1: Commit Session Changes
 
-Commit files directly modified in this session that are still uncommitted.
+Commit files directly modified in this session that are still uncommitted. **This step is commit only — `git push` and PR creation are out of scope here and everywhere else in cleanup** (per `~/.agents/rules/git.md`: push is always its own decision, gated separately from commit). Do not chain a push onto a Step 1 commit result, in any mode.
 
 **Procedure**:
 1. Check uncommitted changes with `git status`
@@ -733,9 +742,19 @@ The `skill-usage.md` "Generic skill artifact RAG store obligation" rule says **i
 
 ---
 
-## Step 4: Checklist Record
+## Step 4: Checklist & Backlog Sync
 
-Record the work performed in this conversation to the checklist. **Always use the checklist medium regardless of project type** — no company/non-company branching.
+Record and synchronize the work performed in this conversation with the checklist and external backlog trackers (`Skill("backlog")`).
+
+### Script Helper Gate & Prohibit Direct Text Edit (HARD STOP)
+
+In Antigravity (Gemini) and interactive sessions, modifying `fix_plan.md` or `checklist.md` directly via raw text editing (`replace_file_content`, `multi_replace_file_content`, `write_to_file`) is **strictly prohibited (`HARD STOP`)**.
+- All checklist mutations (completing items via `--set-marker '[x]'`, moving to Completed via `--move`, appending progress notes via `--append-note`) **MUST** be performed by executing dedicated CLI scripts:
+  - `python skills/fix-plan/scripts/update_item.py --file <path> --match "<keyword>" --set-marker '[x]'`
+  - `python skills/fix-plan/scripts/update_item.py --file <path> --match "<keyword>" --move`
+  - `python skills/fix-plan/scripts/add_item.py`
+  - `Skill("backlog")` / `skills/backlog/scripts/plane_sync.py` (when Plane or secondary tracker is canonical)
+- Bypassing script helpers by performing raw string replacements is a direct rule violation.
 
 ### Checklist file decision order
 
@@ -934,6 +953,7 @@ Chat text alone is not a state-preservation medium — it scrolls away and is no
 | 4 | Omit some items like Session ID, commits, files | All 8 rows above are mandatory. State "N/A" explicitly for any that don't apply |
 | 5 | Compress the comprehensive report text into the next option description | The comprehensive report is a separate response text. next options are a separate medium for deciding the next action |
 | 6 | Emit the comprehensive matrix as response text only, with no `walkthrough-<topic>-<sessid8>.md` file written | The walkthrough file is a mandatory row, not an optional enhancement — chat text alone does not persist across compact/session boundaries |
+| 7 | Emit the Step 4.5 matrix and then re-emit a near-identical full table again as the session-end report after Step 5 | One full matrix per cleanup pass. The later session-end report follows the "Same-pass duplication rule" (see the Mandatory Rows section): always-repeat rows (Session identity + RAG chunk counts) + post-matrix delta + a one-line reference |
 
 ### Self-check (immediately before the Step 5 next call every time)
 

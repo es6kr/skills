@@ -8,7 +8,7 @@ depends-on:
   - skill-kit
 description: |
   Run the self-improving loop before session end. config - enable/disable individual tasks [config.md], hook-review - review hook errors and suggest improvements [hook-review.md], rag-store - persist to RAG before session end + sync fix_plan completed items to RAG (medium matrix fallback) [rag-store.md], run - 5-step sequential execution (commit → self-improve → knowledge persist → checklist record → next-action recommendation) [run.md]. Mistake recording (retrospect) and FA pruning moved to the fa skill — invoke Skill("fa") / Skill("fa", "fa-prune"). Supports Ralph mode (records to improvements.md instead of AskUserQuestion).
-  Use on "wrap up", "session cleanup", "end session", "cleanup", "record mistake", "save feedback", "improve", "retrospect", "hook error", "next action", "RAG store", "qdrant store", "fix_plan sync".
+  Use on "wrap up", "session cleanup", "end session", "cleanup", "record mistake", "save feedback", "improve", "retrospect", "hook error", "next action", "RAG store", "qdrant store", "fix_plan sync", "cleanup --auto", "cleanup --ralph", "auto mode", "ralph mode".
 triggers:
   - event: Stop
     action: inject
@@ -40,14 +40,16 @@ Sequentially run cleanup tasks before session end.
 ```
 /cleanup              # run topic (default)
 /cleanup run          # explicit run
-/cleanup --auto       # non-interactive: decision asks become tracker upserts
 ```
 
-### `--auto` (non-interactive)
+### Suppress asks (attended session, no interruptions)
 
-`--auto` runs the same five steps but replaces every user-decision ask (Step 2 findings handling, Step 3 storage location, Step 4 medium, Step 5 wip multi-select) with an **upsert of all candidates into the workspace tracker** (`fix_plan.md` / `checklist.md`). Nothing is dropped and nothing is auto-decided — the decision becomes a tracker item.
+```
+/cleanup --auto        # attended session, don't ask — use documented defaults, still commit/edit/call skills normally
+/cleanup --ralph       # typed in an interactive session (no RALPH_LOOP=1): treated as --auto (see run.md's mode comparison table)
+```
 
-Destructive and irreversible actions (`git push`, PR creation, remote state changes, file deletion) are **never** automated by `--auto`; they stay unexecuted and are upserted as tracker items. See [run.md](./run.md) "`--auto` Mode" for the full ask → upsert mapping and how it differs from Ralph Mode.
+`--ralph`'s fully-restricted meaning (record-only, no direct modification, report to `.ralph/improvements.md`) applies only to a true autonomous loop — `.ralph/` directory present **and** `RALPH_LOOP=1` set. See [run.md](./run.md) "Auto Mode vs. Ralph Mode" for the full comparison.
 
 ### Change settings
 

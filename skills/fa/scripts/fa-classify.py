@@ -103,6 +103,37 @@ RESOLVED = re.compile(
     re.I,
 )
 
+# Phase 2 (backward-compatible meta parser): sections rewritten by the class
+# reorganization carry a machine-readable header
+#   <!-- fa: class=<slug> count=N last=<date> status=<state> [hooks=...] -->
+# When present, `status` drives HOT/COLD deterministically instead of the regex
+# heuristics below; sections without a header fall back to the heuristics (older
+# or hand-edited entries), so both formats coexist during the transition.
+META = re.compile(r"<!--\s*fa:\s*(.+?)\s*-->")
+# status values that mean the recurring risk is handled (a guard/rule/fix exists)
+RESOLVED_STATUSES = {"hook-active", "guard-added", "fixed", "rule-covered"}
+# status values that mean the risk is still open (keep HOT unless stale)
+UNRESOLVED_STATUSES = {"hook-pending", "watch"}
+
+
+def parse_section_meta(body):
+    """Return the `fa:` header's key=value fields as a dict, or None if absent."""
+    m = META.search(body)
+    if not m:
+        return None
+    out = {}
+    for kv in m.group(1).split():
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            out[k] = v
+    return out
+
+
+def meta_is_resolved(status):
+    """True when the meta `status` indicates the risk is already handled."""
+    return status in RESOLVED_STATUSES
+
+
 # the hook skill was renamed hook -> hook-kit; older log entries still reference
 # the pre-rename path, so fall back to the renamed location before giving up.
 _HOOK_RENAME = ("/skills/hook/resources/", "/skills/hook-kit/resources/")
@@ -137,6 +168,23 @@ def analyze(path, cutoff, relaxed=False):
         resolved = bool(RESOLVED.search(s))
         later_body = bool(title_date and latest and latest > title_date)
         old = (title_date or latest or "9999") < cutoff
+        # meta header (Phase 2) overrides the heuristic signals when present
+        meta = parse_section_meta(s)
+        via_meta = meta is not None
+        status = meta.get("status", "") if via_meta else ""
+        if via_meta:
+            try:
+                mcount = int(meta.get("count", "1"))
+            except ValueError:
+                mcount = 1
+            meta_last = meta.get("last", "")
+            recur = mcount > 1
+            resolved = meta_is_resolved(status)
+            hook = status == "hook-pending"
+            if meta_last:
+                latest = meta_last
+                old = meta_last < cutoff
+            later_body = False
         blocked = (recur or hook) and not resolved
         hook_paths = []
         if hook:
@@ -166,6 +214,8 @@ def analyze(path, cutoff, relaxed=False):
             "later_body": later_body,
             "old": old,
             "cold": cold,
+            "via_meta": via_meta,
+            "status": status,
             "via_resolve": cold and (recur or hook) and resolved,
             "via_relaxed": cold and relaxed and not cold_strict,
             "hook_paths": hook_paths,
@@ -201,6 +251,33 @@ def cut(rows, outdir):
     return cold, index
 
 
+def verify_meta(path):
+    """Parallel diff: for every meta-carrying section, compare the meta `status`
+    verdict (resolved?) against the legacy heuristic verdict. Phase 2 target is 0
+    disagreements — remaining ones are surfaced for review (usually a heuristic
+    false negative the meta corrects, or a mis-set status field to fix)."""
+    text = io.open(path, encoding="utf-8").read()
+    sections = ["## " + p for p in re.split(r"(?m)^## ", text)[1:]]
+    total_meta = 0
+    disagreements = []
+    for s in sections:
+        meta = parse_section_meta(s)
+        if not meta:
+            continue
+        total_meta += 1
+        title = s.split("\n", 1)[0][3:].strip()
+        status = meta.get("status", "")
+        meta_res = meta_is_resolved(status)
+        heur_res = bool(RESOLVED.search(s))
+        if meta_res != heur_res:
+            disagreements.append((title, status, meta_res, heur_res))
+    print(f"verify-meta: {total_meta} meta sections, "
+          f"{len(disagreements)} resolved-verdict disagreements")
+    for title, status, mr, hr in disagreements:
+        print(f"  [status={status}] meta_resolved={mr} heuristic_resolved={hr} | {title[:70]}")
+    return disagreements
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", default=DEFAULT_FILE)
@@ -215,7 +292,14 @@ def main():
                     help="stale-recurrence policy (option B): newest date < cutoff "
                          "demotes despite recurrence markers; unresolved hook still blocks")
     ap.add_argument("--json", dest="json_out", default=None)
+    ap.add_argument("--verify-meta", action="store_true",
+                    help="parallel diff: meta-based `resolved` vs heuristic `resolved` "
+                         "on meta-carrying sections (Phase 2 reproducibility check)")
     args = ap.parse_args()
+
+    if args.verify_meta:
+        verify_meta(args.file)
+        return
 
     rows = analyze(args.file, args.cutoff, relaxed=args.relaxed)
     n = len(rows)
