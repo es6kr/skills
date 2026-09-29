@@ -131,6 +131,7 @@ Identify the type of task just completed.
 | fix_plan.md / checklist.md | Project-tracked next items (Ralph or general workspace) — **mandatory read when a fix_plan / checklist skill is available** (see "Dependency-gated behaviors"); otherwise an ordinary optional source |
 | Plane | Self-hosted project tracker, if this environment has one configured (check local infra docs for connection details) — check open issues/cycles when the project has one wired up |
 | Session wrap-up | **Only when a session-cleanup skill is available** (see "Dependency-gated behaviors"). `/cleanup` — gated: explicit user wrap-up signal OR injected context-usage at/above the **per-model** threshold (Fable/Mythos 55%, Opus 50%, others 45% — see suggestion-patterns.md "Context-usage gate") |
+| New external-system reference | Was a new tool/service integration just set up this turn (CLI install, credential file, API endpoint)? → "Persist as durable reference" candidate — domain skill first, project memory only if no skill owns the topic (see suggestion-patterns.md "After configuration change") |
 | Other (free text) | Auto-provided by AskUserQuestion |
 
 | # | Don't (forbidden) | Do (correct alternative) |
@@ -140,6 +141,7 @@ Identify the type of task just completed.
 | 3 | Skip Read of suggestion-patterns.md because "I know the patterns" | suggestion-patterns.md is updated with new "After X" templates regularly. Read every time |
 | 4 | Treat just-completed work as the only source | Each candidate discovery source row is a separate enumeration. Cover all rows before stopping |
 | 5 | `/next` receives an explicit file/target argument → proceed straight to a generic TaskList/fix_plan.md-wide sweep (e.g. dumping every `(P0)`/`(P1)` line across unrelated projects) without first reading the argument's own explicit candidates | Read the argument's target first (Step 0.45). Adopt its named follow-up candidates as top priority; run TaskList/fix_plan.md only to confirm nothing else was missed |
+| 6 | Fill a slot with a candidate whose promised effect is already satisfied (e.g. enabling a plugin whose member skills are already loaded via another channel — activation would only double-load) | Verify each newly-discovered candidate against current state (available-skills list, live config) before composing — already-satisfied = availability 0, exclude it. Deferring the check to the option description ("verify duplicates after selecting") is forbidden |
 
 #### Premise verification for stale/prior-session candidates (HARD STOP)
 
