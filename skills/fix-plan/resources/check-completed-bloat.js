@@ -44,6 +44,7 @@ if (!filePath) {
 
 if (filePath && (filePath.includes('fix_plan.md') || filePath.includes('checklist.md'))) {
   if (fs.existsSync(filePath)) {
+    const content = fs.readFileSync(filePath, 'utf8');
     const headingMatch = content.match(/^## Completed\s*$/m);
     if (headingMatch) {
       // slice from end of matched heading; stop at the next top-level "## " heading

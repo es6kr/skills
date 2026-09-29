@@ -115,6 +115,8 @@ Self-check after every topic completion:
 2. Did the user explicitly express follow-up intent (e.g. "record then proceed with X")? If no, just report
 3. Does the response end with "Should I enter /X?" If yes, it's a violation — remove and end the report
 
+*Clarification*: Ask-skip applies ONLY to suppressing unrequested autonomous `AskUserQuestion` follow-up workflow suggestions. It does NOT authorize truncating or omitting the required Step 4 Priority Triage summary output table from the response.
+
 Exceptions:
 
 - User explicitly expressed follow-up intent — ask allowed

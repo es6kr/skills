@@ -76,11 +76,13 @@ A plan-draft follows three stages.
 ### 1. Write
 
 1. Confirm the item genuinely needs a plan and is being deferred (not act-now, not external-blocked).
-2. Ensure a `## Plan Drafts` section exists; create it if absent (place after `## Progress`, near `## Issue Drafts` if present).
+2. Ensure a `## Plan Drafts` section exists; perform a full-file header audit (`grep_search` with `Query: "^##\s+"` or `CaseInsensitive: true`) first. Create a new `## Plan Drafts` header ONLY if zero existing matches are found. If present, append the new stub to the existing section.
 3. Pick a priority (`P0`-`P3`) reflecting promote urgency relative to other drafts (default `P2` when uncertain). The reason is always `:selfable` for Plan Drafts — see [priority.md](./priority.md).
 4. Append the entry as `- [BLOCKED:P*:selfable] {Purpose}` with the four minimal fields underneath.
 
 ### 2. Promote
+
+A `deep` role-profile default invocation surfaces promote-ready drafts (stubs whose complexity fits the deep tier) as execution candidates at the end of its run — see SKILL.md "deep-profile completion handoff". User selection there counts as the promote decision and enters this procedure; drafts are never auto-promoted.
 
 When the resume trigger is met or the user requests promotion:
 

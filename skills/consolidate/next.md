@@ -37,6 +37,27 @@ Immediately after the Status line output, **ask the user for the PR handling dir
 4. Is the merge question leading (Q1)? → If findings exist, invert: finding-handling leads
 5. Is this a post-hoc review PR? → finding options must NOT include "defer all" (deferring contradicts the PR's purpose). Offer scope choices only (which findings), applied immediately
 
+### Finding-handling options must reuse the posted Status column (HARD STOP)
+
+**When Step 7's AI Review Summary already classified each finding's Status (`🔴 Pending` / `🟡 Deferred` / `⚪ Rejected` / `🟢 Fixed`), the Step 8 finding-handling ask must be built FROM those values — never re-derive the decision from scratch.** Status is the classification output of `classify.md`/`post.md`; Step 8 reuses it as input. Composing a fresh item-picker (a multiSelect over all findings, a file/domain grouping, a severity-only grouping) that ignores the already-published Status column repeats a decision the user already saw answered in the Summary table.
+
+- **Only `🔴 Pending` findings need a fix-now-vs-defer decision** — those are the ones still awaiting disposition. `🟡 Deferred`, `⚪ Rejected`, and `🟢 Fixed` findings are already resolved states; reference them as such (Rejected routes through the "Reject finding option mandate" override path above) rather than re-listing them as open choices.
+- **Each option description must quote the finding's current Status value** from the Summary table — this is the mechanical proof the ask is derived from, not independent of, the published classification.
+- **One axis per Pending finding** (per the axis-merged-ask HARD STOP): a `questions` array entry per finding, not a single multiSelect item-picker across all of them.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Build the Step 8 ask as a fresh multiSelect item-picker over all findings, ignoring the Summary's Status column | Filter to `🔴 Pending` findings only; each becomes its own question in the array |
+| 2 | Present a file/domain grouping ("fix file A only" / "fix file A + B" / "fix all") as the primary axis | Status is the primary axis (Pending needs a decision; Deferred/Rejected/Fixed don't). File/domain grouping is at most a secondary commit-unit inside the Pending set |
+| 3 | Treat "code changes always need explicit approval" as license to ignore the already-published Status and re-ask from zero | That principle governs whether the *code fix* runs without approval, not whether the *ask's options* may ignore prior classification. Reuse Status; still ask before touching code |
+| 4 | Omit the Status value from the option description | Quote the exact Status cell text (e.g. "🔴 Pending") in each option's description |
+
+**Self-check (before composing Step 8 finding-handling options, every time)**:
+1. Did you Read the just-posted (or about-to-post) Summary's Status column values?
+2. Does each Pending finding get its own question in the array, with its Status value quoted in the option description?
+3. Are Deferred/Rejected/Fixed findings excluded from the fix-now-vs-defer axis (referenced as already-resolved instead)?
+4. Are you about to invent a grouping axis (file/domain/severity-only) that doesn't derive from Status? → STOP, recompose using Status as the primary input.
+
 ### Refresh the Summary before the merge ask when findings were fixed this session (HARD STOP)
 
 **When the finding-handling answer applies fixes this session (a fix commit lands + CI re-passes), the AI Review Summary posted at Step 7 is now stale — it still lists the fixed findings as open/Valid.** Before composing the merge ask, **PATCH the existing Summary comment to reflect resolution** (each fixed finding marked Resolved with the fixing commit SHA), per `post.md` "Single Summary preservation guard" PATCH procedure. A merge recommendation sitting on a Summary that still shows the findings as open is self-contradictory: the reader sees unresolved findings while the option says merge, and the merge-attestation URL points at a pre-fix record.

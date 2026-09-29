@@ -103,6 +103,8 @@ Self-check (before posting a new Step 7 Summary comment):
 2. If yes, does an Internal Code Review also already exist? — same query for `## Internal Code Review`
 3. If both exist and the Summary's `created_at` precedes the Internal Review's `created_at` → **order is reversed**. Apply the PATCH-swap damage control. Do not create a third comment
 
+> **Presence check must query both mediums (HARD STOP)**: item 1's query above only checks issue comments. When the unified-POST medium (below) applies, the Summary is published as a **Formal Review body**, not an issue comment — a comments-only check false-negatives. Also query `gh api repos/<owner>/<repo>/pulls/<N>/reviews` and check for a review `body` matching the same Summary-header prefixes.
+
 ### Mechanical Verification Gate (HARD STOP — verify_consolidate.py)
 
 **After posting or updating consolidation comments (or before marking consolidation complete), running `python3 skills/consolidate/scripts/verify_consolidate.py --pr <NUMBER>` is MANDATORY.**
@@ -427,7 +429,7 @@ gh pr comment NUMBER -R owner/repo --body-file /tmp/pr-review-summary.md
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | After a major fix, add a new "Update" comment via `gh pr comment` | Find existing Summary comment ID and `gh api .../comments/{id} -X PATCH -f body=@file` |
+| 1 | After a major fix, add a new "Update" comment via `gh pr comment` | Find existing Summary comment ID and `gh api .../comments/{id} -X PATCH --input <(jq -n --rawfile body <file> '{body: $body}')` — **never `-f body=@file`**: `-f` posts the literal string, only `-F` reads `@path`, and even `-F` is riskier than `--input` for multi-line markdown |
 | 2 | Accumulate new comments by just adding "Update N" prefix | Adding "Update 2" prefix in the body is OK, but **update the same comment via PATCH**. Creating new IDs is forbidden |
 | 3 | Leave prior Summary as-is and post a new comment | (a) For a single comment, PATCH (b) For multiple stale Summaries, delete prior or `minimizeComment(OUTDATED)` |
 | 4 | Think "edit history disappears so new comment is safer" | GitHub preserves edit history permanently (queryable via `?old_index=N`). Accumulating new comments = noise |
@@ -507,6 +509,7 @@ fi
 2. N=0 → new comment (`gh pr comment`)
 3. N≥1 → **PATCH** (`gh api .../comments/{id} -X PATCH`). Adding a new comment is forbidden
 4. N≥2 (stale accumulation) → PATCH the most recent one + delete/minimize the rest
+5. **After every PATCH, read back** (`gh api .../comments/{id} --jq '.body'`) and diff against the intended content — a 200 response / returned URL only confirms the HTTP call succeeded, not that the body landed correctly (`-f body=@file` silently posts the literal string instead of file contents; this step is what catches it)
 
 **Formal Review medium** (PATCH-impossible):
 1. `gh api .../pulls/{N}/reviews | jq '[.[] | select(.user.login == "<self>") | select(.body | contains("AI Review Summary"))] | length'` → M items
@@ -788,8 +791,8 @@ Among all actionable items from Step 4 classification:
 
 | Environment detection (based on CWD or workspace) | Medium | Format |
 |--------------------------------------|------|------|
-| `{workspace}/.ralph/fix_plan.md` exists | `.ralph/fix_plan.md` "On Hold" section (inserted **above** the trailing `## Completed`/`## REPEAT` — never at EOF) | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action direction, location, PR #N}` |
-| `{workspace}/checklist.md` exists (Ralph not used) | `checklist.md` | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action, PR #N}` |
+| `{workspace}/.ralph/fix_plan.md` exists | `.ralph/fix_plan.md` "On Hold" section (inserted **above** the trailing `## Completed`/`## REPEAT` — never at EOF) | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action direction, location, [PR #N](URL)}` |
+| `{workspace}/checklist.md` exists (Ralph not used) | `checklist.md` | `- [BLOCKED] [REVIEW_FEEDBACK] {reviewer}: {summary} — {action, [PR #N](URL)}` |
 | Neither exists + GitHub Issue collaboration | New GitHub Issue | `gh issue create` — title `deferred from PR #N: {summary}`, finding details in body |
 | Neither exists + no collaboration medium | AskUserQuestion | "Where to register?" options (new `.ralph/fix_plan.md` / new `checklist.md` / Issue / skip registration) |
 
@@ -811,6 +814,7 @@ Among all actionable items from Step 4 classification:
 3. Add N deferred items in batch (Edit)
 4. Report the N registered items' medium file path in chat (user-verifiable)
 5. **Verify placement**: after the Edit, confirm the nearest preceding `##` heading of the registered items is an active-work section — NOT `## REPEAT` or `## Completed`. If it is one of those, the block landed in the wrong section — move it above the trailing sections
+6. **Recurrence Prevention (Harness Check)**: For any Critical or Important findings that represent recurring risks or common mistakes, evaluate whether they should be codified into a persistent guardrail (e.g., custom linter/AST rules, Git pre-commit/pre-push hooks, or test harness validations). If a finding is a candidate for automation, append `[HARNESS_CANDIDATE]` to the checklist entry to flag it for codification in a follow-up task.
 
 ### Don't / Do table
 

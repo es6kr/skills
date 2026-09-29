@@ -12,6 +12,33 @@ Cross-checks commit-hash and file-path references cited inside `fix_plan.md` / `
 
 [sync.md](./sync.md) polls **external GitHub state** (`gh pr view` / `gh issue view`) — it answers "did the PR/issue change state on GitHub." This topic checks **local git-object and filesystem state** — it answers "does the commit this item cites actually exist, and does the file it points at still show the described problem." A tracker item can cite a commit hash that was never actually created (recorded from a plan that was never executed, or lost when a branch was reset), or point at a file that was since deleted/renamed — `sync` cannot detect either, since neither touches GitHub.
 
+## Canonical-source cross-check for referenced plan/research docs (HARD STOP)
+
+Before building a decision (an `AskUserQuestion`, a priority tag, a resume-trigger) from the **content** of a plan/research `.md` file that a tracker item references, cross-check whether that file's own path is a workspace-local artifacts mirror rather than the corpus that actually owns the topic. A file living under a workspace's `artifacts` role (e.g. `.agents/docs/generated/`) can be a stale, superseded fork of a copy maintained in a different workspace's registered `wiki` corpus — trusting the mirror's content without this check reproduces false claims the corpus's canonical copy already corrected.
+
+### Procedure
+
+1. Resolve the current workspace's artifacts path: `bash <hook-kit>/resources/workspace-config.sh --export` → `WSCFG_ARTIFACTS_PATH`. If the referenced doc lives under this path, treat it as a **candidate mirror**, not automatically canonical.
+2. Enumerate **every** registered `wiki` corpus across **all** profiles in `~/.agents/config.json` — not just the current workspace's own (`WSCFG_WIKI_PATH` only covers the resolved profile; a topic can be authored under a *different* profile's corpus):
+   ```bash
+   jq -r '.profiles | to_entries[] | "\(.key): \(.value.roles.wiki.path // "none")"' ~/.agents/config.json
+   ```
+3. `find` the doc's basename inside each corpus path returned above (`raw/articles/`, `outputs/`, etc.):
+   ```bash
+   find <each-wiki-path> -iname "<basename>" 2>/dev/null
+   ```
+4. If a corpus copy exists, diff it against the mirror copy (mtime + line count, at minimum). A **shorter and/or older** copy is the suspect — read the corpus copy instead, and check whether its frontmatter (`research:`, `relates_to:`) or a changelog line ("Updated ...") points at a companion doc that has since split off the topic you're deciding.
+5. A mirror doc's own `research: none` (or any other "nothing more to see" frontmatter field) is **not evidence** the corpus has no deeper analysis — it only reflects what that fork's author knew at save time. The cross-check in steps 2-4 runs regardless of what the local copy's frontmatter claims.
+
+### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Trust the first copy found inside the workspace's own `artifacts` mirror path as canonical | Resolve `WSCFG_ARTIFACTS_PATH`, then cross-check the doc's basename against every profile's `wiki.path` in `~/.agents/config.json` before trusting its content |
+| 2 | Read a mirror doc's `research: none` frontmatter as proof no deeper analysis exists | That field reflects the fork's save-time state only — search corpora regardless |
+| 3 | Assume a topic's canonical corpus is the *current* workspace's own registered wiki | A topic can be authored under a different profile's corpus (e.g. a workspace-A tracker item referencing content that actually lives in workspace-B's wiki) — enumerate all profiles, not just the active one |
+| 4 | Treat a doc's "Updated ..." changelog note as self-contained once read | If it describes new axes/analysis, search the corpus for a dedicated companion doc it may be pointing at |
+
 ## Procedure
 
 ### 1. Extract reference tokens
@@ -61,6 +88,41 @@ State the count of tokens extracted, how many resolved cleanly, and how many wer
 Tracker verify: N hash refs + M path refs extracted, X resolved, Y flagged (phantom/missing)
 ```
 
+## Second dimension: inline "residual =" claims vs linked plan Progress Checklists
+
+Steps 1-4 verify **atomic references** (a commit hash, a file path). A second, independent staleness source is the **inline residual note** many items carry: a phrase like `residual = ③ requirements doc` paired with a link to a `plan-*.md` whose Progress Checklist is that item's canonical progress. When the plan checklist advances but the item's residual note is not updated, the note claims work is still pending that the plan already marks done — a stale-forward claim that `sync` and the reference check above both miss (no external state changed, no phantom hash).
+
+> **Locale keywords** — a non-English tracker uses its own residual keyword. Those synonyms live in the git-ignored `data/locale-patterns.json` (`residual_keywords` array — the same file section/marker patterns come from), never inline in this published English topic. Load them at runtime and OR them into the grep alternation. See `skill-kit/language` "PUBLIC repo locale-pattern externalization".
+
+### Procedure
+
+1. **Extract residual-note items** — items carrying both a residual phrase and a plan link:
+
+   ```bash
+   RESIDUAL_KW="residual|remaining$(jq -r '.residual_keywords // [] | map("|"+.) | join("")' data/locale-patterns.json 2>/dev/null)"
+   grep -nE "(${RESIDUAL_KW})[[:space:]]*=|\bplan-[a-z0-9-]+\.md" <tracker-file>
+   ```
+
+   Pair each residual line with the `plan-*.md` (or other `*.md`) path in the same item block.
+
+2. **Read the linked plan's Progress Checklist** — extract its `- [ ]` (open) and `- [x]` (done) entries.
+
+3. **Cross-check the residual claim against the checklist** — residual notes usually enumerate the pending steps (`①②③`, `1. 2. 3.`, `Phase N`, named sub-items). Match each enumerated step to the plan checklist:
+
+   | Residual note says | Plan checklist shows | Verdict |
+   |--------------------|----------------------|---------|
+   | step X still pending | X is `- [ ]` | current — agree |
+   | step X still pending | X is `- [x]` | **stale-forward** — note over-states remaining work |
+   | "residual = none / done" | one or more `- [ ]` remain | **stale-backward** — note under-states remaining work |
+
+4. **Correct, don't re-do** — for a stale-forward note, rewrite the residual phrase to the plan's actual open set (or `[x]` the item when the plan checklist is fully `[x]`). Never re-execute a step the plan already marks done — stopping the tracker from driving already-finished work is the whole point of the check.
+
+### Report (folded into the Step 4 line)
+
+```text
+Tracker verify: N hash + M path refs (X resolved, Y flagged); R residual-note items checked, S stale vs plan checklist
+```
+
 ## Don't / Do
 
 | # | Don't | Do |
@@ -70,9 +132,10 @@ Tracker verify: N hash refs + M path refs extracted, X resolved, Y flagged (phan
 | 3 | Skip this check because the tracker "looks recent" | Staleness is about the reference's accuracy, not the tracker's age — a reference can go stale within the same session if other work lands concurrently |
 | 4 | Silently correct flagged items without reporting the count | Always emit the report line (Step 4) — the check's value is visible verification, not a silent pass |
 
-## Self-check (before triaging a `[BLOCKED]`/`[ ]` item that cites a hash or path)
+## Self-check (before triaging a `[BLOCKED]`/`[ ]` item that cites a hash, path, or residual note)
 
 1. Does the item text contain a hash-like token or a backtick-quoted file path?
 2. If yes, resolve it per Step 2 before treating the item's claim as current
 3. Unresolvable (phantom/missing) → flag for the user, do not guess either direction
 4. Resolvable but target state contradicts the claim → correct the tracker, don't re-apply
+5. Does the item carry an inline "residual =" note plus a linked `plan-*.md`? If yes, cross-check that note against the plan's Progress Checklist (Second dimension) before acting — a stale-forward note drives already-finished work

@@ -39,6 +39,10 @@ import re
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 SECTION_RE = re.compile(r'^##\s+(.+?)\s*$')
 CITATION_ITEM_RE = re.compile(r'(\w+):"([^"]*)"')
 MARKER_RE = re.compile(r'<!--\s*pinned-backing:\s*(.*?)\s*-->')

@@ -62,6 +62,16 @@ if hasattr(sys.stdout, "reconfigure"):
 
 ITEM_RE = re.compile(r"^([ \t]*)-[ \t]+(\[[^\]]*\])[ \t]+(.*)$")
 
+# A short one-line reference to a research/plan artefact -- the escape hatch the
+# budget error message itself recommends -- is exempt from MAX_BODY_LINES. Without
+# this, an item already at the cap has no sanctioned way to follow that advice:
+# the reference note is itself one more line, so appending it would also be
+# rejected, leaving no path back into budget (see add_item.py's fix_plan.md
+# entry "update_item.py 10줄 예산 초과 항목의 append 막다른 길 해소"). The exemption is
+# capped at REF_NOTE_MAX_LEN so it cannot be used to smuggle an arbitrarily long
+# note in under the guise of a short reference.
+REF_NOTE_MAX_LEN = 100
+
 
 def find_item_block(lines: list[str], match_text: str) -> tuple[int, int, int]:
     """Locate the single item whose action text contains match_text.
@@ -125,15 +135,17 @@ def apply_update(block: list[str], set_marker: str | None, append_note: str | No
                 break
         if note_indent is None:
             note_indent = " " * (indent + 2)
-        note_line = f"{note_indent}- {append_note.strip()}"
+        stripped_note = append_note.strip()
+        note_line = f"{note_indent}- {stripped_note}"
         prospective_len = len(block) + 1
-        if prospective_len > MAX_BODY_LINES:
+        if prospective_len > MAX_BODY_LINES and len(stripped_note) > REF_NOTE_MAX_LEN:
             raise ValueError(
                 f"item body would grow to {prospective_len} lines, over the "
-                f"{MAX_BODY_LINES}-line budget. Move the note into a "
-                "research-<slug>.md / plan-<slug>.md artefact and reference it "
-                "with a one-line sub-bullet instead (add.md 'Deliverable "
-                "separation matrix')."
+                f"{MAX_BODY_LINES}-line budget, and the note is {len(stripped_note)} "
+                f"chars (over the {REF_NOTE_MAX_LEN}-char one-line-reference "
+                "exemption). Move the note into a research-<slug>.md / "
+                "plan-<slug>.md artefact and reference it with a short one-line "
+                "sub-bullet instead (add.md 'Deliverable separation matrix')."
             )
         block.append(note_line)
 
@@ -454,10 +466,30 @@ def self_test() -> int:
     # apply_update: budget enforcement
     padded_block = block + [f"  - pad {i}" for i in range(7)]  # 3 + 7 = 10 lines, +1 note = 11 > 10
     try:
-        apply_update(padded_block, None, "one more line pushes it over budget")
-        check("length budget enforced", False)
+        apply_update(padded_block, None, "one more line pushes it over budget, and this note is also long enough to fail the reference exemption")
+        check("length budget enforced for a long note", False)
     except ValueError:
-        check("length budget enforced", True)
+        check("length budget enforced for a long note", True)
+
+    # apply_update: a short one-line artefact reference is exempt from the
+    # budget even when the item is already over it (the escape hatch the
+    # error message itself recommends must actually be reachable)
+    ref_updated = apply_update(padded_block, None, "see plan-xyz.md")
+    check(
+        "short reference note is exempt from the length budget",
+        ref_updated[-1] == "  - see plan-xyz.md",
+    )
+    check("reference-note exemption still grows the block by one line", len(ref_updated) == len(padded_block) + 1)
+
+    # apply_update: a note right at REF_NOTE_MAX_LEN is exempt, one char over is not
+    at_cap_note = "x" * REF_NOTE_MAX_LEN
+    apply_update(padded_block, None, at_cap_note)  # must not raise
+    check("note exactly at REF_NOTE_MAX_LEN is exempt", True)
+    try:
+        apply_update(padded_block, None, "x" * (REF_NOTE_MAX_LEN + 1))
+        check("note one char over REF_NOTE_MAX_LEN is still rejected when over budget", False)
+    except ValueError:
+        check("note one char over REF_NOTE_MAX_LEN is still rejected when over budget", True)
 
     # run_update end-to-end via a temp file
     import tempfile

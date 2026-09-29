@@ -7,7 +7,7 @@ import os
 import re
 import codecs
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from workspace_profile import resolve_tracker_root
 
 def parse_args():
@@ -85,14 +85,39 @@ def all_descendants_checked(n):
             return False
     return True
 
+COMPLETION_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})[^)\n]*(?:completed|완료)")
+
 def extract_date(text):
+    """Best-effort completion-date guess from a single line of text."""
+    m = COMPLETION_DATE_RE.search(text)
+    if m:
+        return m.group(1)
     dates = re.findall(r"\b(202\d-\d{2}-\d{2})\b", text)
     if dates:
-        return dates[-1]
+        # First literal, not last: a title can reference an unrelated
+        # earlier date (e.g. a priority-demotion date) after its own
+        # leading/true date, and fix_plan.md's own Completed-entry
+        # convention places the authoritative date first
+        # ("- YYYY-MM-DD HH:mm — summary").
+        return dates[0]
     m = re.search(r"\b(202\d-\d{2})\b", text)
     if m:
         return m.group(1) + "-01"
     return datetime.now().strftime("%Y-%m-%d")
+
+def extract_date_from_node(node):
+    """Like extract_date, but also checks child lines for an explicit
+    completion annotation before falling back to the parent title's own
+    date literal(s) — the true completion date is often logged in a
+    child sub-bullet rather than the parent title line."""
+    m = COMPLETION_DATE_RE.search(node.text)
+    if m:
+        return m.group(1)
+    for child in node.children:
+        m = COMPLETION_DATE_RE.search(child.text)
+        if m:
+            return m.group(1)
+    return extract_date(node.text)
 
 def node_to_lines(node):
     lines = []
@@ -195,8 +220,16 @@ def node_to_completed_block(node, strip_checkbox=True):
     return lines
 
 def main():
+    # Console codepages other than UTF-8 (e.g. Windows cp949) crash on
+    # print() of tracker text containing em-dashes, Korean, etc. Reconfigure
+    # stdout/stderr to UTF-8 with a safe fallback so the archive-write loop
+    # (which prints each entry's title) never dies mid-write.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     args = parse_args()
-    
+
     # 1. Resolve file path
     file_path = args.file
     if not file_path:
@@ -221,8 +254,19 @@ def main():
     # 2. Resolve cutoff date
     cutoff_date = args.cutoff
     if not cutoff_date:
-        # Defaults to YYYY-MM-01 of the current date
-        cutoff_date = datetime.now().strftime("%Y-%m-01")
+        if args.period == "weekly":
+            # Defaults to the Monday of the current ISO week — matches
+            # check-completed-bloat.js's own "current week start" boundary.
+            # Falling back to the monthly YYYY-MM-01 default here (as before)
+            # silently produced a monthly-equivalent cutoff even when --period
+            # weekly was requested, under-archiving relative to the weekly
+            # threshold the companion guard hook enforces.
+            today = datetime.now()
+            monday = today - timedelta(days=today.weekday())
+            cutoff_date = monday.strftime("%Y-%m-%d")
+        else:
+            # Defaults to YYYY-MM-01 of the current date
+            cutoff_date = datetime.now().strftime("%Y-%m-01")
     print(f"Archive Cutoff Date: {cutoff_date}")
 
     # Read file
@@ -273,7 +317,7 @@ def main():
             for node in forest:
                 if node.is_list_item and node.checked is True:
                     completed_entries.append({
-                        "date": extract_date(node.text),
+                        "date": extract_date_from_node(node),
                         "node": node
                     })
                 elif node.is_list_item and node.text.strip():
@@ -285,7 +329,7 @@ def main():
                         })
                     else:
                         completed_entries.append({
-                            "date": extract_date(node.text),
+                            "date": extract_date_from_node(node),
                             "node": node
                         })
             continue
@@ -322,7 +366,7 @@ def main():
 
                 if is_top_level_complete or is_subtree:
                     completed_entries.append({
-                        "date": extract_date(node.text),
+                        "date": extract_date_from_node(node),
                         "node": node
                     })
                 else:
@@ -415,8 +459,13 @@ def main():
     else:
         output_bytes = output_content.encode('utf-8')
 
-    # Backup original file — timestamped slot so a rerun cannot clobber the only good copy
-    backup_path = f"{file_path}.{datetime.now().strftime('%Y%m%d-%H%M%S')}.bak"
+    # Write archives & backup
+    tracker_dir = os.path.dirname(file_path)
+    bak_dir = os.path.join(tracker_dir, ".bak")
+    os.makedirs(bak_dir, exist_ok=True)
+
+    # Backup original file into .bak/ directory — timestamped slot so a rerun cannot clobber the only good copy
+    backup_path = os.path.join(bak_dir, f"{os.path.basename(file_path)}.{datetime.now().strftime('%Y%m%d-%H%M%S')}.bak")
     with open(backup_path, 'wb') as f:
         f.write(raw)
     print(f"Backup created at {backup_path}")

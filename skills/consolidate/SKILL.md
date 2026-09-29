@@ -53,6 +53,7 @@ Interactive mode auto-activated by caller args (intent: <intent class>) — draf
 | 3 | Silent activation without chat acknowledgement | Emit the one-liner above so the user can confirm the intent was caught |
 | 4 | Map "important decision ask" only to scope-decision axes (Step 5 Axis B / Step 8 next-action) | Body content of Internal Review / Summary is an "important decision" too — every POSTed artifact is subject to review-before-post |
 | 5 | Directly running a local/CLI review tool (e.g., CodeRabbit CLI) and skipping the sequential topics of the `consolidate` skill (collect -> internal -> classify) | Even when running local CLI tools, always route through the `collect.md` and `internal.md` steps to ensure that the Internal Code Review comments and AI Review Summary are always posted as a pair |
+| 6 | Declaring consolidation completed or proceeding to PR merge without physically POSTing the AI Review Summary comment on GitHub (`gh pr comment` / `gh api POST`) | Must physically execute Step 7 (`post.md`) to POST or PATCH the AI Review Summary comment on the PR on GitHub before declaring consolidation complete or offering merge (HARD STOP) |
 
 ### Interactive flow contract
 

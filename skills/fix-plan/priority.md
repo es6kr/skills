@@ -119,6 +119,21 @@ The plain `[BLOCKED]` form remains valid (no priority, no reason) — readers/pa
 
 Ralph's autonomous loop continues to skip `[BLOCKED]` regardless of suffix — the suffix is for human triage, not loop control.
 
+### Unranked `- [ ]` entries
+
+`[BLOCKED]` has a documented default; plain `- [ ]` did not, so triage had no defined way to sort the unranked majority of a mature tracker. Resolve each unranked `- [ ]` by its structural position, in this order:
+
+| Position | Treatment | Why |
+|----------|-----------|-----|
+| Nested under a parent entry (sub-checkbox) | **Inherits the parent's rank and reason** — do not assign its own | The sub-item exists to decompose the parent, so ranking it separately double-counts the same work and lets a child drift above its own parent |
+| A bare grouping header carrying no executable content (e.g. `- [ ]` whose text is a section label) | **Excluded from ranking entirely** — not an item | Ranking a label inflates counts with work that does not exist. Prefer converting it to a plain bullet so it stops parsing as an item |
+| Carries a tracker key (`[PROJ-N]`) but no rank | **Rank is authoritative in the tracker, not here** — read it there rather than back-filling locally | These are index entries; a locally invented rank silently competes with the tracker's own field |
+| Standalone executable item, no rank, no tracker key | **Default `P2:selfable`** | `- [ ]` asserts the item is *not* blocked, so the reason is `selfable`; absent a stated rank, the neutral middle (`P2`) is the only non-arbitrary choice. Mirrors the bare-`[BLOCKED]` → `:P2:external` default above |
+
+The default is a **read convention, not a licence to write markers** — do not mass-back-fill `P2:selfable` into the file. Back-fill only when a specific item's real rank is known, exactly as with bare `[BLOCKED]`.
+
+Report unranked standalone items as their own line in the triage output (e.g. "N unranked → read as P2:selfable"). Folding them silently into the P2 bucket hides how much of the tracker has never actually been triaged.
+
 ### Plan Drafts (`## Plan Drafts` section)
 
 Entries in `## Plan Drafts` are **always** `[BLOCKED:P*:selfable]`, never `[ ]` — see [draft.md](./draft.md) for the rationale. The marker pieces decompose as:

@@ -63,7 +63,24 @@ Skill("superpowers:receiving-code-review")
 
 This loads the verify→evaluate→respond protocol. Follow it for every feedback item in Step 4 (classify).
 
-**Abort if unavailable (HARD STOP)**: If the `Skill("superpowers:receiving-code-review")` call fails or the skill does not exist, **immediately abort the consolidate procedure**. Report to the user "Cannot use the `superpowers:receiving-code-review` skill; aborting consolidate" and terminate. Analyzing reviews without the verify→evaluate→respond framework risks blind acceptance, so alternative continuation is prohibited.
+**Proactive Plugin Installation (HARD STOP)**: `superpowers` MUST be installed as a **plugin** (`obra/superpowers`), NOT as individual skills via `npx skills add`. If the plugin is not present, install it via the plugin management mechanism:
+```bash
+# Plugin installation for superpowers
+claude plugin add obra/superpowers
+```
+Check and install any other missing peer skills or plugins (like `git-repo` or `github-flow` from `es6kr/skills`) in the same manner.
+
+**Abort if unavailable (HARD STOP)**: If the skill remains unavailable even after the installation attempt, or if the installation command fails, **immediately abort the consolidate procedure**. Report to the user "Cannot use the `superpowers:receiving-code-review` skill; aborting consolidate" and terminate. Analyzing reviews without the verify→evaluate→respond framework risks blind acceptance, so alternative continuation is prohibited.
+
+## Re-checking a previously-posted AI Review Summary
+
+When following up on a `[REVIEW_FEEDBACK]` fix_plan entry (checking whether a previously-deferred finding is still outstanding), don't re-parse `gh pr view --json comments`'s output by hand — extract the already-posted Findings table structurally:
+
+```bash
+uv run python ~/.claude/skills/consolidate/scripts/extract-review-findings.py <owner/repo> <pr_number>
+```
+
+Prints `{"comment_url": "...", "findings": [{"#": "1", "Source": "...", ...}, ...]}` — one dict per row, keyed by whatever column headers the table actually used (column layout varies slightly across sessions — e.g. `Source`/`Location` vs `Reviewer`/`File:Line`). Errors with `{"error": "no AI Review Summary comment found"}` (exit 1) if the PR has no posted summary yet.
 
 ## Next
 
