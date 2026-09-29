@@ -96,7 +96,15 @@ fi
 
 if [ -f "$marker" ]; then
   now=$(date +%s)
-  mtime=$(stat -f %m "$marker" 2>/dev/null || stat -c %Y "$marker" 2>/dev/null || echo 0)
+  # GNU coreutils uses `stat -c %Y`; BSD/macOS uses `stat -f %m`. The probe
+  # order is load-bearing, not cosmetic: BSD `stat -c` fails outright, but GNU
+  # `stat -f` SUCCEEDS with an unrelated filesystem dump (there `-f` means
+  # --file-system). Probing the BSD form first therefore captured that
+  # multi-line dump as $mtime on Linux and the arithmetic below died with
+  # "syntax error in expression", so the marker cache never took effect and
+  # every command was blocked even right after `orca terminal list`.
+  mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null || echo 0)
+  case "$mtime" in ''|*[!0-9]*) mtime=0 ;; esac
   age=$(( now - mtime ))
   if [ "$age" -lt 1800 ]; then
     exit 0
