@@ -5,6 +5,16 @@
 
 set -euo pipefail
 
+# Headless self-suppression — this hook's additionalContext assumes a human
+# will act on it (AskUserQuestion, manual verification). Ralph loops and bare
+# `claude -p` calls have no one to read it, so the injection is pure context
+# waste there. RALPH_LOOP kept for back-compat; AGENT_HEADLESS is the runtime-
+# agnostic signal claude-wrapper-ralph.sh / the headless-mode shell function
+# set (plan-ralph-headless-plugin-disablement.md, es6kr workspace).
+if [[ "${RALPH_LOOP:-}" == "1" || "${AGENT_HEADLESS:-}" == "1" ]]; then
+  exit 0
+fi
+
 INPUT="$(cat)"
 PROMPT="$(echo "$INPUT" | python3 -c "import sys, json; d = json.load(sys.stdin); print(d.get('prompt', ''))" 2>/dev/null || echo "")"
 
