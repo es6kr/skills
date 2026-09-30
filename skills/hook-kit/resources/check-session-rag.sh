@@ -213,7 +213,7 @@ Signals detected:
   - Audit/discovery prompts: $audit_signal
   - RAG-store calls: $store_count
 
-Per skill-usage.md "session-end RAG store requirement": store key findings to a RAG receiver before ending the session. Use the appropriate <vendor>-store MCP tool (1 call per finding, with metadata keys: type, project, date, category). MCP store tool unavailable this session (MCP bindings are fixed at session start)? Use the vendor script route instead — e.g. Skill("es6kr", "qdrant-import") / qdrant-import.py — it counts as a store call here, per the tool-priority rule (skill script -> CLI -> HTTP -> MCP). Do NOT conclude the store is impossible from MCP absence alone.
+Per skill-usage.md "session-end RAG store requirement": store key findings to a RAG receiver before ending the session. Use the appropriate <vendor>-store MCP tool (1 call per finding, with metadata keys: type, project, date, category). MCP store tool unavailable this session (MCP bindings are fixed at session start)? Use the vendor script route instead — e.g. Skill("rag:qdrant", "qdrant-import") / qdrant-import.py — it counts as a store call here, per the tool-priority rule (skill script -> CLI -> HTTP -> MCP). Do NOT conclude the store is impossible from MCP absence alone.
 
 To skip this check intentionally, the user must explicitly say "no RAG store needed" or "skip qdrant store".
 
