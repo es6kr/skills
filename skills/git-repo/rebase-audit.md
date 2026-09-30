@@ -96,6 +96,45 @@ After restoration, report the updated `git diff --cached` state and stop. Whethe
 3. Are all candidates gathered into a single `AskUserQuestion` multiSelect call, rather than one ask per file?
 4. Did any restoration touch content outside the user's selected hunks?
 
+## Resolving a pick whose entire content is already upstream (proven-redundant pick)
+
+The mirror-image case to the accidental-revert audit above: instead of a hunk being wrongly
+dropped, an entire pick's content turns out to already exist in `onto` (equal or further
+refined) — typically an old preserved/orphan branch being rebased onto a base that already
+absorbed its work through a different SHA (a squash-merge, a separate cherry-pick landing).
+
+**Proof, not assumption**: before resolving every conflict in a pick by keeping `ours`,
+establish it mechanically per file — `git show <pick-sha>:<file>` vs `git show <onto>:<file>`
+via `diff`, confirming `onto`'s version is a strict superset/refinement (same fields plus
+more, or byte-identical). Don't take "the file already has similar content" as sufficient;
+confirm nothing in `theirs` is missing from `ours`.
+
+**Resolution without `git checkout --ours`**: `bash-guard`-style safety hooks commonly pattern-match
+`git checkout --ours/--theirs <path>` as "discards working directory changes" and block it,
+even though conflict-side selection during a merge/rebase is not the destructive discard the
+guard is meant to catch. Write the winning stage's blob directly instead — index stage 2 is
+`ours`, stage 3 is `theirs`:
+
+```bash
+git show :2:<file> > <file>   # ours (HEAD side of the conflict)
+git add <file>
+```
+
+**Continuing confirms the redundancy independently**: after resolving every conflicted file
+this way, `git rebase --continue`. A pick that is now a true no-op either lands as an empty
+commit (rebase reports it and moves on) or git detects "patch contents already upstream" and
+auto-drops it — either outcome is git's own confirmation that the proof above was correct, not
+just a plausible guess. If the branch's *every* pick resolves this way, the final tip lands
+exactly on `onto` — a clean, git-native "this branch is now an ancestor of `onto`" state that
+`git branch --merged` can verify later, unlike `git rebase --abort`, which just leaves the
+orphan branch at its stale pre-rebase tip with nothing resolved.
+
+**Don't default to `--abort` because a stuck rebase looks like a mistake**: hitting a conflict
+mid-rebase is not itself evidence the rebase was ill-conceived. If the conflict resolves this
+cleanly (mechanically provable redundancy), completing it is the more thorough close — `--abort`
+trades "definitely nothing lost" for "definitely nothing resolved either," which just defers the
+same investigation to a future session.
+
 ## Post-mortem: clobbered branch pointers after a botched rebase
 
 A different failure shape than the live-rebase case above: an interactive rebase finishes badly (e.g. lands on a junk placeholder commit) and, as a side effect, a batch of unrelated local branches end up pointing at that same wrong tip — their reflog shows a single `branch: Created from main`-style entry with no prior history, meaning the ref was recreated rather than moved. This shows up hours or days later as many branches sharing one identical short SHA that clearly isn't any of their real work.
