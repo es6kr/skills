@@ -406,6 +406,10 @@
           },
           {
             "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-self-task-open-at-wrapup.js"
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-malformed-tool-call.sh"
           },
           {
