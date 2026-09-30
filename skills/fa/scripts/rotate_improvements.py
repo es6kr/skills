@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 import sys
+import tempfile
 
 RESOLVED_TAG_PREFIXES = {
     'APPLIED',
@@ -108,9 +109,15 @@ def parse_improvements(content: str):
         else:
             active_entries.append(entry)
 
-    return "".join(preamble_lines), active_entries, resolved_entries
+    # `sections` is returned alongside the per-entry copy because prose carried on
+    # entries is only recoverable while that section still HAS an entry. When every
+    # item in a section is resolved, all of them move to the archive and the prose
+    # has no carrier left, so it disappears from both files. The ordered map is the
+    # only way format_entries can re-emit such a section.
+    sections = {h2: "".join(lines) for h2, lines in section_prose.items()}
+    return "".join(preamble_lines), sections, active_entries, resolved_entries
 
-def format_entries(entries, preamble=None, archive_link=None):
+def format_entries(entries, preamble=None, archive_link=None, sections=None):
     # Keep the file's own preamble. Regenerating a fixed header here would discard
     # whatever the ledger carried above its first section.
     if preamble and preamble.strip():
@@ -124,20 +131,40 @@ def format_entries(entries, preamble=None, archive_link=None):
         out.append(f"<!-- archive-link: {archive_link} -->\n\n")
         out.append(f"> 📦 **Archived Items**: Past resolved items are archived in [{archive_link}]({archive_link}).\n\n")
 
-    current_h2 = None
+    # Walk sections in their original order rather than following `entries`, so a
+    # section whose every item was archived still emits its heading and prose
+    # instead of vanishing with its items. Falling back to entry order keeps the
+    # function usable when no section map is supplied.
+    by_h2 = {}
     for e in entries:
-        if e['h2'] and e['h2'] != current_h2:
-            current_h2 = e['h2']
-            header = current_h2 if current_h2.endswith('\n') else current_h2 + '\n'
+        by_h2.setdefault(e['h2'], []).append(e)
+
+    ordered_h2 = list((sections or {}).keys())
+    for e in entries:
+        if e['h2'] not in ordered_h2:
+            ordered_h2.append(e['h2'])
+
+    for h2 in ordered_h2:
+        section_entries = by_h2.get(h2, [])
+        prose = (sections or {}).get(h2, '')
+        if not section_entries:
+            # Orphaned section: no surviving entry carries this prose.
+            if not prose.strip():
+                continue
+            if not h2:
+                continue
+        if h2:
+            header = h2 if h2.endswith('\n') else h2 + '\n'
             out.append(f"\n{header}")
-            prose = e.get('section_prose', '')
             if prose.strip():
                 out.append(prose if prose.endswith('\n') else prose + '\n')
             else:
                 out.append('\n')
-        out.append("".join(e['lines']))
-        if not "".join(e['lines']).endswith('\n'):
-            out.append('\n')
+        for e in section_entries:
+            body = "".join(e['lines'])
+            out.append(body)
+            if not body.endswith('\n'):
+                out.append('\n')
     return "".join(out)
 
 def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict:
@@ -147,7 +174,7 @@ def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict
     with open(src_path, 'r', encoding='utf-8') as f:
         content = f.read()
         
-    preamble, active, resolved = parse_improvements(content)
+    preamble, sections, active, resolved = parse_improvements(content)
     stats = {
         'src': src_path,
         'archive': archive_path,
@@ -161,7 +188,9 @@ def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict
         
     # Prepare archive content
     archive_basename = os.path.basename(archive_path)
-    active_text = format_entries(active, preamble=preamble, archive_link=archive_basename)
+    active_text = format_entries(
+        active, preamble=preamble, archive_link=archive_basename, sections=sections
+    )
     
     archive_existing = ""
     if os.path.exists(archive_path):
@@ -183,13 +212,28 @@ def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict
         archive_text = archive_existing.rstrip() + "\n\n" + resolved_formatted.lstrip()
         
     os.makedirs(os.path.dirname(archive_path) or '.', exist_ok=True)
-    with open(archive_path, 'w', encoding='utf-8') as f:
-        f.write(archive_text.strip() + '\n')
-        
-    with open(src_path, 'w', encoding='utf-8') as f:
-        f.write(active_text.strip() + '\n')
-        
+    # Archive first, and only truncate the source once the archive is durable.
+    # Both go through a temp file + os.replace: two plain open(...,'w') calls leave
+    # a window where an interruption truncates the source with its content not yet
+    # anywhere else, and this script has no backup to fall back on.
+    _atomic_write(archive_path, archive_text.strip() + '\n')
+    _atomic_write(src_path, active_text.strip() + '\n')
+
     return stats
+
+def _atomic_write(path: str, text: str) -> None:
+    directory = os.path.dirname(path) or '.'
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix='.rotate-', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 def main():
     if sys.stdout.encoding and sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
