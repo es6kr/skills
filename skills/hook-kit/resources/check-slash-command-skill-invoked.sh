@@ -78,7 +78,9 @@ SCOPED=$(tail -n +"$ABS_LINE" "$TRANSCRIPT_PATH" 2>/dev/null)
 
 # Structural match only: `"skill":"<slug>"` appears ONLY inside a real Skill
 # tool_use `input` object — free-text mentions are JSON-escaped and never match.
-if printf '%s' "$SCOPED" | grep -qF "\"skill\":\"$SLUG\""; then
+# Also accept a namespaced form (`"skill":"<plugin>:<slug>"`, e.g. Skill("es6kr:claude-session", ...)) —
+# a plugin-qualified call is still a genuine invocation of the same skill.
+if printf '%s' "$SCOPED" | grep -qE "\"skill\":\"([a-zA-Z0-9_-]+:)?${SLUG}\""; then
   exit 0
 fi
 
