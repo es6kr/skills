@@ -91,10 +91,26 @@ disconnected or confirmed headless/invisible — see "Fresh-login flow" below.
 
 **Known CDP-hostile services** (grows as new cases are confirmed):
 
-| Service | Symptom | Confirmed working alternative | Notes |
-|---------|---------|-------------------------------|-------|
-| Cloudflare (dash.cloudflare.com and any Cloudflare-fronted site) | Turnstile "Verifying you are human" interstitial that does not clear, or clears then re-triggers | **wmux/cmux panel**, when detected (see Backend selection table above) | Self-referential — Cloudflare's own dashboard sits behind Cloudflare's bot protection |
-| Google (accounts.google.com and Google-account-gated consoles) | "Couldn't sign you in — this browser or app may not be secure" | **wmux/cmux panel**, when detected | Google explicitly blocks non-standard/automation-flagged browser sessions for account sign-in |
+**Scope: this table is per host OS layer (SKILL.md Step 0a), not per service alone.** Every row below
+was recorded on `host=windows` with `chrome-devtools-mcp` attached to the user's Windows Chrome. A
+verdict here does not transfer to `host=wsl`, where Playwright MCP drives a separate Linux Chrome —
+see "WSL measurements" immediately after the table.
+
+| Service | Symptom (`host=windows`, chrome-devtools) | Confirmed working alternative | Notes |
+|---------|-------------------------------------------|-------------------------------|-------|
+| Cloudflare (dash.cloudflare.com and any Cloudflare-fronted site) | Turnstile "Verifying you are human" interstitial that does not clear, or clears then re-triggers | **wmux/cmux panel**, when detected (see Backend selection table above); on `host=wsl` the login form is reachable — see below | Self-referential — Cloudflare's own dashboard sits behind Cloudflare's bot protection |
+| Google (accounts.google.com and Google-account-gated consoles) | "Couldn't sign you in — this browser or app may not be secure" | **`host=wsl` + Playwright MCP** (measured end-to-end, see below); **wmux/cmux panel**, when detected | The flag is attached to the browser instance, so a separate Linux Chrome is not covered by the Windows finding |
+
+#### WSL measurements (`host=wsl`, Playwright MCP / Linux Chrome)
+
+| Service | Result | Evidence scope |
+|---------|--------|----------------|
+| Google (accounts.google.com → console.cloud.google.com) | **Sign-in completed; console fully drivable** | Reached `signin/challenge/pwd`, completed reauth, then created *and* deleted an OAuth client through the console UI — including the confirm-word delete dialog. No "browser may not be secure" screen at any point |
+| Cloudflare (dash.cloudflare.com/login) | **Login form reached; no interstitial** | Email + password fields present, no `challenges.cloudflare.com` iframe, and none of "Verifying you are human" / "Checking your browser" / "Access denied" present. **Sign-in completion not verified** (no credential submitted) — do not read this row as "login succeeds" |
+
+**Consequence for the escalation rule below**: while `host=wsl`, do not treat a listed service as
+pre-blocked. Try Playwright MCP first and record what actually happens; escalate only on an observed
+block. The ladder applies unchanged on `host=windows`.
 
 **A recorded preferred browser (see "Preferred-browser check" above) does not override this table**: even when a specific desktop app is the user's stated preference, if that app is itself automation/CDP-instrumented (e.g. QA/testing-oriented browsers that embed their own remote-debugging or automation daemon), CDP-hostile services will still block it the same way they block chrome-devtools-mcp — confirmed with a browser built on this kind of architecture failing Cloudflare login. For services in this table, escalate to wmux/cmux (or the documented handoff) regardless of the recorded preferred-browser fact; the preferred-browser check governs the generic OS-level-open case, not this escalation ladder.
 
@@ -395,10 +411,20 @@ since there is nothing to skip to when the goal is deletion.
    ID matches the caller-supplied identifier (`command`'s `<key-id>`) — if `command` supplied only a
    name/date and multiple rows match it, **abort and ask** rather than guessing; a wrong-row delete is
    unrecoverable.
+3.5. **Expect a confirm-word gate on the delete dialog** — several consoles (Google Cloud's credential
+   delete among them) keep the dialog's delete button `disabled` until a literal confirmation word is
+   typed into a text field. A text-matched click (`button:has-text("Delete")`, or its localized
+   equivalent) then resolves to a disabled element and **silently no-ops** — no error, no exception,
+   and the row is still there. Before clicking: read the dialog's buttons and check each one's
+   `disabled` state; if the delete button is disabled, look for the confirm field, read the exact word
+   the dialog demands **off the dialog's own text** and type that, then re-check the button became
+   enabled. Do not assume the word is `Delete`: the console localizes it, so on a non-English locale
+   the required string is the translated verb, and typing the English one leaves the button disabled.
 4. **Verify revocation before reporting success** — after the delete click, re-read the key list (or
    the specific key's state) and confirm the exact identifier no longer appears / shows revoked. Do not
-   report success from the click alone — some consoles show a stale row until a refresh, or the click
-   can silently fail.
+   report success from the click alone — some consoles show a stale row until a refresh, the click can
+   silently fail, or (per 3.5) it can land on a disabled button. A no-op delete that is reported as
+   done leaves a credential the caller believes is dead — the worst outcome of this flow.
 5. **No Persist step, but clean up existing local copies** — step 6 (Persist) of the main Procedure does
    not apply to a revoke: there is no new credential to store. However, a revoked secret must not remain
    in any local cache (`skill data/`, memory, `.env`, a secret store) — delete or invalidate persisted
