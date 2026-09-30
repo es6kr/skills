@@ -119,6 +119,22 @@ A report that ends with any of these is a forbidden text-question. Convert it to
 3. Is the decision a real branch (≥2 executable options)? Compose those as options + Other.
 4. This gate **overrides** Step 0.3 skip: even right after a recording/management topic, a deferred decision forces the ask.
 
+### Chain-continuation carry-forward check (HARD STOP — every turn inside a `stop_hook_active`-suppressed chain)
+
+**A prose-phrased decision asked in an earlier turn of the same chain does not resolve itself just because later turns are driven by background task-notifications instead of a user reply.** `check-ask-bypass-keywords.sh` (the hook backing this gate) only fires on the *first* stop of a `stop_hook_active`-suppressed chain — every later stop in that same chain is structurally silent (same limitation already documented for the `next`-invocation duty in the "Post-task-completion" table's row 7 below). A turn that only reacts to the newest notification, without checking whether an earlier turn in this chain left a question unanswered, silently drops that decision.
+
+Before driving any new or unrelated work in a turn that resumed from a background task-notification (not a genuine user reply):
+
+1. Scan your own most recent turn(s) in this chain for a Step 0.4-pattern prose question (or a properly-composed `AskUserQuestion` that the user has not yet answered).
+2. If one exists and remains unanswered → resolve it first: either compose the missed `AskUserQuestion` now (if it was asked as prose), or explicitly re-state the still-open decision in this turn's text before continuing — do not silently proceed with unrelated work as if the question had been withdrawn.
+3. Only after that check is clear may the turn continue driving other work (polling, re-dispatch, status checks, etc.).
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Ask a real decision as prose, then treat every subsequent background-notification turn as "nothing to report on that, move on" | Re-surface the decision (as a proper `AskUserQuestion`) at the first opportunity after noticing it's still unanswered — do not let notification turns silently roll past it |
+| 2 | Assume the hook will catch a missed prose question because it's "hook-active" for this class | The hook only fires on the chain's first stop. Turns 2+ in the same chain are the self-check's sole coverage |
+| 3 | Wait for the user to notice and re-ask ("what about X?") before resolving the dropped decision | Self-detect on the very next turn that touches related work, not on user prompting |
+
 ### Surfacing/triage → `wip` delegation (HARD STOP — route target, not just "ask")
 
 When the deferred decision is **"which of N surfaced candidates to start"** (the output of a triage / surfacing topic — `fix-plan priority`, a candidate list, a "top-N actionable" report), the forced ask is **not** a `next` single-select "what next?". Route it to `Skill("wip")` — the surfaced candidates are multi-item work needing task registration + per-item direction (proceed / split / hold), which is wip's resume procedure. This generalizes the cleanup→wip rule ([[feedback_cleanup_wip_not_next]]) to every surfacing topic.
@@ -199,6 +215,7 @@ Otherwise → proceed to Step 0.5.
 4. **Context & Relevance Filtering**: Filter these tasks to identify those related to the current session (e.g., matching files edited, directories touched, or keywords from the conversation history). **Relevance-filter fallback (HARD STOP)**: if this filter yields zero session-related items but the unfiltered, priority-sorted backlog (step 5) has entries, do NOT conclude "no candidates" — fall back to surfacing the top priority-sorted items regardless of session relevance. `fix_plan.md` is the workspace's standing backlog, not merely a continuation thread for the current session's topic; a real P0/P1 item is worth surfacing even when it has nothing to do with what the session just did.
 5. **Sort by Priority**: Sort the remaining candidates by priority level: `P0` -> `P1` -> `P2` -> `[REPEAT]`.
 6. **Compose Options**: Surface the top 2-3 prioritized and related tasks as options in `AskUserQuestion`. Place them above generic options like "End session", using concise labels with their priority level indicated in the description (e.g. `[P0]`). **When surfaced via the step 4 relevance-filter fallback** (session-unrelated but top-priority), the option description MUST also carry an explicit "(workspace backlog, unrelated to this session)" qualifier — the user needs to know these are not a continuation of what was just discussed.
+6a. **Cross-workspace target check (HARD STOP — independent of step 4's relevance filter)**: before finalizing any option built from a `fix_plan.md` entry, check whether the entry's actual work target (a repo URL, an org name, a PR/issue reference) belongs to a **different** git org/repo than the current session's own workspace root. A `fix_plan.md` can legitimately index items that live in another org's repo (a cross-project dependency tracker) — "the text is physically present in *this* workspace's tracker" is not the same as "the work is *this* workspace's own work," so it does not exempt the item from step 4's relevance filter or from this qualifier. When the target differs, the option description MUST name both sides explicitly (e.g. `(cross-workspace: <other-org>/<other-repo> — this session is <current-org>/<current-repo>)`) — this applies whether the candidate arrived via the step 4 fallback or via a normal relevance match, and regardless of whether the candidate is Recommended.
 7. **Write-back when the user selects (HARD STOP)**: this step is entered when `TaskList`/`TaskCreate` is empty, done, **or unavailable** — so `SKILL.md` Step 3's default "register each via `TaskCreate`" cannot be assumed to succeed for a selection made here. If `TaskCreate` is still unavailable at selection time, follow `SKILL.md` Step 3's `TaskCreate`-unavailable fallback (write the selection back into `fix_plan.md`/`checklist.md` instead of silently treating "options were shown" as "the selection is tracked").
 
 ### Don't / Do table
@@ -215,6 +232,7 @@ Otherwise → proceed to Step 0.5.
 | 8 | Apply row 2's "don't pull from a parent workspace's fix_plan.md" when the **local** tracker's active-work section has itself been replaced with a redirect note pointing to that parent (e.g. "this repo's items live in `<parent-path>` — see there") | An explicit redirect note is the local tracker delegating scope — follow it, and treat the parent tracker's own top-level `##` sections as in-scope for this session. Row 2 bans *assuming* a parent's backlog is relevant; it does not ban following a redirect the local tracker itself declares |
 | 9 | Skip checking `<workspace-root>/.agents/fix_plan.md` because the session already used `~/.agents` heavily this turn (skills/rules repo) and the name "`.agents`" reads as "that global repo" | The two are unrelated: `~/.agents` (absolute, home-rooted, git-tracked skills/rules repo) vs `<workspace-root>/.agents/` (relative to a *different* project's root, untracked Ralph state dir). A workspace-relative `.agents/` is always a candidate under step 2, regardless of how much `~/.agents` was touched this session |
 | 10 | Step 4's session-relevance filter returns zero matches → conclude "no candidates" and fall through to Step 0.65's free-text ask, discarding the priority-sorted backlog entirely | Zero relevance matches ≠ zero candidates. Apply the step 4 fallback: surface the top priority-sorted items from the unfiltered backlog, labeled "(workspace backlog, unrelated to this session)" |
+| 11 | Treat a `fix_plan.md`-indexed item as "in scope" for a next-action option because it is textually present in the current workspace's tracker, when its actual work target is a different org/repo | Compare the item's target repo/org against the current session's own workspace root (step 6a). Different org/repo → label explicitly, even if the item passed the step 4 relevance filter on file-text grounds alone |
 
 ### Self-check (before declaring "no work" / "session complete")
 
@@ -224,6 +242,7 @@ Otherwise → proceed to Step 0.5.
 4. If you grepped the tracker's `##` header list, did you actually Read every top-level section on that list — or only the one you most recently wrote to? → Read all of them before reporting a candidate count
 5. Does the local tracker's active-work section contain a redirect note pointing to a parent/org-level tracker? → Follow it and scan that parent's own top-level `##` sections (not just the subsection the note names)
 6. Did you check for a **workspace-LOCAL** `<workspace-root>/.agents/fix_plan.md`, not just `.ralph/fix_plan.md` or bare `fix_plan.md`? → Some Ralph workspaces (non-git, no `.ralph/`) use `.agents/` as their loop state directory — a plain `ls <root>/fix_plan.md <root>/.ralph/fix_plan.md` misses it
+7. Does any surfaced candidate's target repo/org differ from the current session's own workspace root? → Label it per step 6a, regardless of how it passed the relevance filter
 
 ## Step 0.65: Repeated no-candidate invocation → forced direct ask (HARD STOP)
 
@@ -397,6 +416,15 @@ options: [
 
 After receiving both answers, compose the actual next-action options based on the answered current state + waiting items.
 
+## Step 0.8: Visible Report Pre-condition Gate (HARD STOP)
+
+**Before invoking `AskUserQuestion` or presenting next-action options, verify that all mandatory visible markdown reports (such as Priority Triage candidate tables, 5-Why root cause analyses, or task completion summaries) have been physically emitted into the visible response text.** Calling `AskUserQuestion` or checking off a task as completed while suppressing or omitting the required text report is strictly forbidden.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Check off task as completed and invoke `AskUserQuestion` without emitting the physical report table in visible text | Emit the full physical markdown report table in visible response text BEFORE calling `AskUserQuestion` |
+| 2 | Treat checking `task.md` as equivalent to producing the report | `task.md` tracks progress; visible response text delivers the report to the user. Both are required |
+
 ## Context-usage citation on every next-composed ask (HARD STOP — not scoped to cleanup options)
 
 **Every `AskUserQuestion` this skill composes states the live context-usage percentage in the question text, regardless of whether a cleanup/wrap-up option is being offered.** The `context-usage-stale` guard class (17+ recurrences, hooks `context-usage-inject.sh` + `block-cleanup-option-below-context-gate.sh`) only covers citation accuracy **inside a cleanup option** — it cannot detect a plain next-action ask that omits the number entirely, because a hook sees only the tool-call payload and cannot tell "this ask was composed by `next`" from any other skill's ask. This gate exists precisely to cover that hook-blind spot at the skill-composition layer.
@@ -417,6 +445,34 @@ Get the number the same way the cleanup-gate section does: the latest injected `
 3. Is the fresh reading at/above the session model's threshold (or did the injection script emit a `CLEANUP-GATE` directive)? → The cleanup/retrospective option becomes **REQUIRED as the Recommended #1 option** of the turn-final ask — next-action candidate discovery is secondary and may be skipped
 
 ---
+
+## Continuation-over-re-ask (HARD STOP — ample budget + remaining approved/selfable work means keep working)
+
+The completion-time `next` duty below governs how a finished batch is CLOSED — it does not license closing a turn that should not be ending yet. When ALL of the following hold, the default is to CONTINUE executing in the same turn, not to compose another ask:
+
+1. **Live context usage is comfortably below the model's cleanup threshold** (Fable/Mythos 55%, Opus 50%, others 45%) — verified by live-check, not a stale injected reading;
+2. **Remaining work exists** that is either (a) a natural continuation of a flow the user already approved this session (an unchecked follow-up in the same plan's checklist, a step of the same deliverable that just unblocked), or (b) a `selfable` candidate this session's own triage/surfacing pass produced; and
+3. **No genuine decision branch is pending** — deploy / push / destructive ops / scope change / ownership take-over each still require their own consent ask regardless of budget.
+
+In that state, composing a "proceed now vs hold" pacing ask — or ending the turn so the user must manually re-invoke `/next` to restart work — is itself the violation (recurrence class: premature-wrapup-recommend, 3rd occurrence: the user had to override a "Hold (Recommended)" ask with "context is ample, proceed" and manually re-invoke `/next` between batches). Asks exist for decision branches, not for permission to keep doing already-sanctioned work.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Finish a batch at low context usage, then close the turn with a report/ask so the user must manually re-invoke `/next` to get the next item started | Continue into the next approved-flow follow-up or surfaced `selfable` item in the same turn; report progress inline as you go |
+| 2 | Compose a "proceed now / hold" ask for a lightweight, immediately-doable follow-up of an already-approved flow | Just proceed — it is reversible, in-scope work. Reserve asks for genuine branches |
+| 3 | Read condition 2 as license to start ANY backlog item autonomously | Scope = same-flow continuations + this session's own surfaced `selfable` candidates. Items the user explicitly deferred or declined this session stay deferred — do not re-litigate them |
+| 4 | Treat this section as overriding deploy/push/destructive/merge consent gates | Consent gates always fire regardless of budget — this section removes only the *pacing* ask, never a *consent* ask |
+| 5 | Treat a held/deferred TaskList item as excluded from candidates and jump straight to checklist-only (`fix_plan`) backlog | Deferred = do not auto-proceed, NOT excluded. Registered TaskList items (held included) are surfaced FIRST as candidates, above any checklist-only backlog item |
+
+**Deferred ≠ de-prioritized below checklist-only items (HARD STOP)**: row 3's "items the user deferred this session stay deferred" governs *auto-continuation* (do not silently resume them), NOT *candidate precedence*. A TaskList-**registered** item — even one held/deferred this session — still outranks a checklist-only (`fix_plan.md`) backlog item as a next-action candidate. When composing the next-action ask, surface the registered TaskList items first (with their held/blocked status noted in the description), and only then checklist-only backlog. Do NOT skip the registered items and reach for `fix_plan` backlog because they were "already deferred this session" — that inverts the intended **TaskList > checklist-only** precedence (Step 0.5/0.6: `fix_plan` is the fallback *when TaskList surfaces no candidate at all*, not when its items are merely held). "Do not re-litigate" (row 3) means do not auto-execute a deferred item without asking — it does not mean demote it below the checklist.
+
+**Registered task = actionable "proceed"; a perceived blocker = overridable note, not grounds for demotion (HARD STOP)**: when a registered TaskList item is surfaced as a candidate, its default option framing is the *progression* action ("proceed with / execute X"), NOT "blocked / not doable this session / carryover". Distinguish two blocker classes: a **hard blocker** (the action genuinely cannot execute — a required tool/credential is absent, a hard dependency is unmet) makes the item non-actionable; a **soft/policy blocker** (a scoping convention such as cwd-isolation or "do this in the other session", a role preference, an author-set deferral) is **user-overridable** — surface it as a note *inside* the actionable option ("proceed here — overrides the X-session scoping; pointer-only so safe") rather than as grounds to demote the item to non-actionable carryover. Collapsing a soft blocker into "not doable this session" forces the user to manually command the progression you should have offered as the Recommended action.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 6 | Frame a registered task carrying a soft/policy blocker (cwd-isolation, session-scope convention, role preference, author-set deferral) as "blocked / not doable this session / carryover" and drop it from actionable options | Offer it as an actionable "proceed with X" option (Recommended when it is the top registered item); put the soft blocker as an overridable note in the description. Only a hard blocker (missing tool / credential / unmet hard dependency) makes an item non-actionable |
+
+**Self-check (before composing any ask after completing a work item)**: is this ask a genuine decision branch, or am I asking permission to continue already-sanctioned work while budget remains? The latter → skip the ask, continue working. And: (a) are any registered TaskList items (even held/deferred) being skipped in favor of checklist-only `fix_plan` backlog? → If yes, re-order — registered items come first. (b) Am I framing a registered task as "blocked/carryover" on a blocker the user could override? → If the blocker is soft/policy (not a missing tool/credential/hard dependency), offer "proceed" as the actionable option with the blocker as an overridable note.
 
 ## Post-task-completion follow-up is Skill("next") invocation duty — no plain-text questions (HARD STOP)
 

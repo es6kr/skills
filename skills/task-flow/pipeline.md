@@ -25,8 +25,7 @@ flowchart LR
 3. **Intent & Constraints Alignment**: Explore user intent, success criteria, and trade-offs before generating plan artifacts.
 
 ### Stage 1: Planning & Research (`task-plan`)
-1. **Pre-search**: Run RAG and Qdrant memory lookups to find previous architectural decisions.
-
+1. **Pre-search & Tracker Reconciliation**: Run RAG and Qdrant memory lookups to find previous architectural decisions. **Cross-verify findings with workspace backlog trackers (Plane SSOT and `fix_plan.md`) and live system evidence** to ensure decision premises remain valid before proposing actions.
 2. **Research**: Trace root causes and evaluate technical alternatives.
 3. **Draft Deliverable**: Author a 3-tier deliverable (`roadmap-*.md`, `plan-*.md`) containing the 8 mandatory sections.
 4. **User Review Gate**: Present the plan to the user and obtain explicit confirmation before proceeding.

@@ -19,6 +19,16 @@ Entry: `Skill("consolidate", "internal ...")` or `pr.md` Workflow Step 3.5 / Ste
 
 **Engine-duplication gate (HARD STOP — before running ANY review engine)**: enumerate engines that already produced review evidence on this PR (cloud walkthrough/summary comment, Copilot review, a prior CLI run recorded in the existing Internal Review comment or session tracker). Running an engine that already reviewed this PR = duplicate → **forbidden without an explicit user ask**.
 
+**Re-review exception — two bot reviews already in (operator policy)**: when the bot layer already carries **two independent engine reviews** on this PR, a further review is scoped to the **delta that findings-application produced** — and that re-review is **sufficient, not mandatory**. In that situation CodeRabbit CLI *is* permitted even though it duplicates the cloud CodeRabbit engine, because a re-review of applied fixes is a different act from a first review of the same diff. The duplication the gate above forbids is re-running an engine against a diff it has already reviewed; re-running it against the fixes made in response to its own findings is the intended use.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat a re-review of applied fixes as a duplicate run and refuse the CLI | Two bot reviews already present → CLI permitted for the findings-applied delta |
+| 2 | Make the delta re-review mandatory before the Summary can be posted | It is sufficient, not required. No applied findings yet = nothing to re-review = proceed |
+| 3 | Re-review the whole diff when only a subset of findings was applied | Scope the re-review to the applied delta |
+
+**Self-check (before invoking any engine on a PR that already has bot reviews)**: how many independent engines reviewed this PR? If two or more — is there an *applied-findings delta* to re-review? No delta → no re-review needed. Delta present → the CLI is an allowed engine for it, duplication notwithstanding.
+
 **CodeRabbit invocation-mode matrix** (self-contained — do not rely on external rule files):
 
 | Repo visibility | Cloud Free | Cloud Lite/Pro/Team | CLI local | superpowers code-reviewer |
@@ -63,6 +73,20 @@ The PRIVATE+Free row explains why cloud output may be walkthrough-only — but t
 | 4 | Use tool status lines (`findings: 0`) as the Internal Review body | The body must show what was verified and how (per-hunk verification notes). A zero-findings tool run is evidence, not a review |
 | 5 | Install CLI silently, or use CLI without `coderabbit auth status` check | Offer install/re-auth via AskUserQuestion — install + `coderabbit auth login` require user interaction |
 | 6 | Modify `.coderabbit.yaml` (cloud config) hoping to unlock CLI/agent capabilities | yaml is the cloud-config medium only. CLI/agent capabilities are mode-orthogonal — yaml has no effect on them |
+
+### Two rules pointing opposite ways is itself an ask trigger (HARD STOP)
+
+The gates in this skill are written as HARD STOPs, which makes wording strength a tempting tie-breaker when two of them disagree. It is not one. When two artifacts — two topics, a topic and a verifier script, a skill and a workspace-level gate — give **opposite instructions for the same situation**, that contradiction is the finding, and resolving it by obeying whichever is phrased more forcefully hides it.
+
+Stop and ask, presenting both instructions and what each would produce. Adopting the stronger-sounding one silently converts a documentation defect into a behavioural one, and the next run hits it again with no record that it happened.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Compare wording strength (HARD STOP vs a plain table row) and follow the louder one | Strength does not rank instructions. Surface the conflict and ask |
+| 2 | Pick one side, proceed, and leave the contradiction in place | The conflict is a finding — record it so the rule can be reconciled |
+| 3 | Read one gate's phrasing as license to manufacture a trigger another gate says is absent | A routing/verification requirement presupposes its trigger; it never creates one |
+
+**Self-check (whenever two gates seem to apply and disagree)**: can I satisfy both at once? If no, am I about to choose by phrasing strength? Then ask instead — and note which two artifacts conflicted.
 
 **Self-check (before dispatching any review engine in Step 3.5)**:
 

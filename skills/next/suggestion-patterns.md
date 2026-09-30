@@ -341,6 +341,8 @@ gh api 'orgs/<org>/copilot/billing' --jq '{
 
 **Availability gate (HARD STOP)**: If query 3 returns `active: 0` or `management: "disabled"` or fails with "Not Found", **Copilot reviewer registration is NOT possible for this PR**. The "Request Copilot review" option in the "Copilot absent" branch becomes inactive — skip the option set and self-decide on `consolidate (CodeRabbit only)` instead. Do not present an ask whose Recommended option is impossible to execute.
 
+**CodeRabbit tier × visibility gate (HARD STOP — before composing any "wait for CodeRabbit" option)**: CodeRabbit's plan matrix blocks line-by-line reviews on **PRIVATE + Free-plan** repos — only a walkthrough is ever posted there. Before composing any option that waits on / polls for / registers a task for a CodeRabbit review arrival, verify with primary sources: (1) repo visibility (`gh repo view --json isPrivate`), (2) plan tier (project-memory fact or the walkthrough's plan line), (3) current review state (`gh pr checks <N>` — a CodeRabbit line reading `Review completed` means nothing more is coming). PRIVATE + Free, or `Review completed` already present → a wait/poll option is **invalid**: route to the internal-review fallback (generic code-reviewer agent / inline diff analysis) instead. "The PR just went ready, so the review must be pending" is exactly the assumption this gate forbids — run the queries, don't infer. Recurrence source: a "register task and wait for CodeRabbit" Recommended option composed on a Free+PRIVATE repo whose walkthrough had already completed.
+
 **CI-gate-only base branch gate (HARD STOP — check BEFORE the reviewer-matrix queries)**: some long-lived branches exist purely to accumulate CI-passing commits ahead of a later, separately-reviewed promotion PR (e.g. a two-tier staging model). What matters is the base branch's *role*, not its literal name — verify via `gh pr checks <N>`: a CodeRabbit line reading `Review skipped: reviews are disabled for this base branch` means this base is CI-gate-only, and no walkthrough will ever arrive (not "pending", not "rate limited"). When this signal is present, skip the reviewer-matrix branches entirely — self-decide "CI green + Test Plan + Mergeable is the full gate for this base" and route straight to `github-flow/merge.md`'s CI-gate-only exception, not any of the four branches below.
 
 Then map to a branch:
@@ -467,6 +469,10 @@ A session-cleanup / retrospective / wrap-up option — including as a diversity 
 
 **Post-compact floor (HARD STOP)**: immediately after a compact/summarization boundary — an explicit compact command, an `isCompactSummary` entry, or a session that opened with a "continued from a previous conversation that ran out of context" summary — assume usage is **under 20% until re-measured**, and never quote a percentage that appears in the pre-compact conversation or its summary. The measurement mechanism reads the last assistant-message usage field, which still describes the pre-compact session until a new assistant turn has been generated; a figure read at that moment can overstate reality by tens of percentage points. This is the operator-facing counterpart of the injection script's own first-post-compact suppression — the script suppresses its own output, but nothing stops a composer from quoting a number it read elsewhere.
 
+   **Post-compact floor heuristic (HARD STOP)**: immediately after a `/compact` or summarization boundary, the injected reading reflects the **pre-compact** window (the old summary + re-injected always-on context, not yet compressed into the new window) and is stale-**high**. Until a live re-check (Live-check fallback below) confirms otherwise, treat context as **< 20%**. Do not trust the injected number for a threshold decision on the first turn(s) after a compact — the fresh-looking percentage can be 3×+ the real usage (observed: injected 60.1% vs live 22.6% one turn after `/compact`).
+
+   **Scope — not limited to the cleanup gate (HARD STOP)**: this staleness discipline governs **any** decision keyed on a context-usage percentage, not just whether to offer cleanup. That includes **loop / budget completion checks** — e.g. a ralph-loop `--completion-promise` of the form "context > N%", a token-budget cap, or a "context is high enough to stop" judgment. Never satisfy such an **upper**-threshold from an injected reading taken at or around a compact boundary: run the Live-check first and decide on the live number. A stale-high reading falsely satisfying a "context > N%" completion promise ends a loop that should still be running — the mirror of the cleanup gate's stale-high over-offer.
+
 When neither holds, omit the cleanup/wrap-up option entirely — fill the slot with another discovery-source candidate or present fewer options. Cleanup value scales with session fullness; offering it early pressures a premature session boundary the user did not ask for.
 
 **Live-check fallback when the last injection predates this turn's tool-call chain (HARD STOP)**: a Stop-hook-triggered continuation can run many tool calls (file reads, skill topic loads, PR/CI operations) with **no intervening `UserPromptSubmit`** — the injected line only refreshes on that event. During such a chain, automatic mid-session context compression can silently shrink the real usage well below an old high reading, with no explicit marker in the transcript (no `isCompactSummary` entry, and no user-visible manual-compact command run — e.g. Claude Code's `/compact` — in between). An old reading is therefore not just potentially stale-low (understating), it can also be stale-high (overstating) by the time you compose the ask. If the last injected reading is more than a few tool calls old, do not cite its percentage — get a live one instead, if your environment provides a context-usage injection script:
@@ -500,9 +506,36 @@ Therefore: when a selection is about to be executed **and the percentage was par
 TaskList   # use pending/in_progress entries as the source
 ```
 
+### fix_plan.md candidate prioritization rules
+
+1. **Workspace-local prioritization**: Candidates from the local project's `fix_plan.md` are prioritized over generic options or templates.
+2. **Priority Sorting**: Candidates must be sorted strictly in the order of `P0` -> `P1` -> `P2` -> `[REPEAT]`.
+3. **Session Relevance**: Highlight and recommend tasks first that touch files or folders modified in the current session — session-irrelevant `fix_plan.md` items (even high-priority ones) must not be `Recommended` by default.
+4. **Cross-workspace target labeling (HARD STOP)**: `fix_plan.md` can legitimately index items whose actual work target is a different git org/repo than the current workspace's own (a cross-project dependency tracker entry). Being textually present in the local tracker does not make an item "this session's own work." Before surfacing such an item as an option, compare its target repo/org against the current session's workspace root — if they differ, the option description must name both sides explicitly (e.g. `(cross-workspace: <other-org>/<other-repo>)`), and it must not be `Recommended` unless the user's current work thread is actually about that target repo. See `ask-gates.md` Step 0.6 item 6a for the full procedure.
+
+### Session context synthesis in AskUserQuestion text (HARD STOP)
+
+When composing the question text for `AskUserQuestion` at the end of a session, do NOT use generic phrasings like "All modification requests are complete" or its Korean translation equivalent indicating general completion.
+Instead, you MUST dynamically synthesize the main technical themes, objectives, or features worked on in the current session (e.g. "backchannel logout finalization", "CI stability", "relocation of plans to llm-wiki/generated", "block-manual-delegation hook FP mitigation", "branch-policy contradiction fix").
+This helps the user clearly associate the recommended next steps with the active development context.
+
+**Strict Length Limit (HARD STOP)**: The synthesized context summary in the question text MUST be kept extremely concise.
+- **Maximum limit**: 1-2 high-level themes, under 15 words total.
+- **Forbidden**: Do NOT list 3+ distinct commits, subtasks, bug fixes, or minor achievements in a single question text. Keep details inside `walkthrough.md`, not in the choice prompt.
+
+#### Don't / Do
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Use generic phrasings ("All tasks are done", "Everything is complete") | Summarize the key achievements of this session in the question text |
+| 2 | Enumerate every tiny commit or tool error (e.g., listing 5+ distinct bug fixes and updates in a long sentence) | Focus on the high-level technical goals under 15 words (e.g. "relocated plan files to llm-wiki/generated and resolved branch-policy contradiction") |
 ### Recommended priority — actionable follow-up over "End session" (HARD STOP)
 
 **"End session" must never be the default Recommended option.** It carries no actionable value beyond what the user already implies by stopping responding; suggesting it autonomously is an autonomous proposal of a work-progression decision (branching / session termination / skipping), which is forbidden. If the user wants to end the session, they will say so or simply stop — `next` does not need to nominate it.
+
+**Scope + class test (HARD STOP)**: this rule is NOT confined to this wrap-up section — it applies to **every** ask composed anywhere in this skill's flow (including mid-flow disposition/remainder asks and Step 0.66 minimal confirmations), and "End session" is judged by **effect, not label**: any option whose selection ends the session's work ("stop here", "delegate the remainder and finish", hand-off-and-close variants) belongs to this class and must not carry `(Recommended)`.
+
+**Hold/defer options follow the same discipline (HARD STOP)**: a "Hold" / "defer" option on a lightweight, immediately-doable follow-up of an already-approved flow must NOT carry `(Recommended)` while live context usage is below the model's cleanup threshold and the user has not signaled wrap-up intent — recommending deferral there is the pacing variant of recommending "End session" (recurrence class: premature-wrapup-recommend, 3rd occurrence: user overrode a "Hold (Recommended)" with "context is ample, proceed"). Default-recommend the proceed option instead — and per ask-gates "Continuation-over-re-ask", such a follow-up usually warrants no ask at all. A deferral may be Recommended only when an external signal genuinely warrants it: tracker guidance naming a dedicated session, a blocking dependency, or an explicit user deferral earlier in the session.
 
 Instead, the **Recommended** option is always **the most actionable follow-up** available. In priority order:
 

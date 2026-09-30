@@ -17,6 +17,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/commit-tidy/resources/commit-review-trigger.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-pm-turn-budget.sh"
           }
         ]
       },
@@ -118,6 +122,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-compound-commands.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-excessive-ci-polling.sh"
           },
           {
             "type": "command",
@@ -395,6 +403,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-cleanup-without-claudify.sh"
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-self-task-open-at-wrapup.js"
           },
           {
             "type": "command",

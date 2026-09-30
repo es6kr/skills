@@ -80,13 +80,13 @@ fi
 # Auditable opt-out — a genuinely independent new workspace was intended.
 echo "$sanitized_command" | grep -q 'ORCA_NEW_WORKSPACE_APPROVED=1' && exit 0
 
-# `orca terminal create --worktree active` explicitly attaches to the CURRENT
-# worktree, not a new one — that's already the safe path, allow it.
-# Accept both `--worktree active` and `--worktree=active` (Orca CLI supports
-# `--flag=value` too; the whitespace-only form rejected a valid command).
-if [ "$is_terminal_create" -eq 1 ]; then
-  echo "$sanitized_command" | grep -qE -- '--worktree[=[:space:]]+active' && exit 0
-fi
+# NOTE: `--worktree active` is deliberately NOT an exemption here. It attaches to
+# the CURRENT worktree instead of creating a new one, but it still opens a new
+# TAB — and a new tab without first checking whether the current terminal is
+# splittable is exactly what this guard gates (see its name). Treating it as a
+# safe path let the whole gate be bypassed by appending one flag. It now falls
+# through to the marker check below like any other create; run
+# `orca terminal list` first, or use the auditable opt-out above.
 
 # `orca worktree create` without `--no-parent` is a deliberate stacked/branch-
 # from-current choice, not the independent-new-workspace default — allow it.
@@ -96,7 +96,15 @@ fi
 
 if [ -f "$marker" ]; then
   now=$(date +%s)
-  mtime=$(stat -f %m "$marker" 2>/dev/null || stat -c %Y "$marker" 2>/dev/null || echo 0)
+  # GNU coreutils uses `stat -c %Y`; BSD/macOS uses `stat -f %m`. The probe
+  # order is load-bearing, not cosmetic: BSD `stat -c` fails outright, but GNU
+  # `stat -f` SUCCEEDS with an unrelated filesystem dump (there `-f` means
+  # --file-system). Probing the BSD form first therefore captured that
+  # multi-line dump as $mtime on Linux and the arithmetic below died with
+  # "syntax error in expression", so the marker cache never took effect and
+  # every command was blocked even right after `orca terminal list`.
+  mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null || echo 0)
+  case "$mtime" in ''|*[!0-9]*) mtime=0 ;; esac
   age=$(( now - mtime ))
   if [ "$age" -lt 1800 ]; then
     exit 0

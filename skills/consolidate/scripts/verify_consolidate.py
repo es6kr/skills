@@ -88,6 +88,54 @@ def titled_as(body: str, slug: str) -> bool:
     return False
 
 
+# The `requesting-code-review` link is a PROVENANCE CLAIM: "this artifact is the
+# superpowers requesting-code-review framework's own output". internal.md's
+# "Bot-layer content in the body drops the suffix" rule therefore FORBIDS that link
+# whenever the body carries bot-layer findings -- a CodeRabbit CLI substitute run, for
+# instance -- and prescribes an engine-naming heading instead.
+#
+# Requiring the link unconditionally put this script in direct contradiction with that
+# rule: a review authored by the CLI could satisfy the skill or the verifier, never
+# both, and the only way to pass was to state a provenance the artifact did not have.
+#
+# The path below accepts an engine-named Code Review, but it is deliberately a
+# CONJUNCTION of independent conditions -- a single weak signal must never pass a
+# provenance gate:
+#   1. the invisible `<!-- consolidate:verified -->` marker (it came through consolidate)
+#   2. a Code Review heading naming a recognised review engine (it states WHICH)
+#   3. the heading does not claim the word "Summary" (post.md reserves that for Step 7)
+# Dropping any one of them would let an ordinary comment that merely says "code review"
+# in its heading register as the artifact.
+ENGINE_RE = re.compile(r"coderabbit|copilot|superpowers|code-reviewer", re.IGNORECASE)
+CODE_REVIEW_TITLE_RE = re.compile(r"code\s+review", re.IGNORECASE)
+VERIFIED_MARKER = "<!-- consolidate:verified -->"
+
+
+def titled_as_internal_by_engine(body: str) -> bool:
+    """True when an engine-named Code Review satisfies ALL of the conditions above.
+
+    This is the sanctioned shape for a Code Review whose body holds bot-layer content,
+    per internal.md's suffix-drop rule. It does not relax the provenance gate -- it
+    replaces one strong signal (the framework link) with the conjunction of three
+    weaker but independent ones.
+    """
+    if VERIFIED_MARKER not in (body or ""):
+        return False
+    line = title_line(body)
+    if not HEADING_RE.match(line):
+        return False
+    if not CODE_REVIEW_TITLE_RE.search(line):
+        return False
+    if "summary" in line.lower():
+        return False
+    return bool(ENGINE_RE.search(line))
+
+
+def is_internal_review(body: str) -> bool:
+    """Internal Code Review detection: framework link OR engine-named conjunction."""
+    return titled_as(body, INTERNAL_SLUG) or titled_as_internal_by_engine(body)
+
+
 # A consolidate artifact can be posted as an issue comment OR as a review.
 # internal.md routes the Internal Code Review to the reviews API whenever
 # line-specific Critical/Important findings exist, because only that API carries
@@ -166,18 +214,20 @@ class ConsolidateValidator:
 
         # 2. Extract Internal Code Review and AI Review Summary comments
         posted_artifacts = sorted(list(issue_comments) + list(reviews), key=posted_at)
-        internal_reviews = [c for c in posted_artifacts if titled_as(c.get("body", ""), INTERNAL_SLUG)]
+        internal_reviews = [c for c in posted_artifacts if is_internal_review(c.get("body", ""))]
         summaries = [c for c in posted_artifacts if titled_as(c.get("body", ""), SUMMARY_SLUG)]
 
         if not internal_reviews:
             near_miss = [c for c in posted_artifacts
                          if looks_like(c.get("body", ""), "code review")
                          and not titled_as(c.get("body", ""), SUMMARY_SLUG)]
-            hint = (f" (comment {near_miss[-1].get('id')} has a Code Review heading but no "
-                    f"[{INTERNAL_SLUG}](...) link in it)") if near_miss else ""
+            hint = (f" (comment {near_miss[-1].get('id')} has a Code Review heading, but it carries "
+                    f"neither a [{INTERNAL_SLUG}](...) link nor the engine-named form: the "
+                    f"{VERIFIED_MARKER} marker AND a named engine in the heading)") if near_miss else ""
             self.errors.append(
                 f"Missing Internal Code Review comment -- its title line must carry a "
-                f"[{INTERNAL_SLUG}](...) link{hint}.")
+                f"[{INTERNAL_SLUG}](...) link, or name the contributing engine(s) in the heading "
+                f"alongside the {VERIFIED_MARKER} marker{hint}.")
         if not summaries:
             near_miss = [c for c in posted_artifacts if looks_like(c.get("body", ""), "summary")]
             hint = (f" (comment {near_miss[-1].get('id')} has a Summary heading but no "
@@ -189,7 +239,7 @@ class ConsolidateValidator:
         # A single comment titled as both artifacts collapses the pair the whole
         # workflow rests on; without this the two lists below would resolve to it twice.
         both = [c for c in posted_artifacts
-                if titled_as(c.get("body", ""), INTERNAL_SLUG)
+                if is_internal_review(c.get("body", ""))
                 and titled_as(c.get("body", ""), SUMMARY_SLUG)]
         if both:
             self.errors.append(

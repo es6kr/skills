@@ -139,7 +139,22 @@ type: feedback
 + add a pointer to the `MEMORY.md` index
 + **dual-sync**: save on both WSL and Windows (follow the dual-sync rule in `~/.agent/rules/common.md`)
 
-#### 4-2. Add to failed-attempts.md
+#### 4-2. Add to the FA store (environment-routed: native memory first, file fallback)
+
+**Environment detection (run once per session, before the first FA write):**
+
+| Detected environment | Native memory system | Storage call |
+|---|---|---|
+| Claude Code + Serena MCP registered (`mcp__serena__*` / `mcp__plugin_serena_serena__*` tools present) | Serena project-independent memory store | `write_memory("global/fa/<class-slug>", content)` — the `global/` prefix writes to `~/.serena/memories/global/`, verified project-independent (physically confirmed: a memory written while one project was active landed in a location any later-activated project can also `read_memory`/`list_memories` against) |
+| Hermes agent runtime (`hermes` CLI resolvable, e.g. `~/AppData/Local/hermes/bin/hermes` or `$HERMES_HOME` set) | Hermes built-in memory (`MEMORY.md`/`USER.md`) — `hermes memory status/setup` only configures *external* provider plugins (honcho/mem0/etc.), it does not expose a scripted "append a fact" CLI call | **Not yet wired** — `hermes memory` has no non-interactive write path as of this writing. Until that's confirmed, fall through to the file (below) even on Hermes. Revisit when a Hermes memory-write API/CLI surface is confirmed |
+| OpenClaw runtime (`openclaw`/`clawo` CLI resolvable) | OpenClaw's own memory system | **Not yet confirmed** — CLI presence detected but its memory-write surface wasn't verified in the session that authored this table (the `--help` invocation didn't return in time to inspect). Fall through to the file until confirmed |
+| None of the above (Antigravity, plain shell, or Serena unavailable this session) | — | Fall through to the file-based procedure below (unchanged) |
+
+**Why this order**: FA entries are behavioral corpus that recurs across unrelated projects — a genuinely project-independent store (Serena's `global/` prefix) is the correct home when one is available and verified, rather than a single ever-growing markdown file. Hermes and OpenClaw are included in the detection table per explicit user instruction, but their write path is not implemented yet — recording that gap here (rather than silently only doing Claude Code) keeps the next session honest about what's actually wired versus merely detected.
+
+**Granularity (per user decision)**: one memory per **class**, not per occurrence — `global/fa/<class-slug>.md` mirrors the current per-class HOT section. A recurrence appends a new dated block to the *same* memory (read the existing memory first via `read_memory`, append, `write_memory` the merged content back) rather than creating `global/fa/<class-slug>-2.md` etc.
+
+**Fallback — file-based procedure (Antigravity / no native memory system detected):**
 
 Add a section to `$FA_STORE/failed-attempts.md` (HOT). This is skill data, not a rules file — `~/.agents/rules/failed-attempts.md` only contains a location-pointer stub.
 
