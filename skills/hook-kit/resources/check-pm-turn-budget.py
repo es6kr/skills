@@ -165,8 +165,12 @@ def main():
 
     msg = track_pm_budget(tool_name, tool_input, session_id)
     if msg:
-        # Warning to stderr for model feedback in PostToolUse
+        # PostToolUse stderr reaches the model only on exit 2; on exit 0 it is
+        # discarded, so the budget warning would be written where nobody reads it.
+        # Advisory only — the tool call already ran and is not being undone.
+        # Same channel as skills/fix-plan/resources/warn-fixplan-item-schema.sh.
         print(msg, file=sys.stderr)
+        sys.exit(2)
 
     sys.exit(0)
 
