@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/es6kr/skills/compare/todowrite-v0.9.3...todowrite-v0.9.4) (2026-09-30)
+
+
+### Bug Fixes
+
+* **todowrite:** restore exec bit on claude-task.py ([#569](https://github.com/es6kr/skills/issues/569)) ([151c2f7](https://github.com/es6kr/skills/commit/151c2f7feb2675bf6c26c2ad077578c4d2fd1154))
+
 ## [0.9.3](https://github.com/es6kr/skills/compare/todowrite-v0.9.2...todowrite-v0.9.3) (2026-09-24)
 
 

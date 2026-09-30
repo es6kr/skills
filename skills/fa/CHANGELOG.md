@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/fa-v0.4.3...fa-v0.5.0) (2026-09-30)
+
+
+### Features
+
+* **cleanup, fa:** enhance session cleanup pipeline, automated FA rotation, and streaming search ([9b3f366](https://github.com/es6kr/skills/commit/9b3f36609c3ebb1f227bcef549cffb3a8e85d0a5))
+
+
+### Bug Fixes
+
+* **fa:** keep the ledger preamble and section prose when rotating ([c8f94ed](https://github.com/es6kr/skills/commit/c8f94ed353853b6d75e6dfe916b96123b1206dbb))
+* resolve the four promotion-blocking criticals ([ccb781d](https://github.com/es6kr/skills/commit/ccb781dcddeabfa5adfb159ac49aabb5dbbf9a5a))
+
 ## [0.4.3](https://github.com/es6kr/skills/compare/fa-v0.4.2...fa-v0.4.3) (2026-09-24)
 
 

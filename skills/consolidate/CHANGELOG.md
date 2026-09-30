@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0](https://github.com/es6kr/skills/compare/consolidate-v0.6.5...consolidate-v0.7.0) (2026-09-30)
+
+
+### Features
+
+* **fix-plan, consolidate:** consolidate task coordination, review collection, and docs ([d6162d8](https://github.com/es6kr/skills/commit/d6162d8d25bb80c85aa2c5cd475afdf0ee638535))
+
+
+### Bug Fixes
+
+* **consolidate:** accept an engine-named Code Review in the provenance gate ([dbb93fb](https://github.com/es6kr/skills/commit/dbb93fb0c329e6efaa9ea1257058ef4455c4085c))
+* **consolidate:** enhance review collection, PATCH verification, and harness check ([858adef](https://github.com/es6kr/skills/commit/858adef07f212f09e550be77c7fc89cfd229e9fe))
+* **consolidate:** make the dispatch-failure history select the starting rung ([17637c3](https://github.com/es6kr/skills/commit/17637c303d26aed4af95514af44d527e7076e422))
+* **consolidate:** reconcile the two-comment invariant across pr/internal/post ([1e17091](https://github.com/es6kr/skills/commit/1e170913e104711bc124008a632360cc59c0f05d))
+* **consolidate:** reconcile the two-comment invariant and the provenance gate ([28d2f9a](https://github.com/es6kr/skills/commit/28d2f9a399e28342ef16cc9244279c85ec75bf39))
+* **consolidate:** Step 8 finding-handling ask must reuse posted Status column ([#561](https://github.com/es6kr/skills/issues/561)) ([2d310e3](https://github.com/es6kr/skills/commit/2d310e3cc51d4b28d711973c27bc94e4abae9d2e))
+
 ## [0.6.5](https://github.com/es6kr/skills/compare/consolidate-v0.6.4...consolidate-v0.6.5) (2026-09-20)
 
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/next-v0.10.2...next-v0.11.0) (2026-09-30)
+
+
+### Features
+
+* **next:** enhance candidate discovery, context heuristics, and decision gates ([bdf3cd9](https://github.com/es6kr/skills/commit/bdf3cd9c3a38091cff85be9db382d7a1d8def496))
+
+
+### Bug Fixes
+
+* **next:** add already-satisfied candidate verification to option diversity gate ([1b6fc6c](https://github.com/es6kr/skills/commit/1b6fc6c11c94f91c1f2a75b22db7bd0ca8ae58b7))
+* **next:** add CodeRabbit tier x visibility gate to After-PR-creation pattern ([7bcae82](https://github.com/es6kr/skills/commit/7bcae82e38ee1d5eb08b785520518422b64a3ddd))
+* **next:** add continuation-over-re-ask gate, positive cleanup trigger, and harness candidate patterns ([88b5a26](https://github.com/es6kr/skills/commit/88b5a265287e85477c9196135e879e5d774544ec))
+* **next:** assume &lt;20% context right after /compact; generalize staleness gate to loop promises ([d88230a](https://github.com/es6kr/skills/commit/d88230a152d2d1d19884fb1583bc13bcb9290cde))
+* **next:** close chain-blindness gap for Step 0.4 prose-decision drops ([dba4b29](https://github.com/es6kr/skills/commit/dba4b294222a7046432d64564e72752403950cb0))
+* **next:** rank registered TaskList items above checklist-only backlog and frame them as actionable proceed ([c09074e](https://github.com/es6kr/skills/commit/c09074e92da799fa9f7be80f47e3abdd2d350b65))
+* **next:** require cross-workspace target labeling for fix_plan candidates ([5f7774c](https://github.com/es6kr/skills/commit/5f7774c9a6ddfd1f5053750c97af4dbfc395aa2d))
+* **next:** scope End-session-never-Recommended rule to all ask paths ([181f3e2](https://github.com/es6kr/skills/commit/181f3e23631d72ecf184db4c6cb8e2915e37f8cd))
+
 ## [0.10.2](https://github.com/es6kr/skills/compare/next-v0.10.1...next-v0.10.2) (2026-09-24)
 
 

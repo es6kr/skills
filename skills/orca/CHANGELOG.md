@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/es6kr/skills/compare/orca-v0.4.0...orca-v0.4.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **orca:** probe GNU stat before BSD stat in the marker age check ([057db41](https://github.com/es6kr/skills/commit/057db418b8ebd56a7fa98a3c8967b8a06bd16cb8))
+* **orca:** stop treating --worktree active as a split-check exemption ([7568fcb](https://github.com/es6kr/skills/commit/7568fcbf7a4081426abec73318946abe63123424))
+* **orca:** stop treating --worktree active as a split-check exemption (green) ([410abbe](https://github.com/es6kr/skills/commit/410abbee2702bd53816312f2af09beeb688cf3f2))
+
 ## [0.4.0](https://github.com/es6kr/skills/compare/orca-v0.3.0...orca-v0.4.0) (2026-09-24)
 
 

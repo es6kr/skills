@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.0](https://github.com/es6kr/skills/compare/fix-plan-v0.16.1...fix-plan-v0.17.0) (2026-09-30)
+
+
+### Features
+
+* **fix-plan, consolidate:** consolidate task coordination, review collection, and docs ([d6162d8](https://github.com/es6kr/skills/commit/d6162d8d25bb80c85aa2c5cd475afdf0ee638535))
+* **fix-plan:** add task lock, artifact scanner, prune, and cleanup utilities ([90c8d34](https://github.com/es6kr/skills/commit/90c8d342a0e56ab312b0b59473857ebc149fab1b))
+
+
+### Bug Fixes
+
+* **fix-plan:** enforce flowchart precedent, residual verification, and triage rules ([acea09d](https://github.com/es6kr/skills/commit/acea09dd37a62479ffd90e82e6fccdeadac2d5b4))
+* **fix-plan:** make the task lock a real mutex and the tracker write atomic (green) ([4dc2f7e](https://github.com/es6kr/skills/commit/4dc2f7e433a0f6fa19fee5120c7b0ec58f49477c))
+
 ## [0.16.1](https://github.com/es6kr/skills/compare/fix-plan-v0.16.0...fix-plan-v0.16.1) (2026-09-27)
 
 

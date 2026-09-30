@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/cleanup-v0.7.1...cleanup-v0.8.0) (2026-09-30)
+
+
+### Features
+
+* **cleanup, fa:** enhance session cleanup pipeline, automated FA rotation, and streaming search ([9b3f366](https://github.com/es6kr/skills/commit/9b3f36609c3ebb1f227bcef549cffb3a8e85d0a5))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/cleanup-v0.7.0...cleanup-v0.7.1) (2026-09-20)
 
 
