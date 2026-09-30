@@ -70,7 +70,7 @@ try:
             if entry.get("type") == "assistant":
                 msg = entry.get("message", {}) or {}
                 usage = msg.get("usage")
-                if isinstance(usage, dict) and any(k in usage for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")):
+                if isinstance(usage, dict) and msg.get("model") != "<synthetic>" and any(k in usage for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")):
                     cur_total = sum(int(usage.get(k, 0) or 0) for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
                     if prev_total is not None and cur_total < prev_total:
                         marker_gap_drop = True
