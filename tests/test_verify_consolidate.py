@@ -16,7 +16,9 @@ from skills.consolidate.scripts.verify_consolidate import (
     INTERNAL_SLUG,
     SUMMARY_SLUG,
     ConsolidateValidator,
+    is_internal_review,
     titled_as,
+    titled_as_internal_by_engine,
 )
 
 
@@ -169,6 +171,47 @@ class TestTitleLineArtifactDetection(unittest.TestCase):
 
     def test_heading_without_link_is_not_an_artifact(self):
         self.assertFalse(titled_as("## Internal Code Review\nfindings\n", INTERNAL_SLUG))
+
+    # --- engine-named Code Review (internal.md's suffix-drop shape) --------------
+    # internal.md FORBIDS the requesting-code-review link when the body carries
+    # bot-layer content, so requiring that link unconditionally made the skill and
+    # this verifier unsatisfiable at the same time. The replacement is a conjunction,
+    # not a looser single check: marker AND engine-named heading AND no "Summary".
+
+    ENGINE_NAMED = ("## Code Review (CodeRabbit CLI local)\n"
+                    "<!-- consolidate:verified -->\nfindings\n")
+
+    def test_engine_named_review_is_recognised_without_the_framework_link(self):
+        self.assertFalse(titled_as(self.ENGINE_NAMED, INTERNAL_SLUG))
+        self.assertTrue(titled_as_internal_by_engine(self.ENGINE_NAMED))
+        self.assertTrue(is_internal_review(self.ENGINE_NAMED))
+
+    def test_engine_named_review_without_the_marker_is_rejected(self):
+        """The marker is one of the conjunction's terms, not decoration."""
+        body = "## Code Review (CodeRabbit CLI local)\nfindings\n"
+        self.assertFalse(titled_as_internal_by_engine(body))
+        self.assertFalse(is_internal_review(body))
+
+    def test_code_review_heading_naming_no_engine_is_rejected(self):
+        """A bare 'Code Review' heading must not register just by carrying the marker."""
+        body = "## Code Review\n<!-- consolidate:verified -->\nfindings\n"
+        self.assertFalse(titled_as_internal_by_engine(body))
+        self.assertFalse(is_internal_review(body))
+
+    def test_engine_named_heading_claiming_summary_is_rejected(self):
+        """post.md reserves the word Summary for the Step 7 artifact."""
+        body = ("## Code Review Summary (CodeRabbit CLI local)\n"
+                "<!-- consolidate:verified -->\nfindings\n")
+        self.assertFalse(titled_as_internal_by_engine(body))
+        self.assertFalse(is_internal_review(body))
+
+    def test_the_summary_artifact_is_not_mistaken_for_an_engine_named_review(self):
+        """The Summary carries the marker too — only the heading separates them."""
+        self.assertFalse(titled_as_internal_by_engine(self.SUMMARY))
+        self.assertFalse(is_internal_review(self.SUMMARY))
+
+    def test_framework_linked_review_still_passes_through_is_internal_review(self):
+        self.assertTrue(is_internal_review(self.INTERNAL))
 
     def test_missing_internal_review_is_reported_with_a_near_miss_hint(self):
         issue_comments = [
