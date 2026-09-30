@@ -43,15 +43,33 @@ When consolidating a promotion PR (e.g., `next-fix` or `next-feat` -> `main`), i
 
 ### Pre-Summary gate — Code Review comment MUST already exist (HARD STOP — visible even if internal.md was skipped)
 
-**Before posting this Summary, a Code Review comment (Step 3.5.3, `requesting-code-review` link — under whatever title, default `## Internal Code Review` or a caller custom title like `## Code Review`) MUST already exist on the PR.** This gate is restated here in post.md (not only in internal.md) so that skipping the internal.md topic does not also skip the 2-comment invariant.
+**When Step 3.5's trigger was satisfied, a Code Review comment (Step 3.5.3 — under whatever title, default `## Internal Code Review` or a caller custom title like `## Code Review`) MUST already exist on the PR before posting this Summary.** This gate is restated here in post.md (not only in internal.md) so that skipping the internal.md topic does not also skip the 2-comment invariant.
+
+**The gate is conditional on the trigger, and it does not create one (HARD STOP)**: `internal.md`'s post-count table has a row reading "External AI only without Internal Review → 1 post → Summary only". That row is not an oversight this gate overrides — it is the case where none of Step 3.5's three triggers fired (CodeRabbit walkthrough-only / reviewer failure / Copilot unavailable) because the external bot layer produced a complete review on its own. Reading this gate as unconditional turns it into a trigger generator: it manufactures a mandatory Internal Review for a PR whose own routing says one post suffices, and the fallback machinery (engine selection, the escalation ladder) gets spun up for a fallback that was never triggered.
+
+Determine which case you are in **before** applying the gate:
+
+| Step 3.5 trigger state | Code Review comment | This gate |
+|---|---|---|
+| One or more triggers fired | Required — post it first, Summary second | Applies in full |
+| No trigger fired (external bot review complete) | Not required | Does not apply — `internal.md`'s 1-post row governs; post the Summary alone |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Read "MUST already exist" as unconditional and require a Code Review on every PR | Check the trigger state first. No trigger = `internal.md`'s 1-post row governs |
+| 2 | Treat this gate as outranking `internal.md`'s 1-post row because it is phrased as a HARD STOP | They describe different cases, so they never actually conflict. Wording strength is not a tie-breaker (see `internal.md` "Two rules pointing opposite ways") |
+| 3 | Manufacture an Internal Review to satisfy the gate when no trigger fired | That inverts the dependency — the gate presupposes a trigger, it does not create one |
 
 ```bash
 gh api repos/{owner}/{repo}/issues/{N}/comments \
   --jq '[.[] | select(.body | test("requesting-code-review"))] | length'
 ```
 
-- Result `0` → **STOP. Do not post the Summary.** Return to Step 3.5 (internal.md) and post the Code Review comment first. Posting the Summary alone (or merging both into one comment) is the documented 6-recurrence violation ("Review comment ≠ AI Review Summary").
+- Result `0` **and a Step 3.5 trigger fired** → **STOP. Do not post the Summary.** Return to Step 3.5 (internal.md) and post the Code Review comment first. Posting the Summary alone (or merging both into one comment) is the documented 6-recurrence violation ("Review comment ≠ AI Review Summary").
+- Result `0` **and no trigger fired** → this is `internal.md`'s 1-post case. Post the Summary alone and state in its reviewer matrix why no Internal Review was run, so a reader can tell "not triggered" from "skipped".
 - Result `≥1` → the paired Code Review comment exists; proceed with the Summary post (chronologically after it).
+
+> The grep above matches the `requesting-code-review` link. A Code Review whose body carries bot-layer content drops that link by design (`internal.md`, "Bot-layer content in the body drops the suffix") and instead names its engines in the heading — so a `0` here does not by itself mean no Code Review exists. Confirm against the heading before concluding it is absent: `gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | test("consolidate:verified")) | .body | split("\n")[0]'` (and the same over `pulls/{N}/reviews`, since the review medium is where inline-bearing Code Reviews land).
 
 ### Step 3.5.3 review comment ↔ Step 7 Summary paired pattern
 

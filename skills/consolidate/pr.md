@@ -28,7 +28,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 
 | Step | Topic file | Responsibility |
 |------|-----------|----------------|
-| 1 (Identify PR) + 2 (Skip Conditions) + 2.5 (Copilot sequential) + 2.6 (re-review trigger policy) + 2.7 (worktree checkout) | (inline in this file) | PR identification + skip judgment + Copilot sequential execution + first-vs-re-review classification + check out PR branch into a worktree |
+| 1 (Identify PR) + 2 (Skip Conditions) + 2.2 (promotion-PR coverage unit) + 2.5 (Copilot sequential) + 2.6 (re-review trigger policy) + 2.7 (worktree checkout) | (inline in this file) | PR identification + skip judgment + judging a promotion PR's coverage per constituent commit + Copilot sequential execution + first-vs-re-review classification + check out PR branch into a worktree |
 | 3 (Collect AI Reviews) + 3.6 (superpowers:receiving-code-review) | [`collect.md`](./collect.md) | AI review collection + load verify→evaluate→respond framework |
 | 3.5 (Internal Review Fallback) + 4.5 (UI capture verification) | [`internal.md`](./internal.md) | Post Internal Code Review comment on walkthrough only/Copilot failure + verify captures on UI-change PRs |
 | 4 (Analyze and Classify) | [`classify.md`](./classify.md) | dual-label (Type \| Severity) classification + PR diff scope cross-check + option grouping |
@@ -36,7 +36,7 @@ Review AI bot feedback (CodeRabbit, Copilot, etc.) on a PR and post an AI Review
 | 7 (Auto-Post AI Review Summary + Formal Review) + 7.5 (Status line) + 7.6 (Auto-register Deferred Findings) | [`post.md`](./post.md) | Auto-post the Summary (no user decision) + auto-register Findings to fix_plan `[REVIEW_FEEDBACK]` (defer by default) |
 | 8 (Post-Summary Next-Action Ask) | [`next.md`](./next.md) | Merge/fix-deferred/hold option ask (fix only on explicit user instruction at this step) |
 
-Entry order: Step 1 → 2 → **2.3** (duplicate-review check, three axes — submitted human reviews + pending requests + foreign AI Summary; ask before proceeding on any hit) → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
+Entry order: Step 1 → 2 → **2.2** (promotion-PR coverage judged per constituent commit — only when the head is a staging branch) → **2.3** (duplicate-review check, three axes — submitted human reviews + pending requests + foreign AI Summary; ask before proceeding on any hit) → **2.4** (Copilot availability pre-check, always) → (2.5 multi-PR only, skipped if 2.4 = not available) → 2.6 (re-review trigger classification, always) → 2.7 (worktree checkout) → [collect](./collect.md) → [internal](./internal.md) (conditional fallback, auto-routed when 2.4 = not available) → [classify](./classify.md) → [decide](./decide.md) → [post](./post.md) → [next](./next.md).
 
 ### The index above is an execution list, not a reading suggestion (HARD STOP)
 
@@ -88,6 +88,35 @@ Skip entirely if any of these are true:
 > **Bash exit code caveat**: `grep -c` returns exit code 1 when there are zero matches. When chaining multiple commands with `grep` last, add a `|| true` guard to prevent false-positive errors.
 
 If skipped, report the reason and stop.
+
+## Step 2.2: Promotion-PR review coverage is judged per constituent commit (HARD STOP)
+
+A promotion PR (a staging branch such as `develop` merging into `main`) carries commits that already passed through their own PRs. Counting the reviews attached to the **promotion PR itself** therefore measures the wrong thing: a promotion PR can legitimately show one bot review, or none, while every commit inside it was reviewed on arrival.
+
+Judge coverage by the constituent commits, not by the review count on this PR:
+
+```bash
+# Which PRs fed this staging branch, and did each carry bot review evidence?
+gh pr list -R <owner>/<repo> --state merged --base <staging-branch> --limit 20 \
+  --json number,title,mergedAt
+gh api repos/<owner>/<repo>/issues/<constituent-N>/comments --jq '[.[] | .user.login] | unique'
+gh api repos/<owner>/<repo>/pulls/<constituent-N>/reviews --jq '[.[] | .user.login] | unique'
+```
+
+| Observation on the promotion PR | Reading |
+|---|---|
+| Few or no reviews, constituents each reviewed | Coverage satisfied at the commit level — do not manufacture a review to raise the PR-level count |
+| Few or no reviews, constituents also unreviewed | Genuine gap — this PR's review is the batch's only review, so it carries the whole batch's weight |
+
+**A bot absent here is a gap to report, not a matrix row to fill in**: if an engine is active on the repository (it has commented on other PRs) but posted nothing on this one, say so in the Summary's reviewer matrix as an unexplained absence. Recording it as "clean" claims a verdict that engine never gave.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Count reviews on the promotion PR and conclude the batch is under-reviewed | Enumerate the constituent PRs and check each one's review evidence |
+| 2 | Treat an engine's absence on this PR as that engine's clean verdict | An absent review is an absence. Report it as a gap in the reviewer matrix |
+| 3 | Infer an engine is uninstalled from its absence on one PR | Check repo-wide: `gh api repos/<owner>/<repo>/issues/comments --paginate --jq '[.[] | .user.login] | unique'` |
+
+**Self-check (on any PR whose head is a staging branch)**: did I enumerate the constituent PRs before judging coverage? For each engine missing here, did I check whether it is active elsewhere in the repo — and report absence as absence rather than as a pass?
 
 ## Step 2.3: Duplicate-review check (HARD STOP — three axes, ask before proceeding on any hit)
 
