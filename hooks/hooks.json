@@ -193,6 +193,11 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-live-action-without-workflow-skill.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-browser-auth-without-skill.sh",
+            "timeout": 10
           }
         ]
       },
@@ -340,6 +345,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-supervisor-loop-work.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-premature-ralph-loop-cleanup.sh"
           }
         ]
       },
@@ -416,6 +425,10 @@
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/reap-orphaned-helper-procs.js",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-self-task-open-at-wrapup.js"
           },
           {
             "type": "command",

@@ -165,8 +165,11 @@ def main():
 
     msg = track_pm_budget(tool_name, tool_input, session_id)
     if msg:
-        # Warning to stderr for model feedback in PostToolUse
+        # exit 2 is what surfaces stderr to the model. On exit 0 the harness
+        # discards it, which made this warning a silent no-op -- see
+        # check-excessive-ci-polling.py for the same contract.
         print(msg, file=sys.stderr)
+        sys.exit(2)
 
     sys.exit(0)
 
