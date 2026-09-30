@@ -120,7 +120,17 @@ if matched:
     PROJECT_KEY=$(printf '%s' "$PWD" | tr '/.' '-')
     PROJECT_DIR="$HOME/.claude/projects/$PROJECT_KEY"
     if [ -d "$PROJECT_DIR" ]; then
-      TRANSCRIPT=$(find_newest_transcript "$PROJECT_DIR" "*.jsonl" 1)
+      # Session-ID-aware: Claude Code exports CLAUDE_CODE_SESSION_ID into this
+      # process's own environment. Prefer the exact transcript it names over
+      # the mtime-newest guess below -- when multiple sessions run
+      # concurrently against the same workspace project dir, mtime picks
+      # whichever sibling session wrote most recently, not this one (see
+      # fix_plan.md 2026-09-30).
+      if [ -n "$CLAUDE_CODE_SESSION_ID" ] && [ -f "$PROJECT_DIR/$CLAUDE_CODE_SESSION_ID.jsonl" ]; then
+        TRANSCRIPT="$PROJECT_DIR/$CLAUDE_CODE_SESSION_ID.jsonl"
+      else
+        TRANSCRIPT=$(find_newest_transcript "$PROJECT_DIR" "*.jsonl" 1)
+      fi
     fi
   fi
 
