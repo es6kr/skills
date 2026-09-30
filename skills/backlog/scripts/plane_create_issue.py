@@ -230,6 +230,55 @@ def build_intake_payload(title: str, description: str = "", priority: str = None
     return {"issue": issue}
 
 
+def _fetch_pages_for_exact_title(plane_host, workspace_slug, project_id, token, title, list_path, unwrap_issue_detail=False):
+    """Paginate one Plane list endpoint, returning the first item whose issue
+    name exactly matches `title`, or None. Best-effort: any fetch/parse error
+    degrades to "no match" rather than raising — idempotency is a guard, not
+    a hard gate that should be able to block issue creation on its own.
+    """
+    headers = {"User-Agent": UA}
+    cursor = "100:0:0"
+    try:
+        while True:
+            url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{project_id}/{list_path}/?cursor={cursor}"
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            req.add_unredirected_header("x-api-key", token)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                page = json.loads(resp.read().decode("utf-8"))
+            results = page.get("results", page if isinstance(page, list) else [])
+            for entry in results:
+                candidate = entry.get("issue_detail") if unwrap_issue_detail else entry
+                if isinstance(candidate, dict) and candidate.get("name") == title:
+                    return candidate
+            if not isinstance(page, dict):
+                break
+            next_cursor = page.get("next_cursor")
+            if not next_cursor or not page.get("next_page_results"):
+                break
+            cursor = next_cursor
+    except Exception:
+        return None
+    return None
+
+
+def rest_search_exact_title(plane_host, workspace_slug, project_id, token, title):
+    """Look for an existing issue with this exact title, checking both the
+    regular `issues/` list and the `intake-issues/` (Triage) list.
+
+    Both are necessary: `issues/` alone misses anything still pending triage
+    — Plane's own `issues/` endpoint excludes intake-pending issues, and
+    `is_intake=True` (this file's default) creates *only* via the intake
+    endpoint (see `_create_intake_via_rest_api`), so most real-world
+    duplicates would sit in Triage, invisible to a plain `issues/` search.
+    """
+    found = _fetch_pages_for_exact_title(plane_host, workspace_slug, project_id, token, title, "issues")
+    if found:
+        return found
+    return _fetch_pages_for_exact_title(
+        plane_host, workspace_slug, project_id, token, title, "intake-issues", unwrap_issue_detail=True
+    )
+
+
 def create_via_rest_api(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
     plane_host = (profile.get("plane_host") or "").rstrip("/")
     token = profile.get("token")
@@ -262,6 +311,28 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
         return {
             "success": False,
             "reason": f"Refusing to send credentials to a non-HTTPS plane_host: {plane_host!r}",
+        }
+
+    # Idempotency guard (Phase 1, plan-duplicate-detection-architecture.md):
+    # the K3s Django-shell path already skips duplicate exact-title issues
+    # (build_k3s_py_script's "Idempotency check"); this REST path had no
+    # equivalent. Same return schema as the K3s guard so callers can't tell
+    # the two apart.
+    existing = rest_search_exact_title(plane_host, workspace_slug, prj_id, token, title)
+    if existing:
+        issue_id = existing.get("id")
+        seq_id = existing.get("sequence_id")
+        identifier = fetch_project_identifier(plane_host, workspace_slug, token, prj_id)
+        browse_url = format_browse_url(plane_host, workspace_slug, identifier, seq_id) if identifier else None
+        return {
+            "success": True,
+            "method": "Existing (Idempotency Guard)",
+            "id": issue_id,
+            "sequence_id": seq_id,
+            "title": existing.get("name"),
+            "url": f"{plane_host}/{workspace_slug}/projects/{prj_id}/issues/{issue_id}",
+            "browse_url": browse_url,
+            "intake": is_intake,
         }
 
     url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/issues/"

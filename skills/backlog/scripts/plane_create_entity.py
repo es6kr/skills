@@ -68,7 +68,15 @@ for _shared_dir in _shared_script_dirs():
 # Single source of truth for profile resolution. Importing it eagerly is
 # deliberate: a missing resolver must fail loudly rather than silently degrade
 # into a run that targets whichever workspace the environment happens to name.
-from plane_client import resolve_profile, normalize_priority, convert_document  # noqa: E402
+#
+# `convert_document` is NOT re-exported by plane_client (verified: absent from
+# plane_client.py entirely) — it is only used inside create_via_k3s_page_fallback()
+# (the --type page K3s conversion path), so importing it eagerly here breaks
+# every caller of this module, including the plain Issue-creation path that
+# has nothing to do with Page conversion. Deferred to a local import at its
+# one call site (create_via_k3s_page_fallback) so that pre-existing, unrelated
+# breakage stays isolated to that one feature instead of the whole module.
+from plane_client import resolve_profile, normalize_priority  # noqa: E402
 
 
 def parse_inline_tiptap(text: str) -> list:
@@ -221,6 +229,41 @@ def markdown_to_tiptap_and_html(md_text: str):
     return tiptap_doc, html_out, md_text
 
 
+def rest_search_exact_title(plane_host: str, workspace_slug: str, project_id: str, token: str, title: str) -> "dict | None":
+    """Look for an existing issue with an exact-match title in this project.
+
+    Plane's `issues/` list endpoint ignores the documented `?search=` query
+    param entirely (verified 2026-09-30: identical result count/content with
+    and without `?search=`, and with a nonsense term) — so this fetches every
+    page and filters client-side, mirroring `plane_client.py`'s
+    `list_issues()` pagination pattern. Returns the matching issue dict, or
+    `None` if no exact-title match exists (including on any fetch error —
+    idempotency is a best-effort guard, not a hard gate: a failure here must
+    not block issue creation, only skip the duplicate check for this call).
+    """
+    headers = {"x-api-key": token, "User-Agent": UA}
+    cursor = "100:0:0"
+    try:
+        while True:
+            url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{project_id}/issues/?cursor={cursor}"
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                page = json.loads(resp.read().decode("utf-8"))
+            results = page.get("results", page if isinstance(page, list) else [])
+            for issue in results:
+                if issue.get("name") == title:
+                    return issue
+            if not isinstance(page, dict):
+                break
+            next_cursor = page.get("next_cursor")
+            if not next_cursor or not page.get("next_page_results"):
+                break
+            cursor = next_cursor
+    except Exception:
+        return None
+    return None
+
+
 def create_via_rest_api(profile: dict, title: str, description: str = "", project_id: str = None, is_intake: bool = True, priority: str = None) -> dict:
     plane_host = (profile.get("plane_host") or "").rstrip("/")
     token = profile.get("token")
@@ -245,6 +288,25 @@ def create_via_rest_api(profile: dict, title: str, description: str = "", projec
                 "Refusing to guess a target — configure the workspace profile "
                 "or set the corresponding environment variables."
             ),
+        }
+
+    # Idempotency guard (Phase 1, plan-duplicate-detection-architecture.md):
+    # the K3s Django-shell path already skips duplicate exact-title issues
+    # (build_k3s_py_script's "Idempotency check"); this REST path had no
+    # equivalent, so the same title could be created twice depending on
+    # which path a caller happened to take. Same return schema as the K3s
+    # guard ("Existing (Idempotency Guard)") so callers can't tell them apart.
+    existing = rest_search_exact_title(plane_host, workspace_slug, prj_id, token, title)
+    if existing:
+        issue_id = existing.get("id")
+        return {
+            "success": True,
+            "method": "Existing (Idempotency Guard)",
+            "id": issue_id,
+            "sequence_id": existing.get("sequence_id"),
+            "title": existing.get("name"),
+            "url": f"{plane_host}/{workspace_slug}/projects/{prj_id}/issues/{issue_id}",
+            "intake": is_intake,
         }
 
     url = f"{plane_host}/api/v1/workspaces/{workspace_slug}/projects/{prj_id}/issues/"
@@ -547,6 +609,12 @@ def create_via_k3s_page_fallback(profile: dict, title: str, description: str = "
     # empty, so the first person to open the page sees a blank body and search
     # cannot find it. Plane's own converter derives the JSON and the binary from
     # the same HTML, which keeps the four representations consistent.
+    #
+    # Local import (see the module-level plane_client import comment): this
+    # name does not currently exist in plane_client.py, so this Page-creation
+    # path fails here at call time with a clear ImportError — pre-existing,
+    # unrelated breakage, not introduced or fixed by this change.
+    from plane_client import convert_document
     canonical_tiptap, binary_b64 = convert_document(plane_host, html_desc)
     if canonical_tiptap is not None:
         tiptap_doc = canonical_tiptap
