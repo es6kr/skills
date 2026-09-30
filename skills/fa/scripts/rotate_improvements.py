@@ -29,26 +29,36 @@ def is_resolved_tag(tag: str) -> bool:
     return prefix in RESOLVED_TAG_PREFIXES
 
 def parse_improvements(content: str):
-    """Parses improvements markdown content into (active_entries, resolved_entries).
-    
+    """Parses improvements markdown content into (preamble, active, resolved).
+
     Structure typically:
     Header / preamble
     ## [Date] Section
+    (optional section prose)
     ### Item Title
     - **Tag**: [STATUS]
     - Details...
+
+    Everything that is not an entry falls into one of two buckets, and BOTH are
+    returned so a caller rewriting the file can put them back. Losing them is not
+    cosmetic: this script overwrites its source, so anything it fails to return is
+    gone from disk.
+
+    - preamble: lines before the first header
+    - section prose: lines after a `##` but before that section's first `###`,
+      carried on every entry of that section as `section_prose`
     """
     lines = content.splitlines(keepends=True)
-    
-    # Split into preamble and items
+
     preamble_lines = []
-    items = [] # list of (header_hierarchy, item_lines, tag)
-    
+    items = [] # list of (h2, h3, item_lines)
+    section_prose = {} # h2 line -> its prose lines
+
     current_h2 = ""
     current_h3 = ""
     current_lines = []
     in_item = False
-    
+
     for line in lines:
         if line.startswith('## '):
             if in_item and current_lines:
@@ -56,6 +66,7 @@ def parse_improvements(content: str):
                 current_lines = []
                 in_item = False
             current_h2 = line
+            section_prose.setdefault(current_h2, [])
         elif line.startswith('### '):
             if in_item and current_lines:
                 items.append((current_h2, current_h3, current_lines))
@@ -65,48 +76,65 @@ def parse_improvements(content: str):
             current_lines = [line]
         elif in_item:
             current_lines.append(line)
+        elif current_h2:
+            # Inside a section but ahead of its first entry — belongs to the
+            # section, not to the document preamble.
+            section_prose[current_h2].append(line)
         else:
             preamble_lines.append(line)
-            
+
     if in_item and current_lines:
         items.append((current_h2, current_h3, current_lines))
-        
+
     active_entries = []
     resolved_entries = []
-    
+
     for h2, h3, item_lines in items:
         item_text = "".join(item_lines)
         match = TAG_REGEX.search(item_text)
         tag = match.group(1) if match else ""
-        
+
         entry = {
             'h2': h2,
             'h3': h3,
             'lines': item_lines,
             'text': item_text,
-            'tag': tag
+            'tag': tag,
+            'section_prose': "".join(section_prose.get(h2, []))
         }
-        
+
         if is_resolved_tag(tag):
             resolved_entries.append(entry)
         else:
             active_entries.append(entry)
-            
-    return active_entries, resolved_entries
 
-def format_entries(entries, archive_link=None):
-    out = ["# Improvements Ledger\n\n"]
-    if archive_link:
+    return "".join(preamble_lines), active_entries, resolved_entries
+
+def format_entries(entries, preamble=None, archive_link=None):
+    # Keep the file's own preamble. Regenerating a fixed header here would discard
+    # whatever the ledger carried above its first section.
+    if preamble and preamble.strip():
+        out = [preamble if preamble.endswith('\n') else preamble + '\n']
+    else:
+        out = ["# Improvements Ledger\n\n"]
+
+    # Only introduce the archive pointer when the preserved preamble does not
+    # already carry one — otherwise every rotation appends another copy.
+    if archive_link and 'archive-link' not in (preamble or ''):
         out.append(f"<!-- archive-link: {archive_link} -->\n\n")
         out.append(f"> 📦 **Archived Items**: Past resolved items are archived in [{archive_link}]({archive_link}).\n\n")
-        
+
     current_h2 = None
     for e in entries:
         if e['h2'] and e['h2'] != current_h2:
             current_h2 = e['h2']
-            if not current_h2.endswith('\n'):
-                current_h2 += '\n'
-            out.append(f"\n{current_h2}\n")
+            header = current_h2 if current_h2.endswith('\n') else current_h2 + '\n'
+            out.append(f"\n{header}")
+            prose = e.get('section_prose', '')
+            if prose.strip():
+                out.append(prose if prose.endswith('\n') else prose + '\n')
+            else:
+                out.append('\n')
         out.append("".join(e['lines']))
         if not "".join(e['lines']).endswith('\n'):
             out.append('\n')
@@ -119,7 +147,7 @@ def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict
     with open(src_path, 'r', encoding='utf-8') as f:
         content = f.read()
         
-    active, resolved = parse_improvements(content)
+    preamble, active, resolved = parse_improvements(content)
     stats = {
         'src': src_path,
         'archive': archive_path,
@@ -133,7 +161,7 @@ def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict
         
     # Prepare archive content
     archive_basename = os.path.basename(archive_path)
-    active_text = format_entries(active, archive_link=archive_basename)
+    active_text = format_entries(active, preamble=preamble, archive_link=archive_basename)
     
     archive_existing = ""
     if os.path.exists(archive_path):
