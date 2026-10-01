@@ -5,6 +5,10 @@ on:
     branches: [main, develop]
   push:
     branches: [main, develop]
+  # Manual re-run. Without this, a pull_request run that never fired (or one whose
+  # logs have expired) cannot be re-triggered without an empty commit or a
+  # close/reopen cycle -- both of which leave permanent noise on the pull request.
+  workflow_dispatch:
 
 jobs:
   bash-guard:
