@@ -365,18 +365,27 @@ def validate_section_marker(section: str | None, marker: str) -> None:
 
 def run_update(args: argparse.Namespace) -> int:
     has_delete = args.delete
-    if not args.set_marker and not args.append_note and not args.move and not has_delete:
-        raise ValueError("at least one of --set-marker / --append-note / --move / --delete is required")
-    if args.move and (args.set_marker or args.append_note or has_delete):
-        raise ValueError("--move cannot be combined with other mutations")
-    if has_delete and (args.set_marker or args.append_note or args.move):
-        raise ValueError("--delete cannot be combined with other mutations")
+    # Read defensively: namespaces predating --set-attr (including every
+    # pre-existing caller and self-test namespace here) do not define it.
+    set_attr = getattr(args, "set_attr", None)
+    if not args.set_marker and not args.append_note and not args.move and not has_delete and not set_attr:
+        raise ValueError(
+            "at least one of --set-marker / --append-note / --set-attr / --move / --delete is required"
+        )
+    if args.move and (args.set_marker or args.append_note or has_delete or set_attr):
+        raise ValueError("--move cannot be combined with other mutations (--set-marker / --append-note / --set-attr)")
+    if has_delete and (args.set_marker or args.append_note or args.move or set_attr):
+        raise ValueError("--delete cannot be combined with other mutations (--set-marker / --append-note / --set-attr)")
     if args.summary is not None and not args.move:
         raise ValueError("--summary only applies together with --move")
     if args.set_marker:
         validate_marker(args.set_marker)
     if args.append_note and ("\n" in args.append_note or "\r" in args.append_note):
         raise ValueError("--append-note must be a single line (no newlines)")
+    if set_attr:
+        # Validate up front so an unregistered key fails before the lock is taken
+        # and before any write path is entered.
+        validate_attr(*set_attr)
 
     if not os.path.exists(args.file):
         raise ValueError(f"tracker not found: {args.file}")
@@ -447,7 +456,7 @@ def run_update(args: argparse.Namespace) -> int:
 
         if args.set_marker:
             validate_section_marker(enclosing_section(lines, start), args.set_marker)
-        block = apply_update(lines[start:end], args.set_marker, args.append_note)
+        block = apply_update(lines[start:end], args.set_marker, args.append_note, set_attr)
 
         out = "\n".join(lines[:start] + block + lines[end:])
 
@@ -1239,6 +1248,13 @@ def main() -> int:
     )
     p.add_argument("--test", action="store_true", help="run the self-test and exit")
     p.add_argument("--file", help="tracker path (fix_plan.md or checklist.md)")
+    p.add_argument(
+        "--set-attr",
+        type=parse_attr_arg,
+        metavar="KEY=VALUE",
+        help="set a trailing [KEY:VALUE] attribute on the item "
+             "(registered keys: " + ", ".join(sorted(ATTR_VOCAB)) + ")",
+    )
     p.add_argument("--match", help="substring of the target item's action text (must match exactly one item)")
     p.add_argument("--set-marker", help="'[ ]', '[x]', '[-]', or '[BLOCKED:P<0-3>:external|selfable]'")
     p.add_argument("--append-note", help="one-line progress note appended as a new sub-bullet")
