@@ -86,12 +86,25 @@ if [[ -z "$TRANSCRIPT" || ! -f "$TRANSCRIPT" ]]; then
   exit 0
 fi
 
-# context-usage-inject.sh lives in the context-measure skill (split out of
-# hook-kit, 2026-08-10) — not a same-directory sibling, hence the explicit
-# cross-skill path.
-CTX_INJECT="$HOME/.claude/skills/context-measure/resources/context-usage-inject.sh"
+# Resolve context-usage-inject.sh via a probe chain. A single hardcoded path
+# fails silently: this previously pointed at a `context-measure` skill that does
+# not exist in this repo or at runtime, so the -f test always failed and the
+# guard exited 0 on every invocation -- a permanently inert hook that looked
+# like a passing one. The same-directory sibling is tried first so a plugin
+# install resolves without depending on $HOME layout.
+CTX_INJECT=""
+for _candidate in \
+  "$(dirname "$0")/context-usage-inject.sh" \
+  "$(dirname "$0")/../../session/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/hook-kit/resources/context-usage-inject.sh" \
+  "$HOME/.claude/skills/session/resources/context-usage-inject.sh"; do
+  if [[ -f "$_candidate" ]]; then
+    CTX_INJECT="$_candidate"
+    break
+  fi
+done
 LATEST_PCT=""
-if [[ -f "$CTX_INJECT" ]]; then
+if [[ -n "$CTX_INJECT" && -f "$CTX_INJECT" ]]; then
   TRANSCRIPT_JSON=${TRANSCRIPT//\\/\\\\}
   CTX_OUT=$(printf '{"transcript_path": "%s"}' "$TRANSCRIPT_JSON" \
     | bash "$CTX_INJECT" 2>/dev/null)

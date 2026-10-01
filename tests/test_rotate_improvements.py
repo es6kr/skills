@@ -1,10 +1,12 @@
 import os
+import pathlib
 import sys
 import tempfile
 import unittest
 
 # Add fa scripts to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'skills', 'fa', 'scripts'))
+import rotate_improvements
 from rotate_improvements import parse_improvements, rotate_file, is_resolved_tag
 
 SAMPLE_IMPROVEMENTS = """# Improvements Ledger
@@ -65,7 +67,7 @@ class TestRotateImprovements(unittest.TestCase):
         self.assertFalse(is_resolved_tag(''))
 
     def test_parse_improvements(self):
-        preamble, active, resolved = parse_improvements(SAMPLE_IMPROVEMENTS)
+        preamble, _sections, active, resolved = parse_improvements(SAMPLE_IMPROVEMENTS)
         self.assertEqual(len(resolved), 2)  # Item 1, Item 3
         self.assertEqual(len(active), 2)    # Item 2, Item 4
         # The parser collects the preamble; it must also hand it back so the
@@ -73,7 +75,7 @@ class TestRotateImprovements(unittest.TestCase):
         self.assertIn('archive-link', preamble)
 
     def test_parse_returns_section_prose(self):
-        _preamble, active, _resolved = parse_improvements(SAMPLE_WITH_PROSE)
+        _preamble, _sections, active, _resolved = parse_improvements(SAMPLE_WITH_PROSE)
         # Prose sitting between `## Topic A` and its first `###` belongs to that
         # section, not to the document preamble, and must survive as such.
         topic_a = [e for e in active if 'Topic A' in e['h2']]
@@ -123,6 +125,103 @@ class TestRotateImprovements(unittest.TestCase):
                 archive_content = f.read()
             self.assertIn('[APPLIED]', archive_content)
             self.assertIn('[IMPLEMENTED:PR#123]', archive_content)
+
+    def test_section_prose_survives_when_every_item_is_archived(self):
+        """Prose carried on entries is only recoverable while the section still HAS
+        an entry. When all of a section's items resolve, they all move to the
+        archive and the prose loses its carrier -- it then vanished from both
+        files."""
+        sample = (
+            "# Improvements Ledger\n\n"
+            "<!-- archive-link: improvements.archive.md -->\n\n"
+            "## [2026-09-01] Topic C\n\n"
+            "Section-level context for Topic C.\n\n"
+            "### Item 5\n"
+            "- **Tag**: [APPLIED]\n"
+            "- Description: Resolved.\n\n"
+            "## [2026-09-02] Topic D\n\n"
+            "Context for Topic D.\n\n"
+            "### Item 6\n"
+            "- **Tag**: [BLOCKED]\n"
+            "- Description: Still open.\n"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_path = os.path.join(tmpdir, 'improvements.md')
+            archive_path = os.path.join(tmpdir, 'improvements.archive.md')
+            with open(src_path, 'w', encoding='utf-8') as f:
+                f.write(sample)
+
+            rotate_file(src_path, archive_path, dry_run=False)
+
+            with open(src_path, 'r', encoding='utf-8') as f:
+                src_content = f.read()
+
+            # Topic D keeps an active item, so its prose has a carrier.
+            self.assertIn('Context for Topic D.', src_content)
+            # Topic C's only item was archived -- this is the regression.
+            self.assertIn('Section-level context for Topic C.', src_content)
+            self.assertIn('Topic C', src_content)
+            self.assertNotIn('[APPLIED]', src_content)
+
+    def test_rotate_is_idempotent(self):
+        """A second rotation with nothing left to resolve must not mutate the file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_path = os.path.join(tmpdir, 'improvements.md')
+            archive_path = os.path.join(tmpdir, 'improvements.archive.md')
+            with open(src_path, 'w', encoding='utf-8') as f:
+                f.write(SAMPLE_WITH_PROSE)
+
+            rotate_file(src_path, archive_path, dry_run=False)
+            with open(src_path, 'r', encoding='utf-8') as f:
+                after_first = f.read()
+
+            rotate_file(src_path, archive_path, dry_run=False)
+            with open(src_path, 'r', encoding='utf-8') as f:
+                after_second = f.read()
+
+            self.assertEqual(after_first, after_second)
+
+    def test_writes_are_atomic(self):
+        """Both writes must go through a temp file + os.replace. Two plain
+        open(...,'w') calls leave a window where an interruption truncates the
+        source with its content not yet anywhere else, and there is no backup."""
+        source = pathlib.Path(rotate_improvements.__file__).read_text(encoding='utf-8')
+        self.assertIn('os.replace', source)
+        self.assertIn('tempfile.mkstemp', source)
+        self.assertNotIn("open(src_path, 'w'", source)
+        self.assertNotIn("open(archive_path, 'w'", source)
+
+    def test_format_entries_fallback_preserves_prose_when_sections_omitted(self):
+        """When format_entries is invoked without the sections map (sections=None),
+        it should fall back to entry-carried section_prose."""
+        from rotate_improvements import parse_improvements, format_entries
+        preamble, sections, active, resolved = parse_improvements(SAMPLE_WITH_PROSE)
+        rendered = format_entries(active, preamble=preamble, sections=None)
+        self.assertIn("Context for Topic A: raised during the September audit, owner unassigned.", rendered)
+
+    def test_atomic_write_cleanup_on_failure(self):
+        """If _atomic_write encounters an exception while writing, it must clean
+        up its temporary file and leave the target file intact."""
+        from unittest.mock import patch
+        from rotate_improvements import _atomic_write
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = os.path.join(tmpdir, 'target.md')
+            with open(target, 'w', encoding='utf-8') as f:
+                f.write('initial content')
+
+            with patch('os.fdopen', side_effect=IOError('simulated disk failure')):
+                with self.assertRaises(IOError):
+                    _atomic_write(target, 'new content')
+
+            # Original file remains unmodified
+            with open(target, 'r', encoding='utf-8') as f:
+                self.assertEqual(f.read(), 'initial content')
+
+            # No leaked temp files
+            tmps = [p for p in os.listdir(tmpdir) if p.startswith('.rotate-')]
+            self.assertEqual(tmps, [])
+
 
 if __name__ == '__main__':
     unittest.main()
