@@ -4,17 +4,93 @@
 Tracks tool calls in PM-mode sessions (e.g. /fix-plan --pm).
 Warns when the cumulative tool-call count reaches 30, preventing the agent
 from sliding into full-stack direct implementation within a PM governance session.
+
+The guard is registered on the Bash matcher only, so a Bash command string is
+its sole activation signal. Activation therefore has to distinguish a command
+that *invokes* the pipeline from one that merely *mentions* it: quoted text and
+heredoc bodies are masked out, commands whose job is to read or print text are
+excluded, and the pipeline token must precede the --pm flag the way it does in
+an invocation. Without that, `grep -n -- '--pm' <path>/fix_plan.md` activated
+the guard, and because the flag is sticky for the session the budget warning
+then fired every tenth tool call until the session ended.
 """
 
 from __future__ import annotations
 import json
 import os
+import re
 import sys
 import tempfile
 
 STATE_DIR = os.path.expanduser("~/.claude/state")
 STATE_FILE = os.path.join(STATE_DIR, "pm-session-counters.json")
 PM_BUDGET_LIMIT = 30
+
+# How often the exceeded-budget warning repeats, and how many times. Bounding
+# the escalations keeps a wrong activation from occupying the whole session.
+ESCALATION_STEP = 10
+MAX_ESCALATIONS = 3
+
+# Commands whose purpose is to read, search or print text. A reference to the
+# pipeline inside one of these is a mention, not an invocation.
+TEXT_INSPECTION_CMDS = frozenset(
+    {
+        "ack", "ag", "awk", "cat", "cut", "diff", "echo", "egrep", "fgrep",
+        "grep", "head", "jq", "less", "more", "nl", "printf", "rg", "sed",
+        "sort", "strings", "tac", "tail", "tee", "uniq", "wc", "yq",
+    }
+)
+
+# The pipeline token in command position, then the --pm flag after it. A search
+# whose pattern is "--pm" puts the flag first and does not match.
+_INVOCATION_RE = re.compile(
+    r"(?:^|[;&|(]\s*|\s)"                              # start of a command
+    r"(?:(?:python3?|uvx|bash|sh|zsh)\s+(?:-\S+\s+)*)?"  # optional interpreter
+    r"(?:\S*/)?fix[-_]plan[\w.-]*"                      # the pipeline itself
+    r"[^;&|]*?\s--pm(?=[\s=]|$)"                        # ... then the flag
+)
+
+_QUOTED_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
+_ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def _mask_literals(cmd: str) -> str:
+    """Blank out quoted spans and heredoc bodies so text *about* a command is
+    not read as the command itself. Length is preserved so offsets still line
+    up for anyone debugging a match."""
+    cut = cmd.find("<<")
+    if cut != -1:
+        cmd = cmd[:cut]
+    return _QUOTED_RE.sub(lambda m: " " * len(m.group(0)), cmd)
+
+
+def _leading_command(cmd: str) -> str:
+    """The program name of the first command, skipping VAR=value prefixes."""
+    for token in cmd.strip().split():
+        if _ENV_ASSIGN_RE.match(token):
+            continue
+        return os.path.basename(token)
+    return ""
+
+
+def pm_mode_env() -> bool | None:
+    """PM_MODE as a tri-state: True forces the guard on, False forces it off,
+    None leaves the decision to command inspection. The off state matters for a
+    session that knows the budget does not apply to it."""
+    raw = os.environ.get("PM_MODE")
+    if raw is None:
+        return None
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def is_pm_invocation(cmd: str) -> bool:
+    """True when the command actually runs the fix-plan PM pipeline."""
+    if not cmd:
+        return False
+    masked = _mask_literals(cmd)
+    if _leading_command(masked) in TEXT_INSPECTION_CMDS:
+        return False
+    return bool(_INVOCATION_RE.search(masked))
 
 
 def get_state() -> dict:
@@ -42,41 +118,53 @@ def save_state(state: dict):
 
 
 def is_pm_session(session_id: str, tool_input: dict) -> bool:
-    # 1. Direct env variable
-    if os.environ.get("PM_MODE") in ("1", "true", "TRUE"):
-        return True
+    # 1. Explicit env variable, in either direction
+    forced = pm_mode_env()
+    if forced is not None:
+        return forced
 
-    # 2. Check if the current command invoked fix-plan --pm
+    # 2. Does the current command invoke fix-plan --pm?
     cmd = (
         tool_input.get("CommandLine", "")
         or tool_input.get("command", "")
         or tool_input.get("cmd", "")
     )
-    if "--pm" in cmd and ("fix_plan" in cmd or "fix-plan" in cmd):
+    if is_pm_invocation(cmd):
         return True
 
-    # 3. Check persistent session state flag
+    # 3. Persistent session state flag
     state = get_state()
     return state.get(session_id, {}).get("is_pm", False)
 
 
+SESSION_TYPE_CHECK = (
+    "- First classify this session type. Performing the PM role (triaging the backlog and\n"
+    "  allocating it across channels) is what this budget targets. Building or measuring the\n"
+    "  PM role itself — writing its probes, scoring model or rules — is a different session\n"
+    "  and this warning is a false positive there: say so and carry on.\n"
+)
+
+
 def track_pm_budget(tool_name: str, tool_input: dict, session_id: str) -> str | None:
+    forced = pm_mode_env()
+    if forced is False:
+        # An explicit off switch wins over everything, including a session that
+        # was already flagged. Return before touching state so the flag cannot
+        # be set by the very call that disabled the guard.
+        return None
+
     state = get_state()
     session_data = state.get(session_id, {"count": 0, "is_pm": False})
 
-    # Activate PM flag if command matches
     cmd = (
         tool_input.get("CommandLine", "")
         or tool_input.get("command", "")
         or tool_input.get("cmd", "")
     )
-    if "--pm" in cmd and ("fix_plan" in cmd or "fix-plan" in cmd):
+    if is_pm_invocation(cmd):
         session_data["is_pm"] = True
 
-    if not session_data.get("is_pm", False) and os.environ.get("PM_MODE") not in (
-        "1",
-        "true",
-    ):
+    if not session_data.get("is_pm", False) and not forced:
         return None
 
     session_data["is_pm"] = True
@@ -90,16 +178,29 @@ def track_pm_budget(tool_name: str, tool_input: dict, session_id: str) -> str | 
             f"\n⚠️ [PM Turn Budget Limit Warning]\n"
             f"This PM session has accumulated {count} tool calls.\n"
             f"Rule Enforcement (Fix-Plan PM Role Mandatory Task Allocation & Dispatch Gate):\n"
+            f"{SESSION_TYPE_CHECK}"
             f"- Avoid self-implementing large tasks within a PM session.\n"
             f"- STOP implementation loops immediately and perform task allocation / handoff Ask\n"
             f"  across available channels (In-Session, Orca worktree split, Deep Tasks, Clawo/Ralph daemon).\n"
         )
-    elif count > PM_BUDGET_LIMIT and count % 10 == 0:
-        return (
-            f"\n🚨 [PM Turn Budget Exceeded]\n"
-            f"PM session tool calls ({count}) significantly exceed budget limit ({PM_BUDGET_LIMIT}).\n"
-            f"Direct implementation is consuming PM session context window. Hand off immediately!\n"
-        )
+
+    over = count - PM_BUDGET_LIMIT
+    if over > 0 and over % ESCALATION_STEP == 0:
+        escalation = over // ESCALATION_STEP
+        if escalation <= MAX_ESCALATIONS:
+            tail = (
+                ""
+                if escalation < MAX_ESCALATIONS
+                else "This is the last escalation; the guard stays quiet from here.\n"
+            )
+            return (
+                f"\n🚨 [PM Turn Budget Exceeded]\n"
+                f"PM session tool calls ({count}) significantly exceed budget limit ({PM_BUDGET_LIMIT}).\n"
+                f"{SESSION_TYPE_CHECK}"
+                f"If this is the PM role itself, direct implementation is consuming the PM session\n"
+                f"context window — hand off now.\n"
+                f"{tail}"
+            )
 
     return None
 
