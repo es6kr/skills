@@ -1103,6 +1103,132 @@ def self_test() -> int:
                lambda: apply_update(attr_block, "[x]", None, ("ICE", "I2,C0.8,E4"))[0],
                want="- [x] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
 
+
+    # ------------------------------------------------------------------
+    # --set-attr CLI wiring
+    #
+    # apply_update already accepts an attribute, but nothing reaches it from the
+    # command line, so the capability is unusable from a skill invocation. These
+    # cases drive the wiring: the flag must satisfy the "at least one mutation"
+    # requirement on its own, refuse to combine with the whole-item operations
+    # (--move / --delete) exactly as --set-marker does, reject an unregistered key
+    # before the tracker is touched, and honour --dry-run.
+    #
+    # The last case pins backward compatibility: a namespace built WITHOUT a
+    # set_attr attribute must still run, because every pre-existing caller and
+    # self-test namespace in this file is built that way.
+    # ------------------------------------------------------------------
+    import tempfile as _tf
+
+    def _attr_tracker() -> str:
+        with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as fh:
+            fh.write("\n".join([
+                "# T", "", "## TODO", "",
+                "- [ ] attr cli target unique-marker-delta",
+                "  - **Why**: delta reason",
+                "  - **How to apply**: delta steps",
+                "",
+            ]))
+            return fh.name
+
+    def _attr_ns(path: str, **over):
+        class NS:
+            delete = False
+        ns = NS()
+        ns.file = path
+        ns.match = "unique-marker-delta"
+        ns.set_marker = None
+        ns.append_note = None
+        ns.dry_run = False
+        ns.move = False
+        ns.summary = None
+        ns.set_attr = None
+        for k, v in over.items():
+            setattr(ns, k, v)
+        return ns
+
+    _p = _attr_tracker()
+    try:
+        rc = run_update(_attr_ns(_p, set_attr=("ICE", "I2,C0.8,E4")))
+        body = open(_p, encoding="utf-8").read()
+        check("--set-attr alone satisfies the at-least-one-mutation check", rc == 0)
+        check("--set-attr writes the marker into the tracker",
+              "- [ ] attr cli target unique-marker-delta [ICE:I2,C0.8,E4]" in body)
+    except Exception as exc:  # noqa: BLE001
+        check("--set-attr alone satisfies the at-least-one-mutation check", False)
+        check("--set-attr writes the marker into the tracker", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_attr=("ICE", "I2,C0.8,E4"), move=True))
+        check("--set-attr cannot be combined with --move", False)
+    except ValueError as exc:
+        check("--set-attr cannot be combined with --move", "set-attr" in str(exc))
+    except Exception:  # noqa: BLE001
+        check("--set-attr cannot be combined with --move", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_attr=("ICE", "I2,C0.8,E4"), delete=True))
+        check("--set-attr cannot be combined with --delete", False)
+    except ValueError as exc:
+        check("--set-attr cannot be combined with --delete", "set-attr" in str(exc))
+    except Exception:  # noqa: BLE001
+        check("--set-attr cannot be combined with --delete", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_attr=("NOPE", "x")))
+        check("--set-attr rejects an unregistered key", False)
+    except ValueError as exc:
+        check("--set-attr rejects an unregistered key", "unregistered attribute key" in str(exc))
+    except Exception:  # noqa: BLE001
+        check("--set-attr rejects an unregistered key", False)
+    else:
+        pass
+    finally:
+        unchanged = open(_p, encoding="utf-8").read()
+        check("a rejected key leaves the tracker untouched", "[NOPE:" not in unchanged)
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_marker="[x]", set_attr=("ch", "orca")))
+        body = open(_p, encoding="utf-8").read()
+        check("--set-attr combines with --set-marker in one invocation",
+              "- [x] attr cli target unique-marker-delta [ch:orca]" in body)
+    except Exception:  # noqa: BLE001
+        check("--set-attr combines with --set-marker in one invocation", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        before = open(_p, encoding="utf-8").read()
+        run_update(_attr_ns(_p, set_attr=("RAID", "R,D"), dry_run=True))
+        check("--dry-run with --set-attr leaves the tracker unwritten",
+              open(_p, encoding="utf-8").read() == before)
+    except Exception:  # noqa: BLE001
+        check("--dry-run with --set-attr leaves the tracker unwritten", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        legacy = _attr_ns(_p, set_marker="[x]")
+        del legacy.set_attr  # a namespace predating the flag
+        check("a namespace without set_attr still runs", run_update(legacy) == 0)
+    except Exception:  # noqa: BLE001
+        check("a namespace without set_attr still runs", False)
+    finally:
+        os.unlink(_p)
+
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
 
