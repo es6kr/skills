@@ -1,9 +1,9 @@
 ---
 name: fix-plan
 description: |
-  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), update (flip marker / append progress note on an existing item), upsert (dup-check → update in place or fall back to add), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
+  fix_plan.md / checklist.md schema and lifecycle management. Topics — format ([ ]/[x]/[BLOCKED] markers, Progress/Completed sections), priority (P0-P3 BLOCKED suffix + external/selfable classification), add (Action/Why/How authoring), update (flip marker / note / `[KEY:VALUE]` attr), upsert (dup-check → update in place or fall back to add), draft (deferred plan stub → promote via code-workflow), move ([x] → Completed summary, subtree partial completion), sync (gh pr/issue state polling → auto-check), issue-drafts (write → publish → archive → delete), model-triage (fit + dedicated section), completion-criteria (DoD + marker rules).
   Default (no args): move (or archive-receiver) → format → sync → priority → flowchart-sync (incl. pinned-mission liveness check), scoped by role-profile (--role=pm|deep|impl).
-  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role", "orca session launch", "fix-plan upsert", "dup check tracker", "pinned mission liveness", "pinned-backing".
+  Use when: "fix_plan", "checklist", "BLOCKED priority", "triage blocked", "fix-plan sync", "issue draft cleanup", "fix-plan draft", "fix-plan default", "fix-plan archive", "model triage", "completion criteria", "role profile", "--role", "orca session launch", "fix-plan upsert", "dup check tracker", "pinned mission liveness", "pinned-backing", "set-attr".
 metadata:
   author: es6kr
   version: "0.1.0"
@@ -40,7 +40,7 @@ Schema and lifecycle management for `fix_plan.md` (Ralph convention) and `checkl
 | priority | `[BLOCKED:P0-P3:reason]` GitHub-aligned priority suffix + `external` / `selfable` reason classification + triage workflow | [priority.md](./priority.md) |
 | sync | GitHub PR/Issue & Plane REST API state polling (`gh` CLI + `plane_sync.py`) → auto-check `[ ]` → `[x]` on MERGED PR or CLOSED issue; PR CLOSED-without-merge → `[BLOCKED:P2:external]` | [sync.md](./sync.md) |
 | sync-automation | Stop-hook checkpoint nudge — reminds to run `sync` when a tracker referencing PR/Issue numbers hasn't been synced in a while, without any network call inside the hook itself | [sync-automation.md](./sync-automation.md) |
-| update | Mutate an EXISTING item in place — flip its marker or append a one-line progress note — via `update_item.py`, without going around `block-direct-checklist-edit.js` | [update.md](./update.md) |
+| update | Mutate an EXISTING item in place — flip its marker, append a one-line progress note, or set a trailing `[KEY:VALUE]` attribute (registered vocabulary: `ICE` / `ch` / `RAID`) — via `update_item.py`, without going around `block-direct-checklist-edit.js` | [update.md](./update.md) |
 | upsert | Dup-check the tracker before authoring — match on Action semantics across all sections, update in place (preserve `Why`, state priority reclassification) when found, fall back to `add`'s schema otherwise | [upsert.md](./upsert.md) |
 | verify | Cross-check commit-hash/file-path references cited in tracker items against local git/filesystem state before trusting a "still unresolved" claim (distinct from `sync`'s external GitHub polling); second dimension cross-checks inline "residual =" notes against the linked plan's Progress Checklist (stale-forward detection) | [verify.md](./verify.md) |
 
