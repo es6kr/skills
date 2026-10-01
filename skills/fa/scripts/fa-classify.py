@@ -148,14 +148,66 @@ def _hook_path_exists(p):
     return False
 
 
+# A class section's machine-readable header sits on the line BEFORE its `## `
+# heading, so splitting the corpus on `^## ` leaves each header trailing at the
+# end of the PREVIOUS chunk. Every section then reads its successor's `last=`
+# (and the final one reads none), which silently inverts staleness: a section
+# whose own last= is recent gets demoted because its successor's is old, and an
+# actually-stale one is kept because its successor's is recent. split_sections
+# re-attaches each header to the section it describes.
+META_LINE = re.compile(r"(?m)^<!--\s*fa:.*?-->[ \t]*$")
+
+
+COMMENT_LINE = re.compile(r"(?m)^<!--.*?-->[ \t]*$")
+
+
+def _split_trailing_meta(chunk):
+    """Split a chunk into (its own body, the next section's header block or '').
+
+    A header block is the `fa:` line plus any sibling comment lines that follow
+    it (`<!-- hook: ... -->` annotations sit there), so the terminator test is
+    "only comments and blanks after the `fa:` line", not "nothing at all".
+    """
+    matches = list(META_LINE.finditer(chunk))
+    if not matches:
+        return chunk, ""
+    last = matches[-1]
+    tail = chunk[last.start():]
+    for line in tail.split("\n"):
+        if not line.strip():
+            continue
+        if not COMMENT_LINE.match(line):
+            # prose follows, so this header describes the current section
+            return chunk, ""
+    return chunk[: last.start()], tail.strip("\n") + "\n\n"
+
+
+def split_sections(text):
+    """Sections, each carrying the `fa:` header that precedes its heading."""
+    parts = re.split(r"(?m)^## ", text)
+    carry = _split_trailing_meta(parts[0])[1]
+    out = []
+    for chunk in parts[1:]:
+        body, nxt = _split_trailing_meta(chunk)
+        out.append(carry + "## " + body)
+        carry = nxt
+    return out
+
+
+def section_title(section):
+    """The `## ` heading text — not line 0, which may be the `fa:` header."""
+    return next(
+        (ln[3:].strip() for ln in section.split("\n") if ln.startswith("## ")), ""
+    )
+
+
 def analyze(path, cutoff, relaxed=False):
     text = io.open(path, encoding="utf-8").read()
-    parts = re.split(r"(?m)^## ", text)
-    sections = ["## " + p for p in parts[1:]]
+    sections = split_sections(text)
 
     rows = []
     for i, s in enumerate(sections):
-        title = s.split("\n", 1)[0][3:].strip()
+        title = section_title(s)
         dates = DATE.findall(s) + BULLET_DATE.findall(s)
         meta_last = META_LAST.search(s)
         # meta-line last= is authoritative when present (class-format sections);
@@ -167,7 +219,10 @@ def analyze(path, cutoff, relaxed=False):
         hook = bool(HOOK_FUTURE.search(s))
         resolved = bool(RESOLVED.search(s))
         later_body = bool(title_date and latest and latest > title_date)
-        old = (title_date or latest or "9999") < cutoff
+        # `latest` is the meta last= when present, else the newest date in the
+        # body — either way it dominates the title, which only carries the date
+        # of the FIRST occurrence and goes stale as soon as the class recurs.
+        old = (latest or title_date or "9999") < cutoff
         # meta header (Phase 2) overrides the heuristic signals when present
         meta = parse_section_meta(s)
         via_meta = meta is not None
@@ -257,7 +312,9 @@ def verify_meta(path):
     disagreements — remaining ones are surfaced for review (usually a heuristic
     false negative the meta corrects, or a mis-set status field to fix)."""
     text = io.open(path, encoding="utf-8").read()
-    sections = ["## " + p for p in re.split(r"(?m)^## ", text)[1:]]
+    # same attribution requirement as analyze(): a section must carry its own
+    # header, not the next one's
+    sections = split_sections(text)
     total_meta = 0
     disagreements = []
     for s in sections:
@@ -265,7 +322,7 @@ def verify_meta(path):
         if not meta:
             continue
         total_meta += 1
-        title = s.split("\n", 1)[0][3:].strip()
+        title = section_title(s)
         status = meta.get("status", "")
         meta_res = meta_is_resolved(status)
         heur_res = bool(RESOLVED.search(s))
@@ -316,7 +373,7 @@ def main():
         f"via relaxed={len(via_relaxed)}) mode={mode} cutoff={args.cutoff}"
     )
     print("\n--- COLD candidates (oldest first; R = resolved-exception, S = stale-recurrence) ---")
-    for r in sorted(cold, key=lambda x: x["title_date"] or x["latest"]):
+    for r in sorted(cold, key=lambda x: x["latest"] or x["title_date"]):
         flag = "S" if r.get("via_relaxed") else ("R" if r["via_resolve"] else " ")
         print(f"[{r['idx']:3d}] {r['latest'] or r['title_date']} {flag} | {r['title'][:88]}")
 
