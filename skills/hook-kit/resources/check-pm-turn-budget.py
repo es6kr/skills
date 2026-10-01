@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
@@ -41,36 +42,121 @@ TEXT_INSPECTION_CMDS = frozenset(
     }
 )
 
-# The pipeline token in command position, then the --pm flag after it. A search
-# whose pattern is "--pm" puts the flag first and does not match.
-_INVOCATION_RE = re.compile(
-    r"(?:^|[;&|(]\s*|\s)"                              # start of a command
-    r"(?:(?:python3?|uvx|bash|sh|zsh)\s+(?:-\S+\s+)*)?"  # optional interpreter
-    r"(?:\S*/)?fix[-_]plan[\w.-]*"                      # the pipeline itself
-    r"[^;&|]*?\s--pm(?=[\s=]|$)"                        # ... then the flag
-)
-
-_QUOTED_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
+INTERPRETERS = frozenset({"python", "python3", "uvx", "bash", "sh", "zsh"})
 _ENV_ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
-def _mask_literals(cmd: str) -> str:
-    """Blank out quoted spans and heredoc bodies so text *about* a command is
-    not read as the command itself. Length is preserved so offsets still line
-    up for anyone debugging a match."""
-    cut = cmd.find("<<")
-    if cut != -1:
-        cmd = cmd[:cut]
-    return _QUOTED_RE.sub(lambda m: " " * len(m.group(0)), cmd)
-
-
-def _leading_command(cmd: str) -> str:
-    """The program name of the first command, skipping VAR=value prefixes."""
-    for token in cmd.strip().split():
-        if _ENV_ASSIGN_RE.match(token):
+def _strip_heredoc(cmd: str) -> str:
+    """Mask heredoc body lines so text inside stdin is not parsed as command tokens,
+    while preserving preceding and following command lines."""
+    lines = cmd.splitlines()
+    res = []
+    in_heredoc = False
+    heredoc_term = ""
+    for line in lines:
+        if in_heredoc:
+            if line.strip() == heredoc_term:
+                in_heredoc = False
             continue
-        return os.path.basename(token)
-    return ""
+        m = re.search(r"<<-?\s*['\"]?([A-Za-z0-9_]+)['\"]?", line)
+        if m:
+            in_heredoc = True
+            heredoc_term = m.group(1)
+            # Remove <<MARKER from the command line while preserving surrounding tokens
+            cleaned_line = line[:m.start()] + " " + line[m.end():]
+            res.append(cleaned_line)
+        else:
+            res.append(line)
+    return "\n".join(res)
+
+
+def _split_commands(cmd: str) -> list[str]:
+    """Split composite command lines on ;, &&, ||, |, and \n outside quoted spans."""
+    parts = []
+    curr = []
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(cmd):
+        c = cmd[i]
+        if c == "'" and not in_double:
+            in_single = not in_single
+            curr.append(c)
+        elif c == '"' and not in_single:
+            in_double = not in_double
+            curr.append(c)
+        elif not in_single and not in_double:
+            if c in (";", "\n"):
+                parts.append("".join(curr))
+                curr = []
+            elif c == "&" and i + 1 < len(cmd) and cmd[i + 1] == "&":
+                parts.append("".join(curr))
+                curr = []
+                i += 1
+            elif c == "|" and i + 1 < len(cmd) and cmd[i + 1] == "|":
+                parts.append("".join(curr))
+                curr = []
+                i += 1
+            elif c == "|":
+                parts.append("".join(curr))
+                curr = []
+            else:
+                curr.append(c)
+        else:
+            curr.append(c)
+        i += 1
+    if curr:
+        parts.append("".join(curr))
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _is_simple_cmd_pm(cmd: str) -> bool:
+    """Inspect a single simple command to check if it executes fix_plan --pm."""
+    try:
+        tokens = shlex.split(cmd, comments=True)
+    except ValueError:
+        tokens = cmd.split()
+
+    if not tokens:
+        return False
+
+    idx = 0
+    while idx < len(tokens) and _ENV_ASSIGN_RE.match(tokens[idx]):
+        idx += 1
+
+    if idx >= len(tokens):
+        return False
+
+    prog = os.path.basename(tokens[idx])
+    if prog in TEXT_INSPECTION_CMDS:
+        return False
+
+    has_pm_flag = any(t == "--pm" or t.startswith("--pm=") for t in tokens[idx:])
+    if not has_pm_flag:
+        return False
+
+    pm_idx = -1
+    for i, t in enumerate(tokens[idx:], start=idx):
+        if t == "--pm" or t.startswith("--pm="):
+            pm_idx = i
+            break
+
+    # If invoked via interpreter (e.g. python3 scripts/fix_plan.py --pm)
+    if prog in INTERPRETERS:
+        script_idx = idx + 1
+        while script_idx < len(tokens) and tokens[script_idx].startswith("-") and not (tokens[script_idx] == "--pm" or tokens[script_idx].startswith("--pm=")):
+            script_idx += 1
+        if script_idx < len(tokens):
+            script_name = os.path.basename(tokens[script_idx])
+            if re.match(r"^fix[-_]plan[\w.-]*$", script_name) and script_idx < pm_idx:
+                return True
+        return False
+
+    # Direct invocation (e.g. fix-plan --pm, ./scripts/fix_plan.py --pm)
+    if re.match(r"^fix[-_]plan[\w.-]*$", prog) and idx < pm_idx:
+        return True
+
+    return False
 
 
 def pm_mode_env() -> bool | None:
@@ -87,10 +173,11 @@ def is_pm_invocation(cmd: str) -> bool:
     """True when the command actually runs the fix-plan PM pipeline."""
     if not cmd:
         return False
-    masked = _mask_literals(cmd)
-    if _leading_command(masked) in TEXT_INSPECTION_CMDS:
-        return False
-    return bool(_INVOCATION_RE.search(masked))
+    cleaned = _strip_heredoc(cmd)
+    for subcmd in _split_commands(cleaned):
+        if _is_simple_cmd_pm(subcmd):
+            return True
+    return False
 
 
 def get_state() -> dict:

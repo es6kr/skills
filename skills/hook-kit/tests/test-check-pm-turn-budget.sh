@@ -57,12 +57,26 @@ probe inactive "appending prose that mentions fix-plan --pm" \
   "echo 'see the fix-plan --pm pipeline' >> /ws/docs/research.md"
 probe inactive "counting matches in a fix_plan path" \
   "grep -c -- '--pm' /ws/.agents/fix_plan.md"
+probe inactive "python running a different script with fix-plan in args" \
+  "python3 tools/report.py fix-plan --pm"
+probe inactive "heredoc containing fix-plan --pm as stdin body" \
+  $'cat <<EOF\nfix-plan --pm\nEOF\necho not-invoked'
+probe inactive "pipeline mentioned after semicolon in echo" \
+  "true; echo fix-plan --pm"
 
 echo "--- true positives: the command actually invokes the pipeline ---"
 probe active "python invocation of fix_plan.py --pm" \
   "python3 skills/fix-plan/scripts/fix_plan.py --pm --triage"
 probe active "shell invocation with flags before --pm" \
   "bash scripts/fix-plan.sh --dry-run --pm"
+probe active "pipeline invoked after another command with semicolon" \
+  "echo starting; python3 scripts/fix_plan.py --pm"
+probe active "quoted script path" \
+  'python3 "scripts/fix_plan.py" --pm'
+probe active "quoted --pm flag" \
+  'python3 scripts/fix_plan.py "--pm"'
+probe active "pipeline followed by heredoc input" \
+  $'python3 scripts/fix_plan.py --pm <<EOF\ninput data\nEOF'
 
 echo "--- explicit off switch ---"
 # PM_MODE is honoured when truthy; it must also be honoured when falsy, so a
