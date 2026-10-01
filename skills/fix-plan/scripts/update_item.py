@@ -1238,6 +1238,45 @@ def self_test() -> int:
     finally:
         os.unlink(_p)
 
+
+    def _run_capture(fn, arg: str, needle: str) -> bool:
+        """True when calling fn(arg) raises an error whose message contains needle."""
+        if not callable(fn):
+            return False
+        try:
+            fn(arg)
+        except Exception as exc:  # noqa: BLE001
+            return needle in str(exc)
+        return False
+
+
+    # ------------------------------------------------------------------
+    # argparse error surfacing
+    #
+    # argparse replaces a ValueError raised by a `type=` callable with its own
+    # generic "invalid <callable> value" line, which discards the part of the
+    # message that carries the registered keys and the value grammar. That message
+    # is the whole value of the vocabulary guard -- a rejection that does not say
+    # what IS allowed sends the caller to the source. Observed on the real CLI:
+    #   update_item.py: error: argument --set-attr: invalid parse_attr_arg value: 'NOPE=x'
+    #
+    # So the argparse boundary needs its own adapter. parse_attr_arg keeps raising
+    # ValueError (its own tests pin that); the adapter re-raises as
+    # ArgumentTypeError, which argparse prints verbatim.
+    # ------------------------------------------------------------------
+    _attr_arg_type = globals().get("attr_arg_type")
+    check("attr_arg_type adapter exists", callable(_attr_arg_type))
+
+    attr_check("attr_arg_type returns the parsed pair for valid input",
+               lambda: _attr_arg_type("ICE=I2,C0.8,E4"), want=("ICE", "I2,C0.8,E4"))
+    attr_check("attr_arg_type raises ArgumentTypeError for an unregistered key",
+               lambda: _attr_arg_type("NOPE=x"), raises=argparse.ArgumentTypeError)
+    attr_check("the unregistered-key message still names the registered keys",
+               lambda: _run_capture(_attr_arg_type, "NOPE=x", "Registered:"), want=True)
+    attr_check("the bad-value message still names the grammar",
+               lambda: _run_capture(_attr_arg_type, "ICE=I2,C0.8", "does not match the grammar"),
+               want=True)
+
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
 
