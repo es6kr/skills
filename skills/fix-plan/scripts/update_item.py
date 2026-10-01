@@ -940,6 +940,95 @@ def self_test() -> int:
     finally:
         os.unlink(already_path)
 
+
+    # ------------------------------------------------------------------
+    # attribute slot (--set-attr KEY=VALUE)
+    #
+    # The tracker line has two marker slots: the leading checkbox marker, which
+    # this script already writes and validates, and a trailing bracket slot that
+    # it does not know about at all.  Measured consequence: the vocabularies the
+    # tool writes reach 35.8% / 265 items, while every trailing-slot vocabulary
+    # sits at 0-4.7% because each one is hand-typed.  These cases drive a general
+    # trailing-slot writer with a registered vocabulary, so a new attribute is a
+    # table entry rather than a new code path.
+    #
+    # Written before the implementation: each probe resolves the symbol through
+    # globals() so a missing feature is reported as a FAIL, not raised as a
+    # NameError that would abort the remaining cases.
+    # ------------------------------------------------------------------
+    _vocab = globals().get("ATTR_VOCAB")
+    _validate_attr = globals().get("validate_attr")
+    _parse_attr_arg = globals().get("parse_attr_arg")
+
+    def attr_check(name: str, fn, want=None, raises=None) -> None:
+        try:
+            got = fn()
+        except Exception as exc:  # noqa: BLE001 - absence must read as FAIL
+            check(name, raises is not None and isinstance(exc, raises))
+            return
+        if raises is not None:
+            check(name, False)
+            return
+        check(name, got == want if want is not None else bool(got))
+
+    check("ATTR_VOCAB registry exists", isinstance(_vocab, dict))
+    check("ATTR_VOCAB registers the ICE key", bool(_vocab) and "ICE" in _vocab)
+    check("ATTR_VOCAB registers the channel key", bool(_vocab) and "ch" in _vocab)
+    check("ATTR_VOCAB registers the RAID key", bool(_vocab) and "RAID" in _vocab)
+
+    attr_check("validate_attr accepts a well-formed ICE value",
+               lambda: _validate_attr("ICE", "I2,C0.8,E4") is None, want=True)
+    attr_check("validate_attr rejects an unregistered key",
+               lambda: _validate_attr("NOPE", "x"), raises=ValueError)
+    attr_check("validate_attr rejects an ICE value missing a component",
+               lambda: _validate_attr("ICE", "I2,C0.8"), raises=ValueError)
+    attr_check("validate_attr rejects a non-numeric ICE component",
+               lambda: _validate_attr("ICE", "I2,Chigh,E4"), raises=ValueError)
+    attr_check("validate_attr accepts a registered channel value",
+               lambda: _validate_attr("ch", "orca") is None, want=True)
+    attr_check("validate_attr rejects an unregistered channel value",
+               lambda: _validate_attr("ch", "telepathy"), raises=ValueError)
+
+    attr_check("parse_attr_arg splits KEY=VALUE",
+               lambda: _parse_attr_arg("ICE=I2,C0.8,E4"), want=("ICE", "I2,C0.8,E4"))
+    attr_check("parse_attr_arg rejects a missing '='",
+               lambda: _parse_attr_arg("ICE"), raises=ValueError)
+
+    attr_block = [
+        "- [ ] attr target item unique-marker-gamma",
+        "  - **Why**: gamma reason",
+        "  - **How to apply**: gamma steps",
+    ]
+
+    attr_check("apply_update writes the attribute at end of the item line",
+               lambda: apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
+    attr_check("apply_update leaves sub-bullets untouched when writing an attribute",
+               lambda: apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4"))[1:],
+               want=attr_block[1:])
+    attr_check("writing an attribute twice is idempotent",
+               lambda: apply_update(
+                   apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4")),
+                   None, None, ("ICE", "I2,C0.8,E4"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
+    attr_check("re-writing the same key replaces it in place rather than appending",
+               lambda: apply_update(
+                   apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4")),
+                   None, None, ("ICE", "I5,C0.9,E1"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I5,C0.9,E1]")
+    attr_check("writing a second key preserves the first",
+               lambda: apply_update(
+                   apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4")),
+                   None, None, ("ch", "orca"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I2,C0.8,E4] [ch:orca]")
+    attr_check("an attribute write preserves a BLOCKED checkbox marker",
+               lambda: apply_update(
+                   ["- [BLOCKED:P1:selfable] blocked attr target"], None, None, ("ch", "clawo"))[0],
+               want="- [BLOCKED:P1:selfable] blocked attr target [ch:clawo]")
+    attr_check("an attribute write combines with --set-marker in one call",
+               lambda: apply_update(attr_block, "[x]", None, ("ICE", "I2,C0.8,E4"))[0],
+               want="- [x] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
+
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
 
