@@ -48,6 +48,22 @@ Analyze staged/unstaged changes and recommend whether to split into multiple com
 ## Mandatory Invocation Gate (HARD STOP)
 
 - **5+ Files / Large-Scale Modification Gate**: Whenever 5+ files are modified/added/deleted, or a broad cross-directory refactoring, skill renaming, or multi-component edit occurs, invoking `commit-tidy` before committing is **MANDATORY** (`HARD STOP`). Monolithic single-commit attempts without a commit-tidy split & staging review are strictly prohibited.
+- **Repeated Red→Green Cycle Gate**: Whenever a branch accumulates **two or more Red→Green pairs**, invoking `commit-tidy` **before the first push of that branch** is MANDATORY (`HARD STOP`), regardless of how few files the cycles touch. The 5+ files gate above does not cover this case — TDD cycles typically rewrite **one** file repeatedly, so a three-cycle branch can reach seven commits while never tripping a file-count threshold.
+
+  Two consequences make the range-level judgement necessary even when each cycle felt self-contained:
+
+  | Consequence | Why it needs the range, not the cycle |
+  |---|---|
+  | Repeated-single-file squash candidates | "Squash-scan scope" below scans the range grouped **by file**. A branch where every commit touches the same file is precisely that scan's target, and no single cycle can see the pattern |
+  | Push-limit collision | A repo may cap commits per push (`.githooks/pre-push`, `PUSH_MAX_COMMITS`). Seven commits against a limit of five forces either a staged push or an override — both decisions belong before the push, not after |
+
+  **The verdict may well be "keep them all"** — different Conventional Commit types (`test` / `feat` / `docs`) are disqualified from squashing by "Don't squash" below, and when each Red encodes a *different* discovery (especially one found by executing the code after an earlier Green) squashing would fabricate a history in which every test predates every implementation. The requirement is that the judgement was **made**, not that it collapses anything.
+
+  | # | Don't | Do |
+  |---|-------|----|
+  | 1 | Treat each Red→Green pair as its own unit task, satisfy the per-task commit obligation, and push the accumulated branch without a range-level pass | From the second Green onward, run `commit-tidy` over `origin/<base>..HEAD` before the first push |
+  | 2 | Invoke `commit-tidy` only after the branch is already pushed | A squash then requires a force-push, which narrows the options to ones needing CI checks and user approval. Order is the whole point |
+  | 3 | Skip the gate because the cycles touch a single file | Single-file is the *trigger*, not an exemption — see the table above |
 
 ## Squash-scan scope (HARD STOP)
 
