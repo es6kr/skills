@@ -36,13 +36,13 @@ case "$TOOL_NAME" in
     ;;
   *browser_click*|*browser_type*|*browser_fill_form*|*browser_press_key*|\
   *browser_select_option*|*browser_file_upload*|*browser_handle_dialog*|\
-  *browser_drag*|*browser_drop*)
+  *browser_drag*|*browser_drop*|*browser_evaluate*|*browser_run_code_unsafe*)
     # Driving a credential flow on an ALREADY-OPEN auth page never calls
-    # browser_navigate, so gating on navigate alone covered 1 of the 10 tools
+    # browser_navigate, so gating on navigate alone covered 1 of the 12 tools
     # the matcher delivers. Treat an interaction as auth-sensitive when this
-    # session already navigated to such a URL.
+    # session navigated to such a URL.
     [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]] && exit 0
-    grep -qE "$AUTH_URL_RE" "$TRANSCRIPT_PATH" 2>/dev/null || exit 0
+    grep -qE '"url":\s*"[^"]*('"$AUTH_URL_RE"')' "$TRANSCRIPT_PATH" 2>/dev/null || exit 0
     URL="(already-open auth page)"
     ;;
   *)

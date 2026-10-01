@@ -4,6 +4,7 @@
 import argparse
 import os
 import re
+import shutil
 import sys
 import tempfile
 
@@ -30,7 +31,7 @@ def is_resolved_tag(tag: str) -> bool:
     return prefix in RESOLVED_TAG_PREFIXES
 
 def parse_improvements(content: str):
-    """Parses improvements markdown content into (preamble, active, resolved).
+    """Parses improvements markdown content into (preamble, sections, active, resolved).
 
     Structure typically:
     Header / preamble
@@ -146,7 +147,8 @@ def format_entries(entries, preamble=None, archive_link=None, sections=None):
 
     for h2 in ordered_h2:
         section_entries = by_h2.get(h2, [])
-        prose = (sections or {}).get(h2, '')
+        fallback = section_entries[0].get('section_prose', '') if section_entries else ''
+        prose = sections.get(h2, fallback) if sections is not None else fallback
         if not section_entries:
             # Orphaned section: no surviving entry carries this prose.
             if not prose.strip():
@@ -225,11 +227,25 @@ def _atomic_write(path: str, text: str) -> None:
     directory = os.path.dirname(path) or '.'
     fd, tmp = tempfile.mkstemp(dir=directory, prefix='.rotate-', suffix='.tmp')
     try:
+        if os.path.exists(path):
+            try:
+                shutil.copymode(path, tmp)
+            except OSError:
+                pass
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)
+        if hasattr(os, 'O_DIRECTORY'):
+            try:
+                dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except OSError:
+                pass
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)

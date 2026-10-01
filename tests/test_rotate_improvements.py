@@ -191,6 +191,37 @@ class TestRotateImprovements(unittest.TestCase):
         self.assertNotIn("open(src_path, 'w'", source)
         self.assertNotIn("open(archive_path, 'w'", source)
 
+    def test_format_entries_fallback_preserves_prose_when_sections_omitted(self):
+        """When format_entries is invoked without the sections map (sections=None),
+        it should fall back to entry-carried section_prose."""
+        from rotate_improvements import parse_improvements, format_entries
+        preamble, sections, active, resolved = parse_improvements(SAMPLE_WITH_PROSE)
+        rendered = format_entries(active, preamble=preamble, sections=None)
+        self.assertIn("Context for Topic A: raised during the September audit, owner unassigned.", rendered)
+
+    def test_atomic_write_cleanup_on_failure(self):
+        """If _atomic_write encounters an exception while writing, it must clean
+        up its temporary file and leave the target file intact."""
+        from unittest.mock import patch
+        from rotate_improvements import _atomic_write
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = os.path.join(tmpdir, 'target.md')
+            with open(target, 'w', encoding='utf-8') as f:
+                f.write('initial content')
+
+            with patch('os.fdopen', side_effect=IOError('simulated disk failure')):
+                with self.assertRaises(IOError):
+                    _atomic_write(target, 'new content')
+
+            # Original file remains unmodified
+            with open(target, 'r', encoding='utf-8') as f:
+                self.assertEqual(f.read(), 'initial content')
+
+            # No leaked temp files
+            tmps = [p for p in os.listdir(tmpdir) if p.startswith('.rotate-')]
+            self.assertEqual(tmps, [])
+
 
 if __name__ == '__main__':
     unittest.main()
