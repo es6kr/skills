@@ -122,6 +122,20 @@ def parse_attr_arg(arg: str) -> tuple[str, str]:
     return key, value
 
 
+def attr_arg_type(arg: str) -> tuple[str, str]:
+    """argparse `type=` adapter that preserves the rejection message.
+
+    argparse swallows a ValueError from a type callable and prints its own generic
+    "invalid <callable> value" line, which drops the registered keys and the value
+    grammar -- the only parts of the message a caller can act on. ArgumentTypeError
+    is printed verbatim, so the boundary re-raises as that instead.
+    """
+    try:
+        return parse_attr_arg(arg)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
 def write_attr(action: str, key: str, value: str) -> str:
     """Set `[KEY:VALUE]` on the action text, replacing that key in place if present.
 
@@ -1289,7 +1303,7 @@ def main() -> int:
     p.add_argument("--file", help="tracker path (fix_plan.md or checklist.md)")
     p.add_argument(
         "--set-attr",
-        type=parse_attr_arg,
+        type=attr_arg_type,
         metavar="KEY=VALUE",
         help="set a trailing [KEY:VALUE] attribute on the item "
              "(registered keys: " + ", ".join(sorted(ATTR_VOCAB)) + ")",
