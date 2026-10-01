@@ -145,10 +145,24 @@ type: feedback
 
 | Detected environment | Native memory system | Storage call |
 |---|---|---|
-| Claude Code + Serena MCP registered (`mcp__serena__*` / `mcp__plugin_serena_serena__*` tools present) | Serena project-independent memory store | `write_memory("global/fa/<class-slug>", content)` — the `global/` prefix writes to `~/.serena/memories/global/`, verified project-independent (physically confirmed: a memory written while one project was active landed in a location any later-activated project can also `read_memory`/`list_memories` against) |
+| Claude Code + Serena **preflight passed** (see "Serena preflight" below — `mcp__serena__*` tool presence alone does NOT qualify) | Serena project-independent memory store | `write_memory("global/fa/<class-slug>", content)` — the `global/` prefix resolves under the HOME of the **process running the Serena server**, which on a WSL-on-Windows setup is *not* the WSL shell's `~`. It is project-independent (a memory written while one project was active is readable from any later-activated project), but measure every candidate home before concluding the namespace is empty |
 | Hermes agent runtime (`hermes` CLI resolvable, e.g. `~/AppData/Local/hermes/bin/hermes` or `$HERMES_HOME` set) | Hermes built-in memory (`MEMORY.md`/`USER.md`) — `hermes memory status/setup` only configures *external* provider plugins (honcho/mem0/etc.), it does not expose a scripted "append a fact" CLI call | **Not yet wired** — `hermes memory` has no non-interactive write path as of this writing. Until that's confirmed, fall through to the file (below) even on Hermes. Revisit when a Hermes memory-write API/CLI surface is confirmed |
 | OpenClaw runtime (`openclaw`/`clawo` CLI resolvable) | OpenClaw's own memory system | **Not yet confirmed** — CLI presence detected but its memory-write surface wasn't verified in the session that authored this table (the `--help` invocation didn't return in time to inspect). Fall through to the file until confirmed |
 | None of the above (Antigravity, plain shell, or Serena unavailable this session) | — | Fall through to the file-based procedure below (unchanged) |
+
+**Serena preflight (run in this order — a tool-presence check is not a preflight):**
+
+1. `initial_instructions` → take the Serena `session_id` from its `<session>` block.
+2. `activate_project(project, session_id)` → without an active project every memory call fails with `No active project`.
+3. **Bounded liveness probe** — one cheap read (e.g. `list_memories` with a `topic`). If it does not return inside the tool timeout, treat Serena as unavailable *for this session* and fall through to the file. A read that hangs is not a slow success: it blocks the FA write the rest of this procedure depends on.
+4. Confirm the `global/fa` namespace already holds entries — in **every** candidate home, not one.
+
+All four must hold. When any step fails, use the file store and **name the failing step in the visible report** — a silent routing fallback is how the two stores drift apart without anyone noticing.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Conclude "Serena is unavailable" from tool presence alone, or "its namespace is empty" from a single HOME's path | Run the four preflight steps and name the one that failed. A second HOME holding an empty duplicate directory is the common trap — absence under one home is not absence |
+| 2 | Let the fallback to the file be invisible because the entry still got written somewhere | State the medium actually used. Routing that silently differs from the documented route is what let one store sit unwritten while the other kept growing |
 
 **Why this order**: FA entries are behavioral corpus that recurs across unrelated projects — a genuinely project-independent store (Serena's `global/` prefix) is the correct home when one is available and verified, rather than a single ever-growing markdown file. Hermes and OpenClaw are included in the detection table per explicit user instruction, but their write path is not implemented yet — recording that gap here (rather than silently only doing Claude Code) keeps the next session honest about what's actually wired versus merely detected.
 
