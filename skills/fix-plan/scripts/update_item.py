@@ -73,6 +73,70 @@ ITEM_RE = re.compile(r"^([ \t]*)-[ \t]+(\[[^\]]*\])[ \t]+(.*)$")
 REF_NOTE_MAX_LEN = 100
 
 
+# ---------------------------------------------------------------- attribute slot
+#
+# A tracker line has two bracket slots.  The LEADING one is the checkbox marker
+# (`[ ]` / `[x]` / `[-]` / `[BLOCKED:P#:owner]`), owned by validate_marker.  The
+# TRAILING one carries per-item attributes, written as `[KEY:VALUE]` at the end of
+# the action text.  Only the trailing slot is handled here, and only for keys this
+# table registers -- an unregistered key is rejected rather than written, so the
+# tracker cannot accumulate private vocabularies that no reader parses.
+#
+# `BLOCKED` is deliberately absent: it is a checkbox-marker value, not an
+# attribute, so keeping it out of this table prevents a trailing `[BLOCKED:...]`
+# from ever being emitted next to a real one.
+ATTR_VOCAB: dict[str, re.Pattern[str]] = {
+    # Impact / Confidence / Ease, each a number: [ICE:I2,C0.8,E4]
+    "ICE": re.compile(r"^I\d+(?:\.\d+)?,C\d+(?:\.\d+)?,E\d+(?:\.\d+)?$"),
+    # Execution channel, one of the five the operating model defines: [ch:orca]
+    "ch": re.compile(r"^(?:orca|clawo|deep-tasks|in-session|user-decision)$"),
+    # Which RAID axes are registered for this item: [RAID:R,D]
+    "RAID": re.compile(r"^[RAID](?:,[RAID])*$"),
+}
+
+
+def validate_attr(key: str, value: str) -> None:
+    """Reject an unregistered attribute key, or a value its grammar disallows."""
+    if key not in ATTR_VOCAB:
+        raise ValueError(
+            f"unregistered attribute key {key!r}. Registered: "
+            f"{', '.join(sorted(ATTR_VOCAB))}. Add the key to ATTR_VOCAB (and its "
+            "grammar) before writing it, so every reader can parse it."
+        )
+    if not ATTR_VOCAB[key].match(value):
+        raise ValueError(
+            f"value {value!r} does not match the grammar registered for {key!r} "
+            f"({ATTR_VOCAB[key].pattern})"
+        )
+
+
+def parse_attr_arg(arg: str) -> tuple[str, str]:
+    """Split a `KEY=VALUE` argument, validating the pair."""
+    if "=" not in arg:
+        raise ValueError(f"--set-attr expects KEY=VALUE, got {arg!r}")
+    key, _, value = arg.partition("=")
+    key, value = key.strip(), value.strip()
+    if not key or not value:
+        raise ValueError(f"--set-attr expects a non-empty KEY and VALUE, got {arg!r}")
+    validate_attr(key, value)
+    return key, value
+
+
+def write_attr(action: str, key: str, value: str) -> str:
+    """Set `[KEY:VALUE]` on the action text, replacing that key in place if present.
+
+    Replacing in place rather than appending is what makes repeated writes
+    idempotent and keeps a re-scored item from growing a second marker for the
+    same key -- the failure mode hand-editing produces.
+    """
+    validate_attr(key, value)
+    token = f"[{key}:{value}]"
+    existing = re.compile(r"[ \t]*\[" + re.escape(key) + r":[^\]]*\]")
+    if existing.search(action):
+        return existing.sub(" " + token, action, count=1).rstrip()
+    return f"{action.rstrip()} {token}"
+
+
 def find_item_block(lines: list[str], match_text: str) -> tuple[int, int, int]:
     """Locate the single item whose action text contains match_text.
 
@@ -111,13 +175,23 @@ def find_item_block(lines: list[str], match_text: str) -> tuple[int, int, int]:
     return start, end, indent
 
 
-def apply_update(block: list[str], set_marker: str | None, append_note: str | None) -> list[str]:
+def apply_update(
+    block: list[str],
+    set_marker: str | None,
+    append_note: str | None,
+    set_attr: tuple[str, str] | None = None,
+) -> list[str]:
     block = list(block)
 
     if set_marker:
         m = ITEM_RE.match(block[0])
         assert m is not None
         block[0] = f"{m.group(1)}- {set_marker} {m.group(3)}"
+
+    if set_attr:
+        m = ITEM_RE.match(block[0])
+        assert m is not None
+        block[0] = f"{m.group(1)}- {m.group(2)} {write_attr(m.group(3), *set_attr)}"
 
     if append_note:
         m = ITEM_RE.match(block[0])
