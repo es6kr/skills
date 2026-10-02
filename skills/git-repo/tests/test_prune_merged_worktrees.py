@@ -172,6 +172,15 @@ class TestPruneMergedWorktrees(unittest.TestCase):
         self.assertEqual(report.action, "Pruned")
         remove_calls = [c for c in mock_run_git.call_args_list if "remove" in c.args[1]]
         self.assertEqual(len(remove_calls), 1, "git worktree remove must be invoked exactly once on a matched, execute=True worktree")
+        prune_calls = [c for c in mock_run_git.call_args_list if c.args[1][:2] == ["worktree", "prune"]]
+        self.assertEqual(
+            prune_calls,
+            [],
+            "unscoped `git worktree prune` must never be invoked: `worktree remove` already "
+            "cleans up the admin dir of the worktree it removed, and a repo-wide prune also "
+            "deregisters unrelated worktrees that git currently marks prunable -- including "
+            "live ones registered with an absolute path from the other platform",
+        )
 
 
 if __name__ == "__main__":
