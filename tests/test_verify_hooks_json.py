@@ -7,6 +7,8 @@ Two failure classes under test:
   - Ghost registration: a registered path has no file behind it -> the hook dies
     with exit 127, which the harness cannot distinguish from "ran, no objection",
     so the guard stays listed while enforcing nothing
+  - Non-executable registration: a registered script exists but is tracked or
+    checked out as mode 644 instead of executable mode 755
 
 Run:
   python -m pytest tests/test_verify_hooks_json.py -v
@@ -52,6 +54,7 @@ def _write_plugin(tmp_path, commands, scripts_to_create=()):
         target = tmp_path / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        target.chmod(0o755)
     return hooks_dir / "hooks.json"
 
 
@@ -73,6 +76,18 @@ def test_existing_script_passes(tmp_path):
     fp = _write_plugin(tmp_path, ['bash "${CLAUDE_PLUGIN_ROOT}/' + rel + '"'], [rel])
     errors, checked, skipped = mod.check_hooks_file(fp)
     assert errors == [] and checked == 1 and skipped == 0
+
+
+def test_non_executable_script_is_reported(tmp_path):
+    """A registered path checked out as 644 is flagged before it can ship."""
+    rel = "skills/a/resources/not-executable.sh"
+    fp = _write_plugin(tmp_path, ['bash "${CLAUDE_PLUGIN_ROOT}/' + rel + '"'], [rel])
+    (tmp_path / rel).chmod(0o644)
+    errors, checked, skipped = mod.check_hooks_file(fp)
+    assert checked == 1 and skipped == 0
+    assert len(errors) == 1
+    assert "Non-executable hook registration" in errors[0]
+    assert "mode 644" in errors[0]
 
 
 def test_relocated_script_is_caught(tmp_path):

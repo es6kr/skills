@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: verify-hooks-json
+        name: Verify hook registrations
+        entry: python3 scripts/verify-hooks-json.py
+        language: system
+        pass_filenames: false
+        files: '^(hooks/hooks\.json|skills/.+/hooks/hooks\.json|scripts/verify-hooks-json\.py)$'
