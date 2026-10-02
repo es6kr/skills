@@ -3,7 +3,7 @@
 # fill_form,press_key,select_option,drag,drop,file_upload,handle_dialog} —
 # block a state-mutating live action taken against a tracked workspace item
 # (fix_plan.md / checklist.md / task.md) when the session has no evidence of
-# having invoked Skill("code-workflow") first.
+# having invoked Skill("task:flow") first.
 #
 # Background: (see failed-attempts.md "risky-complex-task-live-commands-
 # without-code-workflow-plan") — a Prevention rule asking the agent to
@@ -219,14 +219,14 @@ printf '%s\n' "$TRANSCRIPT_MATCHES" | grep -q '^SKILL$' && exit 0
   echo "Why blocked:"
   echo "  - A workspace tracker file (fix_plan.md/checklist.md/task.md) was read this"
   echo "    session, and this call would take a state-mutating or hard-to-reverse"
-  echo "    action, but no workflow skill (Skill(\"task-flow\"), Skill(\"task-exec\"), or Skill(\"code-workflow\")) call has happened yet in this session."
+  echo "    action, but no workflow skill (Skill(\"task:flow\") or Skill(\"task:exec\")) call has happened yet in this session."
   echo "  - This class of mistake (ad hoc live execution on a complex/irreversible"
   echo "    tracker item, bypassing Research->Plan->User Review->Implement) has"
   echo "    recurred 4 times; see failed-attempts.md"
   echo "    \"risky-complex-task-live-commands-without-code-workflow-plan\"."
   echo ""
   echo "Required action before retrying:"
-  echo "  1. Invoke Skill(\"task-flow\") (or Skill(\"task-exec\") / Skill(\"code-workflow\")) for this tracker item"
+  echo "  1. Invoke Skill(\"task:flow\") (or Skill(\"task:exec\")) for this tracker item"
   echo "     (reuse any existing research doc as Prior Knowledge)."
   echo "  2. Get the resulting plan through User Review."
   echo "  3. Only then retry this live action."
