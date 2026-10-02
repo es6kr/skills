@@ -12,15 +12,19 @@ import unittest
 class TestEditGuardCache(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        cls.guard_path = os.path.join(repo_root, "skills", "hook-kit", "resources", "edit-guard.sh")
+        cls.repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        cls.guard_path = os.path.relpath(
+            os.path.join(cls.repo_root, "skills", "hook-kit", "resources", "edit-guard.sh"),
+            cls.repo_root,
+        ).replace(os.sep, "/")
 
     def run_guard(self, payload):
         proc = subprocess.run(
             ["bash", self.guard_path],
             input=json.dumps(payload),
             text=True,
-            capture_output=True
+            capture_output=True,
+            cwd=self.repo_root,
         )
         return proc.returncode, proc.stdout, proc.stderr
 
