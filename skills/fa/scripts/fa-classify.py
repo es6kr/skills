@@ -72,6 +72,9 @@ if os.environ.get("FA_DATA_DIR"):
     )
 
 DATE = re.compile(r"\((\d{4}-\d{2}-\d{2})")
+# Fallback for legacy prose/title sections: every ISO date is a possible
+# recurrence record, not only a date immediately following `(`.
+ISO_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 # class-format meta line (`<!-- fa: class=... count=N last=YYYY-MM-DD status=... -->`)
 # carries the authoritative last-recurrence date. DATE above only matches
 # parenthesized dates and misses this HTML-comment form entirely, so a
@@ -164,22 +167,26 @@ COMMENT_LINE = re.compile(r"(?m)^<!--.*?-->[ \t]*$")
 def _split_trailing_meta(chunk):
     """Split a chunk into (its own body, the next section's header block or '').
 
-    A header block is the `fa:` line plus any sibling comment lines that follow
-    it (`<!-- hook: ... -->` annotations sit there), so the terminator test is
-    "only comments and blanks after the `fa:` line", not "nothing at all".
+    Only the contiguous trailing block of blank/comment lines can be the next
+    section's header. Earlier `fa:` comments followed by prose belong to the
+    current section and must not influence orphan detection.
     """
-    matches = list(META_LINE.finditer(chunk))
+    lines = chunk.splitlines(keepends=True)
+    start = len(lines)
+    while start:
+        line = lines[start - 1].rstrip("\r\n")
+        if line.strip() and not COMMENT_LINE.match(line):
+            break
+        start -= 1
+    trailer = "".join(lines[start:])
+    matches = list(META_LINE.finditer(trailer))
     if not matches:
         return chunk, ""
-    last = matches[-1]
-    tail = chunk[last.start():]
-    for line in tail.split("\n"):
-        if not line.strip():
-            continue
-        if not COMMENT_LINE.match(line):
-            # prose follows, so this header describes the current section
-            return chunk, ""
-    return chunk[: last.start()], tail.strip("\n") + "\n\n"
+    if len(matches) > 1:
+        # Consecutive headers in the trailing comment block are ambiguous.
+        # Keep neither as an adjacent section's metadata.
+        return "".join(lines[:start]), ""
+    return "".join(lines[:start]), trailer.strip("\n") + "\n\n"
 
 
 def split_sections(text):
@@ -208,12 +215,12 @@ def analyze(path, cutoff, relaxed=False):
     rows = []
     for i, s in enumerate(sections):
         title = section_title(s)
-        dates = DATE.findall(s) + BULLET_DATE.findall(s)
+        dates = ISO_DATE.findall(s) + BULLET_DATE.findall(s)
         meta_last = META_LAST.search(s)
         # meta-line last= is authoritative when present (class-format sections);
         # otherwise fall back to the newest date found anywhere in the body.
         latest = meta_last.group(1) if meta_last else (max(dates) if dates else "")
-        title_dates = DATE.findall(title)
+        title_dates = ISO_DATE.findall(title)
         title_date = max(title_dates) if title_dates else ""
         recur = bool(RECUR_TITLE.search(title))
         hook = bool(HOOK_FUTURE.search(s))
