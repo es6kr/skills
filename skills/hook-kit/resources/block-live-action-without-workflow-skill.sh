@@ -200,7 +200,7 @@ TRANSCRIPT_MATCHES=$(jq -r '
   select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") |
   if .name == "Read" and (.input.file_path // "" | test("(^|/)(fix_plan|checklist|task)\\.md$"; "i")) then
     "TRACKER"
-  elif .name == "Skill" and ((.input.skill // .input.name // "") | test("(code-workflow|task-flow|task-exec)"; "i")) then
+  elif .name == "Skill" and ((.input.skill // .input.name // "") | test("(code-workflow|task[-:](flow|exec))"; "i")) then
     "SKILL"
   else
     empty
