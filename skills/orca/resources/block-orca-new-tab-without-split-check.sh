@@ -12,6 +12,21 @@
 # Also matches CLI-resolution aliases (orca-ide / orca-dev / $ORCA_CLI_COMMAND)
 # per the orca skill's own "Resolve the CLI" guidance — a bare-`orca`-only
 # match let commands built that way bypass this gate entirely.
+#
+# The gate used to clear itself: running `orca terminal list` stamped a marker
+# that passed every create for the next 30 minutes, and remedy #1 in the block
+# message was to run exactly that command. Following the hook's own advice
+# therefore disarmed it, which is how the class kept recurring with the hook
+# installed and registered. The marker pass is gone; a create now needs one of
+# three named exceptions, each naming which of the documented cases applies:
+#
+#   ORCA_PANE_LIMIT_REACHED=1   the current tab already holds 4 panes
+#   ORCA_NEW_WORKSPACE_APPROVED=1  the user explicitly asked for a new tab/worktree
+#   ORCA_FILE_CONFLICT=1        the two sessions must edit the same files
+#
+# Checking the pane count is still the first step — `orca terminal list --json`
+# reports `tabId` per terminal, and panes in the same tab share it. The gate no
+# longer treats having looked as permission to skip splitting.
 
 input=$(cat)
 
@@ -45,33 +60,10 @@ print(ti.get("command") or d.get("command") or "")
 # guards in this hook family).
 sanitized_command=$(printf '%s' "$command" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
 
-transcript_path=$(printf '%s' "$input" | python3 -c '
-import json, sys
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    print("")
-    sys.exit(0)
-print(d.get("transcript_path") or "")
-' 2>/dev/null)
-
-session_key=$(printf '%s' "$transcript_path" | shasum 2>/dev/null | cut -d" " -f1)
-[ -z "$session_key" ] && session_key="nosession"
-# NOTE (marker removal): this gate used to stamp a 30-minute marker whenever
-# `orca terminal list` ran, and then let ANY create pass while that marker was
-# fresh. That inverted the gate's purpose. What the gate asks is not "did you
-# look?" but "did you act on what you saw by splitting?" — and listing is the
-# precondition for splitting, not a substitute for it. Worse, the block message
-# below advertised that very list command as the way to clear the gate, so an
-# agent that followed the instruction faithfully disarmed the guard for the
-# next 30 minutes and then created a new tab unchallenged. Observed repeatedly
-# (class=orca-terminal-split-pane-parameter-omission); the marker is therefore
-# gone, and creating a new tab/worktree now always requires the auditable
-# opt-out below.
-
-# The command itself is a split-pane / list check — always allow. This must run
-# BEFORE the create-command matching below, since `terminal list`/`terminal
-# split` never match `terminal create`.
+# The command itself is a split-pane / list check — always allow. It is never a
+# create, so it has nothing to gate. Note what is deliberately NOT happening
+# here any more: no marker is stamped, because a later create must stand on its
+# own named exception rather than on the fact that a list ran first.
 if echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+(list|split)\b"; then
   exit 0
 fi
@@ -85,23 +77,23 @@ if [ "$is_worktree_create" -eq 0 ] && [ "$is_terminal_create" -eq 0 ]; then
   exit 0
 fi
 
-# Auditable opt-out — a genuinely independent new target was intended.
-#
-# One variable covers BOTH kinds of new target this gate guards: a new tab
-# (`terminal create`) and a new worktree (`worktree create --no-parent`). The
-# older name said "WORKSPACE", which read as covering only the tab case and left
-# the worktree case looking unauthorized by the same flag. ORCA_NEW_TARGET_APPROVED
-# is the canonical name; the legacy name is still accepted so in-flight sessions
-# and older notes keep working.
-echo "$sanitized_command" | grep -qE '(ORCA_NEW_TARGET_APPROVED|ORCA_NEW_WORKSPACE_APPROVED)=1' && exit 0
+# Auditable opt-outs — either the canonical unified opt-out or one of the three
+# documented named exceptions:
+#   ORCA_NEW_TARGET_APPROVED=1     canonical unified opt-out (covers tab & worktree)
+#   ORCA_PANE_LIMIT_REACHED=1      the tab already holds 4 panes
+#   ORCA_NEW_WORKSPACE_APPROVED=1  the user explicitly asked for a new tab/worktree (legacy alias)
+#   ORCA_FILE_CONFLICT=1           both sessions must edit the same files
+# "The new session's work is unrelated to what the current panes are doing" is
+# NOT one of them: below the pane limit, splitting is the default regardless of topic.
+echo "$sanitized_command" | grep -qE 'ORCA_NEW_TARGET_APPROVED=1|ORCA_PANE_LIMIT_REACHED=1|ORCA_NEW_WORKSPACE_APPROVED=1|ORCA_FILE_CONFLICT=1' && exit 0
 
 # NOTE: `--worktree active` is deliberately NOT an exemption here. It attaches to
 # the CURRENT worktree instead of creating a new one, but it still opens a new
 # TAB — and a new tab without first checking whether the current terminal is
 # splittable is exactly what this guard gates (see its name). Treating it as a
 # safe path let the whole gate be bypassed by appending one flag. It now falls
-# through to the block below like any other create; split into the current
-# terminal instead, or use the auditable opt-out above.
+# through to the block below like any other create: split into the current tab,
+# or use the auditable opt-out / declare one of the named exceptions above.
 
 # `orca worktree create` without `--no-parent` is a deliberate stacked/branch-
 # from-current choice, not the independent-new-workspace default — allow it.
@@ -120,21 +112,24 @@ Why blocked:
     split into.
 
 Required action (pick one):
-  1. DEFAULT — split into the current tab instead of opening a new one:
-       orca terminal list --json                  # find the handle, count panes
-       orca terminal split --terminal <handle> \
-         --direction vertical --command "<cmd>"   # up to 4 panes per tab
-     Listing alone does NOT clear this gate (it used to, for 30 minutes — that
-     is exactly how this guard kept getting disarmed). Splitting is the action
-     the gate is asking for; listing is only how you find the handle.
-  2. If a genuinely independent new target is intended, prefix the command with
-     ORCA_NEW_TARGET_APPROVED=1 so the opt-out is auditable. Only three reasons
-     qualify, and you should be able to name which one in a sentence:
-       (a) the current tab already holds 4 panes (the limit)
-       (b) the user explicitly asked for a new tab/worktree
-       (c) a real file conflict (the same files must be edited concurrently)
-     "The target repo/topic is unrelated to the current panes" is NOT a fourth
-     reason, and neither is "the repo is not registered with Orca".
+  1. Split instead. `orca terminal list --json` reports a `tabId` per terminal;
+     panes sharing your tabId are your tab's panes. Below 4, splitting is the
+     default:
+       orca terminal split --terminal <handle> --direction vertical --command "<cmd>"
+     A split needs no selector beyond the handle, so it also works where the
+     workspace is open as a plain folder and no git worktree is registered.
+  2. If one of the three documented exceptions genuinely applies, prefix the
+     command with the unified opt-out (ORCA_NEW_TARGET_APPROVED=1) or the named
+     flag that states which exception applies:
+       ORCA_NEW_TARGET_APPROVED=1     canonical unified opt-out
+       ORCA_PANE_LIMIT_REACHED=1      the tab already holds 4 panes
+       ORCA_NEW_WORKSPACE_APPROVED=1  the user explicitly asked for a new tab/worktree
+       ORCA_FILE_CONFLICT=1           both sessions must edit the same files
+     "Unrelated work" is not an exception — below the pane limit, split.
+
+Note: running `orca terminal list` no longer clears this gate. It used to, which
+meant following remedy #1 disarmed the hook for 30 minutes and the pattern kept
+recurring with the hook installed.
 
 Reference: failed-attempts.md class=orca-terminal-split-pane-parameter-omission.
 ============================================================
