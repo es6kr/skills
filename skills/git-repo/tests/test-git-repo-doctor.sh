@@ -430,6 +430,67 @@ else
 fi
 rm -rf "$REPO_12" "$SHIM_12"
 
+# -----------------------------------------------------------------------------
+# Test 13: Conditional - COND-HOOK-REG FAIL when hooks.json has no verifier wiring
+# -----------------------------------------------------------------------------
+REPO_13="$(make_temp_repo)"
+mkdir -p "$REPO_13/hooks" "$REPO_13/.githooks"
+git_in "$REPO_13" config core.hooksPath .githooks
+cat > "$REPO_13/hooks/hooks.json" << 'EOF'
+{"hooks": {}}
+EOF
+git_in "$REPO_13" add hooks/hooks.json
+out_13=$(bash "$SCRIPT" "$REPO_13" 2>&1)
+exit_13=$?
+check "Conditional: COND-HOOK-REG FAIL (no verifier wiring)" 1 "$exit_13" "$out_13"
+if ! echo "$out_13" | grep -q "COND-HOOK-REG.*no hook registration integrity guard"; then
+  echo "FAIL  COND-HOOK-REG missing verifier message missing"
+  FAIL=1
+fi
+rm -rf "$REPO_13"
+
+# -----------------------------------------------------------------------------
+# Test 14: Conditional - COND-HOOK-REG PASS when verifier is wired in pre-commit and CI
+# -----------------------------------------------------------------------------
+REPO_14="$(make_temp_repo)"
+mkdir -p "$REPO_14/hooks" "$REPO_14/scripts" "$REPO_14/.github/workflows" "$REPO_14/.githooks"
+git_in "$REPO_14" config core.hooksPath .githooks
+cat > "$REPO_14/hooks/hooks.json" << 'EOF'
+{"hooks": {}}
+EOF
+cat > "$REPO_14/scripts/verify-hooks-json.py" << 'EOF'
+#!/usr/bin/env python3
+print("ok")
+EOF
+cat > "$REPO_14/.pre-commit-config.yaml" << 'EOF'
+repos:
+  - repo: local
+    hooks:
+      - id: verify-hooks-json
+        entry: python3 scripts/verify-hooks-json.py
+        language: system
+        pass_filenames: false
+EOF
+cat > "$REPO_14/.github/workflows/test.yml" << 'EOF'
+name: Test
+on: [push]
+jobs:
+  hooks-json-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python3 scripts/verify-hooks-json.py
+EOF
+git_in "$REPO_14" add hooks/hooks.json scripts/verify-hooks-json.py .pre-commit-config.yaml .github/workflows/test.yml
+out_14=$(bash "$SCRIPT" "$REPO_14" 2>&1)
+exit_14=$?
+check "Conditional: COND-HOOK-REG PASS (pre-commit and CI wired)" 0 "$exit_14" "$out_14"
+if ! echo "$out_14" | grep -q "COND-HOOK-REG.*PASS"; then
+  echo "FAIL  COND-HOOK-REG pass row missing"
+  echo "OUTPUT: $out_14"
+  FAIL=1
+fi
+rm -rf "$REPO_14"
+
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "ALL TESTS PASSED"

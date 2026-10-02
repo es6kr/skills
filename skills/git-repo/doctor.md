@@ -36,6 +36,7 @@ graph TD
     C --> C4[COND-GO: Go Toolchain Lint]
     C --> C5[COND-PUBLIC: English Hangul Gate]
     C --> C6[COND-CORP: Main Branch Push Block]
+    C --> C7[COND-HOOK-REG: Hook Registration Integrity]
 ```
 
 ### Tier 1: Base (Universal) Checks
@@ -60,7 +61,8 @@ graph TD
 | **`COND-AGENT`** | Workspace is `.agents/` or has `fix_plan.md` | **Tracker Guard** | `pre-commit` must protect against committing untracked/dirty `fix_plan.md`. |
 | **`COND-GO`** | `go.mod` is present | **Go Toolchain** | `pre-commit`/`pre-push` must run `gofmt` / `go vet` / `go test`. |
 | **`COND-PUBLIC`** | Remote is public (`es6kr/*`) | **Public English Gate** | `pre-commit` must contain `check-hangul` gate to enforce English-only text. |
-| **`COND-CORP`** | Remote is corporate (`daegunsoftDev/*`) | **Corp Main Block** | `pre-push` must block direct push to `main` / `master` branches. |
+| **`COND-CORP`** | Remote is corporate (`internal-org/*`) | **Corp Main Block** | `pre-push` must block direct push to `main` / `master` branches. |
+| **`COND-HOOK-REG`** | Repository contains `hooks/hooks.json` | **Hook Registration Integrity** | A hook registration verifier such as `scripts/verify-hooks-json.py` must run in both pre-commit and CI, catching duplicate registrations, ghost paths, and non-executable registered scripts. |
 
 ---
 
@@ -95,6 +97,7 @@ BASE-5     Base         Secret & IP Guard      PASS  pre-commit hook contains se
 COND-MD    Conditional  Markdown Lint          PASS  Markdown files present and validated by hook.
 COND-SKILL Conditional  Skill Frontmatter Lint PASS  Skill files present and verified by metadata/frontmatter lint hook.
 COND-PUBLIC Conditional Public English Gate    PASS  Public English repository contains check-hangul gate in pre-commit.
+COND-HOOK-REG Conditional Hook Registration    PASS  hooks.json present and hook registration integrity is wired into pre-commit and CI.
 ------------------------------------------------------------------------
 Summary: 7 Passed | 0 Warnings | 1 Failed
 
@@ -250,3 +253,28 @@ if [ -n "$CONFLICT_COMMITS" ] && [ "${PUSH_CONFLICT_MSG_OVERRIDE:-0}" != "1" ]; 
 fi
 ```
 
+### 8. Adding Hook Registration Integrity (`COND-HOOK-REG`)
+
+For repositories that publish `hooks/hooks.json`, add a verifier that resolves
+registered `${CLAUDE_PLUGIN_ROOT}` paths and fails on duplicate registrations,
+missing files, or scripts checked out without executable permissions.
+
+Wire it into pre-commit:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: verify-hooks-json
+        name: Verify hook registrations
+        entry: python3 scripts/verify-hooks-json.py
+        language: system
+        pass_filenames: false
+```
+
+Wire the same script into CI:
+
+```yaml
+- name: Verify hooks.json
+  run: python3 scripts/verify-hooks-json.py
+```
