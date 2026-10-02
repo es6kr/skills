@@ -151,6 +151,15 @@ if [ "${1:-}" = "--test" ]; then
   T_TASK_EXEC=$(make_transcript tracker skill:task-exec)
   test_case_bash "risky command + tracker read + Skill(task-exec) called" 0 \
     "terraform apply" "$T_TASK_EXEC"
+  T_TASK_FLOW_NS=$(make_transcript tracker skill:task:flow)
+  test_case_bash "risky command + tracker read + Skill(task:flow) called (colon namespace)" 0 \
+    "terraform apply" "$T_TASK_FLOW_NS"
+  T_TASK_EXEC_NS=$(make_transcript tracker skill:task:exec)
+  test_case_bash "risky command + tracker read + Skill(task:exec) called (colon namespace)" 0 \
+    "terraform apply" "$T_TASK_EXEC_NS"
+  T_TASK_FLOW_PLUGIN=$(make_transcript tracker skill:es6kr:task:flow)
+  test_case_bash "risky command + tracker read + Skill(task:flow) called (plugin-prefixed colon)" 0 \
+    "terraform apply" "$T_TASK_FLOW_PLUGIN"
   T7=$(make_transcript tracker skill:es6kr:code-workflow)
   test_case_tool "browser_navigate + tracker read + Skill(code-workflow) called (namespaced)" 0 \
     "mcp__playwright__browser_navigate" "$T7"
