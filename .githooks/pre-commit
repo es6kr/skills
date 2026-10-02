@@ -60,7 +60,7 @@ import sys
 # lines would crash print() with UnicodeEncodeError, hiding the diagnostics.
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 data = sys.stdin.buffer.read().decode('utf-8', errors='replace')
-# Exempt the range-literal idiom (e.g. re.compile(r'[가-힣]')) — see
+# Exempt the range-literal idiom (e.g. re.compile(r'[\uac00-\ud7a3]')) — see
 # scripts/check-hangul.py's RANGE_LITERAL_RE for the CI-side twin of this.
 range_literal = re.compile('\uac00-\ud7a3')
 hits = [(i, l) for i, l in enumerate(data.splitlines(), 1)
