@@ -327,6 +327,76 @@ class TestContextUsageNowFallbackScoping(unittest.TestCase):
             self.assertIn("Context usage:", res.stdout)
             self.assertIn("/ 200k tokens", res.stdout)
 
+    def test_worktree_cwd_resolves_ancestor_project_dir(self):
+        """A session started in the repo root keeps its project dir under the root's
+        key. When the cwd later moves into a nested worktree (<repo>/.worktrees/x),
+        no project dir exists for that exact cwd; the script must walk up to the
+        nearest ancestor that has one instead of dropping to a global mtime race."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            workspace = os.path.realpath(workspace)
+            projects_dir = pathlib.Path(home) / ".claude" / "projects"
+            project_key = workspace.replace("/", "-").replace(".", "-")
+            own_dir = projects_dir / project_key
+            own_dir.mkdir(parents=True)
+            own_jsonl = own_dir / "own-session.jsonl"
+            self._write_transcript(own_jsonl, 1000)  # 0.5% of a 200k window
+
+            decoy_dir = projects_dir / "-some-other-workspace"
+            decoy_dir.mkdir(parents=True)
+            decoy_jsonl = decoy_dir / "decoy-session.jsonl"
+            self._write_transcript(decoy_jsonl, 90000)  # 45%
+            future = own_jsonl.stat().st_mtime + 3600
+            os.utime(decoy_jsonl, (future, future))
+
+            worktree_cwd = pathlib.Path(workspace) / ".worktrees" / "feature-x"
+            worktree_cwd.mkdir(parents=True)
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env.pop("ANTIGRAVITY_AGENT", None)
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            env.pop("ANTIGRAVITY_APP_DATA_DIR", None)
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=str(worktree_cwd), env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("(0.5%)", res.stdout)
+            self.assertNotIn("(45.0%)", res.stdout)
+
+    def test_unsignaled_antigravity_brain_does_not_outrank_claude_global_fallback(self):
+        """With no Antigravity env signal and no workspace project dir, a stray
+        Antigravity brain transcript must not beat the same-harness Claude global
+        fallback: same-harness evidence outranks a cross-harness guess."""
+        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory() as workspace:
+            projects_dir = pathlib.Path(home) / ".claude" / "projects"
+            only_dir = projects_dir / "-some-other-workspace"
+            only_dir.mkdir(parents=True)
+            only_jsonl = only_dir / "only-session.jsonl"
+            self._write_transcript(only_jsonl, 1000)  # 0.5% of a 200k window
+
+            brain_logs = pathlib.Path(home) / ".gemini" / "antigravity-cli" / "brain" / "stray-conv" / ".system_generated" / "logs"
+            brain_logs.mkdir(parents=True)
+            agy_transcript = brain_logs / "transcript.jsonl"
+            with open(agy_transcript, "w") as f:
+                f.write(json.dumps({
+                    "step_index": 0, "source": "MODEL", "type": "PLANNER_RESPONSE",
+                    "content": "X" * 400000,
+                }) + "\n")
+            future = only_jsonl.stat().st_mtime + 3600
+            os.utime(agy_transcript, (future, future))
+
+            env = dict(os.environ)
+            env["HOME"] = home
+            env.pop("ANTIGRAVITY_AGENT", None)
+            env.pop("ANTIGRAVITY_CONVERSATION_ID", None)
+            env.pop("ANTIGRAVITY_APP_DATA_DIR", None)
+            res = subprocess.run(
+                ["bash", NOW_SH], cwd=workspace, env=env, text=True, capture_output=True
+            )
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("(0.5%)", res.stdout)
+            self.assertIn("/ 200k tokens", res.stdout)
+
     def test_antigravity_env_outranks_claude_code_workspace_dir(self):
         """When running inside Antigravity (ANTIGRAVITY_AGENT=1 or ANTIGRAVITY_CONVERSATION_ID set),
         the active Antigravity session transcript must take precedence over any stale Claude Code
