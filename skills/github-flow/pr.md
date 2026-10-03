@@ -426,6 +426,25 @@ If any of the following applies, the PR is a UI-change PR — capture attachment
 
 Right after PR creation, **do not stop there** — explicitly handle the follow-up for AI review consolidation (CodeRabbit / Copilot). Leaving a gap between PR creation and consolidate causes the flow to end at "review pending" with no further action.
 
+#### -1. Verify review-bot integration exists before investing in Step 9 (HARD STOP)
+
+**Not every repo has Copilot/CodeRabbit wired up.** Before running the Copilot-registration or CodeRabbit-walkthrough-wait procedures below, check for any prior bot activity on the repo/account:
+
+```bash
+# Any review from either bot, on any PR in this repo, ever?
+gh api repos/<owner>/<repo>/issues/comments --jq '[.[] | .user.login] | unique'
+# Account-wide in-flight/past Copilot activity (reuse Step 0-2's query) across open PRs
+```
+
+If both bots show 0 activity across the repo's recent/open PRs, Step 9 (Copilot registration wait, CodeRabbit rate-limit timestamp arithmetic) does not apply — fall back directly to a manual review path (Internal Code Review via a code-review subagent, or a direct CodeRabbit CLI invocation) instead of waiting on bots that were never configured for this repo. Registering Copilot on a repo without the feature enabled returns success (no error, no timeline event) and silently wastes the Step 0-4 verification cycle.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Assume every repo in an org has the same bot config and run full Step 9 unconditionally | Check this repo's own recent PR comments/reviews for bot activity first — one `gh api` call |
+| 2 | Treat `gh pr edit --add-reviewer copilot-pull-request-reviewer` returning without error as proof the registration worked | Verify via the timeline `review_requested` event (Step 0-3's own check) — a repo without the feature returns success but never produces that event |
+
+(Case: `daegunsoftDev/skills` had 0 Copilot/CodeRabbit activity across 20+ open PRs account-wide as of 2026-10-03 — confirmed via this check before skipping Step 9.)
+
 #### 0. Copilot reviewer handling (HARD STOP — automated step)
 
 **Handle the Copilot reviewer first, right after PR creation.** The `next.md` "After PR creation" matrix only triggers via the turn-end stop hook, so any work between PR creation and turn end will skip it. Therefore handle it **automatically in this step**, immediately after PR creation.
