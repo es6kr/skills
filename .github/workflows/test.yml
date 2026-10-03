@@ -124,6 +124,14 @@ jobs:
             python3 "$t" --test || FAIL=1
             echo "::endgroup::"
           done
+          # Bash guards whose tests also live in-file behind --test. These sit in
+          # resources/, so neither the skills/*/tests/*.sh loop nor the python
+          # in-file loop above reaches them.
+          for t in skills/hook-kit/resources/block-live-action-without-workflow-skill.sh; do
+            echo "::group::$t --test"
+            bash "$t" --test || FAIL=1
+            echo "::endgroup::"
+          done
           exit "$FAIL"
 
   frontmatter-lint:
