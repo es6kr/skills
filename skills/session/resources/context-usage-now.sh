@@ -116,17 +116,23 @@ if matched:
   # a cwd-scoped match is the strongest signal of "this call belongs to a
   # Claude Code session for this specific workspace", outranking unconfigured
   # background Antigravity directory checks.
+  # Walk up from $PWD: a session started in the repo root keeps its project dir
+  # under the root's key, so after the cwd moves into a nested worktree
+  # (<repo>/.worktrees/x) the exact-cwd key has no dir. The nearest ancestor with
+  # a project dir is still this session's, unlike a global mtime race.
   if [ "$is_agy_active" -eq 0 ] && [ -z "$TRANSCRIPT" ] && [ -d "$HOME/.claude/projects" ]; then
-    PROJECT_KEY=$(printf '%s' "$PWD" | tr '/.' '-')
-    PROJECT_DIR="$HOME/.claude/projects/$PROJECT_KEY"
-    if [ -d "$PROJECT_DIR" ]; then
-      TRANSCRIPT=$(find_newest_transcript "$PROJECT_DIR" "*.jsonl" 1)
-    fi
-  fi
-
-  # 3. Fallback: unconfigured Antigravity check
-  if [ -z "$TRANSCRIPT" ] && [ -d "$local_agy_brain" ]; then
-    TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl" 4)
+    walk_dir="$PWD"
+    while :; do
+      PROJECT_KEY=$(printf '%s' "$walk_dir" | tr '/.' '-')
+      PROJECT_DIR="$HOME/.claude/projects/$PROJECT_KEY"
+      if [ -d "$PROJECT_DIR" ]; then
+        TRANSCRIPT=$(find_newest_transcript "$PROJECT_DIR" "*.jsonl" 1)
+        [ -n "$TRANSCRIPT" ] && break
+      fi
+      parent_dir=$(dirname "$walk_dir")
+      [ "$parent_dir" = "$walk_dir" ] && break
+      walk_dir="$parent_dir"
+    done
   fi
 
   # 4. Fallback: cross-environment candidate check (only when Antigravity is
@@ -178,6 +184,16 @@ if matched:
         fi
       fi
     done
+  fi
+
+  # 6. Last-resort unconfigured Antigravity check. Deliberately AFTER the
+  # same-harness Claude global fallback: with no Antigravity env signal, a
+  # cross-harness guess must never outrank same-harness evidence (an ungated
+  # brain scan here silently returned an unrelated session's usage).
+  if [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; then
+    if [ -d "$local_agy_brain" ]; then
+      TRANSCRIPT=$(find_newest_transcript "$local_agy_brain" "transcript.jsonl" 4)
+    fi
   fi
 fi
 
