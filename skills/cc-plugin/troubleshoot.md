@@ -115,7 +115,8 @@ cp ~/.claude/plugins/marketplaces/<marketplace>/plugins/<name>/.mcp.json \
 
 **Symptom**: `claude plugin marketplace update` or `claude plugin update <plugin>` reports success
 (the new version downloads/clones fine), but a `temp_git_*` directory is left sitting at the top
-level of `~/.claude/plugins/cache/<marketplace>/` instead of being swapped into place.
+level of `~/.claude/plugins/cache/` (a sibling of the normal `<marketplace>` directories, not
+nested inside one) instead of being swapped into place as `<marketplace>`.
 
 **Diagnosis**:
 
