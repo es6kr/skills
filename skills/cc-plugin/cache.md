@@ -14,7 +14,11 @@ resources/cache-cleanup.sh [--dry-run] [--verbose]
 - `--dry-run`: Preview deletions without removing
 - `--verbose`: Show detailed output
 
-> **Platform**: macOS only. The script uses `stat -f "%B"` (BSD-style birthtime) which is unavailable on Linux. On Linux, `stat -c "%W"` could be substituted but birthtime is not always populated; modification time (`stat -c "%Y"`) is a portable fallback if you adapt the script.
+> **Platform**: cross-platform (macOS, Linux, WSL). The script tries BSD-style birthtime
+> (`stat -f "%B"`) first, falls back to Linux birthtime (`stat -c "%W"`, often `0` on filesystems
+> that don't track it), then falls back again to modification time (`stat -c "%Y"`) so version
+> ordering is still correct everywhere. (This note previously said "macOS only" — that was stale;
+> the fallback chain is already implemented in `resources/cache-cleanup.sh`.)
 
 ## What It Cleans
 
