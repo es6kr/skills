@@ -457,3 +457,40 @@ Hold. Merge via `/github-flow merge 123`.
             any("outside the post.md contract" in e for e in validator.errors),
             f"escaped pipe must not shift the Status column. errors={validator.errors}",
         )
+
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    def test_validator_supports_three_line_source_classification_column(self, mock_api, mock_sha):
+        internal = {
+            "created_at": "2026-10-05T00:00:00Z",
+            "body": """## Internal Code Review — [requesting-code-review](https://skills.sh/obra/superpowers/requesting-code-review)
+<!-- consolidate:verified -->
+
+### Findings
+#### 1. `b.py:2` — internal finding
+detail
+""",
+        }
+        summary = {
+            "created_at": "2026-10-05T00:01:00Z",
+            "body": """## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
+<!-- consolidate:verified -->
+
+> Reviewer matrix: copilot — 1 inline comments
+
+### Consolidated Findings
+| # | Source / Classification | Location | Finding | Status |
+|---|---|---|---|---|
+| 1 | copilot<br>⚠️ Potential issue<br>🟠 Important | `a.py:1` | finding 1 | 🔴 Pending |
+| 2 | superpowers<br>🛠️ Refactor<br>🟡 Minor | `b.py:2` | internal finding | 🟢 Fixed (commit abc1234) |
+
+### Merge Recommendation
+Hold. Merge via `/github-flow merge 123`.
+""",
+        }
+        inline = [{"user": {"login": "Copilot"}, "path": "a.py", "line": 1, "body": "finding 1"}]
+        mock_api.side_effect = [inline, [internal, summary], []]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        self.assertTrue(validator.validate(), f"Validation failed with errors: {validator.errors}")
+        self.assertEqual(len(validator.errors), 0)
+

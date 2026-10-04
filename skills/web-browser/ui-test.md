@@ -204,6 +204,7 @@ mcp__code-mode__call_tool_chain({
 ### 2. Interaction Testing
 - Click buttons, links, and other elements
 - Fill forms and submit data
+- **Auto-save drafts after filling a form (HARD STOP)** — after completing a form fill, immediately trigger the form's own draft/temporary-save action (when one exists) so the input is not lost. Only the final submit is the user's call; filling a form and leaving it unsaved risks losing the entered data on navigation/timeout.
 - Navigate between pages
 - Wait for dynamic content
 
@@ -320,6 +321,48 @@ Issues found: None
 3. snapshot
 4. Report page state
 ```
+
+### Custom dropdown widgets (react-select and similar) — ref-based click/type unreliable
+
+Multi-instance custom-select components (react-select is the most common; the same applies to any JS-rendered listbox that isn't a native `<select>`) frequently break ref-based automation in a specific way: **the accessibility tree exposes only one "active" combobox node at a time, and its ref gets reused/reassigned across the page's multiple visually-distinct dropdown instances** as focus moves. Clicking a snapshot ref that visually pointed at dropdown #3 can silently reopen dropdown #2's menu instead, and `type`/`fill` on the ref's underlying input can appear to succeed (`OK` returned) while the value never actually changes (the framework's controlled-input state resets the DOM value on next render because no real keyboard event reached its event handler).
+
+**Symptoms that indicate this is happening**:
+- A `click` on a ref opens the wrong dropdown's option list (visually confirm via screenshot, not just the tool's return code)
+- `fill`/`type` returns `OK`, but `get value` on the same selector reads back empty or unchanged
+- The same ref number, reused across snapshots, corresponds to different screen positions each time
+
+| # | Don't (forbidden) | Do (correct alternative) |
+|---|-------------------|--------------------------|
+| 1 | Trust a `click`/`fill` tool call's `OK` return as proof the intended element was affected | Take a screenshot (or `get value`) immediately after and visually/programmatically confirm the actual UI state changed as expected |
+| 2 | Keep retrying the same ref-based `click`/`type` when the visible result doesn't match | Switch to direct DOM query + synthetic event dispatch via `eval` (see pattern below) |
+| 3 | Assume a filterable dropdown always needs a typed search string | Some dropdowns show a single relevant option immediately on open with no typing needed (e.g. a picker scoped to one existing resource) — screenshot after opening before assuming you must type |
+
+**Fallback pattern — locate by bounding box, then dispatch real mouse events**:
+
+```javascript
+// 1. Enumerate all instances of the control class + their screen position
+// (use whatever class the framework renders — e.g. '.react-select__control')
+const els = Array.from(document.querySelectorAll('.react-select__control'));
+els.map(el => { const r = el.getBoundingClientRect(); return {x: r.x, y: r.y, text: el.textContent}; });
+
+// 2. Pick the instance by its rendered position/text (NOT by DOM order alone —
+//    verify against a screenshot's visible layout first), then open it with a
+//    full mousedown/mouseup/click sequence (a plain .click() does not open
+//    react-select's menu, since it listens for mousedown)
+const target = els.find(el => el.textContent === 'Select...');
+const r = target.getBoundingClientRect();
+['mousedown', 'mouseup', 'click'].forEach(type =>
+  target.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true, clientX: r.x + 5, clientY: r.y + 5}))
+);
+
+// 3. Select an option the same way — options often render as plain <div>
+// with no distinguishing class; match by trimmed text content instead
+const opt = Array.from(document.querySelectorAll('.react-select__menu-list *'))
+  .find(el => el.children.length === 0 && el.textContent.trim() === 'desired option text');
+['mousedown', 'mouseup', 'click'].forEach(type => opt.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true})));
+```
+
+Typing into the underlying input (for filterable dropdowns) has the same "looks like it worked but didn't" trap when done via the ref-based `fill`/`type`. If typing is genuinely required, focus the actual `<input>` first (`el.querySelector('input')`), then use the backend's `type` command against a fresh CSS id selector obtained from that specific input (`input.id`) — re-derive the id after every open, since these frameworks commonly remount the input (new generated id) on each render.
 
 ## Large Page Handling
 

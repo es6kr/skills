@@ -4,18 +4,7 @@ metadata:
   author: es6kr
   version: "0.1.0"
 description: |
-  Environment-aware browser operations. Detects wmux/cmux/tmux and routes to the right backend
-  (wmux/cmux panel → user-visible, plain → Playwright MCP, chrome-devtools → reuse the user's
-  real logged-in session). Topics:
-  ui-test - snapshots, click/fill/verify, closed shadow DOM cascade diagnosis (cdp-trace)
-  [ui-test.md, cdp-trace.md].
-  credential-issue - open service login via detected backend → wait for user sign-in → issue
-  OR refresh an access key / token / secret / OAuth scope → hand off to follow-up automation
-  (aws-cli, gh secret set, gh auth refresh, etc.) [credential-issue.md]. Covers both new
-  issuance and existing-token scope expansion (PAT scope add, OAuth re-authorize, device-code).
-  Use for: "UI check", "browser test", "screen verify", "Playwright test", "shadow DOM cascade",
-  "::part not working", "CDP trace", "issue token", "service credential", "open login screen",
-  "PAT refresh", "scope expansion", "device-code auth", "browser device-code".
+  Environment-aware browser operations. Detects wmux/cmux/tmux and routes to backend. Topics — ui-test (snapshots, click/fill, shadow DOM), credential-issue (login via backend -> wait sign-in -> issue/refresh token/secret). Use when: "browser", "web-browser", "ui-test", "credential-issue", "playwright", "chrome-devtools", "UI check", "browser test", "screen verify", "Playwright test", "shadow DOM cascade", "::part not working", "CDP trace", "issue token", "service credential", "open login screen", "PAT refresh", "scope expansion", "device-code auth", "browser device-code", "GitHub social login".
 ---
 
 # Web Browser
@@ -48,6 +37,30 @@ web-browser (Step 0: environment detection — shared by all topics)
   service+command parameterized auth flow.
 - **Authentik SSO verification** (`sso-verify`) is **not** included in this skill — it remains in a
   separate local-only `sso-verify` skill (user-environment specific, untracked).
+
+## CRITICAL — capturing a credential-input screen requires an explicit ask (HARD STOP)
+
+**Before capturing a sign-in / credential-input screen — accessibility snapshot, screenshot, or any
+full page-content read — call `AskUserQuestion` and get explicit approval.** Applies to every topic
+in this skill and to every backend.
+
+The reason is not privacy etiquette, it is a measured leak path: a browser profile's saved-password
+autofill populates the password field, and the accessibility tree renders that field's **value in
+plaintext**. The capture therefore carries a live credential into the transcript even though nothing
+was typed and no screenshot of characters was taken. `document.body.innerText` does not expose input
+values, but the accessibility snapshot does.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Snapshot a sign-in page to "see what step we're on" | Read only `location.href` and `document.title`, or specific marker booleans. Ask before any fuller capture |
+| 2 | Assume an empty-looking form is safe because you typed nothing | Profile autofill fills fields without any typing. Emptiness is not verifiable before the capture that would leak it |
+| 3 | Redact only the field you expected to carry the secret | Apply redaction to **every** returned field — element text, `aria-label`, `title`, `placeholder`, `value`. A secret leaked through an unredacted sibling field is the common failure |
+| 4 | Return page values when a count or boolean answers the question | Prefer structure over content: `hasPasswordField: true`, `blockMarkers: {...}`, `buttonCount: 3` |
+| 5 | Treat "the user asked me to test the login" as approval to capture the screen | Testing the flow and capturing the credential screen are separate permissions. Ask for the second one explicitly |
+
+**Self-check (before every snapshot / screenshot / full-text read)**: does the current page accept a
+password, token, secret, or OTP? → If yes, or if unsure, restrict to URL + title and ask before
+capturing more.
 
 ## CRITICAL — user visibility is the top priority (HARD STOP)
 
@@ -128,20 +141,53 @@ not repeat failed automation attempts.
 
 ---
 
-## Step 0: Environment Detection (MANDATORY — before any browser action)
+## Step 0: Environment & Tool Priority Resolution (MANDATORY — before any browser action)
 
-Check environment variables AND CLI presence to determine the browser backend:
+Resolve which browser capability backend to invoke based on the current environment, prioritizing native/editor plugins over MCP servers.
+
+### Step 0a: Host OS layer — WSL detection (MANDATORY, runs before the Tool Priority Matrix)
+
+The multiplexer matrix below answers *which tool* drives the browser. It does not answer *which OS
+the browser process runs on* — and for the CDP-hostile services in
+[credential-issue.md](./credential-issue.md) that second axis decides whether automation works at
+all. A Playwright MCP server started inside WSL drives a **Linux** Chrome, a different fingerprint
+surface from `chrome-devtools-mcp` attaching to the user's **Windows** Chrome. Resolve this layer
+first, record the result, and never carry a CDP-hostile verdict across it.
 
 ```bash
-# wmux
-echo "WMUX=$WMUX"
-# cmux — detect via ANY of these (cmux app does NOT set CMUX_SESSION; use multi-var OR)
-echo "CMUX_BUNDLE_ID=$CMUX_BUNDLE_ID"
-echo "CMUX_PANEL_ID=$CMUX_PANEL_ID"
-echo "CMUX_BUNDLED_CLI_PATH=$CMUX_BUNDLED_CLI_PATH"
-# CLI fallback (env may be unset in nested shells but CLI still works)
-command -v cmux && echo "cmux CLI present"
-command -v wmux && echo "wmux CLI present"
+# WSL detection — either signal is sufficient
+[[ -n "$WSL_DISTRO_NAME" ]] && echo "host=wsl"
+grep -qi microsoft /proc/version 2>/dev/null && echo "host=wsl"
+```
+
+| Host layer | Record as | Consequence for CDP-hostile services |
+|---|---|---|
+| WSL (either signal true) | `host=wsl` | Playwright MCP (Linux Chrome) is a **first-class candidate**, not a skipped backend — measure before escalating |
+| Windows, no WSL signal | `host=windows` | The documented Windows `chrome-devtools-mcp` findings apply as written |
+| macOS / Linux native | `host=native` | Unmeasured for these services — treat as unknown and measure before asserting |
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Jump straight to the Tool Priority Matrix and pick a backend | Resolve `host=` first — it gates the CDP-hostile escalation ladder |
+| 2 | Apply a CDP-hostile verdict recorded on one host layer to another | Verdicts are per host layer. A Windows block is not a WSL block |
+| 3 | Escalate a CDP-hostile service to wmux/cmux/OS-launch while `host=wsl` is untested | On `host=wsl`, try Playwright MCP first and record the outcome before escalating |
+
+### Tool Priority Matrix
+
+| Environment | 1st Priority (Native Plugin / CLI) | 2nd Priority (MCP Server Fallback) |
+|-------------|------------------------------------|------------------------------------|
+| **wmux** | `wmux browser` commands via Bash (User-visible) | Playwright MCP (`mcp__playwright__*`) |
+| **cmux** | `cmux browser` commands via Bash (User-visible) | Playwright MCP (`mcp__playwright__*`) |
+| **Plain / tmux** | Playwright MCP (`mcp__playwright__*`) (Headless default) | Headless Playwright CLI via Bash |
+
+### Backend Availability Check
+
+```bash
+# wmux check
+[[ -n "$WMUX" ]] || command -v wmux >/dev/null 2>&1
+
+# cmux check (detect via ANY of these; CMUX_SESSION is NOT set by cmux app)
+[[ -n "$CMUX_BUNDLE_ID" || -n "$CMUX_PANEL_ID" || -n "$CMUX_BUNDLED_CLI_PATH" ]] || command -v cmux >/dev/null 2>&1
 ```
 
 ### Do & Don't — Browser Backend Selection

@@ -8,6 +8,7 @@ set -euo pipefail
 CACHE_DIR="${HOME}/.claude/plugins/cache"
 DRY_RUN=false
 VERBOSE=false
+TEMP_DIRS_FOUND=0
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -50,6 +51,7 @@ cleanup_marketplace() {
 
     # Skip temp directories
     if [[ "$marketplace_name" == temp_git_* ]]; then
+        TEMP_DIRS_FOUND=$((TEMP_DIRS_FOUND + 1))
         if [[ "$DRY_RUN" == true ]]; then
             echo "[DRY-RUN] Would delete temp directory: $marketplace_dir"
         else
@@ -149,6 +151,12 @@ main() {
     done
 
     echo ""
+    if [[ $TEMP_DIRS_FOUND -gt 0 ]]; then
+        echo "⚠ Found $TEMP_DIRS_FOUND orphaned temp_git_* dir(s). This usually means a prior"
+        echo "  'plugin marketplace update' / 'plugin update' failed to swap in the new version."
+        echo "  If this keeps recurring, see cc-plugin's troubleshoot.md: \"Update succeeds but"
+        echo "  leaves orphaned temp_git_* directories\"."
+    fi
     echo "Done!"
 }
 

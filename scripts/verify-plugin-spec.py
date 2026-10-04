@@ -187,9 +187,9 @@ def check_orphan_plugin_directories(entries: list) -> list:
         if not candidate.is_dir() or not (candidate / "plugin.json").is_file():
             continue
         if candidate.resolve() not in claimed:
-            rel = candidate.relative_to(REPO_ROOT)
+            rel = candidate.relative_to(REPO_ROOT).as_posix()
             errors.append(
-                f"plugin bundle {str(rel)!r} has a plugin.json but no marketplace.json "
+                f"plugin bundle {rel!r} has a plugin.json but no marketplace.json "
                 f"entry -- nothing loads it. Add an entry with source './{rel}'"
             )
     return errors

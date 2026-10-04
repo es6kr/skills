@@ -77,6 +77,128 @@ check("legacy-no-meta falls back to heuristic (recur -> blocked)",
       by_title["legacy-no-meta"].get("via_meta") in (False, None))
 os.unlink(tmp)
 
+# 5. header placement as the real corpus writes it: the `fa:` header sits on the
+# line BEFORE the `## ` heading. The fixtures above put it after, which is why a
+# mis-attribution bug survived them — every section was reading its successor's
+# header, and the final section none at all.
+corpus = (
+    "<!-- fa: class=alpha count=1 last=2026-01-01 status=watch -->\n\n"
+    "## Alpha (2026-01-01, 1회차)\n\nbody a\n\n"
+    "<!-- fa: class=beta count=3 last=2026-09-26 status=rule-covered -->\n\n"
+    "## Beta (2026-08-31, 2회차)\n\nbody b\n\n"
+    "<!-- fa: class=gamma count=1 last=2026-02-02 status=watch -->\n\n"
+    "## Gamma (2026-02-02, 1회차)\n\nbody c\n"
+)
+secs = fa.split_sections(corpus)
+metas = [(fa.parse_section_meta(x) or {}).get("class") for x in secs]
+lasts = [(fa.parse_section_meta(x) or {}).get("last") for x in secs]
+check("header-before-heading: three sections", len(secs) == 3)
+check("header-before-heading: each section owns its header",
+      metas == ["alpha", "beta", "gamma"])
+check("header-before-heading: last= is the section's own",
+      lasts == ["2026-01-01", "2026-09-26", "2026-02-02"])
+check("header-before-heading: no section carries a successor's header",
+      all(x.count("<!-- fa:") == 1 for x in secs))
+
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(corpus)
+    tmp2 = f.name
+rows2 = {r["title"]: r for r in fa.analyze(tmp2, cutoff="2026-09-01", relaxed=True)}
+# Beta recurred on 2026-09-26; its title still shows the first occurrence (2026-08-31).
+# Demoting it would archive a live pattern, so the next recurrence reads as "1st".
+check("fresh recurrence is not demoted despite an old title date",
+      rows2["Beta (2026-08-31, 2회차)"]["cold"] is False)
+check("genuinely stale section is still demoted",
+      rows2["Alpha (2026-01-01, 1회차)"]["cold"] is True)
+check("final section is not starved of its header",
+      rows2["Gamma (2026-02-02, 1회차)"].get("via_meta") is True)
+os.unlink(tmp2)
+
+# 6. a header block can be several comment lines — the `fa:` line plus sibling
+# annotations such as `<!-- hook: ... -->`. The terminator is "only comments and
+# blanks follow", not "nothing follows"; otherwise the annotated sections (the
+# ones carrying a hook reference, i.e. the escalated ones) silently lose their
+# header to the preceding section.
+annotated = (
+    "<!-- fa: class=one count=1 last=2026-01-01 status=watch -->\n\n"
+    "## One (2026-01-01, 1회차)\n\nbody one\n\n"
+    "<!-- fa: class=two count=4 last=2026-09-08 status=hook-implemented -->\n"
+    "<!-- hook: some-guard.sh — commit abc1234 -->\n\n"
+    "## Two (2026-08-31, 1회차)\n\nbody two\n"
+)
+secs3 = fa.split_sections(annotated)
+metas3 = [(fa.parse_section_meta(x) or {}).get("class") for x in secs3]
+check("multi-line header block: each section owns its header",
+      metas3 == ["one", "two"])
+check("multi-line header block: annotation travels with its fa line",
+      "some-guard.sh" in secs3[1] and "some-guard.sh" not in secs3[0])
+
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(annotated)
+    tmp3 = f.name
+rows3 = {r["title"]: r for r in fa.analyze(tmp3, cutoff="2026-09-01", relaxed=True)}
+check("annotated fresh section is not demoted",
+      rows3["Two (2026-08-31, 1회차)"]["cold"] is False)
+os.unlink(tmp3)
+
+# 7. Multiple consecutive `fa:` headers with no heading between them are
+# orphaned metadata. They cannot be safely attributed to either adjacent
+# section, so classification must not apply any of them.
+orphaned = (
+    "## Previous (2026-01-01, 1회차)\n\nbody previous\n\n"
+    "<!-- fa: class=wrong-one count=2 last=2026-08-27 status=watch -->\n\n"
+    "<!-- fa: class=wrong-two count=3 last=2026-08-30 status=watch -->\n\n"
+    "## Target (2026-09-01, 1회차)\n\nbody target\n"
+)
+secs4 = fa.split_sections(orphaned)
+check("orphaned metadata: both sections retain no ambiguous header",
+      [(fa.parse_section_meta(x) or {}).get("class") for x in secs4] == [None, None])
+
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(orphaned)
+    tmp4 = f.name
+rows4 = {r["title"]: r for r in fa.analyze(tmp4, cutoff="2026-09-01", relaxed=True)}
+check("orphaned metadata: target does not inherit stale header",
+      rows4["Target (2026-09-01, 1회차)"].get("via_meta") is False)
+os.unlink(tmp4)
+
+# 8. A valid current-section header followed by prose must remain attached to
+# that section even when the next section has its normal pre-heading header.
+# Only a contiguous trailing comment block is eligible as the next header.
+separated_headers = (
+    "## Current (2026-01-01, 4회차)\n"
+    "<!-- fa: class=current count=4 last=2026-09-10 status=watch -->\n"
+    "current recurrence has prose after its own header.\n\n"
+    "<!-- fa: class=next count=1 last=2026-01-01 status=watch -->\n\n"
+    "## Next (2026-01-01, 1회차)\nbody next\n"
+)
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(separated_headers)
+    tmp5 = f.name
+rows5 = {r["title"]: r for r in fa.analyze(tmp5, cutoff="2026-09-01", relaxed=True)}
+check("prose-separated current header remains attached",
+      rows5["Current (2026-01-01, 4회차)"].get("via_meta") is True)
+check("prose-separated current recurrence is not cold",
+      rows5["Current (2026-01-01, 4회차)"]["cold"] is False)
+os.unlink(tmp5)
+
+# 9. Every ISO date in a title/body is relevant. A later recurrence separated by
+# punctuation must keep the section hot; matching only `(`-prefixed dates can
+# turn a recent recurrence into an unsafe archive candidate.
+later_title_date = (
+    "## Recurrence (2026-08-31, 2회차 / 2026-09-26, Gemini)\n"
+    "body with no machine-readable meta\n"
+)
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(later_title_date)
+    tmp6 = f.name
+rows6 = fa.analyze(tmp6, cutoff="2026-09-01", relaxed=True)
+check("later title recurrence date is selected as latest",
+      rows6[0]["latest"] == "2026-09-26")
+check("later title recurrence date prevents cold classification",
+      rows6[0]["cold"] is False)
+os.unlink(tmp6)
+
 if failures:
     print(f"\n{len(failures)} FAILED")
     sys.exit(1)

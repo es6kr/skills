@@ -73,6 +73,84 @@ ITEM_RE = re.compile(r"^([ \t]*)-[ \t]+(\[[^\]]*\])[ \t]+(.*)$")
 REF_NOTE_MAX_LEN = 100
 
 
+# ---------------------------------------------------------------- attribute slot
+#
+# A tracker line has two bracket slots.  The LEADING one is the checkbox marker
+# (`[ ]` / `[x]` / `[-]` / `[BLOCKED:P#:owner]`), owned by validate_marker.  The
+# TRAILING one carries per-item attributes, written as `[KEY:VALUE]` at the end of
+# the action text.  Only the trailing slot is handled here, and only for keys this
+# table registers -- an unregistered key is rejected rather than written, so the
+# tracker cannot accumulate private vocabularies that no reader parses.
+#
+# `BLOCKED` is deliberately absent: it is a checkbox-marker value, not an
+# attribute, so keeping it out of this table prevents a trailing `[BLOCKED:...]`
+# from ever being emitted next to a real one.
+ATTR_VOCAB: dict[str, re.Pattern[str]] = {
+    # Impact / Confidence / Ease, each a number: [ICE:I2,C0.8,E4]
+    "ICE": re.compile(r"^I\d+(?:\.\d+)?,C\d+(?:\.\d+)?,E\d+(?:\.\d+)?$"),
+    # Execution channel, one of the five the operating model defines: [ch:orca]
+    "ch": re.compile(r"^(?:orca|clawo|deep-tasks|in-session|user-decision)$"),
+    # Which RAID axes are registered for this item: [RAID:R,D]
+    "RAID": re.compile(r"^[RAID](?:,[RAID])*$"),
+}
+
+
+def validate_attr(key: str, value: str) -> None:
+    """Reject an unregistered attribute key, or a value its grammar disallows."""
+    if key not in ATTR_VOCAB:
+        raise ValueError(
+            f"unregistered attribute key {key!r}. Registered: "
+            f"{', '.join(sorted(ATTR_VOCAB))}. Add the key to ATTR_VOCAB (and its "
+            "grammar) before writing it, so every reader can parse it."
+        )
+    if not ATTR_VOCAB[key].match(value):
+        raise ValueError(
+            f"value {value!r} does not match the grammar registered for {key!r} "
+            f"({ATTR_VOCAB[key].pattern})"
+        )
+
+
+def parse_attr_arg(arg: str) -> tuple[str, str]:
+    """Split a `KEY=VALUE` argument, validating the pair."""
+    if "=" not in arg:
+        raise ValueError(f"--set-attr expects KEY=VALUE, got {arg!r}")
+    key, _, value = arg.partition("=")
+    key, value = key.strip(), value.strip()
+    if not key or not value:
+        raise ValueError(f"--set-attr expects a non-empty KEY and VALUE, got {arg!r}")
+    validate_attr(key, value)
+    return key, value
+
+
+def attr_arg_type(arg: str) -> tuple[str, str]:
+    """argparse `type=` adapter that preserves the rejection message.
+
+    argparse swallows a ValueError from a type callable and prints its own generic
+    "invalid <callable> value" line, which drops the registered keys and the value
+    grammar -- the only parts of the message a caller can act on. ArgumentTypeError
+    is printed verbatim, so the boundary re-raises as that instead.
+    """
+    try:
+        return parse_attr_arg(arg)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def write_attr(action: str, key: str, value: str) -> str:
+    """Set `[KEY:VALUE]` on the action text, replacing that key in place if present.
+
+    Replacing in place rather than appending is what makes repeated writes
+    idempotent and keeps a re-scored item from growing a second marker for the
+    same key -- the failure mode hand-editing produces.
+    """
+    validate_attr(key, value)
+    token = f"[{key}:{value}]"
+    existing = re.compile(r"[ \t]*\[" + re.escape(key) + r":[^\]]*\]")
+    if existing.search(action):
+        return existing.sub(" " + token, action, count=1).rstrip()
+    return f"{action.rstrip()} {token}"
+
+
 def find_item_block(lines: list[str], match_text: str) -> tuple[int, int, int]:
     """Locate the single item whose action text contains match_text.
 
@@ -111,13 +189,23 @@ def find_item_block(lines: list[str], match_text: str) -> tuple[int, int, int]:
     return start, end, indent
 
 
-def apply_update(block: list[str], set_marker: str | None, append_note: str | None) -> list[str]:
+def apply_update(
+    block: list[str],
+    set_marker: str | None,
+    append_note: str | None,
+    set_attr: tuple[str, str] | None = None,
+) -> list[str]:
     block = list(block)
 
     if set_marker:
         m = ITEM_RE.match(block[0])
         assert m is not None
         block[0] = f"{m.group(1)}- {set_marker} {m.group(3)}"
+
+    if set_attr:
+        m = ITEM_RE.match(block[0])
+        assert m is not None
+        block[0] = f"{m.group(1)}- {m.group(2)} {write_attr(m.group(3), *set_attr)}"
 
     if append_note:
         m = ITEM_RE.match(block[0])
@@ -291,18 +379,27 @@ def validate_section_marker(section: str | None, marker: str) -> None:
 
 def run_update(args: argparse.Namespace) -> int:
     has_delete = args.delete
-    if not args.set_marker and not args.append_note and not args.move and not has_delete:
-        raise ValueError("at least one of --set-marker / --append-note / --move / --delete is required")
-    if args.move and (args.set_marker or args.append_note or has_delete):
-        raise ValueError("--move cannot be combined with other mutations")
-    if has_delete and (args.set_marker or args.append_note or args.move):
-        raise ValueError("--delete cannot be combined with other mutations")
+    # Read defensively: namespaces predating --set-attr (including every
+    # pre-existing caller and self-test namespace here) do not define it.
+    set_attr = getattr(args, "set_attr", None)
+    if not args.set_marker and not args.append_note and not args.move and not has_delete and not set_attr:
+        raise ValueError(
+            "at least one of --set-marker / --append-note / --set-attr / --move / --delete is required"
+        )
+    if args.move and (args.set_marker or args.append_note or has_delete or set_attr):
+        raise ValueError("--move cannot be combined with other mutations (--set-marker / --append-note / --set-attr)")
+    if has_delete and (args.set_marker or args.append_note or args.move or set_attr):
+        raise ValueError("--delete cannot be combined with other mutations (--set-marker / --append-note / --set-attr)")
     if args.summary is not None and not args.move:
         raise ValueError("--summary only applies together with --move")
     if args.set_marker:
         validate_marker(args.set_marker)
     if args.append_note and ("\n" in args.append_note or "\r" in args.append_note):
         raise ValueError("--append-note must be a single line (no newlines)")
+    if set_attr:
+        # Validate up front so an unregistered key fails before the lock is taken
+        # and before any write path is entered.
+        validate_attr(*set_attr)
 
     if not os.path.exists(args.file):
         raise ValueError(f"tracker not found: {args.file}")
@@ -373,7 +470,7 @@ def run_update(args: argparse.Namespace) -> int:
 
         if args.set_marker:
             validate_section_marker(enclosing_section(lines, start), args.set_marker)
-        block = apply_update(lines[start:end], args.set_marker, args.append_note)
+        block = apply_update(lines[start:end], args.set_marker, args.append_note, set_attr)
 
         out = "\n".join(lines[:start] + block + lines[end:])
 
@@ -940,6 +1037,260 @@ def self_test() -> int:
     finally:
         os.unlink(already_path)
 
+
+    # ------------------------------------------------------------------
+    # attribute slot (--set-attr KEY=VALUE)
+    #
+    # The tracker line has two marker slots: the leading checkbox marker, which
+    # this script already writes and validates, and a trailing bracket slot that
+    # it does not know about at all.  Measured consequence: the vocabularies the
+    # tool writes reach 35.8% / 265 items, while every trailing-slot vocabulary
+    # sits at 0-4.7% because each one is hand-typed.  These cases drive a general
+    # trailing-slot writer with a registered vocabulary, so a new attribute is a
+    # table entry rather than a new code path.
+    #
+    # Written before the implementation: each probe resolves the symbol through
+    # globals() so a missing feature is reported as a FAIL, not raised as a
+    # NameError that would abort the remaining cases.
+    # ------------------------------------------------------------------
+    _vocab = globals().get("ATTR_VOCAB")
+    _validate_attr = globals().get("validate_attr")
+    _parse_attr_arg = globals().get("parse_attr_arg")
+
+    def attr_check(name: str, fn, want=None, raises=None) -> None:
+        try:
+            got = fn()
+        except Exception as exc:  # noqa: BLE001 - absence must read as FAIL
+            check(name, raises is not None and isinstance(exc, raises))
+            return
+        if raises is not None:
+            check(name, False)
+            return
+        check(name, got == want if want is not None else bool(got))
+
+    check("ATTR_VOCAB registry exists", isinstance(_vocab, dict))
+    check("ATTR_VOCAB registers the ICE key", bool(_vocab) and "ICE" in _vocab)
+    check("ATTR_VOCAB registers the channel key", bool(_vocab) and "ch" in _vocab)
+    check("ATTR_VOCAB registers the RAID key", bool(_vocab) and "RAID" in _vocab)
+
+    attr_check("validate_attr accepts a well-formed ICE value",
+               lambda: _validate_attr("ICE", "I2,C0.8,E4") is None, want=True)
+    attr_check("validate_attr rejects an unregistered key",
+               lambda: _validate_attr("NOPE", "x"), raises=ValueError)
+    attr_check("validate_attr rejects an ICE value missing a component",
+               lambda: _validate_attr("ICE", "I2,C0.8"), raises=ValueError)
+    attr_check("validate_attr rejects a non-numeric ICE component",
+               lambda: _validate_attr("ICE", "I2,Chigh,E4"), raises=ValueError)
+    attr_check("validate_attr accepts a registered channel value",
+               lambda: _validate_attr("ch", "orca") is None, want=True)
+    attr_check("validate_attr rejects an unregistered channel value",
+               lambda: _validate_attr("ch", "telepathy"), raises=ValueError)
+
+    attr_check("parse_attr_arg splits KEY=VALUE",
+               lambda: _parse_attr_arg("ICE=I2,C0.8,E4"), want=("ICE", "I2,C0.8,E4"))
+    attr_check("parse_attr_arg rejects a missing '='",
+               lambda: _parse_attr_arg("ICE"), raises=ValueError)
+
+    attr_block = [
+        "- [ ] attr target item unique-marker-gamma",
+        "  - **Why**: gamma reason",
+        "  - **How to apply**: gamma steps",
+    ]
+
+    attr_check("apply_update writes the attribute at end of the item line",
+               lambda: apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
+    attr_check("apply_update leaves sub-bullets untouched when writing an attribute",
+               lambda: apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4"))[1:],
+               want=attr_block[1:])
+    attr_check("writing an attribute twice is idempotent",
+               lambda: apply_update(
+                   apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4")),
+                   None, None, ("ICE", "I2,C0.8,E4"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
+    attr_check("re-writing the same key replaces it in place rather than appending",
+               lambda: apply_update(
+                   apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4")),
+                   None, None, ("ICE", "I5,C0.9,E1"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I5,C0.9,E1]")
+    attr_check("writing a second key preserves the first",
+               lambda: apply_update(
+                   apply_update(attr_block, None, None, ("ICE", "I2,C0.8,E4")),
+                   None, None, ("ch", "orca"))[0],
+               want="- [ ] attr target item unique-marker-gamma [ICE:I2,C0.8,E4] [ch:orca]")
+    attr_check("an attribute write preserves a BLOCKED checkbox marker",
+               lambda: apply_update(
+                   ["- [BLOCKED:P1:selfable] blocked attr target"], None, None, ("ch", "clawo"))[0],
+               want="- [BLOCKED:P1:selfable] blocked attr target [ch:clawo]")
+    attr_check("an attribute write combines with --set-marker in one call",
+               lambda: apply_update(attr_block, "[x]", None, ("ICE", "I2,C0.8,E4"))[0],
+               want="- [x] attr target item unique-marker-gamma [ICE:I2,C0.8,E4]")
+
+
+    # ------------------------------------------------------------------
+    # --set-attr CLI wiring
+    #
+    # apply_update already accepts an attribute, but nothing reaches it from the
+    # command line, so the capability is unusable from a skill invocation. These
+    # cases drive the wiring: the flag must satisfy the "at least one mutation"
+    # requirement on its own, refuse to combine with the whole-item operations
+    # (--move / --delete) exactly as --set-marker does, reject an unregistered key
+    # before the tracker is touched, and honour --dry-run.
+    #
+    # The last case pins backward compatibility: a namespace built WITHOUT a
+    # set_attr attribute must still run, because every pre-existing caller and
+    # self-test namespace in this file is built that way.
+    # ------------------------------------------------------------------
+    import tempfile as _tf
+
+    def _attr_tracker() -> str:
+        with _tf.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as fh:
+            fh.write("\n".join([
+                "# T", "", "## TODO", "",
+                "- [ ] attr cli target unique-marker-delta",
+                "  - **Why**: delta reason",
+                "  - **How to apply**: delta steps",
+                "",
+            ]))
+            return fh.name
+
+    def _attr_ns(path: str, **over):
+        class NS:
+            delete = False
+        ns = NS()
+        ns.file = path
+        ns.match = "unique-marker-delta"
+        ns.set_marker = None
+        ns.append_note = None
+        ns.dry_run = False
+        ns.move = False
+        ns.summary = None
+        ns.set_attr = None
+        for k, v in over.items():
+            setattr(ns, k, v)
+        return ns
+
+    _p = _attr_tracker()
+    try:
+        rc = run_update(_attr_ns(_p, set_attr=("ICE", "I2,C0.8,E4")))
+        body = open(_p, encoding="utf-8").read()
+        check("--set-attr alone satisfies the at-least-one-mutation check", rc == 0)
+        check("--set-attr writes the marker into the tracker",
+              "- [ ] attr cli target unique-marker-delta [ICE:I2,C0.8,E4]" in body)
+    except Exception as exc:  # noqa: BLE001
+        check("--set-attr alone satisfies the at-least-one-mutation check", False)
+        check("--set-attr writes the marker into the tracker", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_attr=("ICE", "I2,C0.8,E4"), move=True))
+        check("--set-attr cannot be combined with --move", False)
+    except ValueError as exc:
+        check("--set-attr cannot be combined with --move", "set-attr" in str(exc))
+    except Exception:  # noqa: BLE001
+        check("--set-attr cannot be combined with --move", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_attr=("ICE", "I2,C0.8,E4"), delete=True))
+        check("--set-attr cannot be combined with --delete", False)
+    except ValueError as exc:
+        check("--set-attr cannot be combined with --delete", "set-attr" in str(exc))
+    except Exception:  # noqa: BLE001
+        check("--set-attr cannot be combined with --delete", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_attr=("NOPE", "x")))
+        check("--set-attr rejects an unregistered key", False)
+    except ValueError as exc:
+        check("--set-attr rejects an unregistered key", "unregistered attribute key" in str(exc))
+    except Exception:  # noqa: BLE001
+        check("--set-attr rejects an unregistered key", False)
+    else:
+        pass
+    finally:
+        unchanged = open(_p, encoding="utf-8").read()
+        check("a rejected key leaves the tracker untouched", "[NOPE:" not in unchanged)
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        run_update(_attr_ns(_p, set_marker="[x]", set_attr=("ch", "orca")))
+        body = open(_p, encoding="utf-8").read()
+        check("--set-attr combines with --set-marker in one invocation",
+              "- [x] attr cli target unique-marker-delta [ch:orca]" in body)
+    except Exception:  # noqa: BLE001
+        check("--set-attr combines with --set-marker in one invocation", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        before = open(_p, encoding="utf-8").read()
+        run_update(_attr_ns(_p, set_attr=("RAID", "R,D"), dry_run=True))
+        check("--dry-run with --set-attr leaves the tracker unwritten",
+              open(_p, encoding="utf-8").read() == before)
+    except Exception:  # noqa: BLE001
+        check("--dry-run with --set-attr leaves the tracker unwritten", False)
+    finally:
+        os.unlink(_p)
+
+    _p = _attr_tracker()
+    try:
+        legacy = _attr_ns(_p, set_marker="[x]")
+        del legacy.set_attr  # a namespace predating the flag
+        check("a namespace without set_attr still runs", run_update(legacy) == 0)
+    except Exception:  # noqa: BLE001
+        check("a namespace without set_attr still runs", False)
+    finally:
+        os.unlink(_p)
+
+
+    def _run_capture(fn, arg: str, needle: str) -> bool:
+        """True when calling fn(arg) raises an error whose message contains needle."""
+        if not callable(fn):
+            return False
+        try:
+            fn(arg)
+        except Exception as exc:  # noqa: BLE001
+            return needle in str(exc)
+        return False
+
+
+    # ------------------------------------------------------------------
+    # argparse error surfacing
+    #
+    # argparse replaces a ValueError raised by a `type=` callable with its own
+    # generic "invalid <callable> value" line, which discards the part of the
+    # message that carries the registered keys and the value grammar. That message
+    # is the whole value of the vocabulary guard -- a rejection that does not say
+    # what IS allowed sends the caller to the source. Observed on the real CLI:
+    #   update_item.py: error: argument --set-attr: invalid parse_attr_arg value: 'NOPE=x'
+    #
+    # So the argparse boundary needs its own adapter. parse_attr_arg keeps raising
+    # ValueError (its own tests pin that); the adapter re-raises as
+    # ArgumentTypeError, which argparse prints verbatim.
+    # ------------------------------------------------------------------
+    _attr_arg_type = globals().get("attr_arg_type")
+    check("attr_arg_type adapter exists", callable(_attr_arg_type))
+
+    attr_check("attr_arg_type returns the parsed pair for valid input",
+               lambda: _attr_arg_type("ICE=I2,C0.8,E4"), want=("ICE", "I2,C0.8,E4"))
+    attr_check("attr_arg_type raises ArgumentTypeError for an unregistered key",
+               lambda: _attr_arg_type("NOPE=x"), raises=argparse.ArgumentTypeError)
+    attr_check("the unregistered-key message still names the registered keys",
+               lambda: _run_capture(_attr_arg_type, "NOPE=x", "Registered:"), want=True)
+    attr_check("the bad-value message still names the grammar",
+               lambda: _run_capture(_attr_arg_type, "ICE=I2,C0.8", "does not match the grammar"),
+               want=True)
+
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
 
@@ -950,6 +1301,13 @@ def main() -> int:
     )
     p.add_argument("--test", action="store_true", help="run the self-test and exit")
     p.add_argument("--file", help="tracker path (fix_plan.md or checklist.md)")
+    p.add_argument(
+        "--set-attr",
+        type=attr_arg_type,
+        metavar="KEY=VALUE",
+        help="set a trailing [KEY:VALUE] attribute on the item "
+             "(registered keys: " + ", ".join(sorted(ATTR_VOCAB)) + ")",
+    )
     p.add_argument("--match", help="substring of the target item's action text (must match exactly one item)")
     p.add_argument("--set-marker", help="'[ ]', '[x]', '[-]', or '[BLOCKED:P<0-3>:external|selfable]'")
     p.add_argument("--append-note", help="one-line progress note appended as a new sub-bullet")
