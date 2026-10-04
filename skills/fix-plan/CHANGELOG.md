@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/es6kr/skills/compare/fix-plan-v0.17.0...fix-plan-v0.17.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **fix-plan:** add a general attribute slot to update_item ([#582](https://github.com/es6kr/skills/issues/582)) ([7610a95](https://github.com/es6kr/skills/commit/7610a95552136a7a29622b6b48c75830a24f765e))
+
 ## [0.17.0](https://github.com/es6kr/skills/compare/fix-plan-v0.16.1...fix-plan-v0.17.0) (2026-09-30)
 
 

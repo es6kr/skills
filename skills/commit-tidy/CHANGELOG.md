@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/es6kr/skills/compare/commit-tidy-v0.7.1...commit-tidy-v0.7.2) (2026-10-04)
+
+
+### Bug Fixes
+
+* **commit-tidy:** require the skill when a branch stacks repeated Red→Green pairs ([#581](https://github.com/es6kr/skills/issues/581)) ([73015af](https://github.com/es6kr/skills/commit/73015af8b350029bfa0db96ed26733358fa71534))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/commit-tidy-v0.7.0...commit-tidy-v0.7.1) (2026-09-18)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/es6kr/skills/compare/web-browser-v0.2.9...web-browser-v0.2.10) (2026-10-04)
+
+
+### Bug Fixes
+
+* **web-browser:** resolve host OS layer before backend, scope CDP-hostile table per host ([#571](https://github.com/es6kr/skills/issues/571)) ([1bd3d66](https://github.com/es6kr/skills/commit/1bd3d662c7b29a82322476f36c9aba7dfb485295))
+
 ## [0.2.9](https://github.com/es6kr/skills/compare/web-browser-v0.2.8...web-browser-v0.2.9) (2026-09-18)
 
 
