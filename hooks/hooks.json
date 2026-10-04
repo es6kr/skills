@@ -157,6 +157,10 @@
           },
           {
             "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-review-post-without-receiving-code-review.sh"
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/consolidate/resources/block-summary-fabricated-claims.sh"
           },
           {
