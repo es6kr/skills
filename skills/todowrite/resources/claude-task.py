@@ -80,7 +80,17 @@ def resolve_task_dir(
             dirs = [d for d in target_base.iterdir() if d.is_dir() and not d.name.startswith(".")]
             if dirs:
                 dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
-                return dirs[0]
+                chosen = dirs[0]
+                other_count = len(dirs) - 1
+                print(
+                    f"Warning: no --session/--dir/CLAUDE_SESSION_ID/CLAUDE_TASK_DIR given — "
+                    f"guessing the most recently modified task directory: {chosen}"
+                    + (f" ({other_count} other candidate(s) ignored, e.g. {dirs[1].name!r})" if other_count else "")
+                    + ". In a multi-session environment this may pick a DIFFERENT session's "
+                    "directory. Pass --session explicitly to avoid cross-session contamination.",
+                    file=sys.stderr,
+                )
+                return chosen
 
     # 5. Default fallback
     fallback = search_bases[0] / "default"
