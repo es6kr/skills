@@ -2,9 +2,11 @@
 
 Discipline rules for invoking skills correctly: slash command → Skill tool, multi-topic topic Read, post-decision auto-invoke, interactive script execution, and vendor dispatch.
 
-## 1. Slash command inject ≠ Skill tool call (HARD STOP)
+## 1. Any route to a skill's procedure — inject, or a self-identified need — requires a Skill tool call (HARD STOP)
 
 System auto-injecting SKILL.md content on `<command-name>/<slug></command-name>` input ≠ Skill tool call completion. Inject = text exposure in context only. The procedure execution obligation starts only with a `Skill` tool call.
+
+The same separation holds when a skill's procedure is needed for a reason other than slash-command receipt — most commonly, recognizing mid-task that some skill's documented steps apply to the current goal. Reading that skill's topic `.md` (via `Read`/`Grep`) to learn "how to do X" is not a substitute for calling `Skill(name, topic)` first, for the same reason inject isn't: having the text in context is not the same act as declaring procedure-entry intent through the tool call.
 
 ### Don't / Do
 
@@ -14,15 +16,15 @@ System auto-injecting SKILL.md content on `<command-name>/<slug></command-name>`
 | 2 | Assume "inject = equivalent to tool call" | Inject = system shows SKILL.md. Tool call = author's explicit act declaring procedure entry intent. No tool call trace = cause for `fix` in next turn |
 | 3 | Avoid tool call thinking "calling Skill again would duplicate SKILL.md exposure, inefficient" | Duplicate exposure is system design — not the author's responsibility domain. Tool call is the forcing function for procedure start |
 | 4 | See inject text and perform Edit/Bash etc. procedure inline directly | Inline before tool call = rule violation. Skill call → return → start from Step 1 is the correct path |
+| 5 | Recognize mid-task (no slash command involved) that a skill's documented procedure applies, then `Read`/`Grep` its topic `.md` directly to learn the steps and act on them | Call `Skill("<name>", "<topic>")` the moment that need is recognized, in the same turn — regardless of whether a slash command triggered the need |
 
-### Self-check (immediately after slash command input)
+### Self-check (immediately after slash command input, or immediately after recognizing a skill's procedure is needed)
 
 1. Does the user's previous input contain `/<slug>` or `<command-name>/<slug></command-name>` pattern? → If match, this rule applies
-2. Does the same response turn include a `Skill("<slug>", ...)` tool call? → If no, call immediately (inline procedure forbidden)
-3. Even if system injected SKILL.md content, tool call is a separate obligation — inject body is for reference only
-4. After tool call returns SKILL.md, re-read and start from Step 1
-
-Violation case reference: `failed-attempts.md` "slash command → Skill tool call missing"
+2. Did I just recognize, through my own task reasoning rather than a slash command, that some skill's documented procedure applies here? → If yes, this rule applies equally
+3. Does the same response turn include a `Skill("<slug>", ...)` tool call? → If no, call immediately (inline procedure, or Reading the topic file directly, is forbidden before that call)
+4. Even if system injected SKILL.md content, tool call is a separate obligation — inject body is for reference only
+5. After tool call returns SKILL.md, re-read and start from Step 1
 
 ## 2. Multi-topic skill — each topic `.md` Read before step execution (HARD STOP)
 
