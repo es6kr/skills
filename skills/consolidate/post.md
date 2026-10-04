@@ -302,12 +302,12 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 ```markdown
 ## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
 
-| # | Source | Severity | Finding | Status |
-|---|--------|----------|---------|--------|
-| 1 | `copilot` | 🟡 Minor | 🛠️ Missing error handling — handled in existing middleware | ⚪ Rejected |
-| 2 | `coderabbitai` | 🟠 Important | ⚠️ N+1 query vulnerability — verified via grep | 🟢 Fixed (commit abc123) |
-| 3 | Internal Code Review | 🟡 Minor | 📝 Unused import | 🟡 Minor |
-| 4 | @reviewer-login | 🟠 Important | 🛠️ DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
+| # | Source / Classification | Location | Finding | Status |
+|---|-------------------------|----------|---------|--------|
+| 1 | `copilot`<br>🛠️ Refactor<br>🟡 Minor | `src/middleware.ts:12` | Missing error handling — handled in existing middleware | ⚪ Rejected |
+| 2 | `coderabbitai`<br>⚠️ Potential issue<br>🟠 Important | `src/query.ts:45` | N+1 query vulnerability — verified via grep | 🟢 Fixed (commit abc123) |
+| 3 | Internal Code Review<br>📝 Nitpick<br>🟡 Minor | `src/index.ts:3` | Unused import | 🟡 Minor |
+| 4 | @reviewer-login<br>🛠️ Refactor<br>🟠 Important | `src/api.ts:88` | DB findUnique lacks try/catch — diverges from sibling route | 🔴 Pending |
 
 [✅ All AI reviews passed. Ready to merge.
 
@@ -389,9 +389,15 @@ If all conditions met, evaluate the PR's commit history (`gh pr view NUMBER --co
 
 Only include reviewers that actually posted reviews on this PR, and only include non-trivial findings (skip 'No actionable comments' rows if there are other findings, or state 'No actionable findings' in the table if all reviewers are clean).
 
-### Source attribution column is MANDATORY (HARD STOP)
+### Source attribution and classification column is MANDATORY (HARD STOP)
 
-**The findings table MUST include a `Source` (or `Reviewer`) column attributing every row to the exact reviewer login it came from** — coderabbitai, copilot, @human-login (e.g., @reviewer-login), Internal Code Review, etc. Composing a findings table with only `# | Severity | Type | Location | Summary` columns strips the audit trail and conflates findings from multiple reviewers into an anonymous pool.
+**The findings table MUST include a `Source / Classification` (or `Source`) column attributing every row to the exact reviewer login it came from, combined with its orthogonal Type and Severity**. To conserve horizontal table width and leave ample room for `Location` and `Finding` descriptions without triggering horizontal scrollbars, `Source`, `Type`, and `Severity` are unified into a single 3-line cell formatted with `<br>`:
+```
+<source><br><type><br><severity>
+```
+Example: `copilot<br>⚠️ Potential issue<br>🟠 Important` or `Internal Code Review<br>🛠️ Refactor<br>🟡 Minor`.
+
+Composing a findings table with separate horizontal columns (`# | Source | Type | Severity | Location | Finding | Status`) unnecessarily stretches the table across 7 columns. Conversely, omitting the source strips the audit trail. The unified 3-line column preserves the full audit trail and dual-label classifications in a compact 5-column layout (`# | Source / Classification | Location | Finding | Status`).
 
 **Source cell formatting**: write @mentions, SHAs, and URLs **bare** — never wrap them in backticks. GitHub renders bare `@username` as an autolinked mention (notification fires), and a backticked `` `@username` `` becomes inline code with no autolink. The same applies to commit SHAs and **real** PR/issue references in any Summary field, not just the Source column. This rule lives in the global rules file `git.md` under the autolink HARD STOP section; consolidate-posted bodies must comply.
 
@@ -399,7 +405,7 @@ Only include reviewers that actually posted reviews on this PR, and only include
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Findings table columns: `# | Severity | Type | Location | Summary` (no source) | Add a `Source` column: `# | Source | Severity | Type | Location | Summary`. Every row's `Source` cell names the exact reviewer login (or `Internal Code Review`) the finding originated from |
+| 1 | Spreading `Source`, `Type`, `Severity` across 3 separate wide columns (`# | Source | Type | Severity | ...`) or omitting source | Consolidate into a single 3-line cell under `Source / Classification`: `<source><br><type><br><severity>` to keep the table compact at 5 columns |
 | 2 | Collapse multiple distinct human MEMBER reviewers into a single "Internal Code Review" entry | Each human reviewer login is a separate `Source` value. Internal Code Review is the subagent-generated review only; human collaborator reviews carry the reviewer's GitHub login |
 | 3 | Omit the header reviewer matrix line when one of the sources is a non-bot MEMBER review | The opening `> Reviewer matrix:` line enumerates every source enumerated in `collect.md` Step 3 — bots + human MEMBER/OWNER reviews. Missing any source there = missing it in the table too |
 | 4 | Merge two findings from different sources into one row "to deduplicate" | Keep one row per (source × finding). If two reviewers raised the same finding, write two rows with the same `Location` + `Summary` but distinct `Source`. Deduplication belongs in the chat narrative, not in the table |
