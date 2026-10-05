@@ -141,6 +141,64 @@ check("annotated fresh section is not demoted",
       rows3["Two (2026-08-31, 1회차)"]["cold"] is False)
 os.unlink(tmp3)
 
+# 7. Multiple consecutive `fa:` headers with no heading between them are
+# orphaned metadata. They cannot be safely attributed to either adjacent
+# section, so classification must not apply any of them.
+orphaned = (
+    "## Previous (2026-01-01, 1회차)\n\nbody previous\n\n"
+    "<!-- fa: class=wrong-one count=2 last=2026-08-27 status=watch -->\n\n"
+    "<!-- fa: class=wrong-two count=3 last=2026-08-30 status=watch -->\n\n"
+    "## Target (2026-09-01, 1회차)\n\nbody target\n"
+)
+secs4 = fa.split_sections(orphaned)
+check("orphaned metadata: both sections retain no ambiguous header",
+      [(fa.parse_section_meta(x) or {}).get("class") for x in secs4] == [None, None])
+
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(orphaned)
+    tmp4 = f.name
+rows4 = {r["title"]: r for r in fa.analyze(tmp4, cutoff="2026-09-01", relaxed=True)}
+check("orphaned metadata: target does not inherit stale header",
+      rows4["Target (2026-09-01, 1회차)"].get("via_meta") is False)
+os.unlink(tmp4)
+
+# 8. A valid current-section header followed by prose must remain attached to
+# that section even when the next section has its normal pre-heading header.
+# Only a contiguous trailing comment block is eligible as the next header.
+separated_headers = (
+    "## Current (2026-01-01, 4회차)\n"
+    "<!-- fa: class=current count=4 last=2026-09-10 status=watch -->\n"
+    "current recurrence has prose after its own header.\n\n"
+    "<!-- fa: class=next count=1 last=2026-01-01 status=watch -->\n\n"
+    "## Next (2026-01-01, 1회차)\nbody next\n"
+)
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(separated_headers)
+    tmp5 = f.name
+rows5 = {r["title"]: r for r in fa.analyze(tmp5, cutoff="2026-09-01", relaxed=True)}
+check("prose-separated current header remains attached",
+      rows5["Current (2026-01-01, 4회차)"].get("via_meta") is True)
+check("prose-separated current recurrence is not cold",
+      rows5["Current (2026-01-01, 4회차)"]["cold"] is False)
+os.unlink(tmp5)
+
+# 9. Every ISO date in a title/body is relevant. A later recurrence separated by
+# punctuation must keep the section hot; matching only `(`-prefixed dates can
+# turn a recent recurrence into an unsafe archive candidate.
+later_title_date = (
+    "## Recurrence (2026-08-31, 2회차 / 2026-09-26, Gemini)\n"
+    "body with no machine-readable meta\n"
+)
+with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+    f.write(later_title_date)
+    tmp6 = f.name
+rows6 = fa.analyze(tmp6, cutoff="2026-09-01", relaxed=True)
+check("later title recurrence date is selected as latest",
+      rows6[0]["latest"] == "2026-09-26")
+check("later title recurrence date prevents cold classification",
+      rows6[0]["cold"] is False)
+os.unlink(tmp6)
+
 if failures:
     print(f"\n{len(failures)} FAILED")
     sys.exit(1)

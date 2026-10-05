@@ -81,8 +81,14 @@ if [[ -f "go.mod" ]]; then
   HAS_GO=1
 fi
 
+HAS_HOOKS_JSON=0
+if grep -qE '(^|/)hooks/hooks\.json$' <<< "$TRACKED_FILES"; then
+  HAS_HOOKS_JSON=1
+fi
+
+CORP_ORG_PATTERN="${GIT_REPO_CORP_PATTERN:-internal-org}"
 IS_CORP=0
-if [[ "$REMOTE_URL" =~ daegunsoftDev ]] || [[ "$REPO_ROOT" =~ daegunsoftDev ]]; then
+if [[ -n "${GIT_REPO_CORP_PATTERN:-}" ]] && { [[ "$REMOTE_URL" =~ ${GIT_REPO_CORP_PATTERN:-} ]] || [[ "$REPO_ROOT" =~ ${GIT_REPO_CORP_PATTERN:-} ]]; }; then
   IS_CORP=1
 fi
 
@@ -121,6 +127,18 @@ if [[ -f "$ACTIVE_HOOKS_DIR/pre-push" ]]; then
 fi
 if [[ -f "$ACTIVE_HOOKS_DIR/commit-msg" ]]; then
   COMMIT_MSG_CONTENT="$(cat "$ACTIVE_HOOKS_DIR/commit-msg" 2>/dev/null || true)"
+fi
+
+PRE_COMMIT_CONFIG_CONTENT=""
+if [[ -f ".pre-commit-config.yaml" ]]; then
+  PRE_COMMIT_CONFIG_CONTENT="$(cat ".pre-commit-config.yaml" 2>/dev/null || true)"
+elif [[ -f ".pre-commit-config.yml" ]]; then
+  PRE_COMMIT_CONFIG_CONTENT="$(cat ".pre-commit-config.yml" 2>/dev/null || true)"
+fi
+
+CI_WORKFLOW_CONTENT=""
+if [[ -d ".github/workflows" ]]; then
+  CI_WORKFLOW_CONTENT="$(cat .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null || true)"
 fi
 
 # Also check .githooks if configured
@@ -255,10 +273,6 @@ if [[ $HAS_MD -eq 1 ]]; then
   elif [[ $HAS_MD_STYLE_TOOL -eq 0 ]]; then
     add_result "COND-MD-STYLE" "Conditional" "Markdown Style Lint" "WARN" "Checked ${LINT_MANIFEST_SOURCES}but found no markdown style/whitespace lint tool (markdownlint/remark-lint/mdl/prettier --check *.md). check-hangul/lint-frontmatter (if present) do not catch trailing whitespace or markdown style issues."
   else
-    CI_WORKFLOW_CONTENT=""
-    if [[ -d ".github/workflows" ]]; then
-      CI_WORKFLOW_CONTENT="$(cat .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null || true)"
-    fi
     if echo "$CLEAN_HOOKS_CONTENT $CI_WORKFLOW_CONTENT" | grep -qiE "${MD_STYLE_TOOL_PATTERN}|make lint|npm run lint|pnpm( run)? lint"; then
       add_result "COND-MD-STYLE" "Conditional" "Markdown Style Lint" "PASS" "Markdown style/whitespace lint tool declared (${LINT_MANIFEST_SOURCES}) and wired into pre-commit, pre-push, or CI."
     else
@@ -273,6 +287,29 @@ if [[ $HAS_SKILLS -eq 1 ]]; then
     add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "PASS" "Skill files present and verified by metadata/frontmatter lint hook."
   else
     add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "FAIL" "Repository contains skills (skills/*/SKILL.md) but lacks a frontmatter/semver lint hook."
+  fi
+fi
+
+# COND-HOOK-REG: Hook registration integrity guard
+if [[ $HAS_HOOKS_JSON -eq 1 ]]; then
+  HOOK_REG_PATTERN='(verify-hooks-json|hook registration|hooks-json)'
+  HOOK_REG_PRECOMMIT=0
+  HOOK_REG_CI=0
+  if echo "$PRE_COMMIT_CONFIG_CONTENT $PRE_COMMIT_CONTENT $PRE_PUSH_CONTENT" | grep -qiE "$HOOK_REG_PATTERN"; then
+    HOOK_REG_PRECOMMIT=1
+  fi
+  if echo "$CI_WORKFLOW_CONTENT" | grep -qiE "$HOOK_REG_PATTERN"; then
+    HOOK_REG_CI=1
+  fi
+
+  if [[ $HOOK_REG_PRECOMMIT -eq 1 && $HOOK_REG_CI -eq 1 ]]; then
+    add_result "COND-HOOK-REG" "Conditional" "Hook Registration" "PASS" "hooks.json present and hook registration integrity is wired into pre-commit and CI."
+  elif [[ $HOOK_REG_PRECOMMIT -eq 0 && $HOOK_REG_CI -eq 0 ]]; then
+    add_result "COND-HOOK-REG" "Conditional" "Hook Registration" "FAIL" "hooks.json present but no hook registration integrity guard is wired into pre-commit or CI."
+  elif [[ $HOOK_REG_PRECOMMIT -eq 0 ]]; then
+    add_result "COND-HOOK-REG" "Conditional" "Hook Registration" "FAIL" "hooks.json present but hook registration integrity is not wired into pre-commit."
+  else
+    add_result "COND-HOOK-REG" "Conditional" "Hook Registration" "FAIL" "hooks.json present but hook registration integrity is not wired into CI."
   fi
 fi
 
@@ -308,7 +345,7 @@ fi
 
 # COND-CORP: Corporate repository main push block
 if [[ $IS_CORP -eq 1 ]]; then
-  if echo "$PRE_PUSH_CONTENT" | grep -qE '(daegunsoftDev|main|master)'; then
+  if echo "$PRE_PUSH_CONTENT" | grep -qE '(main|master)'; then
     add_result "COND-CORP" "Conditional" "Corp Main Push Block" "PASS" "Corporate repository contains direct main/master push protection."
   fi
 fi

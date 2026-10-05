@@ -111,6 +111,61 @@ cp ~/.claude/plugins/marketplaces/<marketplace>/plugins/<name>/.mcp.json \
    ~/.claude/plugins/cache/<marketplace>/<name>/<version>/
 ```
 
+### Update succeeds but leaves orphaned `temp_git_*` directories (WSL and other slower-I/O hosts)
+
+**Symptom**: `claude plugin marketplace update` or `claude plugin update <plugin>` reports success
+(the new version downloads/clones fine), but a `temp_git_*` directory is left sitting at the top
+level of `~/.claude/plugins/cache/` (a sibling of the normal `<marketplace>` directories, not
+nested inside one) instead of being swapped into place as `<marketplace>`.
+
+**Diagnosis**:
+
+```bash
+find ~/.claude/plugins/cache -maxdepth 1 -iname "temp_git_*"
+```
+
+Any hits mean a previous update's clone-then-swap step did not complete — the new version was
+staged into a `temp_git_*` scratch directory, but deleting the old cache directory to make room
+for it failed partway through.
+
+**Root cause**: the swap itself happens inside the closed-source `claude` CLI binary, so it cannot
+be diagnosed or patched from a plugin. It has been reported more often on WSL2 than on native
+Linux/macOS; plausible contributors include WSL2's ext4-on-VHDX I/O being slower/burstier than a
+native filesystem, and multiple concurrent Claude Code sessions holding the same plugin's files
+open while an update tries to replace them. **Ruled out**: a cross-filesystem (`EXDEV`) rename
+between a `/tmp` staging area and `~/.claude/plugins/cache` — on a single-mount WSL install both
+paths resolve to the same `ext4` device (`df -T /tmp ~/.claude/plugins/cache`), so there is no
+filesystem boundary to blame there. Treat this as an upstream timing issue to work around, not a
+cc-plugin bug to fix at the source.
+
+**Fix / mitigation**:
+
+1. The `cc-plugin` plugin's own `SessionStart` hook (`resources/cache-cleanup.sh`) already deletes
+   stale `temp_git_*` directories (and superseded version directories) on every session start —
+   this clears the debris but does not fix the swap itself.
+2. If you notice the symptom mid-session, re-run the update (`claude plugin marketplace update` /
+   `claude plugin update <plugin>`) after the next session start — the retry usually succeeds once
+   the stale directory is out of the way.
+3. If it recurs on the same plugin repeatedly, close other Claude Code sessions/windows before
+   updating (a session holding the plugin loaded is one plausible contributor), and run
+   `claude doctor` to rule out an unrelated installation issue.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Treat the SessionStart sweep's silence as proof the problem is gone for good | The sweep hides the *debris*, not the *cause*. If `temp_git_*` keeps reappearing across sessions, that recurrence is worth reporting, not routine noise — `cache-cleanup.sh` prints a warning line with a count when it finds one, specifically so this doesn't go unnoticed |
+| 2 | Assume the swap failure is an `EXDEV` cross-filesystem rename issue by default | Check first: `df -T` the staging path and the cache path. On a single-mount WSL install (one `ext4` root) there is no filesystem boundary to blame |
+| 3 | Try to find the exact bug by disassembling the compiled `claude` binary | It is a closed, compiled (bun/Node SEA) binary — not practical to patch or reliably reverse-engineer from a plugin. Treat it as a black box; work around it from the plugin side only |
+
+#### Violation case (2026-10-03)
+
+User reported "cache download succeeds, but deleting the existing cache fails, leaving only the
+temp folder" on WSL. No `temp_git_*` directories were present at diagnosis time (the SessionStart
+cleanup had already swept them), `claude plugin marketplace update` / `claude plugin update` both
+ran clean when retried, and `claude doctor` reported no issues — the live environment could not
+reproduce the failure on demand. This section exists so the next occurrence has a ready diagnosis
+command and explanation instead of restarting investigation from zero, and so the cleanup hook's
+silent success is never mistaken for "this never happens."
+
 ### Symlink-Based Dual-Environment Setup — `known_marketplaces.json` Corruption
 
 **Symptom**:
@@ -290,4 +345,6 @@ errors, forcing routing to `troubleshoot.md`.
 - Cache loads at **session start** — changes need restart
 - Missing files in cache → copy from marketplace
 - `dist/hud/index.js` required for HUD plugins
-- `temp_git_*` directories in cache are safe to delete
+- `temp_git_*` directories in cache are safe to delete — recurring appearance is a signal of a
+  failed update swap, not routine noise (see "Update succeeds but leaves orphaned `temp_git_*`
+  directories" above)

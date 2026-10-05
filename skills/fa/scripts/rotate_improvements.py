@@ -247,8 +247,15 @@ def _atomic_write(path: str, text: str) -> None:
             except OSError:
                 pass
     except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
         if os.path.exists(tmp):
-            os.unlink(tmp)
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
         raise
 
 def main():

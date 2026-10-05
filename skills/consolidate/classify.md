@@ -151,6 +151,7 @@ Classify using **CodeRabbit-style dual-label** (category + severity combination)
 | ⚪ Rejected | Technically inappropriate | Reject with reasoning |
 
 **Notation format**: `Type | Severity` — e.g., `⚠️ Potential issue | 🔴 Critical`, `🛠️ Refactor | 🟠 Important`, `📝 Nitpick | 🟡 Minor`
+In the AI Review Summary findings table, `Source`, `Type`, and `Severity` are unified into a single 3-line cell under `Source / Classification` (`<source><br><type><br><severity>`) to preserve horizontal column width for `Location` and `Finding`.
 
 **Orthogonal matrix example** (one finding has one value on each axis):
 

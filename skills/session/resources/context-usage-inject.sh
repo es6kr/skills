@@ -81,16 +81,38 @@ try:
                     marker_since_usage = False
 
     if is_antigravity:
+        full_path = path.replace("transcript.jsonl", "transcript_full.jsonl")
+        target_path = full_path if os.path.isfile(full_path) else path
+
+        if target_path != path:
+            agy_active_steps = []
+            with open(target_path, encoding="utf-8", errors="replace") as f_full:
+                for line in f_full:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except Exception:
+                        continue
+                    src = entry.get("source", "")
+                    content = entry.get("content", "") or ""
+                    if (src == "SYSTEM" and (entry.get("type") == "CHECKPOINT" or "# Resuming from a compaction" in content)) or \
+                       (src in ("SYSTEM", "USER_EXPLICIT", "USER") and "<CONTEXT_SUMMARY>" in content):
+                        agy_active_steps = [entry]
+                    else:
+                        agy_active_steps.append(entry)
+
         content_chars = 0
         for s in agy_active_steps:
             content_chars += len(s.get("content", "") or "")
+            content_chars += len(s.get("thinking", "") or "")
             tool_calls = s.get("tool_calls")
             if tool_calls:
                 content_chars += len(json.dumps(tool_calls, ensure_ascii=False))
 
         # Default Antigravity baseline overhead (System prompt, tool schemas, skills): ~53k tokens
         base_overhead = int(os.environ.get("ANTIGRAVITY_BASE_TOKENS", os.environ.get("CC_BASE_TOKENS", "53000")))
-        # Code, tool arguments, and structured logs have higher token density in Gemini BPE (~2.5 chars/token)
+        # Gemini BPE token density for multimodal/code/logs is ~2.5 chars/token
         chars_per_token = float(os.environ.get("ANTIGRAVITY_CHARS_PER_TOKEN", "2.5"))
         content_tokens = round(content_chars / chars_per_token)
         total_tokens = base_overhead + content_tokens
@@ -102,7 +124,7 @@ try:
 
         print(f"Context usage: ~{used_k}k / {win_k}k tokens ({pct}%)")
         
-        cleanup_pct = float(os.environ.get("CC_CLEANUP_RECOMMEND_PCT", "40.0"))
+        cleanup_pct = float(os.environ.get("CC_CLEANUP_RECOMMEND_PCT", "50.0"))
         if pct >= cleanup_pct:
             print(f"[CLEANUP-GATE] Context usage is at/above threshold ({pct}% >= {cleanup_pct}%). Recommend /cleanup.")
         sys.exit(0)

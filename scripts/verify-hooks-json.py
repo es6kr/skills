@@ -2,7 +2,7 @@
 """
 Verify hook registrations in every hooks.json in this repository.
 
-Two independent failure classes are checked:
+Three independent failure classes are checked:
 
 1. Duplicate registration — the same (event, matcher, script-basename) registered
    more than once. The hook then fires twice on every trigger.
@@ -12,6 +12,10 @@ Two independent failure classes are checked:
    "hook ran and raised no objection": the guard silently enforces nothing while
    still appearing in the registration list. This is how relocating a script
    without updating its registration disables a guard with no visible signal.
+
+3. Non-executable registration — a command references a script tracked as mode
+   644 instead of executable mode 755. Interpreter-prefixed commands can mask
+   that until a registration later calls the script directly.
 
 Ported from es6kr/claude-plugins (PR #23, merged) — that repo hit this exact
 gap: a hook-relocation commit moved a script into another skill's resources/
@@ -26,6 +30,7 @@ convention both repos use).
 
 import json
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -115,11 +120,20 @@ def check_hooks_file(filepath: Path) -> tuple:
             continue
         for rel in rel_paths:
             checked_paths += 1
-            if not (root / rel).is_file():
+            resolved = root / rel
+            if not resolved.is_file():
                 errors.append(
                     f"Ghost hook registration in {filepath}: event='{event}', "
                     f"matcher='{matcher}' points at a missing script "
-                    f"'{rel}' (resolved: {root / rel})"
+                    f"'{rel}' (resolved: {resolved})"
+                )
+                continue
+            if not (resolved.stat().st_mode & stat.S_IXUSR):
+                mode = stat.S_IMODE(resolved.stat().st_mode)
+                errors.append(
+                    f"Non-executable hook registration in {filepath}: event='{event}', "
+                    f"matcher='{matcher}' points at '{rel}' with mode {mode:o}; "
+                    "expected executable mode 755"
                 )
 
     return errors, checked_paths, skipped_commands
@@ -161,7 +175,7 @@ def main():
             print(f"  - {err}")
         sys.exit(1)
 
-    print("✅ No duplicate or ghost hook registrations found in hooks.json files.")
+    print("✅ No duplicate, ghost, or non-executable hook registrations found in hooks.json files.")
 
 
 if __name__ == "__main__":

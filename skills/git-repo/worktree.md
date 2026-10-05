@@ -138,12 +138,25 @@ If the branch does not exist yet:
 git worktree add -b <new-branch> .worktrees/<new-branch> <start-point>
 ```
 
+**Upstream-tracking gotcha when `<start-point>` is a remote-tracking ref (HARD STOP — verify before first push)**: when `<start-point>` is `origin/<branch>` (e.g. `origin/develop`), `git worktree add -b` sets the **new** branch's upstream to that same `origin/<branch>` ref, not to a future same-named remote branch. A bare `git push` on the new branch would then target the shared branch directly instead of creating/updating a feature branch with a matching name.
+
+```bash
+git branch -vv   # new branch shows `[origin/develop]`, not `[origin/<new-branch>]` or no upstream
+```
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Run a bare `git push` on a worktree branch created from `origin/<branch>` without checking upstream first | `git branch --unset-upstream` right after `worktree add`, then always push with an explicit refspec (`git push -u origin <new-branch>`) |
+| 2 | Assume `git worktree add -b <branch> <start-point>` behaves like `git checkout -b` (no upstream set) | It does set upstream whenever `<start-point>` is itself a remote-tracking ref — `git branch -vv` is the fast way to confirm |
+| 3 | Discover this only after a push error or (worse) a successful push to the shared branch | Make `branch --unset-upstream` (or an explicit-refspec push) a standing habit any time `<start-point>` is `origin/<branch>` |
+
 Post-create verification:
 
 ```bash
 git worktree list
 cd .worktrees/<branch-name>
 git branch --show-current
+git branch -vv   # confirm upstream is correct (unset, or the intended same-named remote branch) before the first push
 ```
 
 #### 4B-1. Default `.gitignore` Baseline Gate (HARD STOP)
