@@ -463,6 +463,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/idle-wait-reactive-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-enforce-markers-next-turn.py"
           }
         ]
       }
