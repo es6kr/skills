@@ -445,6 +445,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-rename-schema-when-wrapup-adjacent.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-enforce-markers.py"
           }
         ]
       }
