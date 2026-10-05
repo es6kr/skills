@@ -58,6 +58,28 @@ def test_conventional_plugins_subdir_layout_is_discovered(tmp_path):
     assert any("s2" in p for p in paths)
 
 
+def test_dict_source_externally_fetched_plugin_is_skipped_not_crashed(tmp_path):
+    """Regression: claude-plugins-official lists many plugins with a dict
+    `source` (git-subdir/url fetch spec) instead of a path string -- those
+    plugins' files live in the plugin cache, not under this marketplace
+    checkout, and are out of scope for local discovery. Must be skipped,
+    never crash the whole discovery call."""
+    root = str(tmp_path)
+    _write_marketplace_json(
+        root,
+        "mkt-git",
+        [
+            {
+                "name": "p-git",
+                "source": {"source": "git-subdir", "url": "https://example.com/x.git", "path": "p"},
+            }
+        ],
+    )
+
+    paths = discover_skill_md_paths({"p-git@mkt-git": True}, root)
+    assert paths == []
+
+
 def test_missing_marketplace_json_falls_back_to_plugins_subdir(tmp_path):
     root = str(tmp_path)
     # No .claude-plugin/marketplace.json at all.

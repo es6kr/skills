@@ -32,12 +32,20 @@ def extract_current_turn_text(transcript_path: str) -> str:
 
     start = 0
     for i in range(len(records) - 1, -1, -1):
+        # A sidechain (subagent) record must not count as a main-turn
+        # boundary or be attributed to the main turn's text -- its prose
+        # could mention a trigger phrase, and its Skill(...) calls must
+        # not satisfy a main-turn requirement (final-review Important I6).
+        if records[i].get("isSidechain"):
+            continue
         if _is_real_user(records[i]):
             start = i + 1
             break
 
     out = []
     for record in records[start:]:
+        if record.get("isSidechain"):
+            continue
         if record.get("type") != "assistant":
             continue
         content = record.get("message", {}).get("content", [])

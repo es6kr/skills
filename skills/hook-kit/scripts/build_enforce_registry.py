@@ -36,6 +36,13 @@ def _plugin_root(marketplaces_root: str, marketplace: str, plugin: str) -> str:
         for entry in mp_data.get("plugins", []):
             if entry.get("name") == plugin:
                 source = entry.get("source", "./")
+                if not isinstance(source, str):
+                    # Externally-fetched plugin (git-subdir/url fetch spec,
+                    # e.g. claude-plugins-official) -- its files live under
+                    # the plugin cache, not this marketplace checkout.
+                    # Resolving the cache path is out of scope here; treat
+                    # as locally unresolvable rather than crashing.
+                    return None
                 return os.path.normpath(os.path.join(marketplaces_root, marketplace, source))
     except (OSError, json.JSONDecodeError):
         pass
@@ -53,19 +60,32 @@ def discover_skill_md_paths(enabled_plugins: dict, marketplaces_root: str) -> li
         if not marketplace:
             continue
         root = _plugin_root(marketplaces_root, marketplace, plugin)
+        if root is None:
+            continue
         pattern = os.path.join(root, "skills", "**", "*.md")
         paths.extend(glob.glob(pattern, recursive=True))
     return paths
 
 
-def build_registry(skill_md_paths: list, cache_path: str) -> list:
-    cache = {"files": {}, "markers": {}}
-    if os.path.exists(cache_path):
+def _load_cache(cache_path: str) -> dict:
+    if not os.path.exists(cache_path):
+        return {"files": {}, "markers": {}}
+    try:
         with open(cache_path, "r", encoding="utf-8") as f:
-            try:
-                cache = json.load(f)
-            except json.JSONDecodeError:
-                cache = {"files": {}, "markers": {}}
+            cache = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {"files": {}, "markers": {}}
+    # Shape validation: a cache that is valid JSON but the wrong shape
+    # (e.g. {} or missing a key) must not propagate a KeyError on first
+    # access -- that would permanently fail-open every session from this
+    # point on, since the corrupt file is never rewritten.
+    if not isinstance(cache, dict) or "files" not in cache or "markers" not in cache:
+        return {"files": {}, "markers": {}}
+    return cache
+
+
+def build_registry(skill_md_paths: list, cache_path: str) -> list:
+    cache = _load_cache(cache_path)
 
     registry = []
     for path in skill_md_paths:
@@ -75,8 +95,16 @@ def build_registry(skill_md_paths: list, cache_path: str) -> list:
             continue
         mtime = os.path.getmtime(path)
         if cache["files"].get(path) != mtime:
-            cache["files"][path] = mtime
-            cache["markers"][path] = parse_markers(path)
+            try:
+                cache["files"][path] = mtime
+                cache["markers"][path] = parse_markers(path)
+            except OSError:
+                # One unreadable file (permissions, encoding, race with a
+                # concurrent delete) must not take down the whole registry
+                # -- skip just this file, keep whatever was cached before.
+                cache["files"].pop(path, None)
+                cache["markers"].pop(path, None)
+                continue
         registry.extend(cache["markers"].get(path, []))
 
     with open(cache_path, "w", encoding="utf-8") as f:

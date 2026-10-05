@@ -22,18 +22,35 @@ def _load(name):
     return module
 
 
-CACHE_PATH = os.path.expanduser("~/.claude/.cache/enforce-markers-registry.json")
-SETTINGS_PATH = os.path.expanduser("~/.claude/settings.json")
-MARKETPLACES_ROOT = os.path.expanduser("~/.claude/plugins/marketplaces")
+# Overridable via env var for tests -- production default is the real
+# installed locations.
+CACHE_PATH = os.environ.get(
+    "ENFORCE_MARKERS_CACHE_PATH", os.path.expanduser("~/.claude/.cache/enforce-markers-registry.json")
+)
+SETTINGS_PATH = os.environ.get(
+    "ENFORCE_MARKERS_SETTINGS_PATH", os.path.expanduser("~/.claude/settings.json")
+)
+MARKETPLACES_ROOT = os.environ.get(
+    "ENFORCE_MARKERS_MARKETPLACES_ROOT", os.path.expanduser("~/.claude/plugins/marketplaces")
+)
 
 
 def main() -> int:
+    if os.environ.get("RALPH_LOOP") == "1":
+        return 0
+
     try:
         build_enforce_registry = _load("build_enforce_registry")
         extract_current_turn_text = _load("extract_current_turn_text")
         match_enforce_triggers = _load("match_enforce_triggers")
 
         hook_input = json.load(sys.stdin)
+        # UserPromptSubmit does not resume/retry the way Stop does, but the
+        # guard is cheap and keeps this entrypoint consistent with its
+        # Stop-hook sibling (same family convention).
+        if hook_input.get("stop_hook_active"):
+            return 0
+
         transcript_path = hook_input.get("transcript_path", "")
         if not transcript_path or not os.path.exists(transcript_path):
             return 0
@@ -60,7 +77,10 @@ def main() -> int:
 
         return 0
     except Exception as exc:  # fail open
-        print(f"[hook:check-enforce-markers-next-turn] internal error, failing open: {exc}")
+        # stderr, not stdout: UserPromptSubmit's stdout is injected as
+        # context on every turn, so a persistent internal error would
+        # otherwise pollute every future prompt with this message.
+        print(f"[hook:check-enforce-markers-next-turn] internal error, failing open: {exc}", file=sys.stderr)
         return 0
 
 
