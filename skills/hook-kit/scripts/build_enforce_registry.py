@@ -16,6 +16,34 @@ _spec.loader.exec_module(_parse_enforce_markers)
 parse_markers = _parse_enforce_markers.parse_markers
 
 
+def _plugin_root(marketplaces_root: str, marketplace: str, plugin: str) -> str:
+    """Resolve a plugin's root directory from its marketplace.json `source`.
+
+    A marketplace's .claude-plugin/marketplace.json declares each plugin's
+    `source` relative to the marketplace root. Two layouts exist in the
+    wild: `source: "./"` (single-plugin marketplace -- the plugin root IS
+    the marketplace root, e.g. es6kr-skills) and `source: "./plugins/<name>"`
+    (multi-plugin marketplace -- each plugin has its own subdirectory).
+    Reading marketplace.json is the only way to tell which one applies;
+    assuming the plugins/<name> layout unconditionally silently discovers
+    zero files for every source="./" marketplace (the bug this function
+    fixes -- see tests/test_build_enforce_registry_discovery_layouts.py).
+    """
+    mp_json_path = os.path.join(marketplaces_root, marketplace, ".claude-plugin", "marketplace.json")
+    try:
+        with open(mp_json_path, "r", encoding="utf-8") as f:
+            mp_data = json.load(f)
+        for entry in mp_data.get("plugins", []):
+            if entry.get("name") == plugin:
+                source = entry.get("source", "./")
+                return os.path.normpath(os.path.join(marketplaces_root, marketplace, source))
+    except (OSError, json.JSONDecodeError):
+        pass
+    # Fallback: conventional plugins/<plugin> layout, for marketplaces whose
+    # marketplace.json is missing/unreadable or lacks this plugin entry.
+    return os.path.join(marketplaces_root, marketplace, "plugins", plugin)
+
+
 def discover_skill_md_paths(enabled_plugins: dict, marketplaces_root: str) -> list:
     paths = []
     for key, enabled in enabled_plugins.items():
@@ -24,9 +52,8 @@ def discover_skill_md_paths(enabled_plugins: dict, marketplaces_root: str) -> li
         plugin, _, marketplace = key.partition("@")
         if not marketplace:
             continue
-        pattern = os.path.join(
-            marketplaces_root, marketplace, "plugins", plugin, "skills", "**", "*.md"
-        )
+        root = _plugin_root(marketplaces_root, marketplace, plugin)
+        pattern = os.path.join(root, "skills", "**", "*.md")
         paths.extend(glob.glob(pattern, recursive=True))
     return paths
 

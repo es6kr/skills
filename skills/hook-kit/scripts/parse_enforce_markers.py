@@ -10,6 +10,18 @@ import re
 _MARKER_RE = re.compile(r"<!--\s*enforce:\s*(.*?)-->", re.DOTALL)
 _ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 _VALID_SCOPES = {"same-turn", "next-turn"}
+_FENCE_RE = re.compile(r"(^|\n)(```|~~~).*?\n.*?\1\2", re.DOTALL)
+
+
+def _strip_fenced_blocks(text: str) -> str:
+    """Remove fenced code blocks before marker scanning.
+
+    A skill's own documentation of the marker syntax (e.g.
+    skills/hook-kit/enforce-markers.md) necessarily shows the syntax inside
+    a fenced example -- without this, that documentation self-registers as
+    a live rule every session (final-review Important I4).
+    """
+    return _FENCE_RE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
 
 
 def _skill_name_from_path(file_path: str) -> str:
@@ -26,6 +38,7 @@ def parse_markers(file_path: str) -> list:
     parse_markers.last_errors = []
     with open(file_path, "r", encoding="utf-8") as f:
         text = f.read()
+    text = _strip_fenced_blocks(text)
 
     source_skill = _skill_name_from_path(file_path)
     results = []
