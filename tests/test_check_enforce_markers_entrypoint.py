@@ -99,10 +99,24 @@ def _ordinary_transcript(tmp_path):
 
 
 def _triggering_transcript(tmp_path):
+    """A violation transcript must also show the marker's owning skill
+    ('consolidate', per the fixture marker's source_skill -- derived from
+    its skills/consolidate/collect.md path) as invoked earlier in the
+    session, or the active-skills gate (final-review I7) suppresses it."""
     return _jsonl(
         tmp_path,
         [
             {"type": "user", "message": {"role": "user", "content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "consolidate"}}
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "continue"}},
             {
                 "type": "assistant",
                 "message": {
@@ -219,6 +233,32 @@ def test_stop_hook_passes_when_required_call_present(tmp_path):
                             "input": {"skill": "superpowers:receiving-code-review"},
                         },
                     ],
+                },
+            },
+        ],
+    )
+    result = _run(STOP_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    assert result.stdout.strip() == ""
+
+
+def test_stop_hook_no_violation_when_owning_skill_never_invoked(tmp_path):
+    """Regression for final-review Important I7: the trigger phrase alone
+    (without the marker's owning skill ever being invoked this session)
+    must not fire -- e.g. a turn that merely discusses/documents the
+    consolidate skill's Step 4 wording."""
+    env = _fixture_env(tmp_path, with_marker=True)
+    transcript = _ordinary_transcript(tmp_path)  # no Skill("consolidate") call anywhere
+    # Reuse the trigger phrase without any prior skill invocation.
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "moving on to Step 4 (classify) now"}],
                 },
             },
         ],

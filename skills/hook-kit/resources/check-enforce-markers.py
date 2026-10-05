@@ -67,7 +67,10 @@ def main() -> int:
         registry = build_enforce_registry.build_registry(paths, CACHE_PATH)
 
         turn_text = extract_current_turn_text.extract_current_turn_text(transcript_path)
-        violations = match_enforce_triggers.find_violations(turn_text, registry, "same-turn")
+        active_skills = extract_current_turn_text.extract_all_invoked_skills(transcript_path)
+        violations = match_enforce_triggers.find_violations(
+            turn_text, registry, "same-turn", active_skills=active_skills
+        )
 
         if violations:
             # Stop hook schema (skills/hook-kit/add.md Step 3): blocking is

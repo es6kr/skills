@@ -63,7 +63,10 @@ def main() -> int:
         registry = build_enforce_registry.build_registry(paths, CACHE_PATH)
 
         previous_turn_text = extract_current_turn_text.extract_current_turn_text(transcript_path)
-        violations = match_enforce_triggers.find_violations(previous_turn_text, registry, "next-turn")
+        active_skills = extract_current_turn_text.extract_all_invoked_skills(transcript_path)
+        violations = match_enforce_triggers.find_violations(
+            previous_turn_text, registry, "next-turn", active_skills=active_skills
+        )
 
         if violations:
             lines = [

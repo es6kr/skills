@@ -61,3 +61,37 @@ def extract_current_turn_text(transcript_path: str) -> str:
                 out.append(f'TOOL_CALL Skill("{skill_name}")')
 
     return "\n".join(out)
+
+
+def extract_all_invoked_skills(transcript_path: str) -> set:
+    """Return every skill name invoked via Skill(...) anywhere in the
+    main (non-sidechain) transcript this session.
+
+    Used to gate marker evaluation on whether the marker's owning skill
+    was ever actually invoked this session (final-review Important I7) --
+    without this, a marker fires on every turn regardless of whether its
+    skill is being run or merely discussed/documented/edited.
+    """
+    skills = set()
+    with open(transcript_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("isSidechain"):
+                continue
+            if record.get("type") != "assistant":
+                continue
+            content = record.get("message", {}).get("content", [])
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Skill":
+                    skill_name = block.get("input", {}).get("skill", "")
+                    if skill_name:
+                        skills.add(skill_name)
+    return skills

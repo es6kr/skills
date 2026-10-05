@@ -68,3 +68,29 @@ def test_scope_filter_excludes_other_scope_entries():
     turn_text = "before-dispatch: dispatching review subagent now"
     violations = find_violations(turn_text, [next_turn_marker], "same-turn")
     assert violations == []
+
+
+def test_active_skills_gate_suppresses_violation_when_owning_skill_never_invoked():
+    """Regression for final-review Important I7: a marker must not fire
+    when its owning skill was never invoked this session -- e.g. the
+    trigger phrase appears because the skill is being discussed/
+    documented/edited, not run."""
+    turn_text = "before-dispatch: dispatching review subagent now"
+    violations = find_violations(turn_text, [TRIGGER_MARKER], "same-turn", active_skills=set())
+    assert violations == []
+
+
+def test_active_skills_gate_allows_violation_when_owning_skill_was_invoked():
+    turn_text = "before-dispatch: dispatching review subagent now"
+    violations = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", active_skills={"consolidate"}
+    )
+    assert len(violations) == 1
+
+
+def test_active_skills_none_means_gate_is_not_applied():
+    """Backward compatibility: omitting active_skills (None) preserves the
+    original ungated behavior."""
+    turn_text = "before-dispatch: dispatching review subagent now"
+    violations = find_violations(turn_text, [TRIGGER_MARKER], "same-turn", active_skills=None)
+    assert len(violations) == 1
