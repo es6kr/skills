@@ -69,10 +69,11 @@ session_key=$(printf '%s' "$transcript_path" | shasum 2>/dev/null | cut -d" " -f
 # gone, and creating a new tab/worktree now always requires the auditable
 # opt-out below.
 
+env_prefix="([A-Za-z_][A-Za-z0-9_]*=[^;&|[[:space:]]]*[[:space:]]+)*"
 is_worktree_create=0
 is_terminal_create=0
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
 
 if [ "$is_worktree_create" -eq 0 ] && [ "$is_terminal_create" -eq 0 ]; then
   exit 0
@@ -86,7 +87,9 @@ fi
 # the worktree case looking unauthorized by the same flag. ORCA_NEW_TARGET_APPROVED
 # is the canonical name; the legacy name is still accepted so in-flight sessions
 # and older notes keep working.
-echo "$sanitized_command" | grep -qE '(ORCA_NEW_TARGET_APPROVED|ORCA_NEW_WORKSPACE_APPROVED)=1' && exit 0
+#
+# Must be attached to the guarded create command, not an earlier command.
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(ORCA_NEW_TARGET_APPROVED|ORCA_NEW_WORKSPACE_APPROVED)=1([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^;&|[[:space:]]]*)*[[:space:]]+(${orca_bin_pattern})[[:space:]]+(terminal|worktree)[[:space:]]+create\b" && exit 0
 
 # NOTE: `--worktree active` is deliberately NOT an exemption here. It attaches to
 # the CURRENT worktree instead of creating a new one, but it still opens a new
