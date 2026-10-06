@@ -124,4 +124,46 @@ def test_active_skills_gate_matches_plugin_qualified_skill_ids():
     )
     assert len(violations) == 1
 
+    violations_mkt = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", active_skills={"es6kr@skills:consolidate"}
+    )
+    assert len(violations_mkt) == 1
+
+    violations_path = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", active_skills={"plugins/es6kr/consolidate"}
+    )
+    assert len(violations_path) == 1
+
+
+def test_requires_skill_call_matches_namespaced_and_bare_invocations():
+    turn_text = "before-dispatch: dispatching review subagent now"
+    # Bare marker required_skill vs namespaced turn_skills invocation
+    bare_req_marker = dict(TRIGGER_MARKER, requires_skill_call="receiving-code-review")
+    violations = find_violations(
+        turn_text,
+        [bare_req_marker],
+        "same-turn",
+        turn_skills={"superpowers:receiving-code-review"},
+    )
+    assert violations == []
+
+    # Namespaced marker required_skill vs bare turn_skills invocation
+    ns_req_marker = dict(TRIGGER_MARKER, requires_skill_call="superpowers:receiving-code-review")
+    violations_ns = find_violations(
+        turn_text,
+        [ns_req_marker],
+        "same-turn",
+        turn_skills={"receiving-code-review"},
+    )
+    assert violations_ns == []
+
+    # Slash-separated namespaced turn_skills invocation
+    violations_slash = find_violations(
+        turn_text,
+        [ns_req_marker],
+        "same-turn",
+        turn_skills={"superpowers/receiving-code-review"},
+    )
+    assert violations_slash == []
+
 

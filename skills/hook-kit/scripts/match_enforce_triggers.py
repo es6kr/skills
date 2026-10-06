@@ -2,6 +2,16 @@
 from __future__ import annotations
 
 
+def _normalize_skill_id(name: str) -> str:
+    if not name:
+        return ""
+    if ":" in name:
+        name = name.rsplit(":", 1)[-1]
+    if "/" in name:
+        name = name.rsplit("/", 1)[-1]
+    return name
+
+
 def find_violations(
     turn_text: str,
     registry: list,
@@ -10,12 +20,14 @@ def find_violations(
     turn_skills=None,
 ) -> list:
     active_skill_names = (
-        {name.rsplit(":", 1)[-1] for name in active_skills}
+        {s for name in active_skills for s in (name, _normalize_skill_id(name))}
         if active_skills is not None
         else None
     )
     if turn_skills is not None:
-        invoked_skill_names = {name.rsplit(":", 1)[-1] for name in turn_skills} | set(turn_skills)
+        invoked_skill_names = {
+            s for name in turn_skills for s in (name, _normalize_skill_id(name))
+        }
     else:
         invoked_skill_names = None
 
@@ -32,7 +44,13 @@ def find_violations(
         # development does) is a false positive. `active_skills=None`
         # preserves the original ungated behavior (e.g. for callers that
         # don't have a whole-session view, like synthetic unit tests).
-        if active_skill_names is not None and entry["source_skill"] not in active_skill_names:
+        source_skill = entry.get("source_skill", "")
+        source_norm = _normalize_skill_id(source_skill)
+        if (
+            active_skill_names is not None
+            and source_skill not in active_skill_names
+            and source_norm not in active_skill_names
+        ):
             continue
 
         trigger_text = entry.get("trigger") or entry.get("on_completion")
@@ -40,15 +58,15 @@ def find_violations(
             continue
 
         req = entry["requires_skill_call"]
-        req_bare = req.rsplit(":", 1)[-1]
+        req_norm = _normalize_skill_id(req)
 
         if invoked_skill_names is not None:
-            if req in invoked_skill_names or req_bare in invoked_skill_names:
+            if req in invoked_skill_names or req_norm in invoked_skill_names:
                 continue
         else:
             required_call_marker = f'TOOL_CALL Skill("{req}")'
-            required_call_marker_bare = f'TOOL_CALL Skill("{req_bare}")'
-            if required_call_marker in turn_text or required_call_marker_bare in turn_text:
+            required_call_marker_norm = f'TOOL_CALL Skill("{req_norm}")'
+            if required_call_marker in turn_text or required_call_marker_norm in turn_text:
                 continue
 
         violations.append(
