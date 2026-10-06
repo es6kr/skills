@@ -94,3 +94,11 @@ def test_active_skills_none_means_gate_is_not_applied():
     turn_text = "before-dispatch: dispatching review subagent now"
     violations = find_violations(turn_text, [TRIGGER_MARKER], "same-turn", active_skills=None)
     assert len(violations) == 1
+
+
+def test_active_skills_gate_matches_plugin_qualified_skill_ids():
+    turn_text = "before-dispatch: dispatching review subagent now"
+    violations = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", active_skills={"es6kr:consolidate"}
+    )
+    assert len(violations) == 1

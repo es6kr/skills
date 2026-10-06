@@ -3,6 +3,11 @@ from __future__ import annotations
 
 
 def find_violations(turn_text: str, registry: list, scope_filter: str, active_skills=None) -> list:
+    active_skill_names = (
+        {name.rsplit(":", 1)[-1] for name in active_skills}
+        if active_skills is not None
+        else None
+    )
     violations = []
     for entry in registry:
         if entry.get("scope") != scope_filter:
@@ -16,7 +21,7 @@ def find_violations(turn_text: str, registry: list, scope_filter: str, active_sk
         # development does) is a false positive. `active_skills=None`
         # preserves the original ungated behavior (e.g. for callers that
         # don't have a whole-session view, like synthetic unit tests).
-        if active_skills is not None and entry["source_skill"] not in active_skills:
+        if active_skill_names is not None and entry["source_skill"] not in active_skill_names:
             continue
 
         trigger_text = entry.get("trigger") or entry.get("on_completion")
