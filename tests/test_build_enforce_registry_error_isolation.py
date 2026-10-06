@@ -59,3 +59,16 @@ def test_cache_with_wrong_type_does_not_crash(tmp_path):
 
     registry = build_registry([a], cache_path)
     assert {m["requires_skill_call"] for m in registry} == {"x"}
+
+
+def test_undecodable_file_does_not_crash_the_whole_registry(tmp_path):
+    good = str(tmp_path / "skills" / "foo" / "good.md")
+    bad = str(tmp_path / "skills" / "bar" / "bad.md")
+    _write(good, '<!-- enforce: requires-skill-call="x" trigger="t" scope="same-turn" -->\n')
+    _write(bad, "")
+    with open(bad, "wb") as f:
+        f.write(b"\x80\x81\x82\xff")
+    cache_path = str(tmp_path / "cache.json")
+
+    registry = build_registry([good, bad], cache_path)
+    assert {m["requires_skill_call"] for m in registry} == {"x"}

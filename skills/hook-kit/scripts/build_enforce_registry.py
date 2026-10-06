@@ -98,7 +98,7 @@ def build_registry(skill_md_paths: list, cache_path: str) -> list:
             try:
                 cache["files"][path] = mtime
                 cache["markers"][path] = parse_markers(path)
-            except OSError:
+            except (OSError, UnicodeDecodeError):
                 # One unreadable file (permissions, encoding, race with a
                 # concurrent delete) must not take down the whole registry
                 # -- skip just this file, keep whatever was cached before.
