@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/consolidate-v0.7.0...consolidate-v0.7.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **consolidate:** unify Source, Type, and Severity into a single 3-line column ([#603](https://github.com/es6kr/skills/issues/603)) ([c4ef164](https://github.com/es6kr/skills/commit/c4ef16457eaedcdac22dc7ab74fcb0d3cbf6a276))
+* **hooks:** verify executable hook registrations ([1bd613a](https://github.com/es6kr/skills/commit/1bd613aba2aa5cb2509f3dacd53acc5eab3cbf3f))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/consolidate-v0.6.5...consolidate-v0.7.0) (2026-09-30)
 
 

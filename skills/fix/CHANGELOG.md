@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/es6kr/skills/compare/fix-v0.7.0...fix-v0.7.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **fix:** suppress additionalContext injection in headless/Ralph runs ([ca84cf5](https://github.com/es6kr/skills/commit/ca84cf5124901654c5618e28ee3116e3c008f92d))
+
 ## [0.7.0](https://github.com/es6kr/skills/compare/fix-v0.6.2...fix-v0.7.0) (2026-09-30)
 
 
