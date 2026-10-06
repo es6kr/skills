@@ -339,7 +339,15 @@ def process_repository(repo_dir: Path, execute: bool = False, delete_branch: boo
             rem_ret, _, rem_err = run_git(repo_dir, ["worktree", "remove", str(wt.path)])
             if rem_ret == 0:
                 report.action = "Pruned"
-                run_git(repo_dir, ["worktree", "prune"])
+                # Do NOT add `git worktree prune` here. `worktree remove` already
+                # cleans up the .git/worktrees/<name> admin dir for the worktree it
+                # removed, so the extra call is redundant -- and it is not scoped to
+                # that worktree: it sweeps the whole repo and deregisters every other
+                # entry git currently considers prunable. Worktrees registered with
+                # an absolute path from the other platform (a Windows `C:/...` path
+                # read by WSL git, or vice versa) are marked prunable while being
+                # perfectly alive, so this collaterally dropped unrelated worktrees
+                # that still held uncommitted work.
                 if delete_branch and wt.branch:
                     run_git(repo_dir, ["branch", "-d", wt.branch])
             else:

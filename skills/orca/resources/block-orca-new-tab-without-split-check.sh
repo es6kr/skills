@@ -57,58 +57,52 @@ print(d.get("transcript_path") or "")
 
 session_key=$(printf '%s' "$transcript_path" | shasum 2>/dev/null | cut -d" " -f1)
 [ -z "$session_key" ] && session_key="nosession"
-marker="${TMPDIR:-/tmp}/orca-terminal-list-checked-${session_key}"
+# NOTE (marker removal): this gate used to stamp a 30-minute marker whenever
+# `orca terminal list` ran, and then let ANY create pass while that marker was
+# fresh. That inverted the gate's purpose. What the gate asks is not "did you
+# look?" but "did you act on what you saw by splitting?" — and listing is the
+# precondition for splitting, not a substitute for it. Worse, the block message
+# below advertised that very list command as the way to clear the gate, so an
+# agent that followed the instruction faithfully disarmed the guard for the
+# next 30 minutes and then created a new tab unchallenged. Observed repeatedly
+# (class=orca-terminal-split-pane-parameter-omission); the marker is therefore
+# gone, and creating a new tab/worktree now always requires the auditable
+# opt-out below.
 
-# The command itself is a split-pane / list check — always allow, and stamp the
-# marker so a follow-up create/split within the next 30 minutes doesn't
-# re-trigger this gate. This must run BEFORE the create-command matching below,
-# since `terminal list`/`terminal split` never match `terminal create`.
-if echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+(list|split)\b"; then
-  touch "$marker" 2>/dev/null
-  exit 0
-fi
-
+env_prefix="([A-Za-z_][A-Za-z0-9_]*=[^;&|[[:space:]]]*[[:space:]]+)*"
 is_worktree_create=0
 is_terminal_create=0
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
 
 if [ "$is_worktree_create" -eq 0 ] && [ "$is_terminal_create" -eq 0 ]; then
   exit 0
 fi
 
-# Auditable opt-out — a genuinely independent new workspace was intended.
-echo "$sanitized_command" | grep -q 'ORCA_NEW_WORKSPACE_APPROVED=1' && exit 0
+# Auditable opt-out — a genuinely independent new target was intended.
+#
+# One variable covers BOTH kinds of new target this gate guards: a new tab
+# (`terminal create`) and a new worktree (`worktree create --no-parent`). The
+# older name said "WORKSPACE", which read as covering only the tab case and left
+# the worktree case looking unauthorized by the same flag. ORCA_NEW_TARGET_APPROVED
+# is the canonical name; the legacy name is still accepted so in-flight sessions
+# and older notes keep working.
+#
+# Must be attached to the guarded create command, not an earlier command.
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(ORCA_NEW_TARGET_APPROVED|ORCA_NEW_WORKSPACE_APPROVED)=1([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^;&|[[:space:]]]*)*[[:space:]]+(${orca_bin_pattern})[[:space:]]+(terminal|worktree)[[:space:]]+create\b" && exit 0
 
 # NOTE: `--worktree active` is deliberately NOT an exemption here. It attaches to
 # the CURRENT worktree instead of creating a new one, but it still opens a new
 # TAB — and a new tab without first checking whether the current terminal is
 # splittable is exactly what this guard gates (see its name). Treating it as a
 # safe path let the whole gate be bypassed by appending one flag. It now falls
-# through to the marker check below like any other create; run
-# `orca terminal list` first, or use the auditable opt-out above.
+# through to the block below like any other create; split into the current
+# terminal instead, or use the auditable opt-out above.
 
 # `orca worktree create` without `--no-parent` is a deliberate stacked/branch-
 # from-current choice, not the independent-new-workspace default — allow it.
 if [ "$is_worktree_create" -eq 1 ]; then
   echo "$sanitized_command" | grep -qE -- '--no-parent' || exit 0
-fi
-
-if [ -f "$marker" ]; then
-  now=$(date +%s)
-  # GNU coreutils uses `stat -c %Y`; BSD/macOS uses `stat -f %m`. The probe
-  # order is load-bearing, not cosmetic: BSD `stat -c` fails outright, but GNU
-  # `stat -f` SUCCEEDS with an unrelated filesystem dump (there `-f` means
-  # --file-system). Probing the BSD form first therefore captured that
-  # multi-line dump as $mtime on Linux and the arithmetic below died with
-  # "syntax error in expression", so the marker cache never took effect and
-  # every command was blocked even right after `orca terminal list`.
-  mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null || echo 0)
-  case "$mtime" in ''|*[!0-9]*) mtime=0 ;; esac
-  age=$(( now - mtime ))
-  if [ "$age" -lt 1800 ]; then
-    exit 0
-  fi
 fi
 
 cat >&2 <<'EOF'
@@ -122,13 +116,21 @@ Why blocked:
     split into.
 
 Required action (pick one):
-  1. Run `orca terminal list --json` first to check for a splittable current
-     terminal, then either `orca terminal split --terminal <handle>
-     --direction horizontal|vertical --command "<cmd>"` (same tab) or re-run
-     this command (the list check clears this gate for 30 minutes).
-  2. If a genuinely independent new workspace is intended (unrelated work, not
-     meant to run alongside the current session), prefix the command with
-     ORCA_NEW_WORKSPACE_APPROVED=1 so the opt-out is auditable.
+  1. DEFAULT — split into the current tab instead of opening a new one:
+       orca terminal list --json                  # find the handle, count panes
+       orca terminal split --terminal <handle> \
+         --direction vertical --command "<cmd>"   # up to 4 panes per tab
+     Listing alone does NOT clear this gate (it used to, for 30 minutes — that
+     is exactly how this guard kept getting disarmed). Splitting is the action
+     the gate is asking for; listing is only how you find the handle.
+  2. If a genuinely independent new target is intended, prefix the command with
+     ORCA_NEW_TARGET_APPROVED=1 so the opt-out is auditable. Only three reasons
+     qualify, and you should be able to name which one in a sentence:
+       (a) the current tab already holds 4 panes (the limit)
+       (b) the user explicitly asked for a new tab/worktree
+       (c) a real file conflict (the same files must be edited concurrently)
+     "The target repo/topic is unrelated to the current panes" is NOT a fourth
+     reason, and neither is "the repo is not registered with Orca".
 
 Reference: failed-attempts.md class=orca-terminal-split-pane-parameter-omission.
 ============================================================

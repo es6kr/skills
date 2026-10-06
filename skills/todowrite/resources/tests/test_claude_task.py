@@ -4,6 +4,7 @@ Unit tests for `claude-task` CLI tool (`~/.agents/skills/todowrite/resources/cla
 """
 
 import argparse
+import io
 import os
 import sys
 import json
@@ -42,6 +43,46 @@ class TestClaudeTaskCLI(unittest.TestCase):
     def test_resolve_explicit_dir(self):
         resolved = claude_task.resolve_task_dir(custom_dir=str(self.test_dir))
         self.assertEqual(resolved, self.test_dir.resolve())
+
+    def test_resolve_mtime_fallback_warns_on_stderr(self):
+        """Step 4 (no --session/--dir/env var given) silently guesses the most recently
+        modified session directory — in a multi-session environment this can pick a
+        DIFFERENT session's directory. Must warn on stderr so the caller can notice."""
+        older = self.test_dir / "session-older"
+        newer = self.test_dir / "session-newer"
+        older.mkdir()
+        time.sleep(0.01)
+        newer.mkdir()
+
+        original_base = claude_task.AGENTS_TASKS_BASE
+        claude_task.AGENTS_TASKS_BASE = self.test_dir
+        try:
+            captured = io.StringIO()
+            old_stderr = sys.stderr
+            sys.stderr = captured
+            try:
+                resolved = claude_task.resolve_task_dir(env_type="agent")
+            finally:
+                sys.stderr = old_stderr
+        finally:
+            claude_task.AGENTS_TASKS_BASE = original_base
+
+        self.assertEqual(resolved, newer)
+        warning = captured.getvalue()
+        self.assertIn("Warning", warning)
+        self.assertIn("--session", warning)
+        self.assertIn(str(newer), warning)
+
+    def test_resolve_explicit_session_no_warning(self):
+        """Passing --session must not trigger the step-4 fallback warning."""
+        captured = io.StringIO()
+        old_stderr = sys.stderr
+        sys.stderr = captured
+        try:
+            claude_task.resolve_task_dir(custom_dir=str(self.test_dir), session_id="some-session")
+        finally:
+            sys.stderr = old_stderr
+        self.assertEqual(captured.getvalue(), "")
 
     def test_add_and_load_task(self):
         task_id = claude_task.get_next_task_id(self.test_dir)
