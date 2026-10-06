@@ -50,6 +50,27 @@ def test_prose_mention_of_call_does_not_count():
     assert len(violations) == 1
 
 
+def test_structured_turn_skills_prevents_prose_spoofing():
+    turn_text = (
+        "before-dispatch: dispatching review subagent now\n"
+        'TOOL_CALL Skill("superpowers:receiving-code-review")'
+    )
+    violations = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", turn_skills=set()
+    )
+    assert len(violations) == 1
+
+    violations_passed = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", turn_skills={"superpowers:receiving-code-review"}
+    )
+    assert violations_passed == []
+
+    violations_bare = find_violations(
+        turn_text, [TRIGGER_MARKER], "same-turn", turn_skills={"receiving-code-review"}
+    )
+    assert violations_bare == []
+
+
 def test_no_violation_when_trigger_never_fires():
     turn_text = "unrelated turn content"
     violations = find_violations(turn_text, [TRIGGER_MARKER], "same-turn")
@@ -102,3 +123,5 @@ def test_active_skills_gate_matches_plugin_qualified_skill_ids():
         turn_text, [TRIGGER_MARKER], "same-turn", active_skills={"es6kr:consolidate"}
     )
     assert len(violations) == 1
+
+

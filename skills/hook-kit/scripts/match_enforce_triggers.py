@@ -2,12 +2,23 @@
 from __future__ import annotations
 
 
-def find_violations(turn_text: str, registry: list, scope_filter: str, active_skills=None) -> list:
+def find_violations(
+    turn_text: str,
+    registry: list,
+    scope_filter: str,
+    active_skills=None,
+    turn_skills=None,
+) -> list:
     active_skill_names = (
         {name.rsplit(":", 1)[-1] for name in active_skills}
         if active_skills is not None
         else None
     )
+    if turn_skills is not None:
+        invoked_skill_names = {name.rsplit(":", 1)[-1] for name in turn_skills} | set(turn_skills)
+    else:
+        invoked_skill_names = None
+
     violations = []
     for entry in registry:
         if entry.get("scope") != scope_filter:
@@ -28,9 +39,17 @@ def find_violations(turn_text: str, registry: list, scope_filter: str, active_sk
         if not trigger_text or trigger_text not in turn_text:
             continue
 
-        required_call_marker = f'TOOL_CALL Skill("{entry["requires_skill_call"]}")'
-        if required_call_marker in turn_text:
-            continue
+        req = entry["requires_skill_call"]
+        req_bare = req.rsplit(":", 1)[-1]
+
+        if invoked_skill_names is not None:
+            if req in invoked_skill_names or req_bare in invoked_skill_names:
+                continue
+        else:
+            required_call_marker = f'TOOL_CALL Skill("{req}")'
+            required_call_marker_bare = f'TOOL_CALL Skill("{req_bare}")'
+            if required_call_marker in turn_text or required_call_marker_bare in turn_text:
+                continue
 
         violations.append(
             {

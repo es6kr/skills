@@ -66,10 +66,16 @@ def main() -> int:
         paths = build_enforce_registry.discover_skill_md_paths(enabled_plugins, MARKETPLACES_ROOT)
         registry = build_enforce_registry.build_registry(paths, CACHE_PATH)
 
-        turn_text = extract_current_turn_text.extract_current_turn_text(transcript_path)
+        turn_text, turn_skills = extract_current_turn_text.extract_turn_info(
+            transcript_path, previous=False
+        )
         active_skills = extract_current_turn_text.extract_all_invoked_skills(transcript_path)
         violations = match_enforce_triggers.find_violations(
-            turn_text, registry, "same-turn", active_skills=active_skills
+            turn_text,
+            registry,
+            "same-turn",
+            active_skills=active_skills,
+            turn_skills=turn_skills,
         )
 
         if violations:
