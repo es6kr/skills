@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/consolidate-v0.7.1...consolidate-v0.8.0) (2026-10-06)
+
+
+### Features
+
+* **hook-kit:** declarative step-dependency enforcement engine ([9e3d188](https://github.com/es6kr/skills/commit/9e3d18898453d20a947b74b24032e61bf13bc297))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/consolidate-v0.7.0...consolidate-v0.7.1) (2026-10-04)
 
 

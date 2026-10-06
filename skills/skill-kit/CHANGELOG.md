@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/skill-kit-v0.10.0...skill-kit-v0.11.0) (2026-10-06)
+
+
+### Features
+
+* **hook-kit:** declarative step-dependency enforcement engine ([9e3d188](https://github.com/es6kr/skills/commit/9e3d18898453d20a947b74b24032e61bf13bc297))
+
+
+### Bug Fixes
+
+* **skill-kit:** generalize invoke-discipline §1 beyond slash-command receipt ([#602](https://github.com/es6kr/skills/issues/602)) ([6508508](https://github.com/es6kr/skills/commit/65085089effbde0dd1ea0c2a68090614545a7928))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/skill-kit-v0.9.0...skill-kit-v0.10.0) (2026-09-27)
 
 
