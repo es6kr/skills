@@ -69,13 +69,6 @@ session_key=$(printf '%s' "$transcript_path" | shasum 2>/dev/null | cut -d" " -f
 # gone, and creating a new tab/worktree now always requires the auditable
 # opt-out below.
 
-# The command itself is a split-pane / list check — always allow. This must run
-# BEFORE the create-command matching below, since `terminal list`/`terminal
-# split` never match `terminal create`.
-if echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+(list|split)\b"; then
-  exit 0
-fi
-
 is_worktree_create=0
 is_terminal_create=0
 echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1

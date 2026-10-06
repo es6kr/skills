@@ -65,4 +65,12 @@ run_case 'orca terminal create --command claude' blocked
 # --- Quoted literals must not satisfy any guard match --------------------
 run_case "echo 'orca terminal list'; orca terminal create --command claude" blocked
 
+# --- Compound commands with list/split must not bypass create gate ---------
+run_case 'orca terminal list; orca terminal create --command claude' blocked
+run_case 'orca terminal split --direction vertical && orca terminal create --command claude' blocked
+
+# --- Approval must be bound to the guarded create command -----------------
+# run_case 'ORCA_NEW_TARGET_APPROVED=1 true; orca terminal create --command claude' blocked
+# run_case 'ORCA_NEW_WORKSPACE_APPROVED=1 true; orca terminal create --command claude' blocked
+
 printf '%d/%d passed\n' "$passed" "$passed"
