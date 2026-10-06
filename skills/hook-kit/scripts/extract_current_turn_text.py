@@ -18,7 +18,13 @@ def _is_real_user(record: dict) -> bool:
     return False
 
 
-def extract_current_turn_text(transcript_path: str) -> str:
+def extract_turn_info(transcript_path: str, previous: bool = False) -> tuple[str, set]:
+    """Extract assistant turn text and invoked skill names from session JSONL.
+
+    If previous=False: extracts current turn (assistant messages after the latest real user message).
+    If previous=True: extracts the previous completed assistant turn (assistant messages
+    belonging to the turn before the latest user message/turn).
+    """
     records = []
     with open(transcript_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -30,20 +36,48 @@ def extract_current_turn_text(transcript_path: str) -> str:
             except json.JSONDecodeError:
                 continue
 
-    start = 0
-    for i in range(len(records) - 1, -1, -1):
-        # A sidechain (subagent) record must not count as a main-turn
-        # boundary or be attributed to the main turn's text -- its prose
-        # could mention a trigger phrase, and its Skill(...) calls must
-        # not satisfy a main-turn requirement (final-review Important I6).
-        if records[i].get("isSidechain"):
-            continue
-        if _is_real_user(records[i]):
-            start = i + 1
-            break
+    if not previous:
+        start = 0
+        for i in range(len(records) - 1, -1, -1):
+            if records[i].get("isSidechain"):
+                continue
+            if _is_real_user(records[i]):
+                start = i + 1
+                break
+        target_records = records[start:]
+    else:
+        last_assistant_idx = -1
+        for i in range(len(records) - 1, -1, -1):
+            if records[i].get("isSidechain"):
+                continue
+            if records[i].get("type") == "assistant":
+                last_assistant_idx = i
+                break
 
-    out = []
-    for record in records[start:]:
+        if last_assistant_idx == -1:
+            return "", set()
+
+        start = 0
+        for i in range(last_assistant_idx - 1, -1, -1):
+            if records[i].get("isSidechain"):
+                continue
+            if _is_real_user(records[i]):
+                start = i + 1
+                break
+
+        end = len(records)
+        for i in range(last_assistant_idx + 1, len(records)):
+            if records[i].get("isSidechain"):
+                continue
+            if _is_real_user(records[i]):
+                end = i
+                break
+
+        target_records = records[start:end]
+
+    out_text = []
+    invoked_skills = set()
+    for record in target_records:
         if record.get("isSidechain"):
             continue
         if record.get("type") != "assistant":
@@ -55,12 +89,24 @@ def extract_current_turn_text(transcript_path: str) -> str:
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "text":
-                out.append(block.get("text", ""))
+                out_text.append(block.get("text", ""))
             elif block.get("type") == "tool_use" and block.get("name") == "Skill":
                 skill_name = block.get("input", {}).get("skill", "")
-                out.append(f'TOOL_CALL Skill("{skill_name}")')
+                if skill_name:
+                    invoked_skills.add(skill_name)
+                out_text.append(f'TOOL_CALL Skill("{skill_name}")')
 
-    return "\n".join(out)
+    return "\n".join(out_text), invoked_skills
+
+
+def extract_current_turn_text(transcript_path: str) -> str:
+    text, _ = extract_turn_info(transcript_path, previous=False)
+    return text
+
+
+def extract_previous_turn_text(transcript_path: str) -> str:
+    text, _ = extract_turn_info(transcript_path, previous=True)
+    return text
 
 
 def extract_all_invoked_skills(transcript_path: str) -> set:

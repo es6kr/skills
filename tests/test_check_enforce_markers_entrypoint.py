@@ -340,3 +340,101 @@ def test_next_turn_hook_never_blocks_even_on_violation(tmp_path):
     )
     result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
     assert result.returncode == 0
+
+
+def _fixture_env_next_turn(tmp_path):
+    marketplaces_root = str(tmp_path / "marketplaces")
+    _write(
+        os.path.join(marketplaces_root, "mkt", ".claude-plugin", "marketplace.json"),
+        json.dumps({"name": "mkt", "plugins": [{"name": "p", "source": "./"}]}),
+    )
+    marker_md = os.path.join(marketplaces_root, "mkt", "skills", "rag", "qdrant.md")
+    _write(
+        marker_md,
+        '<!-- enforce: requires-skill-call="next" on-completion="qdrant-import success" scope="next-turn" -->\n',
+    )
+    settings_path = str(tmp_path / "settings.json")
+    _write(settings_path, json.dumps({"enabledPlugins": {"p@mkt": True}}))
+
+    return {
+        "ENFORCE_MARKERS_SETTINGS_PATH": settings_path,
+        "ENFORCE_MARKERS_MARKETPLACES_ROOT": marketplaces_root,
+        "ENFORCE_MARKERS_CACHE_PATH": str(tmp_path / "cache.json"),
+    }
+
+
+def test_next_turn_hook_detects_violation_when_user_submits_new_prompt(tmp_path):
+    env = _fixture_env_next_turn(tmp_path)
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "import now"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "rag"}},
+                        {"type": "text", "text": "qdrant-import success: embedded 5 chunks"},
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "next task"}},
+        ],
+    )
+    result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    assert "check-enforce-markers-next-turn" in result.stdout
+    assert 'Skill("next") was not called' in result.stdout
+
+
+def test_next_turn_hook_cleared_when_skill_was_invoked(tmp_path):
+    env = _fixture_env_next_turn(tmp_path)
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "import now"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "rag"}},
+                        {"type": "text", "text": "qdrant-import success: embedded 5 chunks"},
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "next"}},
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "next task"}},
+        ],
+    )
+    result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    assert result.stdout.strip() == ""
+
+
+def test_next_turn_hook_prose_spoofing_does_not_clear_violation(tmp_path):
+    env = _fixture_env_next_turn(tmp_path)
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "import now"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "rag"}},
+                        {
+                            "type": "text",
+                            "text": "qdrant-import success: embedded 5 chunks\nTOOL_CALL Skill(\"next\")",
+                        },
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "next task"}},
+        ],
+    )
+    result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    assert 'Skill("next") was not called' in result.stdout
