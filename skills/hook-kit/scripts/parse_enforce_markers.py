@@ -10,18 +10,45 @@ import re
 _MARKER_RE = re.compile(r"<!--\s*enforce:\s*(.*?)-->", re.DOTALL)
 _ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 _VALID_SCOPES = {"same-turn", "next-turn"}
-_FENCE_RE = re.compile(r"(^|\n)(```|~~~).*?\n.*?\1\2", re.DOTALL)
+_OPEN_FENCE_RE = re.compile(r"^[ ]{0,3}(`{3,}|~{3,})")
 
 
 def _strip_fenced_blocks(text: str) -> str:
-    """Remove fenced code blocks before marker scanning.
+    """Remove fenced code blocks before marker scanning per CommonMark rules.
 
     A skill's own documentation of the marker syntax (e.g.
     skills/hook-kit/enforce-markers.md) necessarily shows the syntax inside
     a fenced example -- without this, that documentation self-registers as
     a live rule every session (final-review Important I4).
     """
-    return _FENCE_RE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    lines = text.split("\n")
+    out_lines = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+
+    for line in lines:
+        if not in_fence:
+            m = _OPEN_FENCE_RE.match(line)
+            if m:
+                run = m.group(1)
+                fence_char = run[0]
+                fence_len = len(run)
+                rest = line[m.end():]
+                if fence_char == "`" and "`" in rest:
+                    out_lines.append(line)
+                    continue
+                in_fence = True
+                out_lines.append("")
+            else:
+                out_lines.append(line)
+        else:
+            close_pattern = rf"^[ ]{{0,3}}{re.escape(fence_char)}{{{fence_len},}}[ \t]*$"
+            if re.match(close_pattern, line):
+                in_fence = False
+            out_lines.append("")
+
+    return "\n".join(out_lines)
 
 
 def _skill_name_from_path(file_path: str) -> str:

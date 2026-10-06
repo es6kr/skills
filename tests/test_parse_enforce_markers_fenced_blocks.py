@@ -59,3 +59,33 @@ def test_real_enforce_markers_doc_has_zero_live_markers():
     """The engine's own documentation of its syntax must not self-register
     as a rule."""
     assert parse_markers(str(ENFORCE_MARKERS_DOC)) == []
+
+
+def test_marker_inside_indented_fence_is_not_parsed(tmp_path):
+    path = _write(
+        tmp_path,
+        "indented.md",
+        "   ```\n"
+        '   <!-- enforce: requires-skill-call="x" trigger="t" scope="same-turn" -->\n'
+        "   ```\n"
+        '<!-- enforce: requires-skill-call="real" trigger="t" scope="same-turn" -->\n',
+    )
+    markers = parse_markers(path)
+    assert len(markers) == 1
+    assert markers[0]["requires_skill_call"] == "real"
+
+
+def test_marker_inside_longer_fence_with_inner_shorter_fence(tmp_path):
+    path = _write(
+        tmp_path,
+        "longer.md",
+        "````\n"
+        "```\n"
+        '<!-- enforce: requires-skill-call="inner" trigger="t" scope="same-turn" -->\n'
+        "```\n"
+        "````\n"
+        '<!-- enforce: requires-skill-call="real" trigger="t" scope="same-turn" -->\n',
+    )
+    markers = parse_markers(path)
+    assert len(markers) == 1
+    assert markers[0]["requires_skill_call"] == "real"
