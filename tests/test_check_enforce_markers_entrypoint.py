@@ -438,3 +438,109 @@ def test_next_turn_hook_prose_spoofing_does_not_clear_violation(tmp_path):
     result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
     assert result.returncode == 0
     assert 'Skill("next") was not called' in result.stdout
+
+
+def test_stop_hook_blocks_when_owning_skill_is_namespaced(tmp_path):
+    env = _fixture_env(tmp_path, with_marker=True)
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "es6kr:consolidate"}}
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "continue"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "moving on to Step 4 (classify) now"}],
+                },
+            },
+        ],
+    )
+    result = _run(STOP_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    decision = json.loads(result.stdout)
+    assert decision["decision"] == "block"
+
+
+def test_next_turn_hook_passes_when_required_skill_invoked_with_namespace(tmp_path):
+    env = _fixture_env_next_turn(tmp_path)
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "import now"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "plugins/rag"}},
+                        {"type": "text", "text": "qdrant-import success: embedded 5 chunks"},
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "workflow:next"}},
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "next task"}},
+        ],
+    )
+    result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    assert result.stdout.strip() == ""
+
+
+def test_realistic_multiturn_session_lifecycle(tmp_path):
+    """Full realistic session transcript spanning 4 turns (user/assistant):
+    Turn 1: User asks question, assistant runs owning skill.
+    Turn 2: User responds, assistant does intermediate steps without trigger.
+    Turn 3: User continues, assistant triggers next-turn requirement and runs required skill.
+    Turn 4: Next user turn submits - next-turn hook runs cleanly without violation."""
+    env = _fixture_env_next_turn(tmp_path)
+    transcript = _jsonl(
+        tmp_path,
+        [
+            {"type": "user", "message": {"role": "user", "content": "start task"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "rag"}},
+                        {"type": "text", "text": "reading knowledge now"},
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "proceed with import"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "importing chunks into store"},
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "finish up"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "qdrant-import success: embedded 5 chunks"},
+                        {"type": "tool_use", "name": "Skill", "input": {"skill": "next"}},
+                    ],
+                },
+            },
+            {"type": "user", "message": {"role": "user", "content": "whats next?"}},
+        ],
+    )
+    result = _run(NEXT_TURN_HOOK, {"transcript_path": transcript}, env)
+    assert result.returncode == 0
+    assert result.stdout.strip() == ""
