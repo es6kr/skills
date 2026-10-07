@@ -3,8 +3,11 @@
 #
 # Trigger: assistant response contains cleanup-completion or session-end markers
 # Detection: response text matches cleanup keywords + missing distinct RAG visibility row ("RAG store N chunks" or "N chunks added")
-# Action: emit reminder via stdout (non-blocking, exit 0) — Stop hook cannot deny but can inject
-#         context for the next user prompt to re-surface the issue
+# Action: emit {"decision":"block","reason":...} on stdout and exit 2. A Stop
+#         hook cannot suppress the response already written, but this blocks the
+#         stop and feeds `reason` back so the next turn re-surfaces the issue.
+#         (The header previously described a non-blocking "exit 0" reminder,
+#         which the block path at the bottom of this file has never done.)
 #
 # Background: failed-attempts.md — RAG report visibility missing 3 recurrences:
 #   1st (2026-05-27): cleanup procedure compressed — 3-C.1 qdrant import deferred to ask
@@ -57,8 +60,21 @@ RESPONSE=$(echo "$INPUT" | jq -r '
 
 # Fallback: try parsing transcript-based payload (varies by Stop hook implementation)
 if [[ -z "$RESPONSE" ]] && [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
-  # Read last assistant turn from transcript
-  RESPONSE=$(tail -50 "$TRANSCRIPT_PATH" | jq -r 'select(.type=="assistant") | .message.content[]?.text? // empty' 2>/dev/null | tail -100)
+  # Read the LAST assistant turn only — same extraction as the sibling guards
+  # (block-cleanup-missing-rename.sh / block-cleanup-missing-walkthrough.sh).
+  # The earlier form `jq -r 'select(...)' | tail -100` was a false-positive
+  # generator in two distinct ways, because it concatenated the text of EVERY
+  # assistant message in the window and then truncated that blob:
+  #   1. a cleanup marker emitted in an EARLIER turn kept the trigger gate open,
+  #      so ordinary mid-work progress messages were judged to be completion
+  #      reports and re-blocked every turn (the "sticky re-firing" symptom);
+  #   2. `tail -100` dropped the top of a long report, so a COMPLIANT report
+  #      whose 3-C.1 RAG row sat above the last 100 lines was read as having no
+  #      RAG row at all — which is why emitting the RAG line on its own (a short
+  #      response, never truncated) was the only reliable way through.
+  # Slurping and taking `last` scopes the verdict to the response actually being
+  # judged, and removes the truncation entirely.
+  RESPONSE=$(tail -50 "$TRANSCRIPT_PATH" | jq -rs '([.[] | select(.type=="assistant")] | last) as $m | ($m.message.content[]?.text? // empty)' 2>/dev/null)
 fi
 
 if [[ -z "$RESPONSE" ]]; then
