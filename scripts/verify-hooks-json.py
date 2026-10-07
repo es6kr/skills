@@ -17,6 +17,14 @@ Three independent failure classes are checked:
    644 instead of executable mode 755. Interpreter-prefixed commands can mask
    that until a registration later calls the script directly.
 
+   This class is judged from the GIT INDEX, not the filesystem. A filesystem-only
+   check cannot see it on every platform: a Windows/WSL checkout under /mnt/c
+   reports 0777 for every file regardless of what git recorded, so the working
+   copy looks executable while the index says 100644. CI, on a fresh Linux
+   checkout that materializes git's mode, then fails alone — which is exactly how
+   a 100644 hook reached CI despite passing every local gate. The filesystem
+   check is kept as a secondary signal for checkouts that do honour the bit.
+
 Ported from es6kr/claude-plugins (PR #23, merged) — that repo hit this exact
 gap: a hook-relocation commit moved a script into another skill's resources/
 without updating hooks/hooks.json's registration path, silently disabling the
@@ -29,8 +37,10 @@ convention both repos use).
 """
 
 import json
+import os
 import re
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -84,7 +94,7 @@ def iter_commands(data: dict):
                 yield event, matcher, hook.get("command", "")
 
 
-def check_hooks_file(filepath: Path) -> tuple:
+def check_hooks_file(filepath: Path, repo_root: Path = None) -> tuple:
     """Return (errors, checked_paths, skipped_commands) for one hooks.json."""
     if not filepath.is_file():
         return [], 0, 0
@@ -98,6 +108,8 @@ def check_hooks_file(filepath: Path) -> tuple:
     errors = []
     seen = set()
     root = plugin_root_for(filepath)
+    if repo_root is None:
+        repo_root = Path(__file__).resolve().parent.parent
     checked_paths = 0
     skipped_commands = 0
 
@@ -128,7 +140,20 @@ def check_hooks_file(filepath: Path) -> tuple:
                     f"'{rel}' (resolved: {resolved})"
                 )
                 continue
-            if not (resolved.stat().st_mode & stat.S_IXUSR):
+            # Primary: the git index. Platform-independent, and the only signal
+            # visible on a checkout whose filesystem reports 0777 for everything.
+            idx_mode = index_mode_of(repo_root, resolved)
+            if idx_mode is not None and not idx_mode.endswith("755"):
+                errors.append(
+                    f"Non-executable hook registration in {filepath}: event='{event}', "
+                    f"matcher='{matcher}' points at '{rel}' tracked as mode {idx_mode}; "
+                    "expected executable mode 100755 "
+                    "(fix: git update-index --chmod=+x <path>)"
+                )
+            # Secondary: the filesystem, for checkouts that do honour the bit.
+            # Only reported when the index check could not run, so one defect
+            # does not surface as two errors.
+            elif idx_mode is None and not (resolved.stat().st_mode & stat.S_IXUSR):
                 mode = stat.S_IMODE(resolved.stat().st_mode)
                 errors.append(
                     f"Non-executable hook registration in {filepath}: event='{event}', "
@@ -137,6 +162,61 @@ def check_hooks_file(filepath: Path) -> tuple:
                 )
 
     return errors, checked_paths, skipped_commands
+
+
+_INDEX_MODES = None
+
+
+def index_modes(root: Path) -> dict:
+    """Map repo-relative POSIX path -> git index mode string (e.g. "100755").
+
+    Queried once per run. Returns {} when git is unavailable or this is not a
+    work tree, which makes every index-mode check a soft skip rather than a
+    false failure (CI containers without git, exported tarballs, etc.).
+    """
+    global _INDEX_MODES
+    key = str(root)
+    if _INDEX_MODES is not None and _INDEX_MODES.get("__root__") == key:
+        return _INDEX_MODES
+    _INDEX_MODES = {"__root__": key}
+    # GIT_* must be scrubbed. This verifier runs FROM a git hook (pre-push), and
+    # a hook environment exports GIT_DIR / GIT_INDEX_FILE. With those set, git
+    # ignores `-C <root>` and reads the exported repo instead, so the returned
+    # map describes the wrong tree -- silently, as a soft skip. Same hazard the
+    # hangul scanner's own tests document.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-s", "-z"],
+            capture_output=True, text=True, timeout=30, check=False, env=env,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return _INDEX_MODES
+    if out.returncode != 0:
+        return _INDEX_MODES
+    # Records are NUL-separated; each is "<mode> <sha> <stage>\t<path>".
+    for rec in out.stdout.split("\0"):
+        if not rec or "\t" not in rec:
+            continue
+        meta, path = rec.split("\t", 1)
+        parts = meta.split()
+        if len(parts) >= 1:
+            _INDEX_MODES[path] = parts[0]
+    return _INDEX_MODES
+
+
+def index_mode_of(root: Path, resolved: Path):
+    """git index mode for `resolved`, or None when untracked / git unavailable."""
+    modes = index_modes(root)
+    # Only the "__root__" cache key means the query yielded nothing (git absent,
+    # not a work tree) -> soft skip rather than a false failure.
+    if len(modes) <= 1:
+        return None
+    try:
+        rel = resolved.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None
+    return modes.get(rel)
 
 
 def collect_hooks_files(root: Path) -> list:

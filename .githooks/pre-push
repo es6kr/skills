@@ -1,8 +1,10 @@
 #!/usr/bin/env sh
 
 # Pre-push gate — mirrors the CI "Test" workflow (.github/workflows/test.yml)
-# so failures are caught locally instead of only after push. The three checks
-# below are 1:1 with the heavier CI jobs: frontmatter-lint, bats, pytest.
+# so failures are caught locally instead of only after push. The checks
+# below mirror the heavier CI jobs: frontmatter-lint, verify-hooks-json, bats,
+# pytest. NOT yet mirrored (still CI-only): bash-guard --test (Hook Guard Tests)
+# and the per-skill suites (Skill Tests, skills/*/tests).
 # The hangul-check CI job runs in pre-commit instead (see .githooks/pre-commit)
 # so Korean text is rejected at commit time before the push attempt.
 # Keep this in sync whenever a CI job is added/changed.
@@ -205,6 +207,16 @@ fi
 # CI job: frontmatter-lint
 echo "Checking SKILL.md frontmatter (scripts/lint-frontmatter.sh)..."
 bash scripts/lint-frontmatter.sh
+
+# CI job: Verify hooks.json (no duplicates, no ghost paths)
+# Runs the verifier against the REAL tree. tests/test_verify_hooks_json.py only
+# exercises this script against synthetic fixtures, so without this step a hook
+# registered at mode 644 - or a registration pointing at a path that does not
+# exist - passes every local gate and fails only in CI. On a Windows/WSL checkout
+# the trap is sharper: `ls -l` shows the working copy as executable even when the
+# index recorded 100644, so the mode looks right locally while the index disagrees.
+echo "Verifying hooks.json registrations (scripts/verify-hooks-json.py)..."
+"$PY" scripts/verify-hooks-json.py
 
 # CI job: hangul-check is enforced in .githooks/pre-commit (commit-time gate).
 

@@ -23,6 +23,7 @@ Korean docstrings/comments since this repo is PUBLIC and English-only.
 import importlib.util
 import json
 import os
+import subprocess
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CANON = os.path.join(REPO_ROOT, "scripts", "verify-hooks-json.py")
@@ -88,6 +89,111 @@ def test_non_executable_script_is_reported(tmp_path):
     assert len(errors) == 1
     assert "Non-executable hook registration" in errors[0]
     assert "mode 644" in errors[0]
+
+
+# --- index-mode (git-tracked) checks ---
+#
+# These cover the failure this check exists for and could not previously see: a
+# hook whose GIT INDEX mode is 100644 while the filesystem reports it executable.
+# A Windows/WSL checkout under /mnt/c reports 0777 for every file, so the
+# filesystem-only check passed locally and only CI (fresh Linux checkout) failed.
+
+
+def _no_git_env():
+    """Environment with every GIT_* variable dropped.
+
+    Under a git hook (pre-push runs this suite) git exports GIT_DIR pointing at
+    the invoking repository; without scrubbing, these fixtures' git calls would
+    operate on the REAL repo instead of tmp_path.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
+def _git(repo, *args):
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True, text=True, env=_no_git_env(), check=False,
+    )
+
+
+def _init_repo(tmp_path):
+    """A real git work tree, or None when git is unusable here."""
+    r = _git(tmp_path, "init", "-q")
+    if r.returncode != 0:
+        return None
+    _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "user.name", "t")
+    return tmp_path
+
+
+def test_index_mode_644_is_reported_even_when_filesystem_says_executable(tmp_path):
+    """The exact CI-only failure: index 100644, filesystem executable."""
+    repo = _init_repo(tmp_path)
+    if repo is None:
+        import pytest
+        pytest.skip("git unavailable")
+    rel = "skills/a/resources/guard.sh"
+    fp = _write_plugin(tmp_path, ['bash "${CLAUDE_PLUGIN_ROOT}/' + rel + '"'], [rel])
+    _git(repo, "add", "-A")
+    # Demote in the INDEX only; the file on disk stays 0755.
+    _git(repo, "update-index", "--chmod=-x", rel)
+    assert (tmp_path / rel).stat().st_mode & 0o100, "fixture must stay executable on disk"
+
+    errors, checked, skipped = mod.check_hooks_file(fp, repo_root=repo)
+    assert checked == 1 and skipped == 0
+    assert len(errors) == 1, errors
+    assert "Non-executable hook registration" in errors[0]
+    assert "100644" in errors[0]
+    assert "update-index --chmod=+x" in errors[0]
+
+
+def test_index_mode_755_passes(tmp_path):
+    """A hook tracked as 100755 is clean."""
+    repo = _init_repo(tmp_path)
+    if repo is None:
+        import pytest
+        pytest.skip("git unavailable")
+    rel = "skills/a/resources/guard.sh"
+    fp = _write_plugin(tmp_path, ['bash "${CLAUDE_PLUGIN_ROOT}/' + rel + '"'], [rel])
+    _git(repo, "add", "-A")
+    _git(repo, "update-index", "--chmod=+x", rel)
+    errors, checked, skipped = mod.check_hooks_file(fp, repo_root=repo)
+    assert errors == [] and checked == 1 and skipped == 0
+
+
+def test_untracked_script_falls_back_to_filesystem_mode(tmp_path):
+    """Untracked -> index has no answer -> the filesystem check still applies."""
+    repo = _init_repo(tmp_path)
+    if repo is None:
+        import pytest
+        pytest.skip("git unavailable")
+    rel = "skills/a/resources/guard.sh"
+    fp = _write_plugin(tmp_path, ['bash "${CLAUDE_PLUGIN_ROOT}/' + rel + '"'], [rel])
+    # Track something else so the index query returns a non-empty map, leaving
+    # this script genuinely untracked rather than exercising the git-absent path.
+    (tmp_path / "placeholder.txt").write_text("x", encoding="utf-8")
+    _git(repo, "add", "placeholder.txt")
+    (tmp_path / rel).chmod(0o644)
+
+    errors, checked, skipped = mod.check_hooks_file(fp, repo_root=repo)
+    assert checked == 1 and skipped == 0
+    assert len(errors) == 1, errors
+    assert "mode 644" in errors[0]
+
+
+def test_one_defect_yields_one_error_not_two(tmp_path):
+    """Index 644 AND filesystem 644 must not double-report the same hook."""
+    repo = _init_repo(tmp_path)
+    if repo is None:
+        import pytest
+        pytest.skip("git unavailable")
+    rel = "skills/a/resources/guard.sh"
+    fp = _write_plugin(tmp_path, ['bash "${CLAUDE_PLUGIN_ROOT}/' + rel + '"'], [rel])
+    _git(repo, "add", "-A")
+    _git(repo, "update-index", "--chmod=-x", rel)
+    (tmp_path / rel).chmod(0o644)
+    errors, _, _ = mod.check_hooks_file(fp, repo_root=repo)
+    assert len(errors) == 1, errors
 
 
 def test_relocated_script_is_caught(tmp_path):
