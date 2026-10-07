@@ -130,6 +130,9 @@ if [ "${1:-}" = "--test" ]; then
   T_TASK=$(make_transcript tracker-task)
   test_case_bash "kubectl apply + task.md read + no skill call" 2 \
     "kubectl apply -f authentik.yaml" "$T_TASK"
+  T_QDRANT_UPSERT=$(make_transcript tracker)
+  test_case_bash "curl POST /points/upsert (real mutation, not search/scroll) + tracker read + no skill call" 2 \
+    'curl -X POST http://192.168.6.176:30333/collections/x/points/upsert -d "{}"' "$T_QDRANT_UPSERT"
 
   echo ""
   echo "=== Negative fixtures (should allow, exit 0) ==="
@@ -173,6 +176,10 @@ if [ "${1:-}" = "--test" ]; then
     "mcp__playwright__browser_navigate" "$(make_transcript tracker)"
   test_case_bash "curl GET, no method flag, not mutating" 0 \
     "curl -s https://example.com/health"
+  test_case_bash "curl POST /points/search (Qdrant read-only query) + tracker read + no skill call" 0 \
+    'curl -s -X POST http://192.168.6.176:30333/collections/x/points/search -d "{}"' "$(make_transcript tracker)"
+  test_case_bash "curl POST /points/scroll (Qdrant read-only query) + tracker read + no skill call" 0 \
+    'curl -s -X POST http://192.168.6.176:30333/collections/x/points/scroll -d "{}"' "$(make_transcript tracker)"
 
   echo ""
   echo "PASS=$PASS FAIL=$FAIL"
@@ -192,6 +199,14 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   if printf '%s' "$COMMAND" | grep -qiE \
     'kubectl[[:space:]]+(apply|create|delete|patch|replace|exec)|terraform[[:space:]]+apply|docker[[:space:]]+(exec|rm|stop|kill|run)|git[[:space:]]+push|gh[[:space:]]+(pr[[:space:]]+merge|issue[[:space:]]+close|release)|curl[^|]*(-X[[:space:]]*|--request[[:space:]=]+)['"'"'"]?(POST|PUT|PATCH|DELETE)|curl[^|]*(--data|-d([[:space:]=]|['"'"'"]))|ak[[:space:]]+shell|vault[[:space:]]+kv[[:space:]]+put|kubectl[[:space:]]+create[[:space:]]+secret|wmux[[:space:]]+browser[[:space:]]+(open|click|type|fill)|browser[[:space:]]+(click|type|fill)'; then
     RISKY=1
+  fi
+  # Qdrant read-only endpoints (/points/search, /points/scroll) are POST-shaped
+  # queries, not mutations -- same reasoning as the curl-GET exclusion above.
+  # The generic curl POST/--data regex above cannot tell these two endpoints
+  # apart from a real write (e.g. /points/upsert, /points/delete), so carve
+  # them out explicitly after the generic match.
+  if [ "$RISKY" = "1" ] && printf '%s' "$COMMAND" | grep -qiE 'curl.*/points/(search|scroll)([?/"'"'"' ]|$)'; then
+    RISKY=0
   fi
 elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then
   RISKY=1
