@@ -120,16 +120,79 @@ Next session: run /cleanup again after the release lands.
 
 # --- further negatives ------------------------------------------------------
 
-@test "no RAG call anywhere in the session leaves the guard silent" {
+@test "no RAG call + completion-report table claiming success is blocked" {
   printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}}]}}' > "$TRANSCRIPT"
   _add_msg '/cleanup run complete
 
 | Step | Result |
 |------|--------|
 | 1. Commit | clean |
+| 3. Knowledge Persist | done |
+| 5. wip task registration | 2 tasks |
+'
+  _run_guard_transcript_only
+  [ "$status" -eq 2 ]
+  echo "$output" | jq -e '.reason | test("skipped")'
+}
+
+@test "no RAG call + report that honestly declares FAILED is allowed" {
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}}]}}' > "$TRANSCRIPT"
+  _add_msg 'cleanup wrap-up
+
+| Step | Result |
+|------|--------|
+| 1. Commit | clean |
+| 3-C.1 RAG | FAILED - queued to the local pending-import queue, retry task registered |
 '
   _run_guard_transcript_only
   [ "$status" -eq 0 ]
+}
+
+@test "no RAG call + mid-progress prose without a report table is allowed" {
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}}]}}' > "$TRANSCRIPT"
+  _add_msg 'Starting /cleanup run - Step 0 TaskList first, then I will commit.'
+  _run_guard_transcript_only
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "no RAG call + report that already carries a RAG row is allowed" {
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls -la"}}]}}' > "$TRANSCRIPT"
+  _add_msg '/cleanup run complete
+
+| Step | Result |
+|------|--------|
+| **3-C.1 RAG Store** | **0 chunks added - no receiver configured in this workspace** |
+'
+  _run_guard_transcript_only
+  [ "$status" -eq 0 ]
+}
+
+# --- marker alignment with the sibling guards ---------------------------------
+
+@test "session-end titled report with a RAG call but no RAG row is blocked" {
+  printf '%s\n' "$RAG_CALL" > "$TRANSCRIPT"
+  _add_msg '## Session Ended
+
+| Step | Result |
+|------|--------|
+| 1. Commit | 1 commit |
+| 5. wip task registration | 2 tasks |
+'
+  _run_guard_transcript_only
+  [ "$status" -eq 2 ]
+}
+
+@test "session-end report phrasing opens the trigger gate" {
+  printf '%s\n' "$RAG_CALL" > "$TRANSCRIPT"
+  _add_msg 'This is the session-end report.
+
+| Step | Result |
+|------|--------|
+| 1. Commit | 1 commit |
+'
+  _run_guard_transcript_only
+  [ "$status" -eq 2 ]
 }
 
 @test "unrelated response that merely mentions qdrant is not blocked" {
