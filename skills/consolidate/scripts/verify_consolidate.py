@@ -365,15 +365,32 @@ class ConsolidateValidator:
             f"| Table rows: {len(table_rows)}"
         )
 
-        if len(table_rows) != total_expected_findings:
+        # total_expected_findings is a floor, not an exact total: it only counts
+        # sources this script can see from the GitHub API (inline comments, human
+        # reviews) plus the Internal Code Review heading count. A reviewer engine
+        # run locally and never posted to GitHub as its own artifact (e.g. a
+        # CodeRabbit CLI pass run against the working tree) contributes real rows
+        # the Summary is right to include, but this script has no path to count
+        # them independently -- so the table legitimately has MORE rows than this
+        # formula predicts. Only under-reporting (missing/dropped findings) is an
+        # actual defect; extra rows from a local-only engine are not.
+        if len(table_rows) < total_expected_findings:
             self.errors.append(
-                f"Consolidated Findings table row count mismatch: expected {total_expected_findings} rows, but table has {len(table_rows)} rows."
+                f"Consolidated Findings table row count mismatch: expected at least {total_expected_findings} rows, but table has {len(table_rows)} rows."
             )
 
-        # 8. Check that superpowers findings are present in the table
-        superpowers_in_table = [r for r in table_rows if len(r) > 1 and "superpowers" in r[1].lower()]
-        if internal_findings > 0 and len(superpowers_in_table) == 0:
-            self.errors.append("Consolidated Findings table is missing superpowers (Internal Code Review) findings.")
+        # 8. Check that Internal Code Review findings are present in the table.
+        # post.md's own Summary body example sources these rows as "Internal Code
+        # Review", not "superpowers" -- "superpowers" is the provenance-link slug
+        # used in the comment TITLE (see INTERNAL_SLUG), not the Source cell text
+        # a table row is expected to carry. Accept either so a Summary written to
+        # the documented convention is not flagged as missing its own findings.
+        internal_review_in_table = [
+            r for r in table_rows
+            if len(r) > 1 and ("superpowers" in r[1].lower() or "internal code review" in r[1].lower())
+        ]
+        if internal_findings > 0 and len(internal_review_in_table) == 0:
+            self.errors.append("Consolidated Findings table is missing Internal Code Review findings.")
 
         # 9. Check SHA existence for all cited commit SHAs
         sha_matches = re.findall(r"(?:commit\s+`?|#)([0-9a-f]{7,40})`?", summary_body, re.IGNORECASE)
