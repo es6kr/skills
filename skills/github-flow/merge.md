@@ -88,18 +88,30 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
    - After consolidate, confirm the Summary comment was posted → continue to Step 3
    - **Forbidden**: asking the user a merge / apply option without the Summary. consolidate must run first
 
-3. **Summary comment exists → count 🔴 Critical (HARD STOP)**:
+3. **Summary comment exists → count UNRESOLVED 🔴 Critical rows (HARD STOP)**:
+
+   **Row-aware, not a whole-body substring scan (HARD STOP)**: `consolidate/post.md`'s own table convention keeps a finding's severity classification (`🔴 Critical`) in its `Source / Classification` cell **forever**, even after the finding is `Status: 🟢 Fixed` — the classification cell is a permanent audit-trail record, not a live-risk indicator. A substring count of "🔴 Critical" anywhere in the Summary body therefore also counts *already-resolved* Critical findings, which would block a merge that is actually safe. Count only rows whose `Status` cell is still unresolved (i.e. not `🟢 Fixed` and not `⚪ Rejected`):
 
    ```bash
-   # Count 🔴 Critical entries in the Summary body.
-   # CROSS-PLATFORM (HARD STOP): NEVER `grep -c '🔴 Critical'` — Windows Git Bash emoji
-   # byte-matching returns false 0 (silent merge-gate bypass). Count inside jq (UTF-8 native):
+   # Count rows where Classification contains "🔴 Critical" AND Status is still
+   # unresolved (not 🟢 Fixed, not ⚪ Rejected). Parses the 5-column findings
+   # table (# | Source/Classification | Location | Finding | Status) row by row
+   # instead of scanning the whole body for the substring "Critical".
    gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments \
-     --jq '[.[] | select(.body | startswith("## AI Review Summary")) | .body | [scan("🔴 Critical")] | length] | add // 0'
+     --jq '
+       [.[] | select(.body | startswith("## AI Review Summary")) | .body][0]
+       | split("\n")
+       | map(select(startswith("|") and (contains("---") | not)))
+       | map(split("|"))
+       | map(select(length >= 6))
+       | map(select((.[2] // "") | test("🔴 Critical")))
+       | map(select(((.[5] // "") | test("🟢|⚪")) | not))
+       | length
+     '
    ```
 
-   - **🔴 Critical ≥ 1 → merge is absolutely forbidden**. Address the Critical items in code, then refresh the Summary before merging. "deferred" is not allowed — Critical items must be addressed
-   - 🔴 Critical 0 + `Actionable > 0` not yet addressed → use AskUserQuestion to confirm the action (apply / deferred / skip)
+   - **Unresolved 🔴 Critical rows ≥ 1 → merge is absolutely forbidden**. Address the Critical items in code, then refresh the Summary before merging. "deferred" is not allowed — Critical items must be addressed (`Status: 🟢 Fixed (commit <sha>)` once the code is actually fixed, including when fixed by removing/reverting the code the finding targeted)
+   - Unresolved 🔴 Critical = 0 + `Actionable > 0` not yet addressed → use AskUserQuestion to confirm the action (apply / deferred / skip)
    - If everything is addressed or explicitly deferred, continue to Step 2.5
 
 **Forbidden patterns**:
@@ -664,11 +676,23 @@ Right before authoring the merge-recommendation AskUserQuestion, verify all six 
 # 1. CI status
 gh pr checks <N> --json bucket -q '[.[] | .bucket] | group_by(.) | map({(.[0]): length}) | add'
 
-# 2. AI Review Summary — count of 🔴 Critical (forbid merge if ≥ 1)
+# 2. AI Review Summary — count of UNRESOLVED 🔴 Critical rows (forbid merge if ≥ 1)
+# Row-aware (see Step 2 "Row-aware, not a whole-body substring scan" above): a
+# whole-body substring count also counts already-🟢-Fixed Critical rows, which
+# post.md's audit-trail convention keeps in the table forever.
 # CROSS-PLATFORM (HARD STOP): count in jq (UTF-8 native), NOT `grep -c '🔴 Critical'`
 # (Windows Git Bash emoji byte-match → false 0 → silent merge-gate bypass).
 CRIT=$(gh api repos/{owner}/{repo}/issues/<N>/comments \
-  --jq '[.[] | select(.body | startswith("## AI Review Summary")) | .body | [scan("🔴 Critical")] | length] | add // 0')
+  --jq '
+    [.[] | select(.body | startswith("## AI Review Summary")) | .body][0]
+    | split("\n")
+    | map(select(startswith("|") and (contains("---") | not)))
+    | map(split("|"))
+    | map(select(length >= 6))
+    | map(select((.[2] // "") | test("🔴 Critical")))
+    | map(select(((.[5] // "") | test("🟢|⚪")) | not))
+    | length
+  ')
 [ "$CRIT" -ge 1 ] && echo "BLOCKED: Critical unresolved ($CRIT)"
 
 # 2b. AI Review actionable status
