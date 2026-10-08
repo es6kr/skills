@@ -246,6 +246,15 @@ class ConsolidateValidator:
                 f"Comment {both[-1].get('id')} is titled as BOTH the Internal Code Review and "
                 f"the AI Review Summary. They must be two separate comments.")
 
+        # Graph Causal Validation Gate:
+        # A summary comment without a preceding internal review comment breaks the
+        # causal lineage DAG (Finding -> InternalReview -> AISummary).
+        if summaries and not internal_reviews:
+            self.errors.append(
+                f"Broken review causality: Summary comment {summaries[-1].get('id')} is disconnected. "
+                f"Missing preceding internal review comment in PR {self.pr_num} causal DAG."
+            )
+
         if not internal_reviews or not summaries:
             return False
 
