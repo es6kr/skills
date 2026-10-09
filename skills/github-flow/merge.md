@@ -64,6 +64,18 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 
 ### 2. AI Review Summary — every Actionable item addressed
 
+**Scope gate (HARD STOP — run BEFORE the default procedure below)**: this entire condition applies **only when the PR's base is the shared canonical branch** (`master` / `main`). Resolve the base per PR first:
+
+```bash
+gh pr view <PR_NUMBER> -R <owner>/<repo> --json baseRefName --jq '.baseRefName'
+```
+
+- Base is `master` / `main` → the condition applies in full; continue to the default procedure.
+- Base is an intermediate/staging branch (`develop`, `next-feat`, `next-fix`, …) → **the condition does not apply.** Do not auto-invoke `/consolidate pr`, do not require a Summary to exist, and do not treat a bot review's absence as a gap. Skip ahead to condition 3.
+- Do not infer the base from the repository's default branch. A repository whose default is `develop` can still take `master` as its real PR base, and the reverse also occurs — resolve it per PR.
+
+**Why the scoping exists**: a repository with frequent parallel PRs may batch review deliberately — individual PRs into a staging branch accumulate without AI review, and the accumulated commits get one consolidated review when that staging branch opens its promotion PR into the canonical branch. Under that model, requiring a Summary on each staging-bound PR does not add a review; it duplicates the one the promotion PR will carry, and it manufactures review artifacts on PRs whose content is reviewed later as a batch. Whether a given repository uses this model is a property of that repository's branch-promotion convention, so this gate resolves the base rather than assuming either answer. On such a repository a draft PR is likewise outside this condition — a draft has not opted into review, and marking it ready purely to obtain a bot review is a lifecycle decision belonging to the author, not a step for satisfying this gate.
+
 **Default procedure (HARD STOP — strict order)**:
 
 0. **Verify a real Copilot review error** (explicit error keywords only — beware of false positives):
