@@ -60,18 +60,11 @@ print(ti.get("command") or d.get("command") or "")
 # guards in this hook family).
 sanitized_command=$(printf '%s' "$command" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
 
-# The command itself is a split-pane / list check — always allow. It is never a
-# create, so it has nothing to gate. Note what is deliberately NOT happening
-# here any more: no marker is stamped, because a later create must stand on its
-# own named exception rather than on the fact that a list ran first.
-if echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+(list|split)\b"; then
-  exit 0
-fi
-
+env_prefix="([A-Za-z_][A-Za-z0-9_]*=[^;&|[[:space:]]]*[[:space:]]+)*"
 is_worktree_create=0
 is_terminal_create=0
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(${orca_bin_pattern})[[:space:]]+worktree[[:space:]]+create\b" && is_worktree_create=1
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+create\b" && is_terminal_create=1
 
 if [ "$is_worktree_create" -eq 0 ] && [ "$is_terminal_create" -eq 0 ]; then
   exit 0
@@ -85,7 +78,8 @@ fi
 #   ORCA_FILE_CONFLICT=1           both sessions must edit the same files
 # "The new session's work is unrelated to what the current panes are doing" is
 # NOT one of them: below the pane limit, splitting is the default regardless of topic.
-echo "$sanitized_command" | grep -qE 'ORCA_NEW_TARGET_APPROVED=1|ORCA_PANE_LIMIT_REACHED=1|ORCA_NEW_WORKSPACE_APPROVED=1|ORCA_FILE_CONFLICT=1' && exit 0
+# Approval must belong to the guarded create, not an earlier command.
+echo "$sanitized_command" | grep -qE "(^|[;&|][[:space:]]*)${env_prefix}(ORCA_NEW_TARGET_APPROVED|ORCA_NEW_WORKSPACE_APPROVED|ORCA_PANE_LIMIT_REACHED|ORCA_FILE_CONFLICT)=1([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^;&|[[:space:]]]*)*[[:space:]]+(${orca_bin_pattern})[[:space:]]+(terminal|worktree)[[:space:]]+create\b" && exit 0
 
 # NOTE: `--worktree active` is deliberately NOT an exemption here. It attaches to
 # the CURRENT worktree instead of creating a new one, but it still opens a new

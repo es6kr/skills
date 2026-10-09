@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.13.0](https://github.com/es6kr/skills/compare/git-repo-v0.12.1...git-repo-v0.13.0) (2026-10-06)
+
+
+### Features
+
+* **hook-kit:** declarative step-dependency enforcement engine ([9e3d188](https://github.com/es6kr/skills/commit/9e3d18898453d20a947b74b24032e61bf13bc297))
+
+## [0.12.1](https://github.com/es6kr/skills/compare/git-repo-v0.12.0...git-repo-v0.12.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **git-repo:** add COND-HOOK-REG check for hooks.json integrity in doctor ([#590](https://github.com/es6kr/skills/issues/590)) ([f79bd24](https://github.com/es6kr/skills/commit/f79bd24bc783f488fcab834137efbbf485e579df))
+* **git-repo:** document bash-guard-safe resolution for proven-redundant rebase picks ([a085426](https://github.com/es6kr/skills/commit/a08542616db356db9d4dba63cef72d420d4c40c0))
+* **git-repo:** document upstream-tracking gotcha when branching off a remote-tracking ref ([#583](https://github.com/es6kr/skills/issues/583)) ([04004f9](https://github.com/es6kr/skills/commit/04004f9c506f8b99598b8ea25deb0e928ab632c4))
+* **git-repo:** register safe-relocate in the Topics table ([#591](https://github.com/es6kr/skills/issues/591)) ([6eddf07](https://github.com/es6kr/skills/commit/6eddf079e242fcdae4a3dd94de01410ffb6cbf82))
+
 ## [0.12.0](https://github.com/es6kr/skills/compare/git-repo-v0.11.1...git-repo-v0.12.0) (2026-09-24)
 
 

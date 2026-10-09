@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.1](https://github.com/es6kr/skills/compare/session-v0.14.0...session-v0.14.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **session:** make Antigravity context usage compaction-aware and count thinking tokens ([#588](https://github.com/es6kr/skills/issues/588)) ([3b5d7da](https://github.com/es6kr/skills/commit/3b5d7dadb9bab92be51b92b4bb5d19a43edfa518))
+* **session:** resolve context-usage-now transcript via ancestor project dir ([#598](https://github.com/es6kr/skills/issues/598)) ([10c80b2](https://github.com/es6kr/skills/commit/10c80b2ee27ab6f05a6bd712e6fa91191673afa7))
+
 ## [0.14.0](https://github.com/es6kr/skills/compare/session-v0.13.0...session-v0.14.0) (2026-09-27)
 
 
