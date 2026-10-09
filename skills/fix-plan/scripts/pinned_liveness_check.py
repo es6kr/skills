@@ -177,6 +177,73 @@ def run(tracker_path, roadmap_path=None):
     return report
 
 
+def auto_graduate(tracker_path: str) -> dict:
+    """Safely graduates resolved pinned missions: removes them from the pinned header
+    and appends a graduation entry to the ## Completed section."""
+    path = Path(tracker_path)
+    text = path.read_text(encoding="utf-8")
+    sections = split_sections(text)
+    missions = extract_missions(sections.get(PINNED_KEY, []))
+    evaluated = [evaluate_mission(m, sections) for m in missions]
+    resolved = [m for m in evaluated if m["status"] == "resolved"]
+
+    if not resolved:
+        return {"tracker": str(tracker_path), "graduated_count": 0, "graduated": []}
+
+    resolved_labels = {m["label"] for m in resolved}
+    lines = text.splitlines(keepends=True)
+
+    new_lines = []
+    in_pinned = False
+    completed_idx = -1
+
+    for i, line in enumerate(lines):
+        if line.startswith("#"):
+            pass
+
+        # Check if line contains a resolved pinned mission
+        is_resolved_pinned_line = False
+        m_label = MISSION_LABEL_RE.search(line)
+        if m_label and m_label.group(1).strip() in resolved_labels:
+            is_resolved_pinned_line = True
+
+        if is_resolved_pinned_line:
+            continue
+
+        if line.strip().startswith("## Completed"):
+            completed_idx = len(new_lines)
+
+        new_lines.append(line)
+
+    # Append graduation notes to Completed section
+    grad_entries = []
+    import datetime
+    today = datetime.date.today().isoformat()
+    for m in resolved:
+        grad_entries.append(f"- {today} -- Graduated pinned mission: {m['label']}\n")
+
+    if completed_idx != -1:
+        # Insert after "## Completed" header
+        # find first non-empty line or insert directly below
+        insert_pos = completed_idx + 1
+        while insert_pos < len(new_lines) and new_lines[insert_pos].strip() == "":
+            insert_pos += 1
+        for entry in grad_entries:
+            new_lines.insert(insert_pos, entry)
+    else:
+        # Append a new Completed section
+        new_lines.append("\n## Completed\n\n")
+        new_lines.extend(grad_entries)
+
+    path.write_text("".join(new_lines), encoding="utf-8")
+
+    return {
+        "tracker": str(tracker_path),
+        "graduated_count": len(resolved),
+        "graduated": [m["label"] for m in resolved],
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Pinned-mission liveness check for fix_plan.md/checklist.md")
     parser.add_argument("tracker", help="Path to fix_plan.md or checklist.md")
@@ -185,8 +252,19 @@ def main():
         help="Optional roadmap markdown file; its first unchecked '- [ ]' line "
              "becomes the next-mission candidate when a pinned mission resolves"
     )
+    parser.add_argument("--auto-graduate", action="store_true", help="Automatically remove resolved missions from pinned header")
     parser.add_argument("--json", action="store_true", help="Emit the full report as JSON")
     args = parser.parse_args()
+
+    if args.auto_graduate:
+        res = auto_graduate(args.tracker)
+        if args.json:
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+        else:
+            print(f"graduated_count={res['graduated_count']}")
+            for g in res["graduated"]:
+                print(f"Graduated: {g}")
+        return
 
     report = run(args.tracker, args.roadmap_doc)
 
