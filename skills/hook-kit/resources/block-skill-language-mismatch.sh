@@ -11,13 +11,27 @@
 # requires hook implementation in the same fix's Step 2 — this script.
 #
 # Detection details:
-#   - Language signal = Hangul presence (`[가-힣]`) in the description field.
-#     English description → zero Hangul → strict mode.
-#     Korean description  → 1+ Hangul → permissive (Korean skills may use
-#                                      English technical terms).
+#   - Language signal, in priority order (matches
+#     ~/.agents/rules/language.md's own precedence):
+#       1. Explicit `language:` frontmatter field, if present — `language: ko`
+#          forces permissive, `language: en` forces strict, regardless of
+#          what the description field happens to say.
+#       2. Hangul presence (`[가-힣]`) in the description field, when no
+#          `language:` field is set. English description → zero Hangul →
+#          strict mode. Korean description → 1+ Hangul → permissive (Korean
+#          skills may use English technical terms).
 #   - File scope = `.md` files only (data/code files skipped).
 #   - Skill dir resolution = nearest ancestor directory that contains
 #     `SKILL.md`.
+#
+# Locale pin: the Hangul range checks below need grep to decode multi-byte
+# UTF-8 as single codepoints. Under a non-UTF-8 LC_CTYPE (e.g. the bare "C"
+# locale some CI runners default to when no LANG/LC_ALL is explicitly set),
+# both a literal bracket range and a \x{...} PCRE codepoint escape silently
+# fail to match — verified empirically (CI: PR #619 job 113737927612;
+# local repro: LANG=C LC_ALL=C reproduces the exact T1/T5 false-allow).
+# Pin LC_ALL here so detection is correct regardless of the caller's locale.
+export LC_ALL=C.UTF-8
 
 INPUT=$(cat)
 
@@ -53,39 +67,67 @@ done
 
 [[ -f "$SKILL_ROOT/SKILL.md" ]] || exit 0
 
-# Extract the description field. Handles both single-line
-# (`description: text`) and block-scalar (`description: |\n  text`) forms.
-DESC=$(awk '
-  /^description:[[:space:]]*\|/ { in_block=1; next }
-  in_block && /^[^[:space:]]/ { in_block=0 }
-  in_block { print; next }
-  /^description:/ { sub(/^description:[[:space:]]*/, ""); print; exit }
+# Explicit frontmatter `language:` field — authoritative when present.
+# Only read it from inside the frontmatter block (between the first two
+# `---` lines) so a `language:` mention elsewhere in the body can't
+# accidentally override the skill's declared language.
+LANG_FIELD=$(awk '
+  /^---[[:space:]]*$/ { fm++; if (fm == 2) exit; next }
+  fm == 1 && /^language:[[:space:]]*/ {
+    sub(/^language:[[:space:]]*/, "");
+    sub(/[[:space:]]*#.*$/, "");
+    print;
+    exit
+  }
 ' "$SKILL_ROOT/SKILL.md")
 
-# Skill language: English when zero Hangul in description.
-if echo "$DESC" | grep -qE '[가-힣]'; then
-  # Korean skill — permissive, exit.
-  exit 0
-fi
+case "$LANG_FIELD" in
+  ko) exit 0 ;;   # Explicit Korean — permissive, skip the heuristic entirely.
+  en) ;;          # Explicit English — fall through to strict-mode content check.
+  *)
+    # No explicit override — fall back to the description-Hangul heuristic.
+    # Extract the description field. Handles both single-line
+    # (`description: text`) and block-scalar (`description: |\n  text`) forms.
+    DESC=$(awk '
+      /^description:[[:space:]]*\|/ { in_block=1; next }
+      in_block && /^[^[:space:]]/ { in_block=0 }
+      in_block { print; next }
+      /^description:/ { sub(/^description:[[:space:]]*/, ""); print; exit }
+    ' "$SKILL_ROOT/SKILL.md")
+
+    # Skill language: English when zero Hangul in description.
+    # PCRE codepoint escape, not a literal bracket-range — a literal [가-힣]
+    # depends on the shell's LC_COLLATE for multi-byte range matching, which
+    # silently fails to match on GitHub Actions' default runner locale (see
+    # the repo's own test.yml "Korean Text Check" job for the same pattern).
+    if echo "$DESC" | grep -qP '[\x{AC00}-\x{D7A3}]'; then
+      # Korean skill — permissive, exit.
+      exit 0
+    fi
+    ;;
+esac
 
 # English skill — inspect the new content for Hangul.
 NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty' 2>/dev/null)
 [[ -z "$NEW_CONTENT" ]] && exit 0
 
-if ! echo "$NEW_CONTENT" | grep -qE '[가-힣]'; then
+if ! echo "$NEW_CONTENT" | grep -qP '[\x{AC00}-\x{D7A3}]'; then
   # Pure English content — allow.
   exit 0
 fi
 
 # Collect the first 3 violating lines for the error message.
-VIOLATIONS=$(echo "$NEW_CONTENT" | grep -nE '[가-힣]' | head -3)
+VIOLATIONS=$(echo "$NEW_CONTENT" | grep -nP '[\x{AC00}-\x{D7A3}]' | head -3)
+
+LANG_SOURCE="description (zero Hangul, no language: override)"
+[[ "$LANG_FIELD" == "en" ]] && LANG_SOURCE="explicit frontmatter language: en"
 
 {
   echo "DENIED: Korean text in an English-described skill file."
   echo ""
   echo "Target file:     $FILE_PATH"
   echo "Skill root:      $SKILL_ROOT"
-  echo "Description lang: English (zero Hangul in SKILL.md description)"
+  echo "Description lang: English ($LANG_SOURCE)"
   echo ""
   echo "Violating lines (first 3):"
   while IFS= read -r line; do
