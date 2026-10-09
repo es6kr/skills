@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/es6kr/skills/compare/git-repo-v0.12.1...git-repo-v0.13.0) (2026-10-06)
+
+
+### Features
+
+* **hook-kit:** declarative step-dependency enforcement engine ([9e3d188](https://github.com/es6kr/skills/commit/9e3d18898453d20a947b74b24032e61bf13bc297))
+
 ## [0.12.1](https://github.com/es6kr/skills/compare/git-repo-v0.12.0...git-repo-v0.12.1) (2026-10-04)
 
 

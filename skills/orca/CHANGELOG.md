@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/es6kr/skills/compare/orca-v0.4.1...orca-v0.5.0) (2026-10-06)
+
+
+### Features
+
+* **hook-kit:** declarative step-dependency enforcement engine ([9e3d188](https://github.com/es6kr/skills/commit/9e3d18898453d20a947b74b24032e61bf13bc297))
+
+
+### Bug Fixes
+
+* **orca:** bind approval assignment specifically to guarded terminal create command ([adcae2d](https://github.com/es6kr/skills/commit/adcae2d484da14276b434c8673d57e14e95accd0))
+* **orca:** remove early list/split allow branch to prevent compound create bypass ([8c9c893](https://github.com/es6kr/skills/commit/8c9c8933b07b1b52a48ac3fd624e47f856212005))
+* **orca:** stop letting `terminal list` disarm the split-check gate ([#586](https://github.com/es6kr/skills/issues/586)) ([10ae96e](https://github.com/es6kr/skills/commit/10ae96e5051e74c372964741015bd8090d87b2bd))
+
 ## [0.4.1](https://github.com/es6kr/skills/compare/orca-v0.4.0...orca-v0.4.1) (2026-09-30)
 
 
