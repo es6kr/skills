@@ -105,5 +105,5 @@ rc=$?
 check "compound command with rebase --continue blocks on residue" 2 $rc
 
 echo ""
-echo "Result: $PASS_COUNT passed, $FAIL_COUNT failed" 2>/dev/null || echo "Result: $PASS passed, $FAIL failed"
+echo "Result: $PASS passed, $FAIL failed"
 [[ "$FAIL" -eq 0 ]] || exit 1
