@@ -56,7 +56,7 @@ HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBIL
 # Used only by the skipped-ingest branch at the bottom of this file. A report that
 # declares the failure honestly is NOT the failure mode being guarded, so the
 # failure vocabulary is checked first and wins over the success vocabulary.
-HG_CLEANUP_SUCCESS_CLAIM="${HG_CLEANUP_SUCCESS_CLAIM:+${HG_CLEANUP_SUCCESS_CLAIM}|}complete|completed|finished|Session Ended|success"
+HG_CLEANUP_SUCCESS_CLAIM="${HG_CLEANUP_SUCCESS_CLAIM:+${HG_CLEANUP_SUCCESS_CLAIM}|}(^|[^[:alnum:]_])(complete|completed|finished|Session Ended|success)([^[:alnum:]_]|$)"
 HG_CLEANUP_FAILURE_CLAIM="${HG_CLEANUP_FAILURE_CLAIM:+${HG_CLEANUP_FAILURE_CLAIM}|}FAILED|failed|queued|pending-import|retry task"
 
 INPUT=$(cat)
@@ -151,8 +151,10 @@ if [[ "$HAS_RAG_CALL" -eq 0 ]]; then
   if ! echo "$RESPONSE" | grep -qE '^[[:space:]]*\|'; then
     exit 0   # not a report table — mid-cleanup progress message
   fi
-  if echo "$RESPONSE" | grep -qiE "$HG_CLEANUP_FAILURE_CLAIM"; then
-    exit 0   # failure declared honestly; nothing to hide
+  # Failure vocabulary alone (e.g. a Tests row saying "0 failed") is not a
+  # cleanup/RAG failure declaration. Require the failure status on its subject.
+  if echo "$RESPONSE" | grep -qiE "(cleanup([[:space:]]+(run|wrap-up))?|RAG([[:space:]]+(store|ingest|import))?)[[:space:]:*|=-]+($HG_CLEANUP_FAILURE_CLAIM)([^[:alnum:]_]|$)"; then
+    exit 0   # cleanup/RAG failure declared honestly; nothing to hide
   fi
   if ! echo "$RESPONSE" | grep -qiE "$HG_CLEANUP_SUCCESS_CLAIM"; then
     exit 0   # no success claim

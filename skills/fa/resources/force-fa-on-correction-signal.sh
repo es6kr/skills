@@ -83,9 +83,9 @@ FA_EXISTING_CLAIM_NEUTRAL="${FA_EXISTING_CLAIM_NEUTRAL:-(did|does|do|is|are|was|
 # A bare apology is itself a fault acknowledgement, so it satisfies both halves.
 FA_APOLOGY_PATTERN="${FA_APOLOGY_PATTERN:-${KO_JOESONG}|sorry|apolog(y|ies|ise|ize)|my (bad|mistake)}"
 
-FA_FAULT_SIGNAL="${FA_FAULT_SIGNAL:-${KO_NURAK}|${KO_JEONGJEONG}|${KO_BUJEOKJEOL}|${KO_JALMOT}|${KO_ORYU}|${KO_SILSU}|${KO_PPAEMEOK}|${KO_PPATTEU}|${FA_APOLOGY_PATTERN}|omitt?(ed|ing)|omission|left[[:space:]]+out|skipped|missing|missed|forgot|inappropriate|incorrect|wrong|mistake|misread|misreported|fabricat(ed|ion)|${FA_EXISTING_CLAIM_ACCUSATORY}|${FA_EXISTING_CLAIM_NEUTRAL}}"
+FA_FAULT_SIGNAL="${FA_FAULT_SIGNAL:-${KO_NURAK}|${KO_JEONGJEONG}|${KO_BUJEOKJEOL}|${KO_JALMOT}|${KO_ORYU}|${KO_SILSU}|${KO_PPAEMEOK}|${KO_PPATTEU}|${FA_APOLOGY_PATTERN}|omit(ted|ting)?|omission|left[[:space:]]+out|skipped|missing|missed|forgot|inappropriate|incorrect|wrong|mistake|misread|misreported|fabricat(ed|ion)|${FA_EXISTING_CLAIM_ACCUSATORY}|${FA_EXISTING_CLAIM_NEUTRAL}}"
 
-FA_AGENT_FRAME="${FA_AGENT_FRAME:-${KO_WAE}|${KO_NEGA}|${KO_NIGA}|${KO_DANGSIN}|${KO_HAESSEO}|${KO_HAENNA}|${FA_APOLOGY_PATTERN}|why[[:space:]]+(did|do|does|is|are|was|were|have|not|again|keep)|you[[:space:]]+(did|do|forgot|missed|skipped|ignored|never|again)|your[[:space:]]+(answer|report|claim|analysis|output|change|edit|commit|summary|last)|don.?t[[:space:]]+(do|just|assume|guess)|stop[[:space:]]+(doing|assuming)|${FA_EXISTING_CLAIM_ACCUSATORY}}"
+FA_AGENT_FRAME="${FA_AGENT_FRAME:-${KO_WAE}|${KO_NEGA}|${KO_NIGA}|${KO_DANGSIN}|${KO_HAESSEO}|${KO_HAENNA}|^[[:space:]]*(${KO_JOESONG}[^[:space:]]*|${FA_APOLOGY_PATTERN})[[:space:].!]*$|my[[:space:]]+(bad|mistake)|why[[:space:]]+((did|do|does|is|are|was|were|have)[[:space:]]+(not[[:space:]]+)?you|not|again|keep)|you[[:space:]]+(did|do|forgot|missed|skipped|ignored|never|again)|your[[:space:]]+(answer|report|claim|analysis|output|change|edit|commit|summary|last)|don.?t[[:space:]]+(do|just|assume|guess)|stop[[:space:]]+(doing|assuming)|${FA_EXISTING_CLAIM_ACCUSATORY}}"
 
 # Explicit triggers that are already a correction by definition.
 FA_EXPLICIT_TRIGGER="${FA_EXPLICIT_TRIGGER:-^[[:space:]]*(/(fix|fa)([[:space:]]|$)|(fix|fa):)}"
@@ -254,7 +254,20 @@ if idx < 0:
 tail = "\n".join(raw for _, raw in rows[idx + 1:])
 has_fa = "1" if '"'"'"skill":"fa"'"'"' in tail.replace(" ", "") or '"'"'"skill":"es6kr:fa"'"'"' in tail.replace(" ", "") else ""
 compacted = "1" if '"'"'"isCompactSummary":true'"'"' in tail.replace(" ", "") else ""
-print("\t".join([base64.b64encode(text.encode("utf-8")).decode("ascii"), has_fa, compacted]))
+# Only assistant prose after this user turn can acknowledge an agent apology.
+assistant_text = ""
+for d, _ in rows[idx + 1:]:
+    if d.get("type") == "assistant":
+        content = (d.get("message") or {}).get("content", [])
+        if isinstance(content, str):
+            assistant_text = content
+        elif isinstance(content, list):
+            prose = " ".join(b.get("text", "") for b in content
+                             if isinstance(b, dict) and b.get("type") == "text")
+            if prose:
+                assistant_text = prose
+print("\t".join([base64.b64encode(text.encode("utf-8")).decode("ascii"), has_fa, compacted,
+                  base64.b64encode(assistant_text.encode("utf-8")).decode("ascii")]))
 ' 2>/dev/null)" || STATE=""
 
   if [ -z "$STATE" ]; then exit 0; fi
@@ -267,7 +280,14 @@ print("\t".join([base64.b64encode(text.encode("utf-8")).decode("ascii"), has_fa,
   if [ -n "$HAS_FA" ] || [ -n "$COMPACTED" ]; then exit 0; fi
 
   VERDICT="$(printf '%s' "$B64" | base64 -d 2>/dev/null | classify)"
-  if [ "$VERDICT" != "CORRECTION" ]; then exit 0; fi
+  if [ "$VERDICT" != "CORRECTION" ]; then
+    # A polite user request is not an agent apology. At Stop, however, an
+    # assistant acknowledging its own fault must still run the FA procedure.
+    ASSISTANT_TEXT="$(printf '%s' "$STATE" | cut -f4 | base64 -d 2>/dev/null | sanitize)"
+    if ! printf '%s' "$ASSISTANT_TEXT" | grep -qiE "$FA_APOLOGY_PATTERN"; then
+      exit 0
+    fi
+  fi
 
   python3 -c 'import json,sys; print(json.dumps({"decision":"block","reason":sys.argv[1]}))' "$DIRECTIVE"
   exit 0

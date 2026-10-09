@@ -24,14 +24,18 @@
 #   - Skill dir resolution = nearest ancestor directory that contains
 #     `SKILL.md`.
 #
-# Locale pin: the Hangul range checks below need grep to decode multi-byte
-# UTF-8 as single codepoints. Under a non-UTF-8 LC_CTYPE (e.g. the bare "C"
-# locale some CI runners default to when no LANG/LC_ALL is explicitly set),
-# both a literal bracket range and a \x{...} PCRE codepoint escape silently
-# fail to match — verified empirically (CI: PR #619 job 113737927612;
-# local repro: LANG=C LC_ALL=C reproduces the exact T1/T5 false-allow).
-# Pin LC_ALL here so detection is correct regardless of the caller's locale.
-export LC_ALL=C.UTF-8
+# Python Unicode codepoint detection works with BSD grep and the C locale.
+# A detector error must deny rather than be mistaken for English-only content.
+hangul_lines() {
+  python3 -c '
+import sys
+text = sys.stdin.buffer.read().decode("utf-8")
+lines = [(i, line) for i, line in enumerate(text.splitlines(), 1)
+         if any(0xAC00 <= ord(c) <= 0xD7A3 for c in line)]
+for i, line in lines[:3]:
+    print(f"{i}:{line}")
+'
+}
 
 INPUT=$(cat)
 
@@ -76,6 +80,7 @@ LANG_FIELD=$(awk '
   fm == 1 && /^language:[[:space:]]*/ {
     sub(/^language:[[:space:]]*/, "");
     sub(/[[:space:]]*#.*$/, "");
+    sub(/[[:space:]]+$/, "");
     print;
     exit
   }
@@ -96,11 +101,8 @@ case "$LANG_FIELD" in
     ' "$SKILL_ROOT/SKILL.md")
 
     # Skill language: English when zero Hangul in description.
-    # PCRE codepoint escape, not a literal bracket-range — a literal [가-힣]
-    # depends on the shell's LC_COLLATE for multi-byte range matching, which
-    # silently fails to match on GitHub Actions' default runner locale (see
-    # the repo's own test.yml "Korean Text Check" job for the same pattern).
-    if echo "$DESC" | grep -qP '[\x{AC00}-\x{D7A3}]'; then
+    DESC_HANGUL=$(printf '%s' "$DESC" | hangul_lines) || exit 2
+    if [[ -n "$DESC_HANGUL" ]]; then
       # Korean skill — permissive, exit.
       exit 0
     fi
@@ -111,13 +113,11 @@ esac
 NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty' 2>/dev/null)
 [[ -z "$NEW_CONTENT" ]] && exit 0
 
-if ! echo "$NEW_CONTENT" | grep -qP '[\x{AC00}-\x{D7A3}]'; then
-  # Pure English content — allow.
-  exit 0
+# Collect the first 3 violating lines; Python failure is a denial, not an allow.
+VIOLATIONS=$(printf '%s' "$NEW_CONTENT" | hangul_lines) || exit 2
+if [[ -z "$VIOLATIONS" ]]; then
+  exit 0  # Pure English content — allow.
 fi
-
-# Collect the first 3 violating lines for the error message.
-VIOLATIONS=$(echo "$NEW_CONTENT" | grep -nP '[\x{AC00}-\x{D7A3}]' | head -3)
 
 LANG_SOURCE="description (zero Hangul, no language: override)"
 [[ "$LANG_FIELD" == "en" ]] && LANG_SOURCE="explicit frontmatter language: en"
