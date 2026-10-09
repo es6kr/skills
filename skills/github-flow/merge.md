@@ -67,10 +67,12 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 **Scope gate (HARD STOP — run BEFORE the default procedure below)**: this entire condition applies **only when the PR's base is the shared canonical branch** (`master` / `main`). Resolve the base per PR first:
 
 ```bash
-gh pr view <PR_NUMBER> -R <owner>/<repo> --json baseRefName --jq '.baseRefName'
+gh pr view <PR_NUMBER> -R <owner>/<repo> --json baseRefName,isDraft \
+  --jq '(.isDraft | not) and (.baseRefName == "main" or .baseRefName == "master")'
 ```
 
-- Base is `master` / `main` → the condition applies in full; continue to the default procedure.
+- Result `true` → ready-for-review PR into `master` / `main`; the condition applies in full.
+- Draft (`isDraft: true`) → skip this Summary/consolidate condition. Do not mark ready or manufacture reviews to satisfy it.
 - Base is an intermediate/staging branch (`develop`, `next-feat`, `next-fix`, …) → **the condition does not apply.** Do not auto-invoke `/consolidate pr`, do not require a Summary to exist, and do not treat a bot review's absence as a gap. Skip ahead to condition 3.
 - Do not infer the base from the repository's default branch. A repository whose default is `develop` can still take `master` as its real PR base, and the reverse also occurs — resolve it per PR.
 
@@ -89,10 +91,24 @@ gh pr view <PR_NUMBER> -R <owner>/<repo> --json baseRefName --jq '.baseRefName'
 
    **Forbidden**: declaring a partial failure just because the `Reviewed changes` section is missing or the bodyLen is short. Copilot does post short reviews to simple PRs (e.g. PR #110 merged, bodyLen 2040, inline comments only, no `Reviewed changes` section).
 
-1. **Check whether the AI Review Summary comment exists**:
+1. **Read the latest canonical AI Review Summary across issue comments AND Formal Reviews**. Fetch all pages, combine before sorting by publication timestamp, and retain the selected artifact's medium and ID. Never use `[0]` on API order or select a phrase inside a walkthrough. API failure is a hard stop, not an empty Summary:
    ```bash
-   gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --jq '.[] | select(.body | startswith("## AI Review Summary"))'
+   latest_summary() {
+     local comments reviews
+     comments=$(gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --paginate --slurp) || return 1
+     reviews=$(gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews --paginate --slurp) || return 1
+     jq -n --argjson comments "$comments" --argjson reviews "$reviews" '
+       [($comments[][] | . + {medium: "comment"}),
+        ($reviews[][] | . + {medium: "review"})]
+       | map(select((.body // "") | test("^\\s*#{1,6} AI Review Summary[^\\n]*\\[receiving-code-review\\]\\(")))
+       | sort_by(.created_at // .submitted_at)
+       | last // null
+     '
+   }
+   SUMMARY=$(latest_summary) || { echo "BLOCKED: Summary API lookup failed"; exit 1; }
+   printf '%s\n' "$SUMMARY" | jq .
    ```
+   A `null` result means no canonical Summary. A submitted Formal Review is a supported Summary medium; preserve that medium when updating it. Two independently completed substantive CodeRabbit and Copilot reviews permit Summary-only consolidation without inventing or requesting another Internal Review. Badges, skipped/errored reviews, empty bodies and same-engine variants do not satisfy quorum. Record each source review's reviewed SHA separately from the fix/current head; quorum is not proof that later fixes received another review.
 
 2. **No Summary comment → unconditionally auto-invoke `/consolidate pr`**:
    - **Antigravity Unapproved PR clawo Delegation Gate (HARD STOP)**: In Antigravity (Gemini), directly executing `/consolidate pr` or remediating unapproved PRs in the main chat turn is strictly forbidden (`HARD STOP`). You MUST delegate unapproved PR review consolidation and remediation to `clawo` (`clawo session-send <session_name>` or `Skill("clawo", "launch")`).
@@ -109,9 +125,8 @@ gh pr view <PR_NUMBER> -R <owner>/<repo> --json baseRefName --jq '.baseRefName'
    # unresolved (not 🟢 Fixed, not ⚪ Rejected). Parses the 5-column findings
    # table (# | Source/Classification | Location | Finding | Status) row by row
    # instead of scanning the whole body for the substring "Critical".
-   gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments \
-     --jq '
-       [.[] | select(.body | startswith("## AI Review Summary")) | .body][0]
+   SUMMARY=$(latest_summary) || { echo "BLOCKED: Summary API lookup failed"; exit 1; }
+   printf '%s\n' "$SUMMARY" | jq -e '.body // error("Missing AI Review Summary")
        | split("\n")
        | map(select(startswith("|") and (contains("---") | not)))
        | map(split("|"))
@@ -629,7 +644,7 @@ When creating or merging a promotion PR from `develop` to `main`:
   - After a `--merge` (history-preserving) merge this does not apply: the commits are on the target, so the local branch fast-forwards and carries no divergent history.
 - **Post-merge AI Review Summary sync (HARD STOP)**: after a successful merge, immediately PATCH the AI Review Summary comment (the one posted in `consolidate/post.md` Step 7) to reflect the merged state — do NOT leave the Summary frozen at its pre-merge snapshot. The Summary is the user-facing record of the PR's final disposition; if it still says "⏳ Actionable PENDING" or shows an incomplete Test Plan after merge, anyone reading the PR later will see a contradictory record.
   - **What to update**: (a) verdict line: `⏳ Actionable PENDING fix.` → `✅ MERGED <YYYY-MM-DD>` + merge commit SHA + `(#<PR>)` suffix. (b) findings table `Status` column: each "⏳ Pending decision" → either `🟢 Applied (commit <sha>)` or `🟢 Deferred (<tracking-medium reference>)` per the actual outcome. (c) any inline "Test Plan N/M items checked" → "Test Plan M/M ✅" if CI re-pass confirmed.
-  - **How**: `gh api repos/{owner}/{repo}/issues/comments/{comment_id} -X PATCH --input <(jq -n --rawfile body <updated-summary-file> '{body: $body}')` — find the comment id via `gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("## AI Review Summary")) | .id'`. Reuse the same id (PATCH, not new POST) — `consolidate/post.md` "Single Summary preservation guard" applies post-merge too.
+  - **How**: refresh `SUMMARY=$(latest_summary)` using the paginated, timestamp-sorted lookup above, then read `.id` and `.medium` from that exact artifact. For `medium: comment`, PATCH `repos/{owner}/{repo}/issues/comments/{id}`; for `medium: review`, PUT `repos/{owner}/{repo}/pulls/{N}/reviews/{id}` (body-only update). Supply the body via a JSON file, preserve the medium/ID, and read back that exact endpoint to verify the complete body. Do not select all matching comment IDs or post a replacement just because the Summary used the review medium — `consolidate/post.md` "Single Summary preservation guard" applies post-merge too.
   - **Forbidden**: leaving the Summary at its pre-merge state because "the PR is MERGED so the comment is read-only". A MERGED PR's comment body is still PATCH-able and the audit trail benefits from the merged-state record.
   - **Order vs Issue body checklist update (next bullet)**: Summary PATCH runs first (PR-scoped), then issue body checklist update (issue-scoped). Both run before `Deploy follow-up`.
 - **Update related issue body checklists (HARD STOP)**: if the PR referenced an issue via `Relates to #N` / `Resolves #N` / `Fixes #N` / `Refs #N`, immediately after merge update that issue body's checklist (`- [ ]`) to `- [x]` for items covered by the PR scope, and append a reference to the merged PR number. Especially for **epic-style issues** (multiple Phase 1/2/3 checkboxes), batch-update every Phase item completed by the PR merge.
@@ -694,9 +709,8 @@ gh pr checks <N> --json bucket -q '[.[] | .bucket] | group_by(.) | map({(.[0]): 
 # post.md's audit-trail convention keeps in the table forever.
 # CROSS-PLATFORM (HARD STOP): count in jq (UTF-8 native), NOT `grep -c '🔴 Critical'`
 # (Windows Git Bash emoji byte-match → false 0 → silent merge-gate bypass).
-CRIT=$(gh api repos/{owner}/{repo}/issues/<N>/comments \
-  --jq '
-    [.[] | select(.body | startswith("## AI Review Summary")) | .body][0]
+SUMMARY=$(latest_summary) || { echo "BLOCKED: Summary API lookup failed"; exit 1; }
+CRIT=$(printf '%s\n' "$SUMMARY" | jq -e '.body // error("Missing AI Review Summary")
     | split("\n")
     | map(select(startswith("|") and (contains("---") | not)))
     | map(split("|"))
