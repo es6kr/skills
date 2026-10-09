@@ -10,7 +10,7 @@ PASS=0
 FAIL=0
 run_case() {
   local command=$1 expected=$2 output
-  output=$(printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$command" \
+  output=$(python3 -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$command" \
     | TMPDIR="$TMPROOT" "$GUARD" 2>&1 || true)
   if [[ "$expected" == blocked ]]; then
     if grep -q 'BLOCKED: orca new-tab/new-worktree launch' <<<"$output"; then
@@ -81,6 +81,7 @@ run_case 'orca terminal create --command claude' blocked
 # --- Quoted literals naming a create are not a create ----------------------
 run_case "echo 'orca terminal list'; orca terminal create --command claude" blocked
 run_case 'echo "orca terminal create --command claude"' allowed
+run_case 'orca terminal create --command "claude --model opus"' blocked
 
 # --- Compound commands with list/split must not bypass create gate ---------
 run_case 'orca terminal list; orca terminal create --command claude' blocked

@@ -23,12 +23,6 @@
 
 input=$(cat)
 
-orca_bin_pattern='orca-ide|orca-dev|orca'
-if [ -n "$ORCA_CLI_COMMAND" ]; then
-  orca_cli_escaped=$(printf '%s' "$ORCA_CLI_COMMAND" | sed 's/[][\.^$*+()?{}|/]/\\&/g')
-  orca_bin_pattern="${orca_cli_escaped}|${orca_bin_pattern}"
-fi
-
 command=$(printf '%s' "$input" | python3 -c '
 import json, sys
 try:
@@ -42,18 +36,47 @@ print(ti.get("command") or d.get("command") or "")
 
 [ -z "$command" ] && exit 0
 
-sanitized_command=$(printf '%s' "$command" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
-
-is_split=0
-is_repo_add=0
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+terminal[[:space:]]+split\b" && is_split=1
-echo "$sanitized_command" | grep -qE "(^|[;&|]\s*)(${orca_bin_pattern})[[:space:]]+repo[[:space:]]+add\b" && is_repo_add=1
-
-if [ "$is_split" -eq 0 ] && [ "$is_repo_add" -eq 0 ]; then
-  exit 0
-fi
-
-echo "$sanitized_command" | grep -qE 'ORCA_ASK_CONFIRMED=1' && exit 0
+# Parse simple command segments without executing payload text. Approval must
+# be an environment assignment on EVERY guarded action, not text in an argument
+# or an assignment on a preceding/following command.
+needs_ask=$(printf '%s' "$command" | python3 -c '
+import os, re, shlex, sys
+lexer = shlex.shlex(sys.stdin.read(), posix=True, punctuation_chars=";&|()\n")
+lexer.whitespace = " \t\r"
+lexer.whitespace_split = True
+try:
+    tokens = list(lexer)
+except ValueError:
+    # Incomplete shell quoting cannot prove command-bound approval.
+    print(1)
+    sys.exit(0)
+segments, segment = [], []
+for token in tokens:
+    if token and all(c in ";&|()\n" for c in token):
+        segments.append(segment)
+        segment = []
+    else:
+        segment.append(token)
+segments.append(segment)
+resolved = os.environ.get("ORCA_CLI_COMMAND", "")
+for segment in segments:
+    assignments = {}
+    while segment and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", segment[0]):
+        key, value = segment.pop(0).split("=", 1)
+        assignments[key] = value
+    if len(segment) < 3:
+        continue
+    binary = segment[0]
+    if binary != resolved and os.path.basename(binary) not in ("orca", "orca-ide", "orca-dev"):
+        continue
+    if segment[1:3] not in (["terminal", "split"], ["repo", "add"]):
+        continue
+    if assignments.get("ORCA_ASK_CONFIRMED") != "1":
+        print(1)
+        sys.exit(0)
+print(0)
+' 2>/dev/null)
+[ "$needs_ask" = 0 ] && exit 0
 
 transcript_path=$(printf '%s' "$input" | python3 -c '
 import json, sys
