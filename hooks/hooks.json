@@ -453,6 +453,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-rename-schema-when-wrapup-adjacent.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fa/resources/force-fa-on-correction-signal.sh"
           }
         ]
       }
@@ -460,6 +464,10 @@
     "UserPromptSubmit": [
       {
         "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fa/resources/force-fa-on-correction-signal.sh"
+          },
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fix/resources/fix-and-ambiguity-guard.sh"
