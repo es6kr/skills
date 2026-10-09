@@ -132,7 +132,7 @@ if [ "${1:-}" = "--test" ]; then
     "kubectl apply -f authentik.yaml" "$T_TASK"
   T_QDRANT_UPSERT=$(make_transcript tracker)
   test_case_bash "curl POST /points/upsert (real mutation, not search/scroll) + tracker read + no skill call" 2 \
-    'curl -X POST http://192.168.6.176:30333/collections/x/points/upsert -d "{}"' "$T_QDRANT_UPSERT"
+    'curl -X POST http://example.invalid/collections/x/points/upsert -d "{}"' "$T_QDRANT_UPSERT"
 
   echo ""
   echo "=== Negative fixtures (should allow, exit 0) ==="
@@ -177,9 +177,9 @@ if [ "${1:-}" = "--test" ]; then
   test_case_bash "curl GET, no method flag, not mutating" 0 \
     "curl -s https://example.com/health"
   test_case_bash "curl POST /points/search (Qdrant read-only query) + tracker read + no skill call" 0 \
-    'curl -s -X POST http://192.168.6.176:30333/collections/x/points/search -d "{}"' "$(make_transcript tracker)"
+    'curl -s -X POST http://example.invalid/collections/x/points/search -d "{}"' "$(make_transcript tracker)"
   test_case_bash "curl POST /points/scroll (Qdrant read-only query) + tracker read + no skill call" 0 \
-    'curl -s -X POST http://192.168.6.176:30333/collections/x/points/scroll -d "{}"' "$(make_transcript tracker)"
+    'curl -s -X POST http://example.invalid/collections/x/points/scroll -d "{}"' "$(make_transcript tracker)"
 
   echo ""
   echo "PASS=$PASS FAIL=$FAIL"
@@ -200,12 +200,32 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     'kubectl[[:space:]]+(apply|create|delete|patch|replace|exec)|terraform[[:space:]]+apply|docker[[:space:]]+(exec|rm|stop|kill|run)|git[[:space:]]+push|gh[[:space:]]+(pr[[:space:]]+merge|issue[[:space:]]+close|release)|curl[^|]*(-X[[:space:]]*|--request[[:space:]=]+)['"'"'"]?(POST|PUT|PATCH|DELETE)|curl[^|]*(--data|-d([[:space:]=]|['"'"'"]))|ak[[:space:]]+shell|vault[[:space:]]+kv[[:space:]]+put|kubectl[[:space:]]+create[[:space:]]+secret|wmux[[:space:]]+browser[[:space:]]+(open|click|type|fill)|browser[[:space:]]+(click|type|fill)'; then
     RISKY=1
   fi
-  # Qdrant read-only endpoints (/points/search, /points/scroll) are POST-shaped
-  # queries, not mutations -- same reasoning as the curl-GET exclusion above.
-  # The generic curl POST/--data regex above cannot tell these two endpoints
-  # apart from a real write (e.g. /points/upsert, /points/delete), so carve
-  # them out explicitly after the generic match.
-  if [ "$RISKY" = "1" ] && printf '%s' "$COMMAND" | grep -qiE 'curl.*/points/(search|scroll)([?/"'"'"' ]|$)'; then
+  # Exempt only a single query invocation. A query substring in a compound
+  # payload must never clear a mutation elsewhere in that same payload.
+  READ_ONLY_QUERY=$(printf '%s' "$COMMAND" | python3 -c '
+import os, re, shlex, sys
+from urllib.parse import urlparse
+command = sys.stdin.read()
+try:
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()<>")
+    lexer.whitespace_split = True
+    tokens = list(lexer)
+    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+        tokens.pop(0)
+    urls = [t for t in tokens if t.startswith(("http://", "https://"))]
+    unsafe = ("\n" in command or "$(" in command or "`" in command
+              or any(t and all(c in ";&|()<>" for c in t) for t in tokens)
+              or any(t in ("--next", "--config", "-K", "--upload-file", "-T", "--form", "-F") for t in tokens))
+    methods = [tokens[i + 1].upper() for i, t in enumerate(tokens[:-1]) if t in ("-X", "--request")]
+    methods += [t.split("=", 1)[1].upper() for t in tokens if t.startswith("--request=")]
+    methods += [t[2:].upper() for t in tokens if t.startswith("-X") and t != "-X"]
+    print("1" if tokens and os.path.basename(tokens[0]) == "curl" and not unsafe
+          and len(urls) == 1 and re.search(r"/points/(search|scroll)$", urlparse(urls[0]).path)
+          and all(m in ("GET", "POST") for m in methods) else "0")
+except (ValueError, IndexError):
+    print("0")
+' 2>/dev/null)
+  if [ "$RISKY" = "1" ] && [ "$READ_ONLY_QUERY" = "1" ]; then
     RISKY=0
   fi
 elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then

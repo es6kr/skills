@@ -78,11 +78,21 @@ skill_exists "$BASE_SLUG" || exit 0
 ABS_LINE=$(( START + REL_LINE - 1 ))
 SCOPED=$(tail -n +"$ABS_LINE" "$TRANSCRIPT_PATH" 2>/dev/null)
 
-# Structural match only: `"skill":"<slug>"` appears ONLY inside a real Skill
-# tool_use `input` object — free-text mentions are JSON-escaped and never match.
-# Also accept namespaced calls (`"skill":"<plugin>:<slug>"`, e.g. Skill("es6kr:task-flow", ...))
-# or bare calls regardless of whether the slash command was typed with a plugin prefix.
-if printf '%s' "$SCOPED" | grep -qE "\"skill\":\"([a-zA-Z0-9_-]+:)?${BASE_SLUG}\""; then
+# Require actual assistant Skill tool_use structure, not an unrelated input
+# object or quoted text. Bare calls remain compatible with namespaced commands,
+# but two explicitly different namespaces must never satisfy each other.
+if printf '%s' "$SCOPED" | jq -s -e --arg slug "$SLUG" --arg base "$BASE_SLUG" '
+  any(.[];
+    .type == "assistant" and
+    any(.message.content? | select(type == "array") | .[];
+      .type == "tool_use" and .name == "Skill" and
+      (.input.skill? | select(type == "string") |
+        . == $slug or . == $base or
+        (($slug | contains(":")) | not) and (split(":") | last) == $base
+      )
+    )
+  )
+' >/dev/null 2>&1; then
   exit 0
 fi
 
