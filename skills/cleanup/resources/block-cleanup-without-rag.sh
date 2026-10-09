@@ -41,7 +41,7 @@ fi
 # the committed one. Union keeps the committed baseline authoritative; the git-ignored
 # file only ADDS locale variants.
 HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:+${HG_CLEANUP_MARKERS}|}/cleanup|cleanup run|cleanup wrap-up"
-HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBILITY}|}chunks added|qdrant"
+HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBILITY}|}chunk|qdrant"
 
 INPUT=$(cat)
 
@@ -81,7 +81,7 @@ fi
 #   2. Bold line "**chunks added**" / "**qdrant**" / locale variant
 #   3. Header-like "### RAG" / "## RAG"
 HAS_RAG_ROW=0
-if echo "$RESPONSE" | grep -qE '^\s*\|\s*\*{0,2}[^|]*(RAG|qdrant|3-C\.1)[^|]*\*{0,2}\s*\|.*(RAG|qdrant|chunks)'; then
+if echo "$RESPONSE" | grep -qE '^\s*\|\s*\*{0,2}[^|]*(RAG|qdrant|3-C\.1)[^|]*\*{0,2}\s*\|.*(RAG|qdrant|chunk)'; then
   HAS_RAG_ROW=1
 elif echo "$RESPONSE" | grep -qE "\*\*.*($HG_CLEANUP_RAG_VISIBILITY).*\*\*"; then
   HAS_RAG_ROW=1
