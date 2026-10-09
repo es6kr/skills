@@ -150,10 +150,9 @@ def check_hooks_file(filepath: Path, repo_root: Path = None) -> tuple:
                     "expected executable mode 100755 "
                     "(fix: git update-index --chmod=+x <path>)"
                 )
-            # Secondary: the filesystem, for checkouts that do honour the bit.
-            # Only reported when the index check could not run, so one defect
-            # does not surface as two errors.
-            elif idx_mode is None and not (resolved.stat().st_mode & stat.S_IXUSR):
+            # Secondary: the checkout bit also matters on POSIX even when its
+            # index is executable. The elif prevents reporting a bad index twice.
+            elif os.name != "nt" and not (resolved.stat().st_mode & stat.S_IXUSR):
                 mode = stat.S_IMODE(resolved.stat().st_mode)
                 errors.append(
                     f"Non-executable hook registration in {filepath}: event='{event}', "

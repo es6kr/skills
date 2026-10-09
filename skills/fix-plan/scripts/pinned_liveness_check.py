@@ -190,28 +190,31 @@ def auto_graduate(tracker_path: str) -> dict:
     if not resolved:
         return {"tracker": str(tracker_path), "graduated_count": 0, "graduated": []}
 
-    resolved_labels = {m["label"] for m in resolved}
+    resolved_keys = {
+        (m["label"], tuple(m["citations"])) for m in resolved
+    }
     lines = text.splitlines(keepends=True)
 
     new_lines = []
-    in_pinned = False
+    in_pinned = True
     completed_idx = -1
 
-    for i, line in enumerate(lines):
-        if line.startswith("#"):
-            pass
+    for line in lines:
+        heading = SECTION_RE.match(line.rstrip("\r\n"))
+        if heading:
+            in_pinned = False
+            if heading.group(1).strip() == "Completed":
+                completed_idx = len(new_lines)
 
-        # Check if line contains a resolved pinned mission
-        is_resolved_pinned_line = False
-        m_label = MISSION_LABEL_RE.search(line)
-        if m_label and m_label.group(1).strip() in resolved_labels:
-            is_resolved_pinned_line = True
-
-        if is_resolved_pinned_line:
-            continue
-
-        if line.strip().startswith("## Completed"):
-            completed_idx = len(new_lines)
+        # Graduation owns only the monitored pinned line, not every occurrence
+        # of its display label in TODO, history, or another pinned objective.
+        if in_pinned:
+            label = MISSION_LABEL_RE.search(line)
+            marker = MARKER_RE.search(line)
+            if label and marker:
+                key = (label.group(1).strip(), tuple(CITATION_ITEM_RE.findall(marker.group(1))))
+                if key in resolved_keys:
+                    continue
 
         new_lines.append(line)
 
