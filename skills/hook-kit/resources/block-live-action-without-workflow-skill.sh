@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# PreToolUse:Bash + PreToolUse:mcp__playwright__browser_{navigate,click,type,
+# PreToolUse:Bash + PreToolUse:mcp__playwright__browser_{click,type,
 # fill_form,press_key,select_option,drag,drop,file_upload,handle_dialog} —
 # block a state-mutating live action taken against a tracked workspace item
 # (fix_plan.md / checklist.md / task.md) when the session has no evidence of
 # having invoked Skill("task:flow") first.
+#
+# browser_navigate exception: a plain navigate is a GET to a URL and does not
+# by itself mutate anything — the same reasoning that excludes curl GET from
+# the Bash branch below. The actual interaction tools (click/type/fill_form/
+# ...) are what can submit forms or trigger mutations. Flagging navigate
+# blocked read-only page-state diagnosis (opening a URL to see what it
+# currently shows) with no mutating action involved.
 #
 # Background: (see failed-attempts.md "risky-complex-task-live-commands-
 # without-code-workflow-plan") — a Prevention rule asking the agent to
@@ -108,9 +115,6 @@ if [ "${1:-}" = "--test" ]; then
   T2=$(make_transcript tracker-checklist)
   test_case_bash "terraform apply + checklist read + no skill call" 2 \
     "terraform apply -auto-approve" "$T2"
-  T3=$(make_transcript tracker)
-  test_case_tool "browser_navigate + tracker read + no skill call" 2 \
-    "mcp__playwright__browser_navigate" "$T3"
   T4=$(make_transcript tracker)
   test_case_bash "wmux browser click + tracker read + no skill call" 2 \
     'node "$WMUX_CLI" browser click @e3' "$T4"
@@ -126,6 +130,9 @@ if [ "${1:-}" = "--test" ]; then
   T_TASK=$(make_transcript tracker-task)
   test_case_bash "kubectl apply + task.md read + no skill call" 2 \
     "kubectl apply -f authentik.yaml" "$T_TASK"
+  T_QDRANT_UPSERT=$(make_transcript tracker)
+  test_case_bash "curl POST /points/upsert (real mutation, not search/scroll) + tracker read + no skill call" 2 \
+    'curl -X POST http://192.168.6.176:30333/collections/x/points/upsert -d "{}"' "$T_QDRANT_UPSERT"
 
   echo ""
   echo "=== Negative fixtures (should allow, exit 0) ==="
@@ -165,8 +172,14 @@ if [ "${1:-}" = "--test" ]; then
     "mcp__playwright__browser_navigate" "$T7"
   test_case_tool "browser_snapshot (read-only browser tool, not matched by design)" 0 \
     "mcp__playwright__browser_snapshot" "$(make_transcript tracker)"
+  test_case_tool "browser_navigate (read-only GET, not matched by design) + tracker read + no skill call" 0 \
+    "mcp__playwright__browser_navigate" "$(make_transcript tracker)"
   test_case_bash "curl GET, no method flag, not mutating" 0 \
     "curl -s https://example.com/health"
+  test_case_bash "curl POST /points/search (Qdrant read-only query) + tracker read + no skill call" 0 \
+    'curl -s -X POST http://192.168.6.176:30333/collections/x/points/search -d "{}"' "$(make_transcript tracker)"
+  test_case_bash "curl POST /points/scroll (Qdrant read-only query) + tracker read + no skill call" 0 \
+    'curl -s -X POST http://192.168.6.176:30333/collections/x/points/scroll -d "{}"' "$(make_transcript tracker)"
 
   echo ""
   echo "PASS=$PASS FAIL=$FAIL"
@@ -187,7 +200,15 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     'kubectl[[:space:]]+(apply|create|delete|patch|replace|exec)|terraform[[:space:]]+apply|docker[[:space:]]+(exec|rm|stop|kill|run)|git[[:space:]]+push|gh[[:space:]]+(pr[[:space:]]+merge|issue[[:space:]]+close|release)|curl[^|]*(-X[[:space:]]*|--request[[:space:]=]+)['"'"'"]?(POST|PUT|PATCH|DELETE)|curl[^|]*(--data|-d([[:space:]=]|['"'"'"]))|ak[[:space:]]+shell|vault[[:space:]]+kv[[:space:]]+put|kubectl[[:space:]]+create[[:space:]]+secret|wmux[[:space:]]+browser[[:space:]]+(open|click|type|fill)|browser[[:space:]]+(click|type|fill)'; then
     RISKY=1
   fi
-elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(navigate|click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then
+  # Qdrant read-only endpoints (/points/search, /points/scroll) are POST-shaped
+  # queries, not mutations -- same reasoning as the curl-GET exclusion above.
+  # The generic curl POST/--data regex above cannot tell these two endpoints
+  # apart from a real write (e.g. /points/upsert, /points/delete), so carve
+  # them out explicitly after the generic match.
+  if [ "$RISKY" = "1" ] && printf '%s' "$COMMAND" | grep -qiE 'curl.*/points/(search|scroll)([?/"'"'"' ]|$)'; then
+    RISKY=0
+  fi
+elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then
   RISKY=1
 fi
 [ "$RISKY" = "1" ] || exit 0
