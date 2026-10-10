@@ -15,7 +15,7 @@ RESOURCES = ROOT / "skills/hook-kit/resources"
 class CommandGuards(unittest.TestCase):
     def setUp(self):
         self.fixture_env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-        self.tmp = tempfile.TemporaryDirectory(dir=os.environ["TMPDIR"])
+        self.tmp = tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR"))
         self.addCleanup(self.tmp.cleanup)
         self.base = Path(self.tmp.name)
         self.clean = self.repo("clean", "clean")
@@ -99,6 +99,17 @@ class CommandGuards(unittest.TestCase):
     @staticmethod
     def call(skill, name="Skill", kind="tool_use"):
         return {"type": "assistant", "message": {"content": [{"type": kind, "name": name, "input": {"skill": skill}}]}}
+
+
+def test_fixture_without_tmpdir(monkeypatch, tmp_path):
+    monkeypatch.delenv('TMPDIR', raising=False)
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    case = CommandGuards()
+    try:
+        case.setUp()
+        assert case.clean.is_dir() and case.dirty.is_dir()
+    finally:
+        case.doCleanups()
 
 
 if __name__ == "__main__":
