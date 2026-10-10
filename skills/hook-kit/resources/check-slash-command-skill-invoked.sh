@@ -58,9 +58,11 @@ CMD_MATCH=$(tail -n +"$START" "$TRANSCRIPT_PATH" 2>/dev/null \
 [[ -z "$CMD_MATCH" ]] && exit 0
 
 REL_LINE="${CMD_MATCH%%:*}"
-SLUG=$(printf '%s' "$CMD_MATCH" | grep -oE '<command-name>/[a-zA-Z0-9_-]+</command-name>' | head -1 \
-  | sed -E 's#<command-name>/([a-zA-Z0-9_-]+)</command-name>#\1#')
+SLUG=$(printf '%s' "$CMD_MATCH" | grep -oE '<command-name>/[a-zA-Z0-9_:-]+</command-name>' | head -1 \
+  | sed -E 's#<command-name>/([a-zA-Z0-9_:-]+)</command-name>#\1#')
 [[ -z "$SLUG" ]] && exit 0
+
+BASE_SLUG="${SLUG##*:}"
 
 # Only check slugs that map to an actual installed skill — skip native
 # Claude Code commands and unrecognized slugs entirely.
@@ -71,14 +73,26 @@ skill_exists() {
   find "$HOME/.claude/plugins/marketplaces" -mindepth 3 -maxdepth 5 -type d -name "$slug" -path "*/skills/*" 2>/dev/null | grep -q . && return 0
   return 1
 }
-skill_exists "$SLUG" || exit 0
+skill_exists "$BASE_SLUG" || exit 0
 
 ABS_LINE=$(( START + REL_LINE - 1 ))
 SCOPED=$(tail -n +"$ABS_LINE" "$TRANSCRIPT_PATH" 2>/dev/null)
 
-# Structural match only: `"skill":"<slug>"` appears ONLY inside a real Skill
-# tool_use `input` object — free-text mentions are JSON-escaped and never match.
-if printf '%s' "$SCOPED" | grep -qF "\"skill\":\"$SLUG\""; then
+# Require actual assistant Skill tool_use structure, not an unrelated input
+# object or quoted text. Bare calls remain compatible with namespaced commands,
+# but two explicitly different namespaces must never satisfy each other.
+if printf '%s' "$SCOPED" | jq -s -e --arg slug "$SLUG" --arg base "$BASE_SLUG" '
+  any(.[];
+    .type == "assistant" and
+    any(.message.content? | select(type == "array") | .[];
+      .type == "tool_use" and .name == "Skill" and
+      (.input.skill? | select(type == "string") |
+        . == $slug or . == $base or
+        (($slug | contains(":")) | not) and (split(":") | last) == $base
+      )
+    )
+  )
+' >/dev/null 2>&1; then
   exit 0
 fi
 

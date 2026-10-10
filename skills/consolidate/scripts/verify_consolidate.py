@@ -19,18 +19,23 @@ from typing import Any, Dict, List, Optional
 
 
 def run_gh_api(endpoint: str, repo: Optional[str] = None) -> Any:
-    """Run a gh api GET command and return parsed JSON."""
-    cmd = ["gh", "api", endpoint]
-    if repo:
-        cmd.extend(["-R", repo])
+    """Fetch every REST list page; endpoint carries the explicit owner/repo.
+
+    gh api has no -R flag. --slurp makes paginated arrays one JSON document,
+    which must be flattened before counting or sorting artifacts.
+    """
+    cmd = ["gh", "api", endpoint, "--paginate", "--slurp"]
     res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    return json.loads(res.stdout)
+    pages = json.loads(res.stdout)
+    if not isinstance(pages, list) or not all(isinstance(page, list) for page in pages):
+        raise ValueError("Expected paginated REST list response")
+    return [item for page in pages for item in page]
 
 
 def git_sha_exists(sha: str, repo: Optional[str] = None) -> bool:
     """Check if a git SHA exists in the local repository.
 
-    `-R <repo>` only steers `gh api` calls; git itself always resolves
+    `--repo <repo>` steers the API endpoint; git itself always resolves
     against the process cwd. When `repo` is given, resolve it to the local
     ghq checkout (`~/ghq/github.com/<owner>/<name>`) instead of assuming cwd.
     """
@@ -175,6 +180,58 @@ def looks_like(body: str, *keywords: str) -> bool:
     return bool(HEADING_RE.match(line)) and all(k.lower() in line.lower() for k in keywords)
 
 
+def reviewer_engine(login: str) -> str:
+    """Normalize engine variants without counting cloud and CLI twice."""
+    lowered = login.lower()
+    for engine in ("copilot", "coderabbit"):
+        if engine in lowered:
+            return engine
+    return login
+
+
+def completed_review_engines(reviews: List[Dict[str, Any]],
+                             inline: List[Dict[str, Any]], before: str,
+                             reviewed_commit: Optional[str] = None) -> set[str]:
+    """API evidence, not a Summary's self-reported Completed badges, grants quorum.
+
+    Inline findings must belong to the submitted review; zero-finding reviews
+    require an explicit completed-review signal rather than a walkthrough.
+    """
+    by_commit: Dict[str, set[str]] = {}
+    for review in reviews:
+        engine = reviewer_engine((review.get("user") or {}).get("login", ""))
+        body = (review.get("body") or "").strip()
+        timestamp = review.get("submitted_at") or ""
+        commit = review.get("commit_id") or ""
+        if (engine not in {"copilot", "coderabbit"} or not body or not timestamp
+                or not commit or (reviewed_commit and not commit.startswith(reviewed_commit))
+                or timestamp > before
+                or review.get("state") not in {"COMMENTED", "APPROVED", "CHANGES_REQUESTED"}
+                or is_internal_review(body) or titled_as(body, SUMMARY_SLUG)):
+            continue
+        if re.search(r"review\s+skipped|skipped\s+review|unable to review|encountered an error|review failed|review in progress", body, re.I):
+            continue
+        # Badge-only and walkthrough-only bodies are not substantive reviews,
+        # even if a stale inline annotation happens to reference their ID.
+        prose = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", body).strip()
+        if not prose or re.match(r"^#{1,6}\s+walkthrough\b", prose, re.I):
+            continue
+        findings = any(
+            review.get("id") is not None
+            and c.get("pull_request_review_id") == review["id"]
+            and reviewer_engine((c.get("user") or {}).get("login", "")) == engine
+            and (c.get("body") or "").strip()
+            for c in inline
+        )
+        completion = re.search(r"reviewed (?:changes|\d+ files)|actionable comments posted:\s*\d+|no (?:issues|findings)(?: found)?", prose, re.I)
+        if findings or completion:
+            by_commit.setdefault(commit, set()).add(engine)
+    for engines in by_commit.values():
+        if engines == {"copilot", "coderabbit"}:
+            return engines
+    return set()
+
+
 class ConsolidateValidator:
     def __init__(self, pr_num: int, repo: Optional[str] = None) -> None:
         self.pr_num = pr_num
@@ -217,7 +274,11 @@ class ConsolidateValidator:
         internal_reviews = [c for c in posted_artifacts if is_internal_review(c.get("body", ""))]
         summaries = [c for c in posted_artifacts if titled_as(c.get("body", ""), SUMMARY_SLUG)]
 
-        if not internal_reviews:
+        reviewed_match = re.search(r"Reviewed commit\s+`?([0-9a-f]{7,40})", summaries[-1].get("body", ""), re.I) if summaries else None
+        quorum = bool(summaries) and completed_review_engines(
+            reviews, inline_comments, posted_at(summaries[-1]),
+            reviewed_match.group(1) if reviewed_match else None) == {"copilot", "coderabbit"}
+        if not internal_reviews and not quorum:
             near_miss = [c for c in posted_artifacts
                          if looks_like(c.get("body", ""), "code review")
                          and not titled_as(c.get("body", ""), SUMMARY_SLUG)]
@@ -246,10 +307,21 @@ class ConsolidateValidator:
                 f"Comment {both[-1].get('id')} is titled as BOTH the Internal Code Review and "
                 f"the AI Review Summary. They must be two separate comments.")
 
-        if not internal_reviews or not summaries:
+        # Graph Causal Validation Gate:
+        # A summary comment without a preceding internal review comment breaks the
+        # causal lineage DAG (Finding -> InternalReview -> AISummary).
+        if summaries and not internal_reviews and not quorum:
+            self.errors.append(
+                f"Broken review causality: Summary comment {summaries[-1].get('id')} is disconnected. "
+                f"Missing preceding internal review comment in PR {self.pr_num} causal DAG."
+            )
+
+        if not summaries or (not internal_reviews and not quorum):
             return False
 
-        internal_review = internal_reviews[-1]
+        # Summary-only lineage is Finding -> completed independent reviews -> Summary.
+        # Do not manufacture an Internal Review to satisfy the old DAG shape.
+        internal_review = internal_reviews[-1] if internal_reviews else {}
         summary = summaries[-1]
 
         # 3. Check chronological ordering
@@ -262,7 +334,7 @@ class ConsolidateValidator:
 
         # 4. Check Internal Code Review structure and isolation
         internal_body = internal_review.get("body", "")
-        if "<!-- consolidate:verified -->" not in internal_body:
+        if internal_reviews and "<!-- consolidate:verified -->" not in internal_body:
             self.warnings.append("Internal Code Review is missing <!-- consolidate:verified --> provenance comment.")
         
         # Internal Review should NOT echo external reviewer assessment summaries
@@ -351,12 +423,63 @@ class ConsolidateValidator:
 
         # Parse rows in Consolidated Findings table
         table_rows = []
+        provenance_rows = []
+        table_header = []
         for line in summary_body.splitlines():
             line = line.strip()
             if line.startswith("|") and line.endswith("|"):
                 parts = split_cells(line)
+                if parts and parts[0] == "#":
+                    table_header = [p.lower() for p in parts]
                 if parts and parts[0].isdigit():
                     table_rows.append(parts)
+                    provenance_rows.append((table_header, parts))
+            else:
+                table_header = []
+
+        # Counts are only a floor. Each API finding still needs its own attributed
+        # row; padding with unrelated/local findings cannot cover missing sources.
+        used_rows = set()
+        for ic in inline_comments:
+            internal_inline = internal_review_id is not None and ic.get("pull_request_review_id") == internal_review_id
+            engine = reviewer_engine((ic.get("user") or {}).get("login", "unknown"))
+            finding_id = ic.get("id")
+            found = False
+            for index, (header, row) in enumerate(provenance_rows):
+                if index in used_rows:
+                    continue
+                source_index = next((i for i, h in enumerate(header) if h.startswith("source")), None)
+                if source_index is None or source_index >= len(row):
+                    continue
+                source = row[source_index]
+                # Engine attribution comes from visible source text, not its URL.
+                label = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", source).lower()
+                attributed = engine.lower() in label
+                if internal_inline:
+                    attributed = attributed or "superpowers" in label or "internal code review" in label
+                if not attributed:
+                    continue
+                location_indices = [i for i, h in enumerate(header) if h in {"file", "location"}]
+                if finding_id is not None:
+                    expected = f"https://github.com/{repo_prefix.removeprefix('repos/').rstrip('/')}/pull/{self.pr_num}#discussion_r{finding_id}"
+                    # Templates link either the Source or the Location cell.
+                    # Finding prose/status and non-table mentions are not attribution.
+                    link_cells = [source] + [row[i] for i in location_indices if i < len(row)]
+                    covered = any(link.group(1) == expected for cell in link_cells
+                                  for link in re.finditer(r"\[[^\]]*\]\(([^)]*)\)", cell))
+                else:
+                    # Compatibility only for historical fixtures without API IDs.
+                    line_number = ic.get("line") or ic.get("original_line")
+                    location = f"{ic.get('path', '')}:{line_number}"
+                    covered = bool(ic.get("path") and line_number) and any(
+                        i < len(row) and re.search(r"(?<![\w/.-])" + re.escape(location) + r"(?!\d)", row[i])
+                        for i in location_indices)
+                if covered:
+                    used_rows.add(index)
+                    found = True
+                    break
+            if not found:
+                self.errors.append(f"Missing source provenance for {engine} inline finding {finding_id or str(ic.get('path')) + ':' + str(ic.get('line'))}: numbered Summary row must attribute its source link (discussion_r<ID>), or historical path+line when no ID exists.")
 
         print(
             f"[*] Expected findings: {total_expected_findings} "
@@ -365,15 +488,32 @@ class ConsolidateValidator:
             f"| Table rows: {len(table_rows)}"
         )
 
-        if len(table_rows) != total_expected_findings:
+        # total_expected_findings is a floor, not an exact total: it only counts
+        # sources this script can see from the GitHub API (inline comments, human
+        # reviews) plus the Internal Code Review heading count. A reviewer engine
+        # run locally and never posted to GitHub as its own artifact (e.g. a
+        # CodeRabbit CLI pass run against the working tree) contributes real rows
+        # the Summary is right to include, but this script has no path to count
+        # them independently -- so the table legitimately has MORE rows than this
+        # formula predicts. Only under-reporting (missing/dropped findings) is an
+        # actual defect; extra rows from a local-only engine are not.
+        if len(table_rows) < total_expected_findings:
             self.errors.append(
-                f"Consolidated Findings table row count mismatch: expected {total_expected_findings} rows, but table has {len(table_rows)} rows."
+                f"Consolidated Findings table row count mismatch: expected at least {total_expected_findings} rows, but table has {len(table_rows)} rows."
             )
 
-        # 8. Check that superpowers findings are present in the table
-        superpowers_in_table = [r for r in table_rows if len(r) > 1 and "superpowers" in r[1].lower()]
-        if internal_findings > 0 and len(superpowers_in_table) == 0:
-            self.errors.append("Consolidated Findings table is missing superpowers (Internal Code Review) findings.")
+        # 8. Check that Internal Code Review findings are present in the table.
+        # post.md's own Summary body example sources these rows as "Internal Code
+        # Review", not "superpowers" -- "superpowers" is the provenance-link slug
+        # used in the comment TITLE (see INTERNAL_SLUG), not the Source cell text
+        # a table row is expected to carry. Accept either so a Summary written to
+        # the documented convention is not flagged as missing its own findings.
+        internal_review_in_table = [
+            r for r in table_rows
+            if len(r) > 1 and ("superpowers" in r[1].lower() or "internal code review" in r[1].lower())
+        ]
+        if internal_findings > 0 and len(internal_review_in_table) == 0:
+            self.errors.append("Consolidated Findings table is missing Internal Code Review findings.")
 
         # 9. Check SHA existence for all cited commit SHAs
         sha_matches = re.findall(r"(?:commit\s+`?|#)([0-9a-f]{7,40})`?", summary_body, re.IGNORECASE)

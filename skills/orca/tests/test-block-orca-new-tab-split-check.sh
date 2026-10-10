@@ -6,19 +6,27 @@ GUARD="$ROOT/resources/block-orca-new-tab-without-split-check.sh"
 TMPROOT=$(mktemp -d)
 trap 'rm -rf "$TMPROOT"' EXIT
 
-passed=0
+PASS=0
+FAIL=0
 run_case() {
   local command=$1 expected=$2 output
-  output=$(printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$command" \
+  output=$(python3 -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$command" \
     | TMPDIR="$TMPROOT" "$GUARD" 2>&1 || true)
   if [[ "$expected" == blocked ]]; then
-    grep -q 'BLOCKED: orca new-tab/new-worktree launch' <<<"$output" \
-      || { printf 'FAIL (expected blocked): %s\n' "$command" >&2; return 1; }
+    if grep -q 'BLOCKED: orca new-tab/new-worktree launch' <<<"$output"; then
+      PASS=$((PASS + 1))
+    else
+      FAIL=$((FAIL + 1))
+      printf 'FAIL (expected blocked): %s\n' "$command" >&2
+    fi
   else
-    [[ -z "$output" ]] \
-      || { printf 'FAIL (expected allowed): %s\n  got: %s\n' "$command" "$output" >&2; return 1; }
+    if [[ -z "$output" ]]; then
+      PASS=$((PASS + 1))
+    else
+      FAIL=$((FAIL + 1))
+      printf 'FAIL (expected allowed): %s\n  got: %s\n' "$command" "$output" >&2
+    fi
   fi
-  passed=$((passed + 1))
 }
 
 # --- Without the opt-out, every new-target path is gated --------------------
@@ -31,18 +39,24 @@ run_case 'orca worktree create --no-parent --name task' blocked
 run_case 'orca-ide terminal create --worktree active --command claude' blocked
 run_case 'orca-dev worktree create --no-parent --name task' blocked
 
-# --- One opt-out variable covers BOTH new-target kinds ---------------------
-# The older name read as covering only the tab case, leaving the worktree case
-# looking unauthorized by the same flag; one name now covers both.
+# --- Opt-out flags cover new-target kinds ----------------------------------
+# The canonical unified variable covers both tab and worktree creation.
 run_case 'ORCA_NEW_TARGET_APPROVED=1 orca terminal create --worktree active --command claude' allowed
 run_case 'ORCA_NEW_TARGET_APPROVED=1 orca worktree create --no-parent --name task' allowed
-# The legacy name stays accepted so in-flight sessions and older notes keep working.
+# The legacy alias stays accepted so in-flight sessions keep working.
 run_case 'ORCA_NEW_WORKSPACE_APPROVED=1 orca terminal create --worktree active --command claude' allowed
+# Named exceptions are also accepted for fine-grained auditability.
+run_case 'ORCA_PANE_LIMIT_REACHED=1 orca terminal create --command claude' allowed
+run_case 'ORCA_FILE_CONFLICT=1 orca worktree create --no-parent --name task' allowed
 
-# --- Non-create commands stay allowed -------------------------------------
+# --- Non-create commands stay allowed --------------------------------------
 run_case 'orca worktree create --repo id:x --name plan' allowed
 run_case 'orca terminal split --direction vertical' allowed
+run_case 'orca terminal split --terminal term_abc --direction vertical' allowed
+run_case 'orca terminal split --terminal term_abc --direction vertical --command claude' allowed
 run_case 'orca terminal list --json' allowed
+run_case 'orca status --json' allowed
+run_case 'orca repo list --json' allowed
 
 # --- Regression: listing must NOT clear the gate --------------------------
 # This guard used to stamp a 30-minute marker whenever `terminal list` ran and
@@ -55,6 +69,8 @@ run_case 'orca terminal list --json' allowed
 run_case 'orca terminal list --json' allowed
 run_case 'orca terminal create --worktree active --command claude' blocked
 run_case 'orca terminal create --command claude' blocked
+run_case 'orca-ide terminal list --json' allowed
+run_case 'orca-ide terminal create --command claude' blocked
 run_case 'orca-ide terminal create --worktree active --command claude' blocked
 run_case 'orca worktree create --no-parent --name task' blocked
 
@@ -62,8 +78,10 @@ run_case 'orca worktree create --no-parent --name task' blocked
 run_case 'orca terminal split --terminal term_abc --direction vertical' allowed
 run_case 'orca terminal create --command claude' blocked
 
-# --- Quoted literals must not satisfy any guard match --------------------
+# --- Quoted literals naming a create are not a create ----------------------
 run_case "echo 'orca terminal list'; orca terminal create --command claude" blocked
+run_case 'echo "orca terminal create --command claude"' allowed
+run_case 'orca terminal create --command "claude --model opus"' blocked
 
 # --- Compound commands with list/split must not bypass create gate ---------
 run_case 'orca terminal list; orca terminal create --command claude' blocked
@@ -73,4 +91,5 @@ run_case 'orca terminal split --direction vertical && orca terminal create --com
 run_case 'ORCA_NEW_TARGET_APPROVED=1 true; orca terminal create --command claude' blocked
 run_case 'ORCA_NEW_WORKSPACE_APPROVED=1 true; orca terminal create --command claude' blocked
 
-printf '%d/%d passed\n' "$passed" "$passed"
+printf '%d passed, %d failed\n' "$PASS" "$FAIL"
+[[ "$FAIL" -eq 0 ]]
