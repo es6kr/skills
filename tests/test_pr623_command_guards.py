@@ -14,6 +14,7 @@ RESOURCES = ROOT / "skills/hook-kit/resources"
 
 class CommandGuards(unittest.TestCase):
     def setUp(self):
+        self.fixture_env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         self.tmp = tempfile.TemporaryDirectory(dir=os.environ["TMPDIR"])
         self.addCleanup(self.tmp.cleanup)
         self.base = Path(self.tmp.name)
@@ -26,13 +27,13 @@ class CommandGuards(unittest.TestCase):
         for args in (["init", "-q"], ["config", "user.name", "Test"],
                      ["config", "user.email", "test@example.invalid"],
                      ["-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", message]):
-            subprocess.run(["git", "-C", str(path), *args], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(path), *args], env=self.fixture_env, check=True, capture_output=True)
         return path
 
     def rebase(self, command, cwd=None):
         return subprocess.run(["bash", str(RESOURCES / "check-rebase-conflict-residue.sh")],
                               input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
-                              text=True, capture_output=True, cwd=cwd or self.clean)
+                              text=True, capture_output=True, cwd=cwd or self.clean, env=self.fixture_env)
 
     def test_effective_rebase_repository(self):
         q = shlex.quote(str(self.dirty))

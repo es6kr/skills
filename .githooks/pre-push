@@ -14,6 +14,12 @@ set -eu
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
+# Git exports repository-selection variables to hooks. Clear them after resolving
+# our root, before tests create other repositories: cwd/-C cannot override them.
+for git_local_var in $(git rev-parse --local-env-vars); do
+  unset "$git_local_var"
+done
+
 # 'local' branch push guard — HARD STOP (double-defense with workspace rule
 # 'agents-local-branch-nopush.md'). The 'local' branch is a user-private
 # stage / working branch; pushing it to origin pollutes other environments

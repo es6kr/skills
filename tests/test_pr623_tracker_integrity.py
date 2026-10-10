@@ -29,7 +29,10 @@ def test_graduation_preserves_other_sections_and_unmonitored_duplicate(tmp_path,
     assert '\n## Completed\n' in text
     assert module.auto_graduate(str(tracker))['graduated_count'] == 0
 
-def test_executable_index_does_not_mask_missing_filesystem_bit(tmp_path):
+def test_executable_index_does_not_mask_missing_filesystem_bit(tmp_path, monkeypatch):
+    for key in list(os.environ):
+        if key.startswith('GIT_'):
+            monkeypatch.delenv(key)
     module = load('hooks623', 'scripts/verify-hooks-json.py')
     root = tmp_path / 'repo'
     (root / 'hooks').mkdir(parents=True)
