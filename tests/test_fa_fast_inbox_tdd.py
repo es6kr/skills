@@ -1,4 +1,4 @@
-"""TDD Red-phase tests for the FA Fast Staging Inbox (ES6KR-189, Phase 1-2).
+"""TDD tests for the FA Fast Staging Inbox (ES6KR-189, Phase 1-2).
 
 Spec sources (do not invent beyond these):
   - .agents/docs/generated/plan-fa-staging-inbox-integration.md
@@ -10,12 +10,19 @@ Spec sources (do not invent beyond these):
     UTF-8 enforced, atomic-append verification) and Sec.3.2 (fa-inbox-triage.py
     parser skeleton, unchanged from the plan).
 
-These tests target `skills/fa/scripts/fa-fast-record.py` and
-`skills/fa/scripts/fa-inbox-triage.py`, neither of which exists yet in this
-worktree -- this file is the TDD Red commit. No Green implementation
-accompanies it; every test here is expected to fail (import/collection
-failure against the not-yet-written scripts) until a later Green commit
-applies the spec.
+Red phase (commit a3706626): these 7 tests were written and run against
+`skills/fa/scripts/fa-fast-record.py` / `fa-inbox-triage.py` before either
+file existed -- all 7 failed with FileNotFoundError, the expected reason.
+
+Green phase (this revision): both scripts now exist. Per parent-session
+direction (2026-10-11), two further test classes were added here --
+`TestFastRecordAtomicFailureDetection` (negative-path: inject a partial
+`os.write()` and confirm the implementation detects it, rather than
+asserting only that the files now exist) and `TestFastRecordConcurrencySafety`
+(empirical concurrency audit of the atomic-append guarantee) -- see
+fa-green-report.md for the audit that found and fixed a TOCTOU race in the
+original prep-doc's stat-delta verification before these tests were written
+against the corrected implementation.
 
 Run: uvx --python 3.12 pytest tests/test_fa_fast_inbox_tdd.py -v
      (also discovered by the repo-wide `python -m pytest tests -v` CI job,
@@ -23,6 +30,8 @@ Run: uvx --python 3.12 pytest tests/test_fa_fast_inbox_tdd.py -v
 """
 import importlib.util
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -244,6 +253,72 @@ class TestFastRecordEncodingHardening(FastRecordWorkspaceTestCase):
         self.assertFalse(raw_bytes.startswith(b"\xef\xbb\xbf"), "must not write a UTF-8 BOM")
         content = raw_bytes.decode("utf-8")
         self.assertIn(KOREAN_OBSERVATION, content)
+
+
+class TestFastRecordAtomicFailureDetection(FastRecordWorkspaceTestCase):
+    """Green-phase negative-path test (user-directed, 2026-10-11): the Red
+    report flagged that the internal write-verification failure branch was
+    untested because no implementation existed yet to inject a seam into.
+    Now that the Green implementation verifies via `os.write()`'s own
+    return value (see fa-fast-record.py module docstring for why), that
+    seam is exactly `os.write` itself -- inject a short return and confirm
+    the function reports failure instead of a false [OK]."""
+
+    def test_partial_write_is_detected_and_reported_as_failure(self):
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
+        from unittest.mock import patch
+
+        fa_fast_record = _load_module("fa_fast_record_partial", "fa-fast-record.py")
+        out, err = io.StringIO(), io.StringIO()
+        with patch("os.write", return_value=3):  # pretend only 3 of N bytes landed
+            with redirect_stdout(out), redirect_stderr(err):
+                rc = fa_fast_record.fast_record("this entry must be reported as failed, not OK")
+
+        self.assertEqual(rc, 1)
+        self.assertIn("[FAIL]", err.getvalue())
+        self.assertNotIn("[OK]", out.getvalue())
+
+
+class TestFastRecordConcurrencySafety(FastRecordWorkspaceTestCase):
+    """Green-phase audit test (user-directed, 2026-10-11): empirically verify
+    that concurrent writers (e.g. a Ralph loop and an interactive `/fa fast`
+    call appending around the same time) neither corrupt nor lose entries,
+    and that the atomic-append check does not spuriously fail under
+    concurrency. Spawns real OS subprocesses (not threads/multiprocessing)
+    so the write actually crosses process boundaries, matching the real
+    Ralph-vs-interactive scenario. See fa-green-report.md for the standalone
+    audit (audit_original_atomic_check.py / audit_fixed_atomic_check.py)
+    that reproduced 7/8 spurious failures against the original prep-doc
+    algorithm and 0/8 against this fix, which this test re-confirms against
+    the actual shipped module rather than a throwaway copy of it."""
+
+    def test_concurrent_writers_all_succeed_without_corruption_or_loss(self):
+        n = 8
+        script_path = str(Path(FA_SCRIPTS_DIR) / "fa-fast-record.py")
+        procs = []
+        for i in range(n):
+            code = (
+                "import importlib.util, os, sys\n"
+                f"spec = importlib.util.spec_from_file_location('w{i}', {script_path!r})\n"
+                "m = importlib.util.module_from_spec(spec)\n"
+                "spec.loader.exec_module(m)\n"
+                f"os.chdir({str(self.workspace)!r})\n"
+                f"sys.exit(m.fast_record('concurrent worker note {i}', "
+                f"session_id='cw{i:06d}', source='ralph'))\n"
+            )
+            procs.append(subprocess.Popen([sys.executable, "-c", code]))
+
+        returncodes = [p.wait(timeout=10) for p in procs]
+        self.assertEqual(returncodes, [0] * n, f"all {n} concurrent writers must succeed: {returncodes}")
+
+        content = (self.workspace / ".agents" / "improvements.md").read_text(encoding="utf-8")
+        for i in range(n):
+            self.assertIn(f"concurrent worker note {i}", content, f"entry {i} missing or corrupted")
+        self.assertEqual(
+            content.count("[NEEDS_REVIEW]"), n,
+            "entry count must equal writer count -- no loss, no duplication",
+        )
 
 
 if __name__ == "__main__":
