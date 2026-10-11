@@ -39,7 +39,7 @@
         "./skills/web-browser"
       ],
       "strict": true,
-      "version": "0.1.1"
+      "version": "0.1.2"
     },
     {
       "author": {
@@ -58,7 +58,7 @@
         "./skills/task-flow"
       ],
       "strict": true,
-      "version": "0.1.1"
+      "version": "0.1.2"
     },
     {
       "author": {
@@ -79,7 +79,7 @@
         "./skills/ralph"
       ],
       "strict": true,
-      "version": "0.1.1"
+      "version": "0.1.2"
     }
   ]
 }
