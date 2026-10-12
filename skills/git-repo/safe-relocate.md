@@ -31,7 +31,10 @@ Verify that the new branch starts strictly aligned with `origin/<base-branch>`.
 git rev-parse HEAD
 git rev-parse origin/<base-branch>
 ```
-Both SHAs MUST match before proceeding.
+Both SHAs MUST match before proceeding. Pin the resolved base SHA, explicit
+approved commit count and allowed paths in the task contract. Run the
+[feature-base](./feature-base.md) helper in `start` mode with count zero and the
+target worktree root before cherry-pick; a nonzero result blocks Step 4.
 
 ### Step 4: Selective Cherry-Pick & Conflict Resolution
 Cherry-pick only the intended commits from the source branch.
@@ -46,6 +49,12 @@ Inspect the final diff against the base branch to confirm that only target files
 ```bash
 git diff --stat origin/<base-branch>
 ```
+Run `scripts/verify_feature_base.py --repo <target> --base <pinned-base>
+--mode deliver --expected-commits <approved-count> --allow-path <owned-path>`
+(repeat `--allow-path` for every scope item). Require exit zero before local
+handoff or separately authorized publication. It checks clean state, exact
+linear commit range, direct parent for one commit and the whole diff scope.
+
 Verify:
 1. File list matches the intended scope exactly.
 2. No unexpected configuration or formatting changes are present.

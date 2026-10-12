@@ -125,6 +125,16 @@ git status --short                   # confirm clean state
 
 ### 4B. Create new worktree
 
+**Explicit-base start gate:** Before creation, resolve and pin the task's intended
+base SHA, approved final commit count and allowed paths using
+[feature-base](./feature-base.md). Pass that SHA as the start-point, not local
+HEAD. Immediately after acquisition (including reuse), run
+`verify_feature_base.py --repo <target> --base <pinned-base> --mode start
+--expected-commits 0 --allow-path <owned-path>` before editing or cherry-picking.
+A clean directory alone or matching merge-base is insufficient; rejection stops
+the dependent action. For an existing feature being resumed, use its explicit
+`stage`/`deliver` count instead of pretending it is a zero-commit start.
+
 **Default path**: `<repo>/.worktrees/<branch-name>`
 
 ```bash
@@ -214,7 +224,7 @@ When work accumulates on a local/working branch and needs to land as a reviewabl
 
 ### Automation available
 
-`scripts/local-to-staging-pr.sh <repo-dir> <commit-sha> [--branch <name>] [--base <staging-branch>] [--push [--body-file <path>]]` automates steps 2-4 for repos following the staging-branch model: it derives the base from the commit's conventional-commit tag (override with `--base` for a plain-base repo or a divergence-override case), creates the worktree off `origin/<base>`, cherry-picks, and runs a pre-flight scaffolding check (confirms every directory the commit touches already has its baseline file present on the target base, before creating the worktree). Before creating the worktree, it also runs a **non-interactive** subset of the reuse-first gate (§"Worktree decision tree" Steps 1-3): it reclaims any existing `.claude/worktrees/` entry whose branch is already merged into `origin/main` (safe — no unique commits to lose). It does not implement the full interactive gate for *unmerged* inactive candidates, since that choice requires a human (`AskUserQuestion`); a script cannot make it. By default it stops after a clean cherry-pick and prints the push/PR commands — push and `gh pr create --draft` remain manual, keeping the PR title/body under human review before it goes out. Pass `--push` to also push once you've decided to (same per-invocation call as a bare `git push`), and `--push --body-file <path>` to also open the draft PR from a body you've already authored and reviewed — content authorship still happens before the flag is used, this only automates the ceremony around it.
+`scripts/local-to-staging-pr.sh <repo-dir> <commit-sha> --allow-path <owned-path> [--allow-path <owned-path> ...] [--branch <name>] [--base <staging-branch>] [--push [--body-file <path>]]` automates steps 2-4 for repos following the staging-branch model: it derives the base from the commit's conventional-commit tag (override with `--base` for a plain-base repo or a divergence-override case), creates the worktree off `origin/<base>`, cherry-picks, and runs a pre-flight scaffolding check (confirms every directory the commit touches already has its baseline file present on the target base, before creating the worktree). Before creating the worktree, it also runs a **non-interactive** subset of the reuse-first gate (§"Worktree decision tree" Steps 1-3): it reclaims any existing `.claude/worktrees/` entry whose branch is already merged into `origin/main` (safe — no unique commits to lose). It does not implement the full interactive gate for *unmerged* inactive candidates, since that choice requires a human (`AskUserQuestion`); a script cannot make it. By default it stops after a clean cherry-pick and prints the push/PR commands — push and `gh pr create --draft` remain manual, keeping the PR title/body under human review before it goes out. Pass `--push` to also push once you've decided to (same per-invocation call as a bare `git push`), and `--push --body-file <path>` to also open the draft PR from a body you've already authored and reviewed — content authorship still happens before the flag is used, this only automates the ceremony around it.
 
 For plain-base repos (no staging tier), steps 2-5 are manual: run the reuse-first gate (§"Worktree decision tree" Steps 1-3 — inventory, then reuse an inactive worktree if one exists) → `git fetch origin <base>` → worktree add off `origin/<base>` (only if no reuse candidate) → cherry-pick → push → `gh pr create --draft`.
 
