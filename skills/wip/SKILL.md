@@ -6,6 +6,7 @@ description: |
   On /wip invocation, when remaining tasks exist, AskUserQuestion is required for the per-item direction (proceed / split / merge / hold / defer-to-checklist / delete) — asking only about start priority is forbidden.
   After a compact, show prior-work summary then AskUserQuestion(multiSelect) for restore selection and re-register via TodoWrite.
   antigravity - task.md artifact-based checklist (Antigravity environment) [antigravity.md],
+  openclaw - explicit session JSON CLI adapter [openclaw.md],
   claude - TodoWrite/TaskCreate API guide (Claude Code environment) [claude.md],
   resume - environment-agnostic task cleanup + remaining-work workflow [resume.md].
   "wip", "track progress", "register tasks", "task register", "step tracking", "compact recovery", "task resume", "resume task", "cleanup + resume" triggers.
@@ -18,11 +19,14 @@ metadata:
 
 Track current session work as a checklist.
 
+OpenClaw runtime: select [openclaw.md](./openclaw.md) first and map native task notation below to the explicit CLI ledger. Claude-only tool diagnostics do not apply.
+
 ## Topics
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
 | antigravity | task.md artifact-based checklist for Antigravity sessions | [antigravity.md](./antigravity.md) |
+| openclaw | Explicit current-session agent-task JSON CLI | [openclaw.md](./openclaw.md) |
 | claude | TodoWrite/TaskCreate API for Claude Code sessions | [claude.md](./claude.md) |
 | resume | Environment-agnostic task cleanup + remaining-work workflow | [resume.md](./resume.md) |
 
@@ -31,6 +35,7 @@ Track current session work as a checklist.
 ```text
 wip (entry — /wip or "task cleanup + remaining work")
   └─→ resume (environment-agnostic workflow)
+        ├─→ openclaw (agent-task + explicit current sessionId)
         ├─→ claude (Claude Code: TaskList/TaskCreate/TaskUpdate/AskUserQuestion)
         └─→ antigravity (Antigravity: task.md artifact + ask.md emulation)
 ```
@@ -61,7 +66,7 @@ Emitting only a text summary without persistent recording does not satisfy `/wip
 
 **Before dispatching to any topic, classify the args intent.** The `/wip` skill has two mutually-exclusive dispatch paths — resume workflow vs new-task registration — and the wrong choice wastes user time and misapplies the resume gate.
 
-Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then classify:
+Read args + call `TaskList` (Claude Code), list the explicit session ledger (OpenClaw), or read `task.md` (Antigravity). Then classify:
 
 | Signal | Mode | Dispatch |
 |--------|------|----------|
@@ -108,6 +113,7 @@ Read args + call `TaskList` (Claude Code) or read `task.md` (Antigravity). Then 
 | 7 | Interrupt-stacked instructions arrive right after a registration-mode `/wip` (a newer directive: reword, investigate, etc.) → pivot to the newest instruction and never register the original `/wip` args | The original `/wip` args still require `TaskCreate` **first**. Register them before pivoting to any interrupt-stacked instruction — including Bash investigation for the newer directive. The register-before-execute guard hook only covers the case where `/wip` is the *last* user turn; the interrupt-stacked case (a newer non-`/wip` turn follows) is caught only by this discipline |
 
 Environment implementations:
+- OpenClaw → [openclaw.md](./openclaw.md) (agent-task; no Claude tool-error prerequisite)
 - Claude Code → [claude.md](./claude.md) (TaskList/TaskCreate/AskUserQuestion)
 - Antigravity → [antigravity.md](./antigravity.md) (task.md + ask.md)
 

@@ -25,6 +25,8 @@ This skill owns the FA record procedure ([retrospect.md](./retrospect.md)) and t
 hygiene procedure ([fa-prune.md](./fa-prune.md)). Other skills (e.g. `cleanup`'s session-end
 pipeline via `claudify` improve) reference this skill — not the other way around.
 
+**OpenClaw task tracking**: use [wip/openclaw](../wip/openclaw.md) with explicit verified current sessionId before Claude-only diagnostics. `agent-task` is the session ledger; `fix_plan.md` is the project tracker. Existing directory overrides retain priority; never infer fixed-default routing.
+
 ## Topics
 
 | Topic | Description | Guide |
@@ -118,7 +120,7 @@ entries go there instead — one memory per class, appended on recurrence. See
    **Environment-appropriate medium (mandatory fallback chain — do not skip tracking because
    the first tool is unavailable)**:
    - **Claude Code**: `TaskCreate` first. If unavailable this turn, `TodoWrite`. If both are
-     unavailable, the `claude-task` CLI fallback (`todowrite` skill's `claude-task` topic —
+     unavailable, the `agent-task` CLI fallback (`todowrite` skill's `agent-task` topic —
      persists outside the session) exactly as `/fix` Step 0 documents. **Never** the session
      scratchpad directory as the tracking medium — its path can change across a session/compact
      boundary, silently dropping content and defeating the whole point of tracking.
@@ -132,7 +134,7 @@ entries go there instead — one memory per class, appended on recurrence. See
    | 1 | Register a new Stop hook / write a new verification script under the "correct the existing artifact" permission, with no task tracking it | Before authoring the new mechanism, `TaskCreate` a task for it (even a single one) so the work is resumable if the turn breaks |
    | 2 | Reason "it's still just this turn's correction, so no task needed" | The content-edit/new-mechanism line is the test, not "which turn it happens in". A hook registration is new-mechanism regardless of when it happens |
    | 3 | Skip tracking because the fix is small (one hooks.json entry) | Size is irrelevant — the guarantee is about resumability, not effort. A one-line hook registration left mid-edit is just as unrecoverable as a large one |
-   | 4 | `TaskCreate` unavailable → conclude "no way to track it here" and proceed untracked | Fall through the chain: `TodoWrite` → `claude-task` CLI (Claude Code) or `task.md` (Antigravity). The chain has no untracked terminal state |
+   | 4 | `TaskCreate` unavailable → conclude "no way to track it here" and proceed untracked | Fall through the chain: `TodoWrite` → `agent-task` CLI (Claude Code) or `task.md` (Antigravity). The chain has no untracked terminal state |
    | 5 | Use the session scratchpad directory as the fallback medium because it's "just this session anyway" | Scratchpad paths are ephemeral by design and can change across a session/compact boundary, silently dropping their contents — not a valid fallback rung |
 
 ## Skip conditions

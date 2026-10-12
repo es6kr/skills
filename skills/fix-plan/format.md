@@ -155,3 +155,10 @@ Exceptions:
 - [move.md](./move.md) — `[x]` → Completed summary rules + subtree-move
 - [sync.md](./sync.md) — GitHub PR/Issue state polling
 - [issue-drafts.md](./issue-drafts.md) — draft file lifecycle
+
+## Session ledger boundary
+
+`agent-task` (legacy `claude-task` alias) records current-session execution;
+`fix_plan.md` remains the canonical project tracker. Promote deferred durable
+work deliberately; do not migrate, delete or reconcile CLI ledgers automatically.
+OpenClaw uses explicit verified current sessionId via [wip/openclaw](../wip/openclaw.md).
