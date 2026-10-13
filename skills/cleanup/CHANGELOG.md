@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/cleanup-v0.9.0...cleanup-v0.10.0) (2026-10-13)
+
+
+### Features
+
+* **cleanup:** add graph-stop-evaluator shell hook wrapper ([#618](https://github.com/es6kr/skills/issues/618)) ([daf68db](https://github.com/es6kr/skills/commit/daf68db1f9ce3c54d1e3430ba0baec722dc32d52))
+
+
+### Bug Fixes
+
+* **cleanup:** close the RAG-gate marker and skipped-ingest holes ([e0c5b89](https://github.com/es6kr/skills/commit/e0c5b8952781784814830dcc0debeb7b8d3a2f60))
+* **cleanup:** scope RAG-gate response extraction to the last assistant turn ([6c89638](https://github.com/es6kr/skills/commit/6c896385adf7528ff1278a82650cb65049a6d081))
+* **cleanup:** scope RAG-gate response extraction to the last assistant turn ([37a0faa](https://github.com/es6kr/skills/commit/37a0faaaa19917a577ab1e2a13b1059833767427))
+* **guards:** scope cleanup failure and correction language signals ([8838278](https://github.com/es6kr/skills/commit/8838278a12b3c25c0eb32d65ed925b0c141eb242))
+
 ## [0.9.0](https://github.com/es6kr/skills/compare/cleanup-v0.8.0...cleanup-v0.9.0) (2026-10-04)
 
 

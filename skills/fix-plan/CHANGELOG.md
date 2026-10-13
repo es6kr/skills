@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.2](https://github.com/es6kr/skills/compare/fix-plan-v0.17.1...fix-plan-v0.17.2) (2026-10-13)
+
+
+### Bug Fixes
+
+* **fix-plan:** implement auto_graduate in pinned_liveness_check ([#617](https://github.com/es6kr/skills/issues/617)) ([9a532c3](https://github.com/es6kr/skills/commit/9a532c392a74363f679061f46979c7e6f1b2ef8b))
+* **tracker:** preserve pinned ownership and checkout executable checks ([30bcc1e](https://github.com/es6kr/skills/commit/30bcc1e01b78efcf552d9a8b121c42babd68db09))
+
 ## [0.17.1](https://github.com/es6kr/skills/compare/fix-plan-v0.17.0...fix-plan-v0.17.1) (2026-10-04)
 
 
