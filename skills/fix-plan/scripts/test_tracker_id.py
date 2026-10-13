@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """test_tracker_id.py — unit tests for fix-plan tracker ID uniqueness checker and sequence resolver."""
 
+import io
+import json
 import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 # Ensure skills/fix-plan/scripts is in import path
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -101,6 +104,19 @@ class TestTrackerId(unittest.TestCase):
         assigned_id, collided = tracker_id.get_next_available_id(self.tmp_path, "AIAUTO", requested_seq=1)
         self.assertEqual(assigned_id, "AIAUTO-2")
         self.assertTrue(collided)
+
+    def test_main_cli_json_output(self):
+        content = "- [ ] [AIAUTO-1] item 1\n"
+        with open(self.tmp_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        out = io.StringIO()
+        with patch("sys.stdout", out):
+            ret = tracker_id.main(["--file", self.tmp_path, "--prefix", "AIAUTO", "--seq", "1", "--json"])
+        self.assertEqual(ret, 0)
+        data = json.loads(out.getvalue())
+        self.assertEqual(data["identifier"], "AIAUTO-2")
+        self.assertTrue(data["collided"])
 
 
 if __name__ == "__main__":
