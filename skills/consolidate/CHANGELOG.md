@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/consolidate-v0.8.0...consolidate-v0.8.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **consolidate,github-flow:** verify_consolidate.py + merge-gate Critical-count row-awareness ([030a462](https://github.com/es6kr/skills/commit/030a462ee59bbf3afb93261ea61a8473cd99faba))
+* **consolidate:** validate review quorum and per-source provenance ([fd2cb4d](https://github.com/es6kr/skills/commit/fd2cb4d5a9acda22b7ee5fbc788368fd26bc6e7e))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/consolidate-v0.7.1...consolidate-v0.8.0) (2026-10-06)
 
 

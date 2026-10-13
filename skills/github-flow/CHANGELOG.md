@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.4](https://github.com/es6kr/skills/compare/github-flow-v0.11.3...github-flow-v0.11.4) (2026-10-13)
+
+
+### Bug Fixes
+
+* **consolidate,github-flow:** verify_consolidate.py + merge-gate Critical-count row-awareness ([030a462](https://github.com/es6kr/skills/commit/030a462ee59bbf3afb93261ea61a8473cd99faba))
+* **consolidate:** validate review quorum and per-source provenance ([fd2cb4d](https://github.com/es6kr/skills/commit/fd2cb4d5a9acda22b7ee5fbc788368fd26bc6e7e))
+* **github-flow,consolidate:** scope AI-review gates to canonical-branch bases ([#607](https://github.com/es6kr/skills/issues/607)) ([93a630a](https://github.com/es6kr/skills/commit/93a630aedd6e6c20b389c41b105080856f620133))
+* **github-flow:** clarify squash-prohibition enforcement scope and bypass requirement ([#606](https://github.com/es6kr/skills/issues/606)) ([0bc99a3](https://github.com/es6kr/skills/commit/0bc99a351df76b2d770a6c996cbee0722d493749))
+* **github-flow:** merge.md Critical-count check is row-aware, not whole-body scan ([61c7f43](https://github.com/es6kr/skills/commit/61c7f43050344daca10a44dd04aa6c635d86c069))
+
 ## [0.11.3](https://github.com/es6kr/skills/compare/github-flow-v0.11.2...github-flow-v0.11.3) (2026-09-27)
 
 

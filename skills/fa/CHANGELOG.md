@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.2](https://github.com/es6kr/skills/compare/fa-v0.5.1...fa-v0.5.2) (2026-10-13)
+
+
+### Bug Fixes
+
+* **fa:** force FA activation on agent-fault correction signals ([b1bd0af](https://github.com/es6kr/skills/commit/b1bd0af425e9ec5b796b52f6259b437140bf335b))
+* **fa:** force FA activation on agent-fault correction signals ([fb8227b](https://github.com/es6kr/skills/commit/fb8227b0a38d509ea2f08f2ea1911de2f478eeaa))
+* **fa:** mark the correction-signal hook executable ([ddcdf82](https://github.com/es6kr/skills/commit/ddcdf82fed18d488b0023ea37c46a97aabd1b3ff))
+* **guards:** scope cleanup failure and correction language signals ([8838278](https://github.com/es6kr/skills/commit/8838278a12b3c25c0eb32d65ed925b0c141eb242))
+
 ## [0.5.1](https://github.com/es6kr/skills/compare/fa-v0.5.0...fa-v0.5.1) (2026-10-04)
 
 

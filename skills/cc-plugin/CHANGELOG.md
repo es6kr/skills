@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/es6kr/skills/compare/cc-plugin-v0.8.1...cc-plugin-v0.8.2) (2026-10-13)
+
+
+### Bug Fixes
+
+* **cc-plugin:** preserve aliased marketplace checkouts ([8312dd7](https://github.com/es6kr/skills/commit/8312dd7759c18970a02799386b073cd1690f5f3b))
+
 ## [0.8.1](https://github.com/es6kr/skills/compare/cc-plugin-v0.8.0...cc-plugin-v0.8.1) (2026-10-04)
 
 
