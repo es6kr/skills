@@ -210,6 +210,55 @@ class TestFastRecordNoSilentGlobalFallback(unittest.TestCase):
             )
 
 
+class TestFastRecordNestedRepoWorkspaceRoot(unittest.TestCase):
+    """PR #625 review finding 1: the real workspace layout is
+    `<ghq>/<host>/<org>/.agents/` with NO `.git` at the org level, while each
+    repo under it has its own `.git` and no `.agents/`. Anchoring on the
+    nearest `.git` therefore resolves to a repo that has no `.agents/` and
+    every invocation from inside it fails. The root must be the nearest
+    ancestor that actually owns `.agents/` -- but never one at or above the
+    directory that contains `ghq` (that would be the user's global
+    `~/.agents`, i.e. the forbidden silent global fallback)."""
+
+    def setUp(self):
+        self._orig_cwd = os.getcwd()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self._tmp.name).resolve()
+        self.org = self.home / "ghq" / "github.com" / "acme"
+        self.repo = self.org / "skills"
+        self.nested = self.repo / ".workspaces" / "skills" / "wt"
+        self.nested.mkdir(parents=True)
+        (self.repo / ".git").mkdir()  # repo-level .git, no .agents here
+        (self.nested / ".git").write_text("gitdir: ../../../.git/worktrees/wt\n")
+
+    def tearDown(self):
+        os.chdir(self._orig_cwd)
+        self._tmp.cleanup()
+
+    def test_resolves_org_level_agents_dir_when_repo_has_no_agents(self):
+        (self.org / ".agents").mkdir()
+        os.chdir(self.nested)
+        fa_fast_record = _load_module("fa_fast_record_nested", "fa-fast-record.py")
+
+        self.assertEqual(fa_fast_record.resolve_workspace_root(Path.cwd()), self.org)
+
+        rc = fa_fast_record.fast_record("written from inside a nested repo worktree")
+        self.assertEqual(rc, 0)
+        self.assertIn(
+            "written from inside a nested repo worktree",
+            (self.org / ".agents" / "improvements.md").read_text(encoding="utf-8"),
+        )
+
+    def test_never_resolves_an_agents_dir_at_or_above_the_ghq_parent(self):
+        (self.home / ".agents").mkdir()  # global-style dir, above `ghq`
+        os.chdir(self.nested)
+        fa_fast_record = _load_module("fa_fast_record_ceiling", "fa-fast-record.py")
+
+        self.assertIsNone(fa_fast_record.resolve_workspace_root(Path.cwd()))
+        self.assertNotEqual(fa_fast_record.fast_record("must not reach the global dir"), 0)
+        self.assertFalse((self.home / ".agents" / "improvements.md").exists())
+
+
 class TestInboxTriageParserIntegrity(unittest.TestCase):
     """plan Sec.2.2 skeleton (unchanged) + Sec.5 item 2 'Parser Integrity'."""
 
