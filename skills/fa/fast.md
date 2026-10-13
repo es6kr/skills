@@ -44,7 +44,7 @@ by staying only in the transcript.
 `fa-fast-record.py` fails loudly (non-zero exit, `[FAIL]` to stderr) rather than silently
 degrading in two cases — do not add a fallback around either:
 
-- **No workspace root** — no `.git` ancestor found from the caller's cwd. There is no global
+- **No workspace root** — no ancestor owning `.agents/` found from the caller's cwd (searched strictly below the `ghq` parent, so a global `~/.agents` is never picked up). There is no global
   fallback inbox; this is intentional (see the script's module docstring for the Fable-audit
   rationale against the plan's original `~/.agents/improvements.md` fallback).
 - **`.agents/` directory missing** — the script does not auto-create it.

@@ -26,14 +26,31 @@ from datetime import datetime
 from pathlib import Path
 
 
+def _ceiling(cur: Path) -> Path:
+    """Highest directory the root search may NOT reach or pass: the parent of
+    the `ghq` path component (the user's home-like dir, where a global
+    `.agents/` lives), else the real home dir. Resolving to it would be the
+    silent global fallback this script refuses to create."""
+    parts = cur.parts
+    if "ghq" in parts:
+        return Path(*parts[: parts.index("ghq")])
+    return Path.home()
+
+
 def resolve_workspace_root(start: Path):
-    """Walk up from `start` looking for a `.git` entry (dir or file -- a
-    worktree's `.git` is a file containing a `gitdir:` pointer, not a
-    directory, so `.exists()` is used rather than `.is_dir()`); return
-    None if none found."""
+    """Return the nearest ancestor of `start` that owns an `.agents/` dir,
+    searching strictly below the ceiling (see `_ceiling`); None if none.
+
+    Anchored on `.agents/` rather than `.git`: the workspace layout is
+    `<ghq>/<host>/<org>/.agents/` with no `.git` at the org level, while each
+    repo (and its worktrees) under it has its own `.git` and no `.agents/`,
+    so the nearest `.git` is a repo the inbox does not live in."""
     cur = start.resolve()
+    ceiling = _ceiling(cur)
     for candidate in [cur, *cur.parents]:
-        if (candidate / ".git").exists():
+        if candidate == ceiling or candidate in ceiling.parents:
+            return None
+        if (candidate / ".agents").is_dir():
             return candidate
     return None
 
@@ -42,7 +59,7 @@ def fast_record(note: str, session_id: str = "unknown", source: str = "interacti
     workspace_root = resolve_workspace_root(Path.cwd())
     if workspace_root is None:
         print(
-            "[FAIL] No workspace root (.git ancestor) found -- refusing to write a global fallback inbox.",
+            "[FAIL] No workspace root (an ancestor owning .agents/, below the ghq parent) found -- refusing to write a global fallback inbox.",
             file=sys.stderr,
         )
         return 1
