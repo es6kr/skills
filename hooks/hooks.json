@@ -482,6 +482,10 @@
           },
           {
             "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-slash-command-skill-invoked.sh"
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fix/resources/fix-and-ambiguity-guard.sh"
           },
           {
