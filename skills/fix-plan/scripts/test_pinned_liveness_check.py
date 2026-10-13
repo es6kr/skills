@@ -253,5 +253,32 @@ class TestRunEndToEnd(unittest.TestCase):
             Path(path).unlink()
 
 
+class TestAutoGraduate(unittest.TestCase):
+    def test_auto_graduate_removes_resolved_mission_and_appends_to_completed(self):
+        path = write_tracker(RESOLVED_TRACKER)
+        try:
+            res = plc.auto_graduate(path)
+            self.assertEqual(res["graduated_count"], 1)
+            content = Path(path).read_text(encoding="utf-8")
+            # Mission A should no longer be in the pinned block
+            self.assertNotIn("- **Mission A**", content.split("## TODO")[0])
+            # Completed section should contain graduation note
+            self.assertIn("Graduated pinned mission: Mission A", content)
+        finally:
+            Path(path).unlink()
+
+    def test_auto_graduate_no_op_on_open_tracker(self):
+        path = write_tracker(OPEN_TRACKER)
+        before = Path(path).read_text(encoding="utf-8")
+        try:
+            res = plc.auto_graduate(path)
+            after = Path(path).read_text(encoding="utf-8")
+            self.assertEqual(res["graduated_count"], 0)
+            self.assertEqual(before, after)
+        finally:
+            Path(path).unlink()
+
+
 if __name__ == "__main__":
     unittest.main()
+

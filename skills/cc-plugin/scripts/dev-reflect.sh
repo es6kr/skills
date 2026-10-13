@@ -57,6 +57,25 @@ CLONE_MP="$CLONE/.claude-plugin/marketplace.json"
 [ -f "$CLONE_MP" ] || { echo "[dev-reflect] clone has no marketplace.json: $CLONE_MP" >&2; exit 1; }
 command -v jq >/dev/null || { echo "[dev-reflect] jq required" >&2; exit 1; }
 
+# Hook-inherited Git context can defeat git -C when inspecting the destination.
+# Clear only repository-local variables, not general editor/credential settings.
+if command -v git >/dev/null; then
+  for git_local_var in $(git rev-parse --local-env-vars); do
+    unset "$git_local_var"
+  done
+fi
+SOURCE_PHYSICAL="$(cd "$SOURCE" && pwd -P)"
+CLONE_PHYSICAL="$(cd "$CLONE" && pwd -P)"
+SOURCE_COMMON="$(git -C "$SOURCE_PHYSICAL" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+CLONE_COMMON="$(git -C "$CLONE_PHYSICAL" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$SOURCE_COMMON" ]; then SOURCE_COMMON="$(cd "$SOURCE_COMMON" && pwd -P)"; fi
+if [ -n "$CLONE_COMMON" ]; then CLONE_COMMON="$(cd "$CLONE_COMMON" && pwd -P)"; fi
+if [ "$SOURCE_PHYSICAL" = "$CLONE_PHYSICAL" ] || \
+   { [ -n "$SOURCE_COMMON" ] && [ "$SOURCE_COMMON" = "$CLONE_COMMON" ]; }; then
+  echo "[dev-reflect] SKIP: marketplace resolves to the source or another worktree of the same repository; no files changed."
+  exit 0
+fi
+
 # Executes its arguments directly (never eval) so that untrusted values (e.g.
 # PLUGIN_NAME sourced from --source's own marketplace.json) can never be
 # re-parsed as shell syntax, regardless of what characters they contain.

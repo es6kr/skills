@@ -103,7 +103,7 @@ Recommend merge via `/github-flow merge 123`.
         validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
         self.assertFalse(validator.validate())
         self.assertTrue(any("row count mismatch" in err for err in validator.errors))
-        self.assertTrue(any("missing superpowers" in err for err in validator.errors))
+        self.assertTrue(any("missing Internal Code Review findings" in err for err in validator.errors))
 
     @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
     def test_validator_fails_on_out_of_order_comments(self, mock_api):
@@ -493,4 +493,34 @@ Hold. Merge via `/github-flow merge 123`.
         validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
         self.assertTrue(validator.validate(), f"Validation failed with errors: {validator.errors}")
         self.assertEqual(len(validator.errors), 0)
+
+    @patch("skills.consolidate.scripts.verify_consolidate.git_sha_exists", return_value=True)
+    @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
+    def test_validator_fails_when_graph_review_causality_is_broken(self, mock_api, mock_sha):
+        summary = {
+            "id": 999,
+            "created_at": "2026-10-05T00:01:00Z",
+            "body": """## AI Review Summary — [receiving-code-review](https://skills.sh/obra/superpowers/receiving-code-review)
+<!-- consolidate:verified -->
+
+> Reviewer matrix: copilot — 1 inline comments
+
+### Consolidated Findings
+| # | Source / Classification | Location | Finding | Status |
+|---|---|---|---|---|
+| 1 | copilot<br>⚠️ Potential issue<br>🟠 Important | `a.py:1` | finding 1 | 🔴 Pending |
+
+### Merge Recommendation
+Hold. Merge via `/github-flow merge 123`.
+""",
+        }
+        inline = [{"id": 1, "user": {"login": "Copilot"}, "path": "a.py", "line": 1, "body": "finding 1"}]
+        # Only summary exists, no internal review
+        mock_api.side_effect = [inline, [summary], []]
+        validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
+        self.assertFalse(validator.validate())
+        self.assertTrue(
+            any("causal" in e.lower() or "disconnected" in e.lower() for e in validator.errors),
+            f"Expected graph causal error in validator.errors, got: {validator.errors}",
+        )
 

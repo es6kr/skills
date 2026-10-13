@@ -64,6 +64,20 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 
 ### 2. AI Review Summary — every Actionable item addressed
 
+**Scope gate (HARD STOP — run BEFORE the default procedure below)**: this entire condition applies **only when the PR's base is the shared canonical branch** (`master` / `main`). Resolve the base per PR first:
+
+```bash
+gh pr view <PR_NUMBER> -R <owner>/<repo> --json baseRefName,isDraft \
+  --jq '(.isDraft | not) and (.baseRefName == "main" or .baseRefName == "master")'
+```
+
+- Result `true` → ready-for-review PR into `master` / `main`; the condition applies in full.
+- Draft (`isDraft: true`) → skip this Summary/consolidate condition. Do not mark ready or manufacture reviews to satisfy it.
+- Base is an intermediate/staging branch (`develop`, `next-feat`, `next-fix`, …) → **the condition does not apply.** Do not auto-invoke `/consolidate pr`, do not require a Summary to exist, and do not treat a bot review's absence as a gap. Skip ahead to condition 3.
+- Do not infer the base from the repository's default branch. A repository whose default is `develop` can still take `master` as its real PR base, and the reverse also occurs — resolve it per PR.
+
+**Why the scoping exists**: a repository with frequent parallel PRs may batch review deliberately — individual PRs into a staging branch accumulate without AI review, and the accumulated commits get one consolidated review when that staging branch opens its promotion PR into the canonical branch. Under that model, requiring a Summary on each staging-bound PR does not add a review; it duplicates the one the promotion PR will carry, and it manufactures review artifacts on PRs whose content is reviewed later as a batch. Whether a given repository uses this model is a property of that repository's branch-promotion convention, so this gate resolves the base rather than assuming either answer. On such a repository a draft PR is likewise outside this condition — a draft has not opted into review, and marking it ready purely to obtain a bot review is a lifecycle decision belonging to the author, not a step for satisfying this gate.
+
 **Default procedure (HARD STOP — strict order)**:
 
 0. **Verify a real Copilot review error** (explicit error keywords only — beware of false positives):
@@ -77,10 +91,24 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
 
    **Forbidden**: declaring a partial failure just because the `Reviewed changes` section is missing or the bodyLen is short. Copilot does post short reviews to simple PRs (e.g. PR #110 merged, bodyLen 2040, inline comments only, no `Reviewed changes` section).
 
-1. **Check whether the AI Review Summary comment exists**:
+1. **Read the latest canonical AI Review Summary across issue comments AND Formal Reviews**. Fetch all pages, combine before sorting by publication timestamp, and retain the selected artifact's medium and ID. Never use `[0]` on API order or select a phrase inside a walkthrough. API failure is a hard stop, not an empty Summary:
    ```bash
-   gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --jq '.[] | select(.body | startswith("## AI Review Summary"))'
+   latest_summary() {
+     local comments reviews
+     comments=$(gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --paginate --slurp) || return 1
+     reviews=$(gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews --paginate --slurp) || return 1
+     jq -n --argjson comments "$comments" --argjson reviews "$reviews" '
+       [($comments[][] | . + {medium: "comment"}),
+        ($reviews[][] | . + {medium: "review"})]
+       | map(select((.body // "") | test("^\\s*#{1,6} AI Review Summary[^\\n]*\\[receiving-code-review\\]\\(")))
+       | sort_by(.created_at // .submitted_at)
+       | last // null
+     '
+   }
+   SUMMARY=$(latest_summary) || { echo "BLOCKED: Summary API lookup failed"; exit 1; }
+   printf '%s\n' "$SUMMARY" | jq .
    ```
+   A `null` result means no canonical Summary. A submitted Formal Review is a supported Summary medium; preserve that medium when updating it. Two independently completed substantive CodeRabbit and Copilot reviews permit Summary-only consolidation without inventing or requesting another Internal Review. Badges, skipped/errored reviews, empty bodies and same-engine variants do not satisfy quorum. Record each source review's reviewed SHA separately from the fix/current head; quorum is not proof that later fixes received another review.
 
 2. **No Summary comment → unconditionally auto-invoke `/consolidate pr`**:
    - **Antigravity Unapproved PR clawo Delegation Gate (HARD STOP)**: In Antigravity (Gemini), directly executing `/consolidate pr` or remediating unapproved PRs in the main chat turn is strictly forbidden (`HARD STOP`). You MUST delegate unapproved PR review consolidation and remediation to `clawo` (`clawo session-send <session_name>` or `Skill("clawo", "launch")`).
@@ -88,18 +116,29 @@ For projects pushing directly to master (e.g., infra-provisioning repos), commit
    - After consolidate, confirm the Summary comment was posted → continue to Step 3
    - **Forbidden**: asking the user a merge / apply option without the Summary. consolidate must run first
 
-3. **Summary comment exists → count 🔴 Critical (HARD STOP)**:
+3. **Summary comment exists → count UNRESOLVED 🔴 Critical rows (HARD STOP)**:
+
+   **Row-aware, not a whole-body substring scan (HARD STOP)**: `consolidate/post.md`'s own table convention keeps a finding's severity classification (`🔴 Critical`) in its `Source / Classification` cell **forever**, even after the finding is `Status: 🟢 Fixed` — the classification cell is a permanent audit-trail record, not a live-risk indicator. A substring count of "🔴 Critical" anywhere in the Summary body therefore also counts *already-resolved* Critical findings, which would block a merge that is actually safe. Count only rows whose `Status` cell is still unresolved (i.e. not `🟢 Fixed` and not `⚪ Rejected`):
 
    ```bash
-   # Count 🔴 Critical entries in the Summary body.
-   # CROSS-PLATFORM (HARD STOP): NEVER `grep -c '🔴 Critical'` — Windows Git Bash emoji
-   # byte-matching returns false 0 (silent merge-gate bypass). Count inside jq (UTF-8 native):
-   gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments \
-     --jq '[.[] | select(.body | startswith("## AI Review Summary")) | .body | [scan("🔴 Critical")] | length] | add // 0'
+   # Count rows where Classification contains "🔴 Critical" AND Status is still
+   # unresolved (not 🟢 Fixed, not ⚪ Rejected). Parses the 5-column findings
+   # table (# | Source/Classification | Location | Finding | Status) row by row
+   # instead of scanning the whole body for the substring "Critical".
+   SUMMARY=$(latest_summary) || { echo "BLOCKED: Summary API lookup failed"; exit 1; }
+   printf '%s\n' "$SUMMARY" | jq -e '.body // error("Missing AI Review Summary")
+       | split("\n")
+       | map(select(startswith("|") and (contains("---") | not)))
+       | map(split("|"))
+       | map(select(length >= 6))
+       | map(select((.[2] // "") | test("🔴 Critical")))
+       | map(select(((.[5] // "") | test("🟢|⚪")) | not))
+       | length
+     '
    ```
 
-   - **🔴 Critical ≥ 1 → merge is absolutely forbidden**. Address the Critical items in code, then refresh the Summary before merging. "deferred" is not allowed — Critical items must be addressed
-   - 🔴 Critical 0 + `Actionable > 0` not yet addressed → use AskUserQuestion to confirm the action (apply / deferred / skip)
+   - **Unresolved 🔴 Critical rows ≥ 1 → merge is absolutely forbidden**. Address the Critical items in code, then refresh the Summary before merging. "deferred" is not allowed — Critical items must be addressed (`Status: 🟢 Fixed (commit <sha>)` once the code is actually fixed, including when fixed by removing/reverting the code the finding targeted)
+   - Unresolved 🔴 Critical = 0 + `Actionable > 0` not yet addressed → use AskUserQuestion to confirm the action (apply / deferred / skip)
    - If everything is addressed or explicitly deferred, continue to Step 2.5
 
 **Forbidden patterns**:
@@ -485,6 +524,8 @@ In repositories managing skills or plugins (e.g. `es6kr/skills`, `es6kr/claude-p
 - **Strict Exception (1 Real Commit)**: A PR containing **exactly 1 real commit** excluding merge commits (`git log --no-merges ... | wc -l == 1`). If and only if there is a single real commit, squash merge may be recommended/used.
 - **Multi-Commit PRs (`real_commits >= 2`)**: The agent MUST recommend and execute **`Merge commit` (`gh pr merge <N> --merge`)** to preserve granular Conventional Commit history.
 
+**Enforcement scope and the 1-commit exception's actual bypass requirement (clarified — the example repos above are illustrative, not the enforcement boundary)**: the actual enforcement is `hook-kit`'s `bash-guard.py` (`check_pr_merge_squash_policy`), a `PreToolUse:Bash` guard. It is **repo-agnostic** — it blocks every `gh pr merge --squash`/`--rebase` invocation, in any repository, regardless of commit count. It does **not** itself query the PR's commit count. Concretely: the "Strict Exception (1 Real Commit)" above does not make squash pass through the hook automatically — even a verified 1-real-commit PR still requires the `ALLOW_SQUASH_MERGE=1` environment prefix the hook's own denial message names, because the hook has no way to distinguish that case from a multi-commit one without the prefix. Verify the commit count yourself first (per the "Commit-count / distinctness gate" below), then supply the prefix — do not treat the 1-commit exception as removing the need for it.
+
 ### Commit-count / distinctness gate (HARD STOP — before defaulting to squash)
 
 **"Squash Merge (recommended)" below is the default only for PRs whose commits are not independently meaningful.** A PR with 3+ commits spanning genuinely distinct concerns (e.g. separate hook registrations, separate bug fixes bundled together, separate feature slices) loses that per-concern traceability when squashed — the option description must disclose this trade-off, not silently default to squash.
@@ -603,7 +644,7 @@ When creating or merging a promotion PR from `develop` to `main`:
   - After a `--merge` (history-preserving) merge this does not apply: the commits are on the target, so the local branch fast-forwards and carries no divergent history.
 - **Post-merge AI Review Summary sync (HARD STOP)**: after a successful merge, immediately PATCH the AI Review Summary comment (the one posted in `consolidate/post.md` Step 7) to reflect the merged state — do NOT leave the Summary frozen at its pre-merge snapshot. The Summary is the user-facing record of the PR's final disposition; if it still says "⏳ Actionable PENDING" or shows an incomplete Test Plan after merge, anyone reading the PR later will see a contradictory record.
   - **What to update**: (a) verdict line: `⏳ Actionable PENDING fix.` → `✅ MERGED <YYYY-MM-DD>` + merge commit SHA + `(#<PR>)` suffix. (b) findings table `Status` column: each "⏳ Pending decision" → either `🟢 Applied (commit <sha>)` or `🟢 Deferred (<tracking-medium reference>)` per the actual outcome. (c) any inline "Test Plan N/M items checked" → "Test Plan M/M ✅" if CI re-pass confirmed.
-  - **How**: `gh api repos/{owner}/{repo}/issues/comments/{comment_id} -X PATCH --input <(jq -n --rawfile body <updated-summary-file> '{body: $body}')` — find the comment id via `gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | startswith("## AI Review Summary")) | .id'`. Reuse the same id (PATCH, not new POST) — `consolidate/post.md` "Single Summary preservation guard" applies post-merge too.
+  - **How**: refresh `SUMMARY=$(latest_summary)` using the paginated, timestamp-sorted lookup above, then read `.id` and `.medium` from that exact artifact. For `medium: comment`, PATCH `repos/{owner}/{repo}/issues/comments/{id}`; for `medium: review`, PUT `repos/{owner}/{repo}/pulls/{N}/reviews/{id}` (body-only update). Supply the body via a JSON file, preserve the medium/ID, and read back that exact endpoint to verify the complete body. Do not select all matching comment IDs or post a replacement just because the Summary used the review medium — `consolidate/post.md` "Single Summary preservation guard" applies post-merge too.
   - **Forbidden**: leaving the Summary at its pre-merge state because "the PR is MERGED so the comment is read-only". A MERGED PR's comment body is still PATCH-able and the audit trail benefits from the merged-state record.
   - **Order vs Issue body checklist update (next bullet)**: Summary PATCH runs first (PR-scoped), then issue body checklist update (issue-scoped). Both run before `Deploy follow-up`.
 - **Update related issue body checklists (HARD STOP)**: if the PR referenced an issue via `Relates to #N` / `Resolves #N` / `Fixes #N` / `Refs #N`, immediately after merge update that issue body's checklist (`- [ ]`) to `- [x]` for items covered by the PR scope, and append a reference to the merged PR number. Especially for **epic-style issues** (multiple Phase 1/2/3 checkboxes), batch-update every Phase item completed by the PR merge.
@@ -662,11 +703,22 @@ Right before authoring the merge-recommendation AskUserQuestion, verify all six 
 # 1. CI status
 gh pr checks <N> --json bucket -q '[.[] | .bucket] | group_by(.) | map({(.[0]): length}) | add'
 
-# 2. AI Review Summary — count of 🔴 Critical (forbid merge if ≥ 1)
+# 2. AI Review Summary — count of UNRESOLVED 🔴 Critical rows (forbid merge if ≥ 1)
+# Row-aware (see Step 2 "Row-aware, not a whole-body substring scan" above): a
+# whole-body substring count also counts already-🟢-Fixed Critical rows, which
+# post.md's audit-trail convention keeps in the table forever.
 # CROSS-PLATFORM (HARD STOP): count in jq (UTF-8 native), NOT `grep -c '🔴 Critical'`
 # (Windows Git Bash emoji byte-match → false 0 → silent merge-gate bypass).
-CRIT=$(gh api repos/{owner}/{repo}/issues/<N>/comments \
-  --jq '[.[] | select(.body | startswith("## AI Review Summary")) | .body | [scan("🔴 Critical")] | length] | add // 0')
+SUMMARY=$(latest_summary) || { echo "BLOCKED: Summary API lookup failed"; exit 1; }
+CRIT=$(printf '%s\n' "$SUMMARY" | jq -e '.body // error("Missing AI Review Summary")
+    | split("\n")
+    | map(select(startswith("|") and (contains("---") | not)))
+    | map(split("|"))
+    | map(select(length >= 6))
+    | map(select((.[2] // "") | test("🔴 Critical")))
+    | map(select(((.[5] // "") | test("🟢|⚪")) | not))
+    | length
+  ')
 [ "$CRIT" -ge 1 ] && echo "BLOCKED: Critical unresolved ($CRIT)"
 
 # 2b. AI Review actionable status

@@ -74,6 +74,33 @@ gh pr list --head "$(git branch --show-current)" --json number,title --jq '.[0]'
 
 **Confirm owner/repo first (HARD STOP)**: before identifying the PR, run `git remote get-url origin` to pin the exact `<owner>/<repo>`, and pass `-R <owner>/<repo>` on every downstream `gh` call. When multiple worktrees/workspaces share the same basename (e.g. two `web` checkouts under different orgs), relying on cwd alone can target another repo's PR of the same number.
 
+## Step 2.0: Pre-offer gate — resolve base + draft BEFORE offering consolidate as an option (HARD STOP)
+
+**Step 2's skip conditions are evaluated *after* entry, which is too late when consolidate is being offered to the user as a choice.** The user picks "run consolidate", and only then does Step 2 reject the PR — a round trip that spends a user decision on an option that was never available. Worse, the rejection then reads as something to work around, which invites a policy-violating correction ("flip the draft to ready so the bot reviews it") whose only purpose is to make the dead option runnable.
+
+So before putting consolidate, an AI review, or a `gh pr ready` transition into an `AskUserQuestion` option — or into a recommendation — resolve these two fields:
+
+```bash
+gh pr view <N> -R <owner>/<repo> --json baseRefName,isDraft --jq '{base: .baseRefName, draft: .isDraft}'
+```
+
+| Resolved state | Consequence for the option list |
+|---|---|
+| `draft: true` | Condition 4 below will skip the whole flow. **Do not offer consolidate.** Offer it only for after the PR is marked ready, and only when becoming ready is the author's own goal — never as a means of unblocking consolidate |
+| base is an intermediate/staging branch (`develop`, `next-*`) | Condition 5 below will skip Summary/Formal Review. **Do not offer consolidate.** The review gate sits on the later promotion PR into the default branch |
+| base is `master` / `main` and not a draft | Consolidate is genuinely available — proceed |
+
+**A bot review's absence on a staging-base or draft PR is the normal state, not a defect.** Reporting it in condition 2's wording ("reviews not complete") frames a policy-conformant state as a gap, which is what invites the correction the policy forbids. Note also that a bot's CI status check can read SUCCESS while that bot posted no review at all — a green check is not evidence that a review happened.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Offer consolidate as an option, then discover at Step 2 that the PR is a draft or staging-base | Resolve `baseRefName` + `isDraft` before composing the option list; exclude consolidate when either disqualifies it |
+| 2 | Report "CodeRabbit review absent" as a gap on a staging-base or draft PR | Report it as the expected state for that base/draft combination |
+| 3 | Offer "mark it ready so the bot reviews it" to make consolidate runnable | Readiness is the author's decision about PR lifecycle, never a workaround for a skip condition |
+| 4 | Read a bot's green CI check as proof it reviewed | Count its actual review/comment artifacts — the two are independent |
+
+**Self-check (before any `AskUserQuestion` whose options mention consolidate / AI review / ready-transition)**: have I resolved this PR's `baseRefName` and `isDraft` this session? Does either disqualify consolidate under conditions 4-5 below? If so, is consolidate absent from the option list I am about to present?
+
 ## Step 2: Check Skip Conditions
 
 Skip entirely if any of these are true:
