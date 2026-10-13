@@ -1,9 +1,9 @@
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
-import {realpath} from 'node:fs/promises';
+import {realpath,access} from 'node:fs/promises';
 const runFile=promisify(execFile);
-const helper=fileURLToPath(new URL('../../skills/git-repo/scripts/verify_feature_base.py',import.meta.url));
+const helper=fileURLToPath(new URL('./resources/verify_feature_base.py',import.meta.url));
 const TOOL='feature_base_action';
 function request(params,config){
   if (!params || Object.keys(params).some(k=>!['action','contractId','message'].includes(k))) throw new Error('unsupported parameters');
@@ -17,19 +17,38 @@ function request(params,config){
   const count=params.action==='start'?0:params.action==='commit'?c.expectedCommits-1:c.expectedCommits;
   return {contract:c,mode,count};
 }
-export async function verifyContract(contract,mode,count){
-  const repo=await realpath(contract.repo);
-  const args=[helper,'--repo',repo,'--base',contract.base,'--mode',mode,'--expected-commits',String(count)];
+function failure(category){return new Error(`verifier process failed [${category}]`);}
+function rejection(receipt){
+  // The helper can embed Git stderr and paths in its error field. Never relay
+  // arbitrary subprocess text; retain only bounded, known semantic receipts.
+  if(/^commit count \d{1,16} != expected \d{1,16}$/.test(receipt.error??''))return new Error(receipt.error);
+  const safe=['clean worktree required','in-progress git operation','unmerged index',
+    'feature range must be linear, not contain merge commits',
+    'single feature commit must be a direct child of base','start HEAD must equal explicit base'];
+  if(safe.includes(receipt.error))return new Error(receipt.error);
+  return failure('rejected-contract');
+}
+export async function verifyContract(contract,mode,count,helperPath=helper){
+  let repo;
+  try{repo=await realpath(contract.repo);}catch{throw failure('invalid-repo');}
+  try{await access(helperPath);}catch(error){throw failure(error.code==='ENOENT'?'missing-helper':'helper-unavailable');}
+  const args=[helperPath,'--repo',repo,'--base',contract.base,'--mode',mode,'--expected-commits',String(count)];
   for(const p of contract.allowedPaths) args.push('--allow-path',p);
   let stdout;
   try{({stdout}=await runFile('python3',args,{timeout:30000,maxBuffer:1024*1024}));}
   catch(error){
-    let reason='verifier process failed';
-    try{const receipt=JSON.parse(error.stdout);if(typeof receipt.error==='string')reason=receipt.error;}catch{}
-    throw new Error(reason);
+    if(error.code==='ENOENT')throw failure('missing-interpreter');
+    if(error.code==='ERR_CHILD_PROCESS_STDIO_MAXBUFFER')throw failure('output-limit');
+    if(error.killed)throw failure('timeout');
+    let receipt;
+    try{receipt=JSON.parse(error.stdout);}catch{}
+    if(receipt && receipt.valid===false)throw rejection(receipt);
+    throw failure('process-failed');
   }
-  const result=JSON.parse(stdout);
-  if(result.valid!==true) throw new Error('verifier rejected contract');
+  let result;
+  try{result=JSON.parse(stdout);}catch{throw failure('malformed-receipt');}
+  if(!result || typeof result!=='object' || Array.isArray(result) || typeof result.valid!=='boolean')throw failure('malformed-receipt');
+  if(result.valid!==true)throw rejection(result);
   return result;
 }
 async function checked(params,config,verify){

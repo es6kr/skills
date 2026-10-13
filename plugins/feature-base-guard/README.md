@@ -1,7 +1,12 @@
 # Feature Base Guard — OpenClaw Adapter
 
-This user-owned source plugin consumes the common Git preflight at
-`skills/git-repo/scripts/verify_feature_base.py`. It has no network requests,
+This user-owned source plugin runs its package-local Git preflight at
+`resources/verify_feature_base.py`, a byte-identical copy of the canonical
+`skills/git-repo/scripts/verify_feature_base.py`. OpenClaw captures the package
+body, not surrounding monorepo siblings; resolution stays inside the captured
+package and does not depend on host `rootDir` or a developer filesystem path.
+When updating the canonical helper, refresh the packaged copy and run the
+byte-parity regression. Default npm package inclusion includes this resource. It has no network requests,
 credentials or npm runtime dependencies. Load the local development package
 through OpenClaw's supported plugin management/config surface; do not modify
 Gateway configuration through shell scripts.
@@ -74,6 +79,18 @@ Primary host contracts: installed OpenClaw `docs/plugins/hooks/tool-policy.md`
 is `index.ts`; `policy.mjs` is testable without booting a Gateway. This package
 is private/local-development-only; publication requires a built SDK-compatible
 entry and separate authority.
+
+Process failures report fixed categories (`missing-helper`, `helper-unavailable`,
+`missing-interpreter`, `timeout`, `output-limit`, `process-failed`,
+`malformed-receipt`, `rejected-contract`, `invalid-repo`). Raw stderr and arbitrary
+helper error text are never relayed; bounded known semantic rejection messages
+(such as commit-count mismatch) remain visible.
+
+Source changes do not replace an already captured runtime package. The parent
+must recapture/reload through the supported lifecycle and obtain both actual
+native allow and terminal-veto receipts before marking runtime repair complete.
+Keep the original one-commit agent-task contract unchanged; a source repair
+branch with multiple logical commits requires a separate truthful task contract.
 
 ## Checks
 
