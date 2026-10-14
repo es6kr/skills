@@ -112,3 +112,19 @@ git remote set-url origin https://github.com/es6kr/skills.git
 # 4. Verify push authentication
 git push origin <branch>
 ```
+
+### Reverse case: HTTPS push rejected for a missing `workflow` scope — use the SSH Host alias
+
+An HTTPS push goes through the gh OAuth token. When the push touches a file under
+`.github/workflows/`, GitHub rejects it with `refusing to allow an OAuth App to create or update
+workflow ... without workflow scope` if the token lacks `workflow`. SSH pushes authenticate with the
+account's key, so they are not subject to OAuth scopes. If `~/.ssh/config` already maps a Host alias
+to that account's key, push through the alias instead of asking the user to run an interactive
+`gh auth refresh`.
+
+| # | Don't | Do |
+|---|-------|----|
+| 1 | Recommend `gh auth refresh -s workflow` (interactive, browser step) as the first answer to a `workflow` scope rejection | First check for an existing alias: `grep -E "^Host |IdentityFile" ~/.ssh/config`, then `ssh -T git@<alias>` — a `Hi <account>!` reply means the alias authenticates as that account |
+| 2 | Push to the default `github.com` SSH host and assume it is the right account | The default host often maps to a personal key (see the gotcha above). Verify the account in the `ssh -T` reply before pushing |
+| 3 | Rewrite the repository's `origin` URL to the alias just for one push | Push to an explicit URL: `git push git@<alias>:<org>/<repo>.git <branch>:<branch>` — the stored remote stays untouched |
+| 4 | Treat the alias route as permanent policy | It sidesteps the scope check, so it does not fix the token. Add the `workflow` scope later only if HTTPS pushes of workflow files are needed regularly |
