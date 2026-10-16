@@ -15,11 +15,13 @@ import os
 import re
 import sys
 
-# Pattern matching tracker items with project identifiers:
+# Pattern matching tracker items with project identifiers anywhere in checklist line:
 # - [ ] [AIAUTO-12] ...
-# - [x] [INFRA-3] ...
+# - [x] something [INFRA-3] ...
 # - [BLOCKED:P2:selfable] [DTWEB-10] ...
-TRACKER_ID_RE = re.compile(r"^[ \t]*-[ \t]+\[[^\]]*\][ \t]+\[([A-Za-z0-9_]+)-(\d+)\]")
+CHECKLIST_LINE_RE = re.compile(r"^[ \t]*-[ \t]+\[[^\]]*\][ \t]+(.*)$")
+TRACKER_ID_INLINE_RE = re.compile(r"\[([A-Za-z0-9_]+)-(\d+)\]")
+PREFIX_VALID_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 def scan_used_sequences(tracker_path: str, prefix: str) -> set[int]:
@@ -33,22 +35,30 @@ def scan_used_sequences(tracker_path: str, prefix: str) -> set[int]:
         Set of integer sequence numbers already assigned under that prefix.
     """
     clean_prefix = prefix.strip().rstrip("-").upper()
+    if not PREFIX_VALID_RE.match(clean_prefix):
+        raise ValueError(f"Invalid tracker prefix: {prefix!r}")
+
     used: set[int] = set()
 
-    if not tracker_path or not os.path.exists(tracker_path):
+    if not tracker_path:
         return used
+
+    if not os.path.exists(tracker_path):
+        raise FileNotFoundError(f"Tracker file not found: {tracker_path}")
 
     with open(tracker_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
-            m = TRACKER_ID_RE.match(line)
-            if m:
-                item_prefix = m.group(1).upper()
-                if item_prefix == clean_prefix:
-                    try:
-                        seq = int(m.group(2))
-                        used.add(seq)
-                    except ValueError:
-                        pass
+            line_m = CHECKLIST_LINE_RE.match(line)
+            if line_m:
+                rest = line_m.group(1)
+                for m in TRACKER_ID_INLINE_RE.finditer(rest):
+                    item_prefix = m.group(1).upper()
+                    if item_prefix == clean_prefix:
+                        try:
+                            seq = int(m.group(2))
+                            used.add(seq)
+                        except ValueError:
+                            pass
     return used
 
 
@@ -65,13 +75,19 @@ def get_next_available_id(
     Args:
         tracker_path: Path to the markdown tracker file.
         prefix: Project prefix code (e.g. "AIAUTO").
-        requested_seq: Optional desired sequence number.
+        requested_seq: Optional desired sequence number (must be > 0 if provided).
 
     Returns:
         A tuple of (assigned_identifier_string, collided_boolean).
         Example: ("AIAUTO-3", False) or ("AIAUTO-4", True)
     """
     clean_prefix = prefix.strip().rstrip("-").upper()
+    if not PREFIX_VALID_RE.match(clean_prefix):
+        raise ValueError(f"Invalid tracker prefix: {prefix!r}")
+
+    if requested_seq is not None and requested_seq <= 0:
+        raise ValueError(f"Requested sequence must be a positive integer, got {requested_seq}")
+
     used_seqs = scan_used_sequences(tracker_path, clean_prefix)
 
     if requested_seq is not None:

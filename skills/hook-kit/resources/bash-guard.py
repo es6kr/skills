@@ -1002,7 +1002,10 @@ def git_scan_text(command: str) -> str:
             if line.strip() == term:
                 term = None
             continue
-        m = HEREDOC_WRITER.match(line)
+        # Strip quoted strings from line before checking if it starts or chains into a heredoc writer
+        line_no_quotes = re.sub(r"'[^']*'", "''", line)
+        line_no_quotes = re.sub(r'"[^"]*"', '""', line_no_quotes)
+        m = HEREDOC_WRITER.match(line_no_quotes)
         if m and "<<" in line:
             s = re.sub(r".*<<-?[ \t]*", "", line)
             s = s.replace("'", "").replace('"', "")

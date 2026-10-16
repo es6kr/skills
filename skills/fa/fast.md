@@ -26,8 +26,8 @@ by staying only in the transcript.
 
 1. Resolve the session id if available (`source="interactive"` default; Ralph callers pass
    `source="ralph"`).
-2. Call `scripts/fa-fast-record.py`'s `fast_record(note, session_id, source)` directly — or the
-   CLI form `python3 scripts/fa-fast-record.py '<note>'` from the workspace root.
+2. Call `skills/fa/scripts/fa-fast-record.py`'s `fast_record(note, session_id, source)` directly — or the
+   CLI form `python3 skills/fa/scripts/fa-fast-record.py '<note>'` from the workspace root.
 3. Report the one-line `[OK]`/`[FAIL]` result and continue the interrupted task immediately.
    Do **not** chain into Step 1 (mistake detection) or Step 1.5 (recurrence pre-check) of
    `retrospect.md` — that classification work is deferred to the Phase 3 triage pass.

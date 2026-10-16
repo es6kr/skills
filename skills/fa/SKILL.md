@@ -126,7 +126,7 @@ entries go there instead — one memory per class, appended on recurrence. See
    the first tool is unavailable)**:
    - **Claude Code**: `TaskCreate` first. If unavailable this turn, `TodoWrite`. If both are
      unavailable, the `agent-task` CLI fallback (`todowrite` skill's `agent-task` topic —
-     persists outside the session) exactly as `/fix` Step 0 documents. **Never** the session
+     persists in the explicit current-session ledger and survives same-ID compaction) exactly as `/fix` Step 0 documents. **Never** the session
      scratchpad directory as the tracking medium — its path can change across a session/compact
      boundary, silently dropping content and defeating the whole point of tracking.
    - **Antigravity**: the `task.md` artifact convention — a standard markdown checkbox line is

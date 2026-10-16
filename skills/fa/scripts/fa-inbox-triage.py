@@ -12,6 +12,9 @@ import re
 ENTRY_RE = re.compile(r"^##\s+\[(.*?)\]\s+(.*?)\n(.*?)(?=\n##\s+\[|\Z)", re.DOTALL | re.MULTILINE)
 
 
+TAG_NEEDS_REVIEW_RE = re.compile(r"^[ \t]*-[ \t]+\*\*Tag\*\*:[ \t]*\[NEEDS_REVIEW\]", re.MULTILINE)
+
+
 def scan_inbox(filepath: str):
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
@@ -19,6 +22,6 @@ def scan_inbox(filepath: str):
     entries = []
     for match in ENTRY_RE.finditer(content):
         header_type, title, body = match.groups()
-        if "[NEEDS_REVIEW]" in body:
+        if TAG_NEEDS_REVIEW_RE.search(body):
             entries.append({"type": header_type, "title": title, "body": body.strip()})
     return entries

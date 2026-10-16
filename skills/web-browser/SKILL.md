@@ -196,7 +196,7 @@ grep -qi microsoft /proc/version 2>/dev/null && echo "host=wsl"
 [[ -n "$CMUX_BUNDLE_ID" || -n "$CMUX_PANEL_ID" || -n "$CMUX_BUNDLED_CLI_PATH" ]] || command -v cmux >/dev/null 2>&1
 
 # Orca computer-use check (macOS only; resolve the CLI per the `orca` skill first)
-command -v orca >/dev/null 2>&1 && orca computer capabilities --json
+[[ "$(uname -s)" == "Darwin" ]] && { command -v "${ORCA_CLI_COMMAND:-orca}" >/dev/null 2>&1 && "${ORCA_CLI_COMMAND:-orca}" computer capabilities --json; }
 ```
 
 **Orca computer use is not a row of the environment matrix below.** The matrix picks a backend by

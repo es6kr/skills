@@ -70,13 +70,12 @@ def resolve_task_dir(
     else:
         search_bases = [AGENTS_TASKS_BASE]
 
-    # 3. Explicit session ID
     openclaw = env_type == "openclaw" or any(
         key.startswith("OPENCLAW_") for key in os.environ
     )
     # OpenClaw caller identity must be explicit, not a stale inherited Claude ID.
-    if write and openclaw and not session_id:
-        raise ValueError("OpenClaw writes require --session <current-sessionId> or an explicit task directory")
+    if openclaw and not session_id:
+        raise ValueError("OpenClaw commands require --session <current-sessionId> or an explicit task directory")
     s_id = session_id if openclaw else (session_id if session_id is not None else os.environ.get("CLAUDE_SESSION_ID") or os.environ.get("AGENT_SESSION_ID"))
     if s_id is not None:
         validate_component(s_id, "session ID")
@@ -140,12 +139,18 @@ def ledger_lock(task_dir: Path):
     with open(task_dir / ".agent-task.lock", "a+b") as lock:
         if os.name == "nt":
             import msvcrt
+            import time
             lock.seek(0, 2)
             if lock.tell() == 0:
                 lock.write(b"0")
                 lock.flush()
             lock.seek(0)
-            msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+            while True:
+                try:
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.05)
         else:
             import fcntl
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
@@ -219,7 +224,7 @@ def cmd_list(args):
     tasks = []
 
     for f in task_dir.glob("*.json"):
-        if f.name.startswith("."):
+        if f.name.startswith(".") or f.is_symlink():
             continue
         try:
             with open(f, "r", encoding="utf-8") as file:
@@ -342,6 +347,8 @@ def cmd_prune(args):
 
     candidates: List[tuple] = []
     for f in sorted(task_dir.glob("*.json")):
+        if f.is_symlink():
+            continue
         try:
             with open(f, "r", encoding="utf-8") as file:
                 data = json.load(file)

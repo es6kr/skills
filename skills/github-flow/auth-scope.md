@@ -124,7 +124,7 @@ to that account's key, push through the alias instead of asking the user to run 
 
 | # | Don't | Do |
 |---|-------|----|
-| 1 | Recommend `gh auth refresh -s workflow` (interactive, browser step) as the first answer to a `workflow` scope rejection | First check for an existing alias: `grep -E "^Host |IdentityFile" ~/.ssh/config`, then `ssh -T git@<alias>` — a `Hi <account>!` reply means the alias authenticates as that account |
-| 2 | Push to the default `github.com` SSH host and assume it is the right account | The default host often maps to a personal key (see the gotcha above). Verify the account in the `ssh -T` reply before pushing |
+| 1 | Recommend `gh auth refresh -s workflow` (interactive, browser step) as the first answer to a `workflow` scope rejection | First check for an existing alias: `grep -E "^Host \|IdentityFile" ~/.ssh/config`, then `ssh -T git@<alias>` — a `Hi <account>!` reply means the alias authenticates as that account |
+| 2 | Push to the default `github.com` SSH host and assume it is the right account | The default host often maps to a personal key (see the gotcha above). Verify the account in the `ssh -T` reply matches the target repository owner/org before pushing |
 | 3 | Rewrite the repository's `origin` URL to the alias just for one push | Push to an explicit URL: `git push git@<alias>:<org>/<repo>.git <branch>:<branch>` — the stored remote stays untouched |
 | 4 | Treat the alias route as permanent policy | It sidesteps the scope check, so it does not fix the token. Add the `workflow` scope later only if HTTPS pushes of workflow files are needed regularly |

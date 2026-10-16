@@ -69,20 +69,34 @@ def fast_record(note: str, session_id: str = "unknown", source: str = "interacti
         print(f"[FAIL] {inbox_path.parent} does not exist -- not auto-creating.", file=sys.stderr)
         return 1
 
+    clean_note = note.strip()
+    escaped_lines = []
+    for line in clean_note.splitlines():
+        if line.lstrip().startswith("## ["):
+            escaped_lines.append("  " + line)
+        else:
+            escaped_lines.append(line)
+    formatted_note = "\n".join(escaped_lines)
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     entry = (
         f"\n## [Fast Record] {timestamp} (session {session_id[:8]}, source: {source})\n"
-        f"- **Observation**: {note.strip()}\n"
+        f"- **Observation**: {formatted_note}\n"
         f"- **Tag**: [NEEDS_REVIEW]\n"
     )
     entry_bytes = entry.encode("utf-8")
 
-    fd = os.open(str(inbox_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    fd = None
     try:
+        fd = os.open(str(inbox_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
         written = os.write(fd, entry_bytes)
         os.fsync(fd)
+    except OSError as err:
+        print(f"[FAIL] Failed to write to {inbox_path}: {err}", file=sys.stderr)
+        return 1
     finally:
-        os.close(fd)
+        if fd is not None:
+            os.close(fd)
 
     if written != len(entry_bytes):
         print(
@@ -97,6 +111,14 @@ def fast_record(note: str, session_id: str = "unknown", source: str = "interacti
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit("Usage: fa-fast-record.py '<observation>' [--session <uuid>]")
-    sys.exit(fast_record(sys.argv[1]))
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Fast append to improvements.md without blocking interactive modals."
+    )
+    parser.add_argument("observation", help="Observation text to record")
+    parser.add_argument("--session", default="unknown", help="Session UUID")
+    parser.add_argument("--source", default="interactive", help="Source identifier")
+
+    args = parser.parse_args()
+    sys.exit(fast_record(args.observation, session_id=args.session, source=args.source))
