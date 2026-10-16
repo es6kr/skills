@@ -4,22 +4,24 @@ metadata:
   author: es6kr
   version: "0.1.0"
 description: |
-  Environment-aware browser operations. Detects wmux/cmux/tmux and routes to backend. Topics — ui-test (snapshots, click/fill, shadow DOM), credential-issue (login via backend -> wait sign-in -> issue/refresh token/secret). Use when: "browser", "web-browser", "ui-test", "credential-issue", "playwright", "chrome-devtools", "UI check", "browser test", "screen verify", "Playwright test", "shadow DOM cascade", "::part not working", "CDP trace", "issue token", "service credential", "open login screen", "PAT refresh", "scope expansion", "device-code auth", "browser device-code", "GitHub social login".
+  Environment-aware browser operations. Detects wmux/cmux/Orca/tmux and routes to backend. Topics — ui-test (snapshots, click/fill, shadow DOM), credential-issue (login via backend -> wait sign-in -> issue/refresh token/secret), orca-computer (drive the user's real signed-in browser via `orca computer`, for bot-blocked sign-in). Use when: "browser", "web-browser", "ui-test", "credential-issue", "orca-computer", "orca computer", "computer use", "playwright", "chrome-devtools", "UI check", "browser test", "screen verify", "Playwright test", "shadow DOM cascade", "::part not working", "CDP trace", "issue token", "service credential", "open login screen", "PAT refresh", "scope expansion", "device-code auth", "browser device-code", "GitHub social login", "Cloudflare Turnstile", "bot-blocked login", "browser may not be secure".
 ---
 
 # Web Browser
 
 Environment-aware browser operations skill. Detects the runtime environment and routes to the
 appropriate browser backend, then runs one of two workflows: UI testing/verification (`ui-test`) or
-browser-login-assisted credential issuance (`credential-issue`).
+browser-login-assisted credential issuance (`credential-issue`). `orca-computer` is a backend topic
+for driving the user's real desktop browser when automation-attached browsers are blocked.
 
 ## Topics
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
-| ui-test | Snapshot analysis, click/fill/verify, page-state diagnosis | [ui-test.md](./ui-test.md) |
 | cdp-trace | CDP-based closed shadow DOM cascade diagnosis (DOM.getDocument pierce:true + CSS.getMatchedStylesForNode) | [cdp-trace.md](./cdp-trace.md) |
 | credential-issue | service+command param → open login screen → wait for user login → issue access key/token/secret → hand off to automation | [credential-issue.md](./credential-issue.md) |
+| orca-computer | Drive the user's real, signed-in desktop browser through `orca computer` (macOS) — for bot-blocked sign-in (Cloudflare, Google) and session reuse; measured input gotchas | [orca-computer.md](./orca-computer.md) |
+| ui-test | Snapshot analysis, click/fill/verify, page-state diagnosis | [ui-test.md](./ui-test.md) |
 
 ## Topic Dependencies
 
@@ -27,14 +29,18 @@ browser-login-assisted credential issuance (`credential-issue`).
 web-browser (Step 0: environment detection — shared by all topics)
   ├─→ ui-test (UI verification)
   │     └─→ cdp-trace (extends ui-test for closed shadow DOM)
-  └─→ credential-issue (browser-login-assisted token/key issuance)
-        └─→ chrome-devtools backend preferred (reuses the user's real logged-in session)
+  ├─→ credential-issue (browser-login-assisted token/key issuance)
+  │     ├─→ chrome-devtools backend preferred (reuses the user's real logged-in session)
+  │     └─→ orca-computer (escalation backend for CDP-hostile services, alongside wmux/cmux)
+  └─→ orca-computer (backend topic: real desktop browser via `orca computer`)
 ```
 
 - **Step 0 (below) is shared** — every topic detects the backend first, then runs its workflow.
 - `ui-test`, `cdp-trace` are the UI-testing family.
 - `credential-issue` reuses the same backend routing + the user-visibility rule, generalized into a
   service+command parameterized auth flow.
+- `orca-computer` is a backend, not a workflow: `credential-issue` selects it, and it carries its own
+  procedure and measured gotchas. Flag details live in the Orca CLI guide (`orca skills get orca-cli`).
 - **Authentik SSO verification** (`sso-verify`) is **not** included in this skill — it remains in a
   separate local-only `sso-verify` skill (user-environment specific, untracked).
 
@@ -188,7 +194,17 @@ grep -qi microsoft /proc/version 2>/dev/null && echo "host=wsl"
 
 # cmux check (detect via ANY of these; CMUX_SESSION is NOT set by cmux app)
 [[ -n "$CMUX_BUNDLE_ID" || -n "$CMUX_PANEL_ID" || -n "$CMUX_BUNDLED_CLI_PATH" ]] || command -v cmux >/dev/null 2>&1
+
+# Orca computer-use check (macOS only; resolve the CLI per the `orca` skill first)
+command -v orca >/dev/null 2>&1 && orca computer capabilities --json
 ```
+
+**Orca computer use is not a row of the environment matrix below.** The matrix picks a backend by
+which terminal multiplexer hosts the session; `orca computer` works from any terminal while the Orca
+app is running, and it drives the user's *own* browser rather than a panel. Select it by need —
+a sign-in or bot-challenge gate, or a task that must reuse the user's real session — and follow
+[orca-computer.md](./orca-computer.md). A missing MCP tool named "computer use" is not evidence that
+it is unavailable: probe the CLI.
 
 ### Do & Don't — Browser Backend Selection
 
@@ -267,6 +283,7 @@ After Step 0 backend detection, route to the topic:
 | Verify a UI change, snapshot, click/fill | `ui-test` | [ui-test.md](./ui-test.md) |
 | Diagnose `::part` not applying / closed shadow DOM cascade | `cdp-trace` | [cdp-trace.md](./cdp-trace.md) |
 | Open a service login → wait for user login → issue access key/token | `credential-issue` | [credential-issue.md](./credential-issue.md) |
+| Sign in on a bot-blocking site (Cloudflare, Google) or reuse the user's real session | `orca-computer` | [orca-computer.md](./orca-computer.md) |
 
 **Step execution order**: Step 0 (this file — detect backend + user-visibility rule) → read the
 target topic `.md` → follow its procedure. The topic `.md` files hold the actual procedures; this
