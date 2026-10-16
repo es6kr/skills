@@ -76,7 +76,7 @@ run_prompt() {
 }
 
 @test "silent inside an autonomous Ralph loop" {
-  RALPH_LOOP=1 run run_prompt "/cleanup --auto"
+  run env RALPH_LOOP=1 bash -c "jq -n --arg p '/cleanup --auto' '{hook_event_name: \"UserPromptSubmit\", prompt: \$p}' | bash '$GUARD'"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
