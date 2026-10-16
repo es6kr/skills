@@ -264,6 +264,65 @@ print(json.dumps({'hook_event_name':'Stop','transcript_path':sys.argv[1],'stop_h
   [ -z "$output" ]
 }
 
+# Like run_stop, but takes an ordered list of (role, text) rows as JSON so a
+# test can place harness-injected user-role text after the real user message.
+# Roles: "user" (plain text row) | "assistant" (text row).
+run_stop_rows() {
+  local rows_json="$1"
+  TRANSCRIPT="$BATS_TEST_TMPDIR/rows.jsonl"
+  python3 -c "
+import json, sys
+rows, out = json.loads(sys.argv[1]), sys.argv[2]
+with open(out, 'w', encoding='utf-8') as fh:
+    for role, text in rows:
+        fh.write(json.dumps({'type': role, 'message': {'role': role,
+                 'content': [{'type': 'text', 'text': text}]}}) + '\n')
+" "$rows_json" "$TRANSCRIPT"
+  python3 -c "
+import json, sys
+print(json.dumps({'hook_event_name': 'Stop',
+                  'transcript_path': sys.argv[1],
+                  'stop_hook_active': False}))
+" "$TRANSCRIPT" | bash "$GUARD"
+}
+
+# An injected skill body is quoted instructions, not typed input. Its wording
+# ("why didn't you ...") reads as a correction when classified, so it must not
+# become the anchor message the Stop gate judges.
+@test "Stop ignores an injected skill body that reads like a correction" {
+  run run_stop_rows '[["user","add a regression test for the scanner"],
+    ["user","Base directory for this skill: /x/skills/wip\n\nwhy didnt you commit the change? this is wrong"],
+    ["assistant","On it."]]'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "Stop ignores a re-invocation note that reads like a correction" {
+  run run_stop_rows '[["user","add a regression test for the scanner"],
+    ["user","(Re-invocation of /x:wip - the skill instructions were previously loaded) why didnt you commit the change?"],
+    ["assistant","On it."]]'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "Stop ignores Stop-hook feedback text that reads like a correction" {
+  run run_stop_rows '[["user","add a regression test for the scanner"],
+    ["user","Stop hook feedback:\nwhy didnt you commit the change? this is wrong"],
+    ["assistant","On it."]]'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+# Control: skipping injected text must not hide a genuine correction typed
+# before it.
+@test "Stop still blocks a genuine correction that precedes an injected skill body" {
+  run run_stop_rows '[["user","why didnt you commit the change?"],
+    ["user","Base directory for this skill: /x/skills/wip\n\nSome neutral instructions."],
+    ["assistant","Let me analyse."]]'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"FA_CORRECTION_GATE"* ]]
+}
+
 @test "headless runs are exempt" {
   # The payload comes from a file, not a pipe: a headless run exits before
   # reading stdin, which would make a piped producer emit a BrokenPipeError
