@@ -149,12 +149,14 @@ Then remove the `## Plan Drafts` entry. **Order**: archive the file first, remov
 
 When authoring or updating architecture and planning artifacts (`plan-*.md`), stopping after writing to local workspace directories (`.agents/docs/generated/`) is strictly prohibited.
 1. **Security Isolation & CollabMD Sync Path Compliance**: Because `.agents/docs/generated/` is reserved for raw AI generation isolation, authoritative deliverables intended for CollabMD (`plan-*.md`, etc.) MUST be copied or placed in the secure sharing path **`.agents/docs/shared/`** so they are synchronized via Syncthing to the collaborative editor/viewer (CollabMD, `https://collabmd.dgs.ai.kr`), and the frontmatter must declare `collabmd_url` (`https://collabmd.dgs.ai.kr/#file=daegunsoftdev-agents-docs/<filename>`).
-2. **Parent Plane Issue Comment Linkage**: Prompt instructions prohibiting Plane issue mutations ("read-only research/planning") forbid modifying issue state or description, NOT posting reference comments. Agents MUST use `plane_create_comment.py` to post a comment to the corresponding parent Plane issue containing the CollabMD viewer link, local artifact path, executive summary, and audit status, ensuring end-to-end traceability in Plane SSOT.
+2. **Parent Plane Issue Linkage and Authorization**: Search and reuse the real matching parent issue, without duplicate Intake. Reference comments are writes: read-only planning does not authorize comments, issue creation, or state/body changes. Post a verified CollabMD link, self-contained sanitized executive summary and audit status only when the current scope explicitly authorizes that write; otherwise report linkage pending without blocking plan delivery. Do not expose local-only paths in the delivered body or delete original source files.
+3. **Optional Intake Recommendation**: Apply [task-plan review's delivery gate](../task-plan/review.md#plan-delivery-and-optional-intake) and the configured Plane owner's creation policy. Consider whether verified accessible CollabMD content can replace local references without losing essential handoff content. Disclose missing/unavailable content; never fabricate documents or recovery. If recommending new Intake, present rationale, body and limitations and ask BEFORE creation; no recommendation means no needless Intake ask. Mandatory PR/completed audit remains a surfaced need, not silent creation authority. Reuse exact explicit action authorization without re-asking.
 
 | # | Don't | Do |
 |---|-------|----|
-| 1 | Leave plan artifacts only in `.agents/docs/generated/` causing CollabMD `file not found` | Place in `.agents/docs/shared/` per security isolation policy, verify CollabMD URL, and link in Plane comment |
-| 2 | Conflate "prohibit Plane issue mutations" with posting artifact reference links | Distinguish state/body mutations from reference comment posting, completing comment linkage |
+| 1 | Treat a configured path or URL as proof of delivery | Verify shared content and intended audience access before reporting the CollabMD link |
+| 2 | Interpret read-only planning as permission to post comments | Reuse matching issue; write only within current explicit authorization, otherwise report linkage pending |
+| 3 | Block plan sharing because no issue exists or create Intake silently | Share verified plan; ask only when recommending new Intake, preserving audit need |
 
 ## Plan & Research Artifact Mandatory Frontmatter Schema & Creation Date (HARD STOP)
 
