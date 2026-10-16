@@ -149,6 +149,43 @@ Use a lease bound to the inspected remote SHA; do not create an empty `feat`
 commit to conceal the old tag, blindly force-push, or replace the existing PR.
 Update the PR title and re-read both history and checks after correction.
 
+## Branch-scoped automatic cache sync
+
+A firing hook can still publish the wrong worktree's in-progress instructions to
+an installed cache. Before changing automatic reflection, inspect the other hooks'
+branch-detection convention and the repository's explicit eligible-branch policy.
+A push hook inspecting `remote_ref` answers which branch is being pushed; a
+post-commit/post-merge hook must inspect the **current worktree's HEAD** instead.
+Do not infer eligibility from the default branch or from an upstream tracking ref.
+
+For the Claude cache sync policy approved here, only the exact local branch names
+`main`, `master`, and `develop` automatically sync. Put the check **inside each
+hook, around the sync call only**; preserve other hook checks and operations:
+
+```sh
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || branch=
+case "$branch" in
+  main|master|develop)
+    python3 "$repo_root/scripts/sync-plugin-cache.py" || true
+    ;;
+esac
+```
+
+Use the same guard in `post-merge`, retaining its existing `ORIG_HEAD` argument.
+With this command detached HEAD resolves to `HEAD`, and a failed query is cleared
+to an empty value: neither matches. Feature/fix/task branches, similarly named
+branches, and linked worktrees on those branches skip only automatic cache sync.
+This is a convenience-scope check, not a shell-command bypass or security gate.
+Do not disable autosync globally, redesign the writer, install hooks, or change
+runtime `core.hooksPath` as part of this source correction.
+
+Verify both source hooks in disposable Git repositories/worktrees using a fake
+cache writer: the three allowed branches sync, topic branches and detached HEAD
+leave the fake cache unchanged, query failure skips sync, and `post-merge` still
+passes `ORIG_HEAD`. Do not run the real writer against an installed cache to test
+a guard. A source/test pass does not mean copied installed hooks were refreshed;
+report runtime reflection and commit/push separately.
+
 ## Self-check (before changing any hook wiring)
 
 1. Which directory does git actually read? — `git rev-parse --git-path hooks`
