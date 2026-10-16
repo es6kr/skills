@@ -11,8 +11,11 @@ description: |
   AskUserQuestion when deterministic recurrence is high, WITHOUT running fix's full Step 0-4
   procedure unless escalated.
   retrospect - mistake analysis + record to feedback memory/failed-attempts [retrospect.md],
-  fa-prune - deduplicate failed-attempts rules [fa-prune.md].
-  Use when "fa", "record this", "log this mistake", "just record it", "fa prune" is mentioned.
+  fa-prune - deduplicate failed-attempts rules [fa-prune.md],
+  fast - zero-modal staged note to .agents/improvements.md, no 5-Why/no modal [fast.md].
+  Use when "fa", "record this", "log this mistake", "just record it", "fa prune", "fa fast",
+  or a bare note-only intent phrase ("just note this", "don't interrupt, just log it") is
+  mentioned.
 ---
 
 # FA: Failed-Attempts Lifecycle Owner
@@ -21,16 +24,18 @@ Callable directly — no topic, no sub-argument — the same way `/fix` is calle
 misbehavior, evaluates the recurrence risk of underlying procedural gaps or script defects,
 and reports its escalation stage (or offers an immediate fix ask).
 
-This skill owns the FA record procedure ([retrospect.md](./retrospect.md)) and the FA store
-hygiene procedure ([fa-prune.md](./fa-prune.md)). Other skills (e.g. `cleanup`'s session-end
-pipeline via `claudify` improve) reference this skill — not the other way around.
+This skill owns the FA record procedure ([retrospect.md](./retrospect.md)), the FA store
+hygiene procedure ([fa-prune.md](./fa-prune.md)), and the zero-modal staging procedure
+([fast.md](./fast.md)). Other skills (e.g. `cleanup`'s session-end pipeline via `claudify`
+improve) reference this skill — not the other way around.
 
 ## Topics
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
-| retrospect | Mistake detection + recurrence pre-check + record (FA HOT / feedback memory / RAG) | [retrospect.md](./retrospect.md) |
 | fa-prune | Deduplicate / archive stale failed-attempts entries (HOT ↔ COLD lifecycle) | [fa-prune.md](./fa-prune.md) |
+| fast | Zero-modal staged note to `.agents/improvements.md` — no 5-Why, no recurrence pre-check, no `AskUserQuestion`; staged for a later Phase-3 triage pass | [fast.md](./fast.md) |
+| retrospect | Mistake detection + recurrence pre-check + record (FA HOT / feedback memory / RAG) | [retrospect.md](./retrospect.md) |
 
 ## FA data store
 
