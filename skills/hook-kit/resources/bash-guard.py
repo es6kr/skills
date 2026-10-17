@@ -355,7 +355,11 @@ def time_bound_seconds(command: str) -> list[int]:
     ]
 
 EXECUTOR = re.compile(r"\b(?:ba|z|k)?sh\s+-c\b|\bssh\b|\beval\b|\bxargs\b", I)
-HEREDOC_WRITER = re.compile(r"^[ \t]*(cat|tee)[ \t].*<<")
+# The writer may follow earlier commands chained on the same line
+# (`cd x && git log && cat >> f <<'EOF'`); anchoring at line start alone left
+# that heredoc body in the scan, so prose like "git branch -a ... never -f"
+# false-matched the `git branch -f` block.
+HEREDOC_WRITER = re.compile(r"^(?:.*?(?:&&|\|\||;)[ \t]*)?[ \t]*(cat|tee)[ \t].*<<")
 
 # ── gh pr create --draft guard (ported from block-pr-create-without-draft.sh) ──
 GH_TOKEN_RE = re.compile(r"\bgh\b")
@@ -998,7 +1002,10 @@ def git_scan_text(command: str) -> str:
             if line.strip() == term:
                 term = None
             continue
-        m = HEREDOC_WRITER.match(line)
+        # Strip quoted strings from line before checking if it starts or chains into a heredoc writer
+        line_no_quotes = re.sub(r"'[^']*'", "''", line)
+        line_no_quotes = re.sub(r'"[^"]*"', '""', line_no_quotes)
+        m = HEREDOC_WRITER.match(line_no_quotes)
         if m and "<<" in line:
             s = re.sub(r".*<<-?[ \t]*", "", line)
             s = s.replace("'", "").replace('"', "")
@@ -1403,6 +1410,11 @@ def self_test() -> int:
         (False, False, "cat <<'EOF'\ncase history: git push --force overwrites remote history\nEOF"),
         (False, False, "tee -a /tmp/notes.md <<'EOF'\nexample: git reset --hard deletes work\nEOF"),
         (True, False, "bash <<'EOF'\ngit push --force origin main\nEOF"),
+        # chained writer: heredoc body after `&&` is prose, not a command
+        # (regression: prose "git branch -a ... never -f" false-matched branch -f)
+        (False, False, "cd /tmp && git log --oneline -3 && cat <<'EOF'\nrun git branch -a to list, never -f here\nEOF"),
+        (False, False, "git status; tee -a notes.md <<'EOF'\ngit branch -a shows refs; git branch -f is dangerous\nEOF"),
+        (True, False, "cd /tmp && git branch -f main origin/main"),
         # ── background time-bound guard ──
         (True, True, "git push origin main"),
         (True, True, "gh run watch 12345"),

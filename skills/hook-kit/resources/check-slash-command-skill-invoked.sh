@@ -23,10 +23,53 @@
 #     slugs are skipped to avoid false positives.
 #   - `stop_hook_active` guard prevents an infinite block loop if the
 #     reminder itself doesn't get acted on before the next Stop fires.
+#
+# Two registrations, one file (same shape as force-fa-on-correction-signal.sh):
+#   UserPromptSubmit -> preventive. Injects a reminder BEFORE the model emits
+#                       its first token, so the Skill call becomes the first
+#                       tool call instead of being discovered missing later.
+#   Stop             -> the check above, kept as the backstop. An injected
+#                       reminder the model ignores is not a gate.
 
 if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
 
 INPUT=$(cat)
+
+# Only slugs that map to an actual installed skill are checked — native
+# Claude Code commands and unrecognized slugs are skipped entirely.
+skill_exists() {
+  local slug="$1"
+  [[ -d "$HOME/.claude/skills/$slug" ]] && return 0
+  [[ -d "$HOME/.agents/skills/$slug" ]] && return 0
+  find "$HOME/.claude/plugins/marketplaces" -mindepth 3 -maxdepth 5 -type d -name "$slug" -path "*/skills/*" 2>/dev/null | grep -q . && return 0
+  return 1
+}
+
+EVENT=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
+if [[ "$EVENT" == "UserPromptSubmit" ]]; then
+  PROMPT=$(printf '%s' "$INPUT" | jq -r '.prompt // empty' 2>/dev/null)
+  # Raw slash input ("/slug args") or an already-expanded <command-name> tag.
+  # The slug must be followed by whitespace or end of input, so a path such
+  # as "/mnt/c/..." is not mistaken for a command.
+  RE_RAW='^[[:space:]]*/([a-zA-Z0-9_:-]+)([[:space:]]|$)'
+  RE_TAG='<command-name>/([a-zA-Z0-9_:-]+)</command-name>'
+  if [[ "$PROMPT" =~ $RE_RAW ]]; then
+    SLUG="${BASH_REMATCH[1]}"
+  elif [[ "$PROMPT" =~ $RE_TAG ]]; then
+    SLUG="${BASH_REMATCH[1]}"
+  else
+    exit 0
+  fi
+  skill_exists "${SLUG##*:}" || exit 0
+  jq -n --arg slug "$SLUG" '
+    {
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: "Slash command `/\($slug)` was typed. The skill text shown this turn is injected context, NOT an invocation. Make `Skill(\"\($slug)\", <args>)` your FIRST tool call this turn — before reading any topic file or running any step of the procedure. A Stop-time check verifies that the call happened."
+      }
+    }'
+  exit 0
+fi
 
 STOP_HOOK_ACTIVE=$(printf '%s' "$INPUT" | jq -r 'if .stop_hook_active then "true" else "false" end' 2>/dev/null || echo "false")
 if [[ "$STOP_HOOK_ACTIVE" == "true" ]]; then exit 0; fi
@@ -64,15 +107,6 @@ SLUG=$(printf '%s' "$CMD_MATCH" | grep -oE '<command-name>/[a-zA-Z0-9_:-]+</comm
 
 BASE_SLUG="${SLUG##*:}"
 
-# Only check slugs that map to an actual installed skill — skip native
-# Claude Code commands and unrecognized slugs entirely.
-skill_exists() {
-  local slug="$1"
-  [[ -d "$HOME/.claude/skills/$slug" ]] && return 0
-  [[ -d "$HOME/.agents/skills/$slug" ]] && return 0
-  find "$HOME/.claude/plugins/marketplaces" -mindepth 3 -maxdepth 5 -type d -name "$slug" -path "*/skills/*" 2>/dev/null | grep -q . && return 0
-  return 1
-}
 skill_exists "$BASE_SLUG" || exit 0
 
 ABS_LINE=$(( START + REL_LINE - 1 ))

@@ -2,11 +2,11 @@
 name: backlog
 description: |
   Unified backlog lifecycle management and task tracking. Orchestrates session TODOs, workspace checklists (`fix_plan.md`, `checklist.md`), and issue trackers with vendor-agnostic lifecycle contracts.
-  Topics — triage (classify incoming requests into session/file/issue backlogs), priority (GitHub-aligned P0-P3 urgency tagging and blocker triage), sync (external tracker status polling and resolution), prune (demote lower-priority backlog noise from active focus), lifecycle (authoring, state transitions, DoD criteria), comment (post follow-up notes/sub-findings to parent issues), create (issue and intake issue creation).
-  Use when: "backlog", "backlog triage", "backlog sync", "backlog prune", "task lifecycle", "manage backlog", "backlog priority", "backlog cleanup", "plane backlog", "issue comment".
+  Topics — triage (classify incoming requests into session/file/issue backlogs), priority (GitHub-aligned P0-P3 urgency tagging and blocker triage), sync (external tracker status polling and resolution), prune (demote lower-priority backlog noise from active focus), lifecycle (authoring, state transitions, DoD criteria), comment (post follow-up notes/sub-findings to parent issues), create (issue and intake issue creation), record (session completed work and next-session candidates).
+  Use when: "backlog", "backlog triage", "backlog sync", "backlog prune", "task lifecycle", "manage backlog", "backlog priority", "backlog cleanup", "plane backlog", "issue comment", "backlog record".
 metadata:
   author: es6kr
-  version: "0.1.0"
+  version: "0.2.0"
 depends-on:
   - fix-plan
   - todowrite
@@ -39,9 +39,10 @@ Incoming Task / Request
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
-| `prune` | Demote lower-priority items (P2/P3) and stale entries to preserve lean active focus sections | [prune.md](./prune.md) |
 | `comment` | Post follow-up notes and nested review findings as comments on parent issues | [comment.md](./comment.md) |
 | `create` | Create issues and intake items via API with fallback mechanisms | [create.md](./create.md) |
+| `prune` | Demote lower-priority items (P2/P3) and stale entries to preserve lean active focus sections | [prune.md](./prune.md) |
+| `record` | Record this session's completed work + register next-session candidates (session/file/issue routing) | [record.md](./record.md) |
 
 ## Default Invocation (`/backlog`)
 

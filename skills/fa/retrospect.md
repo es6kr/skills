@@ -31,6 +31,7 @@ Before recording a new mistake to failed-attempts.md, **apply the same 2-stage p
 
 1. **Stage 0 (RAG)**: if a RAG receiver (`mcp__<vendor>__*-find` tool) is registered in the current environment, call it with the mistake pattern's key keywords → if there's a semantic match hit, classify as an Nth recurrence
 2. **Stage 1 (grep)**: recursive grep on `$FA_STORE/` (search HOT + archive simultaneously) + grep on `~/.agents/rules/*.md`
+2.5. **Stage 1.5 (Serena, MANDATORY when active — do not skip)**: if Serena MCP is active this session (`mcp__serena__list_memories()` succeeds — see §4-2's "Serena preflight"), also call `list_memories()` and grep the returned name list for the candidate keywords. The file store and Serena's `global/fa/*` namespace are **two separate stores** — per §4-2's routing table, Serena is now the *primary* medium for new FA entries, so a file-only Stage 1 grep can miss a recent recurrence that was only ever written to Serena. Treat a hit here exactly like a Stage 1 HOT hit (classify as Nth recurrence, `read_memory` the existing entry before writing). Skipping this and concluding "no match, new class" from the file grep alone risks creating a duplicate class under a new slug for a pattern that already exists in Serena only.
 3. **On archive-only hit**: call `Skill("fa", "fa-prune")` Step 7 restore procedure (return to HOT + recurrence label)
 4. **Result**: include the recurrence info in the title label of the per-mistake analysis in Step 2 (e.g., `## ... (2026-MM-DD, 2nd recurrence)`)
 5. **Conflict check (cross-class contradiction — separate from same-class recurrence)**: Stage 1's grep only asks "does this exact pattern already exist" (same-class recurrence). It does not ask "does this new entry's conclusion contradict a *different* existing entry's conclusion." Before writing the new entry, read the body of every related hit Stage 1 surfaced (not just its class name) and check whether the new finding narrows, overrides, or reverses that hit's Prevention rule. A hit is "related" when it targets the same object of action (e.g. the same tool, the same category of Plane object, the same command class) even under a different class slug.
@@ -295,18 +296,22 @@ Before recording, always search in this order:
 # 1. HOT + archive simultaneous grep (recursive)
 grep -rlE "<2-3 key keywords>" $FA_STORE/
 
+# 1.5. Serena global/fa/* memory names (when Serena MCP is active this session)
+# list_memories() -> grep the returned names for the same keywords
+
 # 2. feedback memory grep
 ls ~/.claude/projects/*/memory/feedback_*.md 2>/dev/null | xargs grep -l "<keyword>"
 ```
 
-- No results → new entry (1st occurrence)
-- HOT match → recurrence (mark as N+1th occurrence)
+- No results (including Serena, when active) → new entry (1st occurrence)
+- HOT or Serena `global/fa/*` match → recurrence (mark as N+1th occurrence; if the match is only in Serena, `read_memory` it before writing)
 - Archive match → restore to HOT via fa-prune Step 7 procedure, then mark as N+1th occurrence
 
 | # | Don't | Do |
 |---|-------------|-----------------|
 | 1 | Grep HOT only → miss archive | Use `grep -rl $FA_STORE/` for recursive search |
 | 2 | Treat an archive match as a new entry anyway | Call the restore procedure (fa-prune Step 7) to return to HOT |
+| 3 | Grep the file store only → miss a recurrence already recorded in Serena's `global/fa/*` namespace | When Serena is active, `list_memories()` and grep its returned names too — the file store and Serena are separate stores |
 
 ## Notes
 
