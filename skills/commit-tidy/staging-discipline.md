@@ -42,6 +42,23 @@ The one exception: a new project's very first import commit, or a user-requested
 3. Any line not matching intent → halt commit → `git restore --staged <file>` → re-verify
 4. Any line under `rules/`, `agents/`, `docs/` → confirm the user explicitly instructed adding that file in this session
 
+## Explicit feature-range acceptance
+
+For a task that creates or relocates a feature branch, load the task's pinned
+base SHA, current approved commit count and allowed paths. Before the commit,
+run the common [feature-base gate](../git-repo/feature-base.md) in `stage` mode:
+
+```bash
+python3 <git-repo-skill>/scripts/verify_feature_base.py \
+  --repo <worktree> --base <pinned-base> --mode stage \
+  --expected-commits <current-count> --allow-path <owned-path>
+```
+
+Nonzero blocks the commit. Do not infer base from HEAD or silently expand the
+count/scope. After the authorized commit, re-run in `deliver` mode with the
+approved final count before reporting delivery. This gate supplements the
+explicit staging/hunk audit; it does not authorize push or merge.
+
 ## Procedure (every commit)
 
 1. `git status` to enumerate dirty state (staged + unstaged + untracked)
