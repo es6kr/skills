@@ -1,6 +1,6 @@
 # Resume — Task cleanup and remaining work
 
-Environment-agnostic (Claude Code / Antigravity) **task cleanup + remaining-work** workflow.
+Environment-agnostic (Hermes / Claude Code / Antigravity) **task cleanup + remaining-work** workflow.
 
 - **Cleanup** = remove completed/stale items (no user confirmation required)
 - **Remaining work** = per-item direction ask → execute selected items
@@ -14,13 +14,14 @@ Environment-agnostic (Claude Code / Antigravity) **task cleanup + remaining-work
 ## Environment Detection
 
 | Environment | Data medium | Tool guide |
-|-------------|-------------|------------|
+| Hermes | Native `todo_list` + `clarify` | [hermes.md](./hermes.md) |
 | OpenClaw | Explicit current-session JSON ledger | [openclaw.md](./openclaw.md) |
 | Claude Code | `TaskList` / `TaskCreate` / `TaskUpdate` API | [claude.md](./claude.md) |
 | Antigravity (Gemini) | `<appDataDir>/brain/<conversation-id>/task.md` artifact + `ask.md` emulation | [antigravity.md](./antigravity.md) |
 
 Environment detection:
-0. OpenClaw runtime context → [openclaw.md](./openclaw.md); skip Claude-specific missing-tool diagnosis.
+0. Hermes runtime context → [hermes.md](./hermes.md) first: discover and read `todo_list`; map all shared task/ask API notation to native Hermes operations. Do not use Claude missing-tool diagnostics or immediate agent-task fallback.
+0.1. OpenClaw runtime context → [openclaw.md](./openclaw.md); skip Claude-specific missing-tool diagnosis.
 1. `TaskList` tool callable → Claude Code
 2. `task.md` artifact exists or `appDataDir` context present → Antigravity
 3. If both, prefer Claude Code (TaskList is more reliable)
@@ -33,6 +34,8 @@ Environment detection:
 If you find yourself in this file with 0 existing tasks and args that request new deliverables (write / create / add / draft verbs), dispatch back to SKILL.md Step 0 and re-classify — you are in the wrong workflow.
 
 ## Step 1. Cleanup (`completed` auto only — `pending` deletion always requires user confirmation, HARD STOP)
+
+**Hermes override:** follow [hermes.md](./hermes.md) for every task mutation and decision below, including checklist demotion and quick-reference examples. Preserve inherited `in_progress` tasks after compaction until current evidence establishes completion, cancellation or a user-authorized removal; pre-compact status alone is not stale evidence. Remove completed entries only when durable completion evidence exists and the user did not request retention. `deleted` is not a Hermes status: removal requires a fresh full-list read and an explicit replacement preserving all unrelated tasks and parent links. Use native `clarify` for decisions.
 
 Remove stale items immediately. The goal is to take them out of the selectable list so the next step's context is not muddied.
 
@@ -76,6 +79,7 @@ Remove stale items immediately. The goal is to take them out of the selectable l
 
 | Environment | Cleanup command |
 |-------------|-----------------|
+| Hermes | Fresh `todo_list` → authorized removal → retained full list with `merge:false` → verify returned list; preserve unverified inherited work |
 | Claude Code | `TaskList` → identify deletion targets → call `TaskUpdate(taskId, status: "deleted")` for each |
 | Antigravity | Read `task.md` → identify lines to delete → remove those lines via `replace_file_content` |
 
@@ -167,6 +171,7 @@ This fast path is scoped narrowly to the **count == 1** case. With 2+ remaining 
 
 | Environment | Ask method |
 |-------------|-----------|
+| Hermes | Native `clarify`, one question per independent item (up to five per call); see [hermes.md](./hermes.md) |
 | Claude Code | `AskUserQuestion` — one question per task in the `questions` array, max 4 (details: [claude.md](./claude.md) → "AskUserQuestion — per-item direction ask") |
 | Antigravity | `ask.md` emulation (`ArtifactType: "other"`, `RequestFeedback: true`) — per-item options + Pros/Cons (details: [antigravity.md](./antigravity.md) → "Workflow → 1. Interactive Task Selection") |
 
@@ -188,6 +193,7 @@ Among the items decided as "Proceed" in Step 2, decide the start priority → ma
 
 | Environment | Execution |
 |-------------|-----------|
+| Hermes | `todo_list` with `merge:true`, stable id/content/status and preserved parent → work → verified completed update; see [hermes.md](./hermes.md) |
 | Claude Code | `TaskUpdate(taskId, status: "in_progress")` → work → `TaskUpdate(status: "completed")` |
 | Antigravity | Change the matching line in `task.md` to `- [/]` → work → change to `- [x]` |
 

@@ -207,7 +207,9 @@ def test_direct_main_pr_with_few_commits_and_files_is_blocked():
     # Only 2 commits and 3 files directly targeting main -> should route to develop
     cmd = "gh pr create --base main --draft --title 'fix: small patch'"
     changed_files = ["a.py", "b.py", "c.py"]
-    reason = mod.check_pr_create_routing_and_file_limit(cmd, changed_files=changed_files, commit_count=2)
+    reason = mod.check_pr_create_routing_and_file_limit(
+        cmd, changed_files=changed_files, commit_count=2, is_plugin_repo=True
+    )
     assert reason is not None
     assert "develop" in reason.lower()
 

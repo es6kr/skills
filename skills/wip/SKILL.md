@@ -19,12 +19,14 @@ metadata:
 
 Track current session work as a checklist.
 
+Hermes runtime: select [hermes.md](./hermes.md) first. Use native `todo_list` for task operations and `clarify` for decisions. Throughout this shared procedure, map `TaskList`/`TaskCreate`/`TaskUpdate`/`TodoWrite` to that topic's native operations, and `AskUserQuestion` to `clarify`. Do not enter Claude missing-tool or CLI fallback paths just because Claude API names are absent. Compaction alone does not authorize deleting inherited work.
 OpenClaw runtime: select [openclaw.md](./openclaw.md) first and map native task notation below to the explicit CLI ledger. Claude-only tool diagnostics do not apply.
 
 ## Topics
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| hermes | Native todo_list tracking and clarify decisions | [hermes.md](./hermes.md) |
 | antigravity | task.md artifact-based checklist for Antigravity sessions | [antigravity.md](./antigravity.md) |
 | openclaw | Explicit current-session agent-task JSON CLI | [openclaw.md](./openclaw.md) |
 | claude | TodoWrite/TaskCreate API for Claude Code sessions | [claude.md](./claude.md) |
@@ -35,6 +37,7 @@ OpenClaw runtime: select [openclaw.md](./openclaw.md) first and map native task 
 ```text
 wip (entry — /wip or "task cleanup + remaining work")
   └─→ resume (environment-agnostic workflow)
+        ├─→ hermes (Hermes: todo_list + clarify; verified-unavailability fallback only)
         ├─→ openclaw (agent-task + explicit current sessionId)
         ├─→ claude (Claude Code: TaskList/TaskCreate/TaskUpdate/AskUserQuestion)
         └─→ antigravity (Antigravity: task.md artifact + ask.md emulation)
@@ -66,7 +69,7 @@ Emitting only a text summary without persistent recording does not satisfy `/wip
 
 **Before dispatching to any topic, classify the args intent.** The `/wip` skill has two mutually-exclusive dispatch paths — resume workflow vs new-task registration — and the wrong choice wastes user time and misapplies the resume gate.
 
-Read args + call `TaskList` (Claude Code), list the explicit session ledger (OpenClaw), or read `task.md` (Antigravity). Then classify:
+Read args + call no-argument `todo_list` (Hermes), `TaskList` (Claude Code), list the explicit session ledger (OpenClaw), or read `task.md` (Antigravity). Then classify using the detected environment's native operations:
 
 | Signal | Mode | Dispatch |
 |--------|------|----------|
@@ -87,7 +90,7 @@ Read args + call `TaskList` (Claude Code), list the explicit session ledger (Ope
 
 **Follow the 3 steps in [resume.md](./resume.md)** in order:
 
-1. **Cleanup**: immediately delete stale completed/in_progress entries (no user confirmation required)
+1. **Cleanup**: follow resume's environment-specific cleanup policy; Hermes preserves inherited in_progress tasks until their actual state is verified.
 2. **Checklist state recovery** (Step 1.5): for tasks whose state cannot be verified from the in-context conversation (post-compact / inherited items), Grep/Read `fix_plan.md` / `checklist.md` to recover their state before asking
 3. **Per-item direction ask**: for each remaining item, decide proceed / split / merge / hold / defer-to-checklist / delete. `defer-to-checklist` follows `todowrite`'s `file` medium convention (`fix_plan.md`/`checklist.md`) — write the deferred item there rather than leaving it as an orphaned session task
 4. **Start priority + execute**: among items decided as "proceed", choose start priority, mark in_progress, and execute
@@ -113,6 +116,7 @@ Read args + call `TaskList` (Claude Code), list the explicit session ledger (Ope
 | 7 | Interrupt-stacked instructions arrive right after a registration-mode `/wip` (a newer directive: reword, investigate, etc.) → pivot to the newest instruction and never register the original `/wip` args | The original `/wip` args still require `TaskCreate` **first**. Register them before pivoting to any interrupt-stacked instruction — including Bash investigation for the newer directive. The register-before-execute guard hook only covers the case where `/wip` is the *last* user turn; the interrupt-stacked case (a newer non-`/wip` turn follows) is caught only by this discipline |
 
 Environment implementations:
+- Hermes → [hermes.md](./hermes.md) (todo_list first; clarify; no automatic agent-task fallback)
 - OpenClaw → [openclaw.md](./openclaw.md) (agent-task; no Claude tool-error prerequisite)
 - Claude Code → [claude.md](./claude.md) (TaskList/TaskCreate/AskUserQuestion)
 - Antigravity → [antigravity.md](./antigravity.md) (task.md + ask.md)
