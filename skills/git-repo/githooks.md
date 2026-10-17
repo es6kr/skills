@@ -93,6 +93,99 @@ exec "$(git config --global --get core.hooksPath)/commit-msg" "$@"
 | 4 | Copy-install and consider it done | Copy-install has no propagation. Record the install step somewhere the next clone will see it, and re-run it after editing `.githooks/` |
 | 5 | Debug a non-firing hook by reading its body | Check the execute bit first — a non-executable hook fails silently, and the passthrough chain's `[ -x ... ]` test skips it too |
 
+## Commit-type semantics and CI coverage
+
+A valid Conventional Commit prefix is only a syntax check. It does not establish
+that the selected type describes the change, or that CI enforces the repository's
+release policy. Classify skill changes by behavior, not by the `.md` extension.
+
+- New skill or new instruction topic (including authentication/integration):
+  `feat` when required by the destination's component policy.
+- Correction of an existing procedure without a new component: `fix`.
+- Behavior-preserving restructure or rename: `refactor`.
+- Skill-root README/CHANGELOG or ordinary docs without behavior changes:
+  `docs` may apply.
+- Supporting helper/test added to repair an existing procedure: a new file
+  alone does not imply `feat`; inspect its role.
+
+Do not use `docs` or `chore` to hide changes to executable agent instructions.
+Inspect the destination's policy and release configuration first. Account for
+nested plugin skill roots as well as top-level skills. A reference repository's
+staging branches and exceptions are not automatically valid in another repo.
+
+### Verification before commit or PR publication
+
+1. Inspect name-status changes and classify each added file as a component,
+   instruction topic, supporting resource/test, or documentation-only file.
+   Resolve conflicts between the intended change and the selected commit/PR type
+   before publication; a new instruction topic must not be downgraded to `docs`.
+2. Resolve the PR merge base and inspect every non-merge commit in the outgoing
+   range, not just HEAD or the PR title. Check rename semantics, release-generated
+   metadata exemptions, and all affected release components. A later correctly
+   tagged commit does not repair an earlier incorrectly tagged commit.
+3. Identify the actual local checker and the actual CI job independently. A
+   working `commit-msg` hook proves neither semantic classification nor remote
+   enforcement. A green test suite without a commit-policy job proves no tag
+   coverage. Map the policy to the workflow trigger, checked range, invoked
+   command, and failure exit code before claiming coverage.
+4. Exercise the checker against real disposable Git history: reject `docs` on
+   skill instructions and `fix` on a new instruction topic; accept `feat` on that
+   topic, `fix` on an existing procedure, and README-only `docs`. Also cover nested
+   plugin roots, supporting files, renames, an invalid range, and a bad earlier
+   commit followed by a valid tip. Invalid history must fail closed.
+5. Verify PR and direct-push event ranges. Fetch sufficient history; distinguish
+   an explicit branch-creation zero SHA from an unreadable range. Keep commit
+   subjects and event values out of interpolated shell code. Use read-only
+   workflow permissions when no remote mutation is needed.
+6. After publication, read back commit subjects, PR title/base/Draft state and the
+   actual semantic-check job result. Do not equate workflow file presence, job
+   scheduling, local fixtures, or overall green status with that job succeeding.
+   A required check in branch protection is a separate setting: do not claim or
+   change it merely because the workflow now exists.
+
+For an already published wrong tag, inspect current remote SHA and running CI,
+obtain history-rewrite authority, and preserve unrelated commits and workers.
+Use a lease bound to the inspected remote SHA; do not create an empty `feat`
+commit to conceal the old tag, blindly force-push, or replace the existing PR.
+Update the PR title and re-read both history and checks after correction.
+
+## Branch-scoped automatic cache sync
+
+A firing hook can still publish the wrong worktree's in-progress instructions to
+an installed cache. Before changing automatic reflection, inspect the other hooks'
+branch-detection convention and the repository's explicit eligible-branch policy.
+A push hook inspecting `remote_ref` answers which branch is being pushed; a
+post-commit/post-merge hook must inspect the **current worktree's HEAD** instead.
+Do not infer eligibility from the default branch or from an upstream tracking ref.
+
+For the Claude cache sync policy approved here, only the exact local branch names
+`main`, `master`, and `develop` automatically sync. Put the check **inside each
+hook, around the sync call only**; preserve other hook checks and operations:
+
+```sh
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || branch=
+case "$branch" in
+  main|master|develop)
+    python3 "$repo_root/scripts/sync-plugin-cache.py" || true
+    ;;
+esac
+```
+
+Use the same guard in `post-merge`, retaining its existing `ORIG_HEAD` argument.
+With this command detached HEAD resolves to `HEAD`, and a failed query is cleared
+to an empty value: neither matches. Feature/fix/task branches, similarly named
+branches, and linked worktrees on those branches skip only automatic cache sync.
+This is a convenience-scope check, not a shell-command bypass or security gate.
+Do not disable autosync globally, redesign the writer, install hooks, or change
+runtime `core.hooksPath` as part of this source correction.
+
+Verify both source hooks in disposable Git repositories/worktrees using a fake
+cache writer: the three allowed branches sync, topic branches and detached HEAD
+leave the fake cache unchanged, query failure skips sync, and `post-merge` still
+passes `ORIG_HEAD`. Do not run the real writer against an installed cache to test
+a guard. A source/test pass does not mean copied installed hooks were refreshed;
+report runtime reflection and commit/push separately.
+
 ## Self-check (before changing any hook wiring)
 
 1. Which directory does git actually read? — `git rev-parse --git-path hooks`
