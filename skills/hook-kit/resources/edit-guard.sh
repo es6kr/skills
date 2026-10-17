@@ -589,6 +589,9 @@ check_fa_edit_without_rag_search() {
 
   [[ -z "$NEW_CONTENT" ]] && return 0
   echo "$NEW_CONTENT" | grep -qE '^## [^#]' || return 0
+  # Explicit escape valve for a confirmed-new pattern (recurrence already
+  # ruled out by grep) when no RAG receiver is reachable this session.
+  echo "$NEW_CONTENT" | grep -q 'fix-rag-search-skipped' && return 0
 
   local transcript
   transcript=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
