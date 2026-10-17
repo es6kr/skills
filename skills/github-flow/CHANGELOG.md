@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/es6kr/skills/compare/github-flow-v0.11.4...github-flow-v0.12.0) (2026-10-17)
+
+
+### Features
+
+* **web-browser:** add orca-computer topic and allow it for bot-blocked sign-in ([a1a2578](https://github.com/es6kr/skills/commit/a1a2578ada35fc2ae0ef7000b4efd5aa3bc532fb))
+
+
+### Bug Fixes
+
+* **github-flow:** cover the reverse case of a missing workflow scope via SSH Host alias ([88e7645](https://github.com/es6kr/skills/commit/88e7645395091743378800530ba0a703ad16c3f2))
+* **review:** address Copilot and CodeRabbit feedback for PR [#639](https://github.com/es6kr/skills/issues/639) ([1a70705](https://github.com/es6kr/skills/commit/1a707057736ec8ee5f21ae64e2d0dac38d3a2fe7))
+
 ## [0.11.4](https://github.com/es6kr/skills/compare/github-flow-v0.11.3...github-flow-v0.11.4) (2026-10-13)
 
 

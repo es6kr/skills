@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/es6kr/skills/compare/commit-tidy-v0.7.2...commit-tidy-v0.7.3) (2026-10-17)
+
+
+### Bug Fixes
+
+* **commit-tidy:** extend message-discipline self-check to drafting media beyond git commit ([#631](https://github.com/es6kr/skills/issues/631)) ([98d07f7](https://github.com/es6kr/skills/commit/98d07f7fbf2d45a6540a976540c40e9921533fa3))
+
 ## [0.7.2](https://github.com/es6kr/skills/compare/commit-tidy-v0.7.1...commit-tidy-v0.7.2) (2026-10-04)
 
 

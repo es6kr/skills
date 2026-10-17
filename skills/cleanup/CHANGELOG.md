@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/cleanup-v0.10.0...cleanup-v0.11.0) (2026-10-17)
+
+
+### Features
+
+* **todowrite,wip:** add session-scoped agent-task CLI and OpenClaw adapter ([#629](https://github.com/es6kr/skills/issues/629)) ([eb4c4d4](https://github.com/es6kr/skills/commit/eb4c4d4ab6a7f7ba9f719b052d8f3761840012c9))
+
+
+### Bug Fixes
+
+* **cleanup:** consolidate Step 4/5 into single Step 4 Backlog delegating to backlog skill ([c9fdcd5](https://github.com/es6kr/skills/commit/c9fdcd51d06ed2f26a3680f9468794c3ef8091b6))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/cleanup-v0.9.0...cleanup-v0.10.0) (2026-10-13)
 
 

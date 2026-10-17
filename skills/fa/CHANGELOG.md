@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/es6kr/skills/compare/fa-v0.5.2...fa-v0.6.0) (2026-10-17)
+
+
+### Features
+
+* **fa:** add fast zero-modal staging inbox ([#625](https://github.com/es6kr/skills/issues/625)) ([1fd5c54](https://github.com/es6kr/skills/commit/1fd5c5413c5f94bde6a08547ad2fec1f389bf3c3))
+* **todowrite,wip:** add session-scoped agent-task CLI and OpenClaw adapter ([#629](https://github.com/es6kr/skills/issues/629)) ([eb4c4d4](https://github.com/es6kr/skills/commit/eb4c4d4ab6a7f7ba9f719b052d8f3761840012c9))
+
+
+### Bug Fixes
+
+* **fa:** add Serena global/fa/* check to retrospect Stage 1 recurrence pre-check ([#626](https://github.com/es6kr/skills/issues/626)) ([8251ee2](https://github.com/es6kr/skills/commit/8251ee263395099cd04eef8ff1ccc9842948d91f))
+* **fa:** ignore injected skill bodies when anchoring the correction gate ([3cb895e](https://github.com/es6kr/skills/commit/3cb895e9852c739c342b1a17ccac6154c058988b))
+* **hook-kit,fa:** remind to call Skill() on slash commands; ignore injected skill bodies in the correction gate ([01c07ab](https://github.com/es6kr/skills/commit/01c07ab6e97b1b6668d206210e13336d4bd51dce))
+* **review:** address Copilot and CodeRabbit feedback for PR [#639](https://github.com/es6kr/skills/issues/639) ([1a70705](https://github.com/es6kr/skills/commit/1a707057736ec8ee5f21ae64e2d0dac38d3a2fe7))
+
 ## [0.5.2](https://github.com/es6kr/skills/compare/fa-v0.5.1...fa-v0.5.2) (2026-10-13)
 
 
