@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/es6kr/skills/compare/fix-v0.7.1...fix-v0.8.0) (2026-10-17)
+
+
+### Features
+
+* **todowrite,wip:** add session-scoped agent-task CLI and OpenClaw adapter ([#629](https://github.com/es6kr/skills/issues/629)) ([eb4c4d4](https://github.com/es6kr/skills/commit/eb4c4d4ab6a7f7ba9f719b052d8f3761840012c9))
+
 ## [0.7.1](https://github.com/es6kr/skills/compare/fix-v0.7.0...fix-v0.7.1) (2026-10-04)
 
 

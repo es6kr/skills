@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/es6kr/skills/compare/todowrite-v0.10.0...todowrite-v0.11.0) (2026-10-17)
+
+
+### Features
+
+* **todowrite,wip:** add session-scoped agent-task CLI and OpenClaw adapter ([#629](https://github.com/es6kr/skills/issues/629)) ([eb4c4d4](https://github.com/es6kr/skills/commit/eb4c4d4ab6a7f7ba9f719b052d8f3761840012c9))
+
+
+### Bug Fixes
+
+* **review:** address Copilot and CodeRabbit feedback for PR [#639](https://github.com/es6kr/skills/issues/639) ([1a70705](https://github.com/es6kr/skills/commit/1a707057736ec8ee5f21ae64e2d0dac38d3a2fe7))
+
 ## [0.10.0](https://github.com/es6kr/skills/compare/todowrite-v0.9.4...todowrite-v0.10.0) (2026-10-06)
 
 

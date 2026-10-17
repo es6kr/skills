@@ -5,6 +5,13 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/es6kr/skills/compare/backlog-v0.4.2...backlog-v0.5.0) (2026-10-17)
+
+
+### Features
+
+* **backlog:** add record topic for session backlog recording ([4da100e](https://github.com/es6kr/skills/commit/4da100ee4f0e536d17960045ca1a4efa201042d5))
+
 ## [0.4.2](https://github.com/es6kr/skills/compare/backlog-v0.4.1...backlog-v0.4.2) (2026-09-27)
 
 

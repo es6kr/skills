@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/es6kr/skills/compare/skill-kit-v0.11.0...skill-kit-v0.11.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **skill-kit:** require cross-repo doc grep when relocating a skill topic ([#620](https://github.com/es6kr/skills/issues/620)) ([ddbca62](https://github.com/es6kr/skills/commit/ddbca6255cff6d9796bd5b87d0481ccf9da70544))
+
 ## [0.11.0](https://github.com/es6kr/skills/compare/skill-kit-v0.10.0...skill-kit-v0.11.0) (2026-10-06)
 
 
