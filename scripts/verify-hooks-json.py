@@ -44,6 +44,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # `${CLAUDE_PLUGIN_ROOT}/a/b.sh`, `"${CLAUDE_PLUGIN_ROOT}/a/b.sh"`, `$CLAUDE_PLUGIN_ROOT/a/b.sh`
 #
 # The path ends differently depending on whether the reference is quoted, and getting
