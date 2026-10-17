@@ -22,7 +22,7 @@ setup() {
 
 # run_prompt <prompt text> -> runs the hook as a UserPromptSubmit event.
 run_prompt() {
-  jq -n --arg p "$1" '{hook_event_name: "UserPromptSubmit", prompt: $p}' | bash "$GUARD"
+  MSYS_NO_PATHCONV=1 jq -n --arg p "$1" '{hook_event_name: "UserPromptSubmit", prompt: $p}' | bash "$GUARD"
 }
 
 @test "reminds on a raw namespaced slash command with args" {

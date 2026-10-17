@@ -58,16 +58,16 @@ class TestParseIdentifier(unittest.TestCase):
 
 class TestParseBrowseUrl(unittest.TestCase):
     def test_valid(self):
-        url = "https://plane.dgs.ai.kr/dgs/browse/ES6KR-128"
+        url = "https://plane.example.com/workspace/browse/ES6KR-128"
         self.assertEqual(pvi.parse_browse_url(url), ("ES6KR", 128))
 
     def test_trailing_path_ignored(self):
-        url = "https://plane.dgs.ai.kr/dgs/browse/INFRA-6/some-slug-suffix"
+        url = "https://plane.example.com/workspace/browse/INFRA-6/some-slug-suffix"
         self.assertEqual(pvi.parse_browse_url(url), ("INFRA", 6))
 
     def test_no_browse_segment_raises(self):
         with self.assertRaises(ValueError):
-            pvi.parse_browse_url("https://plane.dgs.ai.kr/dgs/projects/uuid/issues/uuid")
+            pvi.parse_browse_url("https://plane.example.com/workspace/projects/uuid/issues/uuid")
 
 
 class TestResolve(unittest.TestCase):

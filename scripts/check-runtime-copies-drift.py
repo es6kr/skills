@@ -45,6 +45,11 @@ import shutil
 import subprocess
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 
 def extract_canonical_paths(registry_text: str) -> set[str]:
     """Every `runtime_copies.canonical` path declared in hook-registry.yaml.
@@ -102,7 +107,7 @@ def build_verify_command(plugins_root: str, repo_root: str, verify_script: str) 
 
 
 def _run_subprocess(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def main(argv=None, stdin_text=None) -> int:
