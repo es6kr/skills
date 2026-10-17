@@ -12,7 +12,7 @@ Usage::
 
     python3 plane_verify_identifier.py ES6KR-128
     python3 plane_verify_identifier.py ES6KR-128 --expect-title-contains "hook registry"
-    python3 plane_verify_identifier.py --browse-url https://plane.dgs.ai.kr/dgs/browse/ES6KR-128
+    python3 plane_verify_identifier.py --browse-url https://plane.example.com/workspace/browse/ES6KR-128
 
 Exit codes:
     0  identifier resolved (and, if given, --expect-title-contains matched)

@@ -34,9 +34,9 @@ _issue_spec.loader.exec_module(plane_create_issue)
 
 
 BASE_PROFILE = {
-    "plane_host": "https://plane.dgs.ai.kr",
+    "plane_host": "https://plane.example.com",
     "token": "test-token",
-    "workspace_slug": "dgs",
+    "workspace_slug": "demo",
     "default_project": "bd4376d5-d451-4608-8c08-f9fda009f4a6",
 }
 
@@ -76,7 +76,7 @@ class TestRestApiBrowseUrl(unittest.TestCase):
         with mock.patch.object(plane_create_issue.urllib.request, "urlopen", fake):
             res = plane_create_issue.create_via_rest_api(dict(BASE_PROFILE), "title", is_intake=False)
         self.assertTrue(res["success"])
-        self.assertEqual(res["browse_url"], "https://plane.dgs.ai.kr/dgs/browse/INFRA-62")
+        self.assertEqual(res["browse_url"], "https://plane.example.com/demo/browse/INFRA-62")
         # The raw API url is retained too — some callers may still want it.
         self.assertIn("/projects/", res["url"])
 
@@ -101,17 +101,17 @@ class TestRestApiBrowseUrl(unittest.TestCase):
         with mock.patch.object(plane_create_issue.urllib.request, "urlopen", fake):
             res = plane_create_issue.create_via_rest_api(dict(BASE_PROFILE), "title", is_intake=True)
         self.assertTrue(res["success"])
-        self.assertEqual(res["browse_url"], "https://plane.dgs.ai.kr/dgs/browse/AIAUTO-176")
+        self.assertEqual(res["browse_url"], "https://plane.example.com/demo/browse/AIAUTO-176")
 
 
 class TestK3sFallbackBrowseUrl(unittest.TestCase):
     def test_generated_script_computes_browse_url_from_prj_identifier(self):
         script = plane_create_issue.build_k3s_py_script(
-            "dgs", "bd4376d5-d451-4608-8c08-f9fda009f4a6", "https://plane.dgs.ai.kr",
+            "demo", "bd4376d5-d451-4608-8c08-f9fda009f4a6", "https://plane.example.com",
             "title", "desc", is_intake=False,
         )
-        self.assertIn('"browse_url": f"https://plane.dgs.ai.kr/dgs/browse/{prj.identifier}-{issue.sequence_id}"', script)
-        self.assertIn('"browse_url": f"https://plane.dgs.ai.kr/dgs/browse/{prj.identifier}-{existing.sequence_id}"', script)
+        self.assertIn('"browse_url": f"https://plane.example.com/demo/browse/{prj.identifier}-{issue.sequence_id}"', script)
+        self.assertIn('"browse_url": f"https://plane.example.com/demo/browse/{prj.identifier}-{existing.sequence_id}"', script)
         compile(script, "<k3s_py_script>", "exec")  # generated source must still be valid Python
 
 
@@ -119,15 +119,15 @@ class TestCliOutputPrefersBrowseUrl(unittest.TestCase):
     def test_main_prints_browse_url_when_present(self):
         fake_res = {
             "success": True, "sequence_id": 62, "method": "REST API", "title": "t",
-            "url": "https://plane.dgs.ai.kr/dgs/projects/x/issues/y",
-            "browse_url": "https://plane.dgs.ai.kr/dgs/browse/INFRA-62",
+            "url": "https://plane.example.com/demo/projects/x/issues/y",
+            "browse_url": "https://plane.example.com/demo/browse/INFRA-62",
         }
         with mock.patch.object(plane_create_issue, "create_plane_issue", return_value=fake_res):
             with mock.patch.object(sys, "argv", ["plane_create_issue.py", "--title", "t"]):
                 with mock.patch("builtins.print") as mock_print:
                     plane_create_issue.main()
         printed = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
-        self.assertIn("https://plane.dgs.ai.kr/dgs/browse/INFRA-62", printed)
+        self.assertIn("https://plane.example.com/demo/browse/INFRA-62", printed)
         self.assertNotIn("/projects/x/issues/y", printed)
 
 

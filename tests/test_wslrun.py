@@ -15,8 +15,8 @@ import wslrun
 class TestWslrunPathTranslation(unittest.TestCase):
     def test_win_to_wsl_path_standard(self):
         self.assertEqual(
-            wslrun.win_to_wsl_path(r"C:\Users\DAEGUNSOFT\ghq\github.com\es6kr"),
-            "/mnt/c/Users/DAEGUNSOFT/ghq/github.com/es6kr"
+            wslrun.win_to_wsl_path(r"C:\Users\testuser\ghq\github.com\es6kr"),
+            "/mnt/c/Users/testuser/ghq/github.com/es6kr"
         )
 
     def test_win_to_wsl_path_forward_slash(self):
@@ -39,14 +39,14 @@ class TestWslrunPathTranslation(unittest.TestCase):
 class TestWslrunArgTranslation(unittest.TestCase):
     def test_translate_arg_absolute_win_path(self):
         self.assertEqual(
-            wslrun.translate_arg(r"C:\Users\DAEGUNSOFT\.agents\fix_plan.md"),
-            "/mnt/c/Users/DAEGUNSOFT/.agents/fix_plan.md"
+            wslrun.translate_arg(r"C:\Users\testuser\.agents\fix_plan.md"),
+            "/mnt/c/Users/testuser/.agents/fix_plan.md"
         )
 
     def test_translate_arg_flag_with_win_path(self):
         self.assertEqual(
-            wslrun.translate_arg(r"--file=C:\Users\DAEGUNSOFT\.agents\fix_plan.md"),
-            "--file=/mnt/c/Users/DAEGUNSOFT/.agents/fix_plan.md"
+            wslrun.translate_arg(r"--file=C:\Users\testuser\.agents\fix_plan.md"),
+            "--file=/mnt/c/Users/testuser/.agents/fix_plan.md"
         )
 
     def test_translate_arg_preserves_non_path(self):
