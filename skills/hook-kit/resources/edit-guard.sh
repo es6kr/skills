@@ -511,7 +511,7 @@ check_stub_file_substantive_edit() {
   [[ ! -f "$FILE_PATH" ]] && return 0
 
   local file_size
-  file_size=$(stat -f "%z" "$FILE_PATH" 2>/dev/null || stat -c "%s" "$FILE_PATH" 2>/dev/null || echo "0")
+  file_size=$(stat -c "%s" "$FILE_PATH" 2>/dev/null || stat -f "%z" "$FILE_PATH" 2>/dev/null || echo "0")
   [[ "$file_size" -gt 5120 ]] && return 0
 
   # Stub identification: 2-axis (either axis matches → consider stub)

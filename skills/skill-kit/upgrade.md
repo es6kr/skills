@@ -556,6 +556,26 @@ User phrases like "commit the deployed state to the worktree first", "publish st
 "as-deployed / at publish time / release as-is", the default interpretation is **baseline split**,
 not "single commit in some order".
 
+#### Feature relocation split (MANDATORY when moving a topic/feature out of this skill into a different skill/plugin)
+
+When an upgrade **removes** a topic/feature from the target skill because it now lives in a different skill or plugin (a "carve-out" split — e.g. moving session-import tooling out of a general-purpose skill into a dedicated one), the same-session checklist must include a cross-repo documentation sweep, not just the split repo's own tree.
+
+**Why**: a skill split correctly updates every same-repo reference (the moved skill's own SKILL.md, Topics table, scripts) but has no forcing function to check *other* repos' documentation that describes or depends on the old location. A backlog item that records the cross-repo risk as "accepted debt" with no re-check trigger lets the same drift resurface repeatedly — each recurrence found independently by whoever next reads the stale doc, instead of once by the split itself.
+
+##### Don't / Do
+
+| # | Don't | Do |
+|---|-------|-----|
+| 1 | Finish a relocation split once the moved skill's own SKILL.md/Topics/scripts are updated | Also grep this workspace's own `CLAUDE.md`, `.claude/rules/*.md`/`~/.agents/rules/*.md`, and the RAG-registry config's `writer` fields for the old skill/topic's literal filenames or `Skill("<old>","<topic>")` calls |
+| 2 | Register the cross-repo drift risk as an "accepted debt" backlog item with no re-check trigger | Fix the hits found by the grep in the same session/PR as the split. A backlog item is for genuinely out-of-reach references (a different org's repo you don't have access to), not for docs sitting in the same workspace |
+| 3 | Treat "no functional breakage" as sufficient reason to defer | Stale documentation is itself the defect — it misleads the next reader (human or agent) into acting on an outdated location |
+
+##### Self-check (before closing a relocation-split upgrade)
+
+1. Does this upgrade **remove** a topic/feature from the target skill because it moved elsewhere? → If yes, this subsection applies.
+2. Ran the cross-repo grep (workspace `CLAUDE.md`, `.claude/rules/*.md`, RAG-registry config `writer` fields) for the old skill/topic's distinctive filenames and `Skill()` calls?
+3. Fixed every hit found, or — only for references genuinely outside this session's reach — registered a tracked follow-up with an explicit re-check trigger (not just "accepted debt")?
+
 ## Notes
 
 - Topic files have no frontmatter (only exists in SKILL.md)

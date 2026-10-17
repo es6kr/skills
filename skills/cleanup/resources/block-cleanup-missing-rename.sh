@@ -45,10 +45,10 @@ HG_SESSION_ID_MARKERS="${HG_SESSION_ID_MARKERS:+${HG_SESSION_ID_MARKERS}|}Sessio
 # report itself rather than a mid-cleanup progress message. Used only to decide
 # whether an ABSENT Session ID line is already due (see the omission branch).
 HG_COMPLETION_WORDS="${HG_COMPLETION_WORDS:+${HG_COMPLETION_WORDS}|}complete|completed|finished|Session Ended|wrap-up"
-# Row labels unique to run.md's Step 5 mandatory-rows table. Requiring one of
+# Row labels unique to run.md's Step 4 mandatory-rows table. Requiring one of
 # these keeps the omission branch off unrelated "<something> cleanup finished"
 # reports that merely happen to contain a table (e.g. a file-cleanup summary).
-HG_CLEANUP_STEP_ROWS="${HG_CLEANUP_STEP_ROWS:+${HG_CLEANUP_STEP_ROWS}|}Self-Improve|Knowledge Persist|RAG Store|wip task|TaskList|Task prune|Weekly Report"
+HG_CLEANUP_STEP_ROWS="${HG_CLEANUP_STEP_ROWS:+${HG_CLEANUP_STEP_ROWS}|}Self-Improve|Knowledge Persist|RAG Store|wip task|Backlog|TaskList|Task prune|Weekly Report"
 
 INPUT=$(cat)
 
@@ -71,7 +71,7 @@ if ! echo "$RESPONSE" | grep -qiE "$HG_CLEANUP_MARKERS"; then
   exit 0
 fi
 
-# A cleanup response that never reaches Step 5 is not a violation of this row
+# A cleanup response that never reaches Step 4 is not a violation of this row
 # yet — that is why an absent Session ID line cannot simply be treated as a
 # violation. But the original "absent => always exit 0" rule left the most
 # common failure mode silent: dropping the ENTIRE row from a finished report
@@ -86,7 +86,7 @@ if ! echo "$RESPONSE" | grep -qiE "$HG_SESSION_ID_MARKERS"; then
     cat <<'EOF'
 {
   "decision": "block",
-  "reason": "Cleanup/session-end completion report omits the 'Session identity (mandatory)' row entirely — no `Session ID:` line and therefore no `/rename` candidates either. cleanup/run.md Step 5's mandatory-rows table requires this row in BOTH the cleanup wrap-up table and any separate session-end report. Re-read that section's literal row text (do not reconstruct the table from memory of a prior pass — it silently drops rows) and re-emit the report with every mandatory row present: Session identity, 0 TaskList, 1 Commit, 2 Self-Improve, 3 Knowledge Persist, 3-C.1 RAG Store (separate row), 3-C.2 structured discovery chunk, 3-C.4 fix_plan sync when applicable, 4 Weekly Report, 5 wip task registration."
+  "reason": "Cleanup/session-end completion report omits the 'Session identity (mandatory)' row entirely — no `Session ID:` line and therefore no `/rename` candidates either. cleanup/run.md Step 4's mandatory-rows table requires this row in BOTH the cleanup wrap-up table and any separate session-end report. Re-read that section's literal row text (do not reconstruct the table from memory of a prior pass — it silently drops rows) and re-emit the report with every mandatory row present: Session identity, 0 TaskList, 1 Commit, 2 Self-Improve, 3 Knowledge Persist, 3-C.1 RAG Store (separate row), 3-C.2 structured discovery chunk, 3-C.4 fix_plan sync when applicable, 4 Backlog."
 }
 EOF
     exit 2
@@ -112,7 +112,7 @@ fi
 cat <<'EOF'
 {
   "decision": "block",
-  "reason": "Cleanup/session-end report includes a 'Session ID:' line but no accompanying `/rename <model>-<topic>-<sessid8>` recommendation (2-3 candidates). cleanup/run.md Step 5's 'Session identity (mandatory)' row requires both together — re-read the row's literal text (do not reconstruct it from memory of a prior pass) and add the rename candidates as standalone `/rename ...` code spans (no label/colon inside the span, so a single copy-paste is directly runnable)."
+  "reason": "Cleanup/session-end report includes a 'Session ID:' line but no accompanying `/rename <model>-<topic>-<sessid8>` recommendation (2-3 candidates). cleanup/run.md Step 4's 'Session identity (mandatory)' row requires both together — re-read the row's literal text (do not reconstruct it from memory of a prior pass) and add the rename candidates as standalone `/rename ...` code spans (no label/colon inside the span, so a single copy-paste is directly runnable)."
 }
 EOF
 exit 2

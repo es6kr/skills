@@ -106,5 +106,5 @@ When referencing, creating, updating, or reporting Plane issues or intake items 
 
 | # | Don't | Do |
 |---|-------|----|
-| 1 | `https://plane.dgs.ai.kr/dgs/projects/<uuid>/issues/<uuid>` long internal API/project URL | `https://plane.dgs.ai.kr/dgs/browse/<IDENTIFIER>-<SEQ>` standard canonical browse URL |
-| 2 | Bare text UUID or sequence number without clickable web URL | Clickable markdown link (`[INFRA-77](https://plane.dgs.ai.kr/dgs/browse/INFRA-77)`) with complete browse URL |
+| 1 | `https://plane.example.com/workspace/projects/<uuid>/issues/<uuid>` long internal API/project URL | `https://plane.example.com/workspace/browse/<IDENTIFIER>-<SEQ>` standard canonical browse URL |
+| 2 | Bare text UUID or sequence number without clickable web URL | Clickable markdown link (`[INFRA-77](https://plane.example.com/workspace/browse/INFRA-77)`) with complete browse URL |

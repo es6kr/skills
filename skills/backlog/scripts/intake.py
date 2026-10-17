@@ -17,8 +17,13 @@ import urllib.error
 sys.stdout.reconfigure(encoding='utf-8')
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_FIX_PLAN = r"C:\Users\DAEGUNSOFT\ghq\github.com\daegunsoftDev\.agents\fix_plan.md"
-BASE_URL = "https://plane.dgs.ai.kr/api/v1/workspaces/dgs"
+DEFAULT_FIX_PLAN = os.environ.get(
+    "PLANE_FIX_PLAN",
+    os.path.join(os.getcwd(), ".agents", "fix_plan.md")
+)
+PLANE_HOST = os.environ.get("PLANE_HOST", "https://plane.example.com").rstrip("/")
+PLANE_WORKSPACE = os.environ.get("PLANE_WORKSPACE", "default")
+BASE_URL = os.environ.get("PLANE_BASE_URL", f"{PLANE_HOST}/api/v1/workspaces/{PLANE_WORKSPACE}")
 UA = "Mozilla/5.0 (plane)"
 
 PRIORITY_MAP = {
@@ -29,12 +34,15 @@ PRIORITY_MAP = {
 }
 
 def get_api_key():
-    key = os.environ.get("DGS_PLANE_API_KEY")
+    key = os.environ.get("PLANE_API_KEY") or os.environ.get("DGS_PLANE_API_KEY")
     if not key:
         try:
             import winreg
             reg = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment")
-            key, _ = winreg.QueryValueEx(reg, "DGS_PLANE_API_KEY")
+            try:
+                key, _ = winreg.QueryValueEx(reg, "PLANE_API_KEY")
+            except Exception:
+                key, _ = winreg.QueryValueEx(reg, "DGS_PLANE_API_KEY")
             winreg.CloseKey(reg)
         except Exception:
             pass
@@ -117,7 +125,7 @@ def parse_untracked_items(fix_plan_path):
         if not checkbox_pattern.match(line):
             continue
 
-        if alt_issue_pattern.search(line) or "plane.dgs.ai.kr" in line:
+        if alt_issue_pattern.search(line) or "/browse/" in line or "/issues/" in line or "plane." in line:
             continue
 
         if current_section in ("## Flow Chart", "## Pipeline Execution Log", "## Completed", "## Hold", "## REPEAT"):
@@ -283,7 +291,7 @@ def main():
             seq = res.get("sequence_id")
             issue_id = res.get("id")
             key = f"{f['project']}-{seq}"
-            url = f"https://plane.dgs.ai.kr/dgs/projects/{proj_id}/issues/{issue_id}"
+            url = f"{PLANE_HOST}/{PLANE_WORKSPACE}/projects/{proj_id}/issues/{issue_id}"
             created_count += 1
             print(f" ✔ Created [{key}]")
             

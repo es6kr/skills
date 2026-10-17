@@ -35,6 +35,7 @@ Manage hooks and script files in `~/.claude/settings.json`. Includes resource (s
 | add | author a NEW hook end-to-end: registry-first check, sibling mirroring, per-event emit schema, `--test` harness weighted toward negatives, dual registration | [add.md](./add.md) |
 | audit | reference/permission/orphan checks (stale + chmod +x + resources matching) | [audit.md](./audit.md) |
 | edit | hook script modification + source sync | [edit.md](./edit.md) |
+| enforce-markers | declarative `<!-- enforce: ... -->` marker syntax for MANDATORY skill-call steps, enforced by a generic Stop/UserPromptSubmit hook instead of a bespoke script per violation | [enforce-markers.md](./enforce-markers.md) |
 | install | resources → hooks/ installation + settings.json registration | [install.md](./install.md) |
 | move | scripts/ → hooks/ migration + path update | [move.md](./move.md) |
 | remove | remove hook entries from settings.json | [remove.md](./remove.md) |

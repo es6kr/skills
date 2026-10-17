@@ -239,12 +239,15 @@ def main():
         target_files.append(Path(args.file))
     else:
         home = Path.home()
-        candidates = [
-            home / "ghq/github.com/es6kr/.agents/fix_plan.md",
-            home / "ghq/github.com/daegunsoftDev/.agents/fix_plan.md",
-            Path(r"C:\Users\DAEGUNSOFT\ghq\github.com\es6kr\.agents\fix_plan.md"),
-            Path(r"C:\Users\DAEGUNSOFT\ghq\github.com\daegunsoftDev\.agents\fix_plan.md"),
-        ]
+        candidates = []
+        custom_plan = os.environ.get("PLANE_FIX_PLAN")
+        if custom_plan:
+            candidates.append(Path(custom_plan))
+        candidates.extend([
+            Path.cwd() / ".agents" / "fix_plan.md",
+            home / ".agents" / "fix_plan.md",
+            home / "ghq" / "github.com" / "es6kr" / ".agents" / "fix_plan.md",
+        ])
         for c in candidates:
             if c.exists() and c not in target_files:
                 target_files.append(c)

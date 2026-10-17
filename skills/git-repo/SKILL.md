@@ -40,6 +40,7 @@ Git repository management and SourceGit GUI client integration.
 | patrol | batch inspection of ghq repositories (status, stash, unpushed + commit-splitter integration) | [patrol.md](./patrol.md) |
 | rebase-audit | audit an active interactive rebase's staged files for accidental reverts (HEAD-vs-index diff + revert-pattern heuristic + AskUserQuestion multiSelect) without touching the rebase itself | [rebase-audit.md](./rebase-audit.md) |
 | rename-worktree | rename worktree directory and metadata (cross-platform, Windows safe) | [rename-worktree.md](./rename-worktree.md) |
+| feature-base | explicit-base start/stage/deliver range and scope gate | [feature-base.md](./feature-base.md) |
 | safe-relocate | relocate working commits from a stale, diverged, or dirty branch onto a clean branch cut directly off the latest remote base (5-step procedure) | [safe-relocate.md](./safe-relocate.md) |
 | sourcegit | SourceGit preference.json management (add repos, workspaces, folder rename) | [sourcegit.md](./sourcegit.md) |
 | ssh-key | per-repo SSH key mapping for multi-account GitHub (core.sshCommand + IdentityAgent) | [ssh-key.md](./ssh-key.md) |
@@ -235,5 +236,5 @@ Key features:
 
 - `./scripts/repo-to-ghq.sh` - Move a repository to the ghq path (bare+worktree → regular)
 - `./scripts/repo-to-bare-worktree.sh` - Convert a regular repo → bare + worktree (inverse)
-- `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch; prints manual push/PR commands by default, or pass `--push [--body-file <path>]` to also push and open the draft PR.
+- `skills/git-repo/scripts/local-to-staging-pr.sh` - Cherry-pick local commit to a staging branch; requires explicit repeated `--allow-path` scope and pinned-base start/deliver checks; prints manual push/PR commands by default, or pass `--push [--body-file <path>]` to also push and open the draft PR.
 - `skills/git-repo/scripts/prune_merged_worktrees.py` - Detect and safely remove clean worktrees whose branches are already merged (GitHub PR lookup + git-native ancestry fallback); defaults to `--dry-run`. See the "Worktree decision tree" squash-merge caveat above.

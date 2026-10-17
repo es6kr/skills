@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/fa-v0.5.0...fa-v0.5.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **fa:** attribute each section's own fa: header instead of its successor's ([#578](https://github.com/es6kr/skills/issues/578)) ([343d979](https://github.com/es6kr/skills/commit/343d979002ce7e8e407ccb717400ac4ef5067a6d))
+* **fa:** classify by bare ISO dates and bound orphan-header detection to the trailing block ([#594](https://github.com/es6kr/skills/issues/594)) ([b021755](https://github.com/es6kr/skills/commit/b021755aefb6e376fef6ab22f294cdb682c8f498))
+* **fa:** close file descriptor before unlinking temp file on error ([#587](https://github.com/es6kr/skills/issues/587)) ([f30d082](https://github.com/es6kr/skills/commit/f30d0825bf363d4984d4d3a2e637b387e3392bad))
+* **fa:** gate Serena routing on a preflight, not tool presence ([#585](https://github.com/es6kr/skills/issues/585)) ([4a5dd90](https://github.com/es6kr/skills/commit/4a5dd90fab23de91955be891055e74d0e95b2d87))
+* residual PR 572 findings not covered by PR 574 ([#576](https://github.com/es6kr/skills/issues/576)) ([c07f39a](https://github.com/es6kr/skills/commit/c07f39aeaa8abe28d432430c87662c289ee9f927))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/fa-v0.4.3...fa-v0.5.0) (2026-09-30)
 
 

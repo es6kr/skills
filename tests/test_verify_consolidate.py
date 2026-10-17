@@ -103,7 +103,7 @@ Recommend merge via `/github-flow merge 123`.
         validator = ConsolidateValidator(pr_num=123, repo="es6kr/skills")
         self.assertFalse(validator.validate())
         self.assertTrue(any("row count mismatch" in err for err in validator.errors))
-        self.assertTrue(any("missing superpowers" in err for err in validator.errors))
+        self.assertTrue(any("missing Internal Code Review findings" in err for err in validator.errors))
 
     @patch("skills.consolidate.scripts.verify_consolidate.run_gh_api")
     def test_validator_fails_on_out_of_order_comments(self, mock_api):

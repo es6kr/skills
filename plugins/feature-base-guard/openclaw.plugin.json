@@ -1,0 +1,61 @@
+{
+  "id": "feature-base-guard",
+  "name": "Feature base guard",
+  "description": "Read-only pinned-base verification with a terminal veto for supported structured Git actions.",
+  "categories": [
+    "developer-tools"
+  ],
+  "contracts": {
+    "tools": [
+      "feature_base_action"
+    ]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "contracts"
+    ],
+    "properties": {
+      "contracts": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repo",
+            "base",
+            "expectedCommits",
+            "allowedPaths"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "base": {
+              "type": "string",
+              "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            "expectedCommits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "allowedPaths": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

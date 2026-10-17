@@ -25,7 +25,7 @@ sys.modules["plane_client"] = plane_client
 _client_spec.loader.exec_module(plane_client)
 
 
-def make_client(host="https://plane.dgs.ai.kr", slug="dgs"):
+def make_client(host="https://plane.example.com", slug="demo"):
     client = plane_client.PlaneClient.__new__(plane_client.PlaneClient)
     client.profile = {"plane_host": host, "workspace_slug": slug}
     return client
@@ -36,7 +36,7 @@ class TestBrowseUrl(unittest.TestCase):
         client = make_client()
         self.assertEqual(
             client.browse_url("INFRA", 62),
-            "https://plane.dgs.ai.kr/dgs/browse/INFRA-62",
+            "https://plane.example.com/demo/browse/INFRA-62",
         )
 
     def test_browse_url_accepts_int_or_str_sequence_id(self):

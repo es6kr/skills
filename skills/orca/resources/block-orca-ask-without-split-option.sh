@@ -54,46 +54,41 @@ ORCA_CTX=$(join_alt "$ORCA_CTX_EN" "$HG_ORCA_HANDOFF_KO")
 SPLIT_PATTERN=$(join_alt "$SPLIT_EN" "$HG_ORCA_SPLIT_KO")
 EXCEPTION_PATTERN=$(join_alt "$EXCEPTION_EN" "$HG_ORCA_EXCEPTION_KO")
 
-extract() { # extract <which>  -- reads payload JSON on stdin
-  python3 -c '
-import json, sys
-which = sys.argv[1]
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-ti = d.get("tool_input") or {}
-qs = ti.get("questions") or []
-parts = []
-for q in qs:
-    if which in ("all", "question"):
-        parts.append(q.get("question") or "")
-        parts.append(q.get("header") or "")
-    if which in ("all", "options"):
-        for o in q.get("options") or []:
-            parts.append(o.get("label") or "")
-            parts.append(o.get("description") or "")
-print("\n".join(p for p in parts if p))
-' "$1" 2>/dev/null
-}
-
 evaluate() { # evaluate <payload-json>  -> 0 allow, 2 block
-  local payload=$1 all options
-  all=$(printf '%s' "$payload" | extract all)
-  options=$(printf '%s' "$payload" | extract options)
+  # Evaluate each question independently: neither an option nor an exception
+  # in a different question can authorize this launch/handoff.
+  printf '%s' "$1" | python3 -c '
+import json, re, sys
+ctx, split, exception = (re.compile(p, re.I) for p in sys.argv[1:4])
 
-  [[ -z "$all" ]] && return 0
-
-  # Not an Orca session-launch/handoff question -> nothing to gate.
-  grep -qiE "$ORCA_CTX" <<<"$all" || return 0
-
-  # A named exception makes the split path inapplicable.
-  grep -qiE "$EXCEPTION_PATTERN" <<<"$all" && return 0
-
-  # The split path must be on offer somewhere in the options.
-  grep -qiE "$SPLIT_PATTERN" <<<"$options" && return 0
-
-  return 2
+def offers_split(option):
+    # Negation applies within a clause, not to affirmative alternatives after
+    # a comma/semicolon or contrast. A trailing "not a new tab" is not a denial
+    # of a preceding split, while "split unavailable" is.
+    for clause in re.split(r"[;,\n]|\b(?:but|instead)\b", option, flags=re.I):
+        for match in split.finditer(clause):
+            before, after = clause[:match.start()], clause[match.end():]
+            denied = re.search(r"\b(?:no|not|never|without|avoid|skip|cannot|cant|dont|disable)\b|don\x27t|can\x27t", before, re.I)
+            unavailable = re.match(r"\s*(?:(?:is|are)\s+)?(?:unavailable|unsupported|disabled|not\s+(?:available|possible|allowed))\b", after, re.I)
+            if not denied and not unavailable:
+                return True
+    return False
+try:
+    payload = json.load(sys.stdin)
+except (ValueError, TypeError):
+    sys.exit(0)
+for q in (payload.get("tool_input") or {}).get("questions") or []:
+    options = [" ".join((o.get("label") or "", o.get("description") or ""))
+               for o in q.get("options") or []]
+    text = "\n".join([q.get("question") or "", q.get("header") or ""] + options)
+    # A product/project name alone is not a session-launch decision.
+    action = re.search(r"\b(?:launch\w*|start\w*|delegat\w*|hand.?off)\b|session.{0,30}\brun\b|\brun\b.{0,30}session|terminal\s+(?:create|split)|worktree\s+create|repo\s+add", text, re.I)
+    # Preserve externally supplied locale handoff triggers when present.
+    locale_action = sys.argv[4] and re.search(sys.argv[4], text, re.I)
+    if ctx.search(text) and (action or locale_action) and not exception.search(text):
+        if not any(offers_split(option) for option in options):
+            sys.exit(2)
+' "$ORCA_CTX" "$SPLIT_PATTERN" "$EXCEPTION_PATTERN" "$HG_ORCA_HANDOFF_KO"
 }
 
 if [[ "${1:-}" == "--test" ]]; then

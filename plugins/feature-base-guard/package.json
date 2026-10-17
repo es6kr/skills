@@ -1,0 +1,7 @@
+{
+  "name": "@es6kr/openclaw-feature-base-guard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "openclaw": { "extensions": ["./index.ts"] }
+}

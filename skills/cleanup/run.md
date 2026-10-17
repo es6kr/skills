@@ -2,6 +2,8 @@
 
 Sequentially performs the 5-step cleanup process before session end.
 
+**OpenClaw task tracking**: select [wip/openclaw](../wip/openclaw.md) before Claude-only tool diagnostics; use explicit verified caller sessionId. `agent-task` is the session ledger, `fix_plan.md` the project tracker.
+
 ## Core Philosophy: Not Cleanup, but Learning + State Preservation
 
 cleanup is not a simple cleanup tool — it is a **self-improving loop + session-end state preservation** mechanism.
@@ -13,19 +15,19 @@ cleanup is not a simple cleanup tool — it is a **self-improving loop + session
    - **What was repeated?** → promote to an automation candidate (improve: pattern-detect → `/skill-kit route`)
    - **What was newly learned?** → accumulate as knowledge (persist: memory, documentation)
 2. **Session-end state preservation (for compact/rewind readiness)** — cleanup is invoked at session end. It's not starting new work, it's **preserving the current progress state so the next session can resume**
-   - Next-session work candidates → registered as wip multi-select tasks (Step 5)
+   - Completed work → checklist & external backlog record via `Skill("backlog", "record", mode="completed")` (Step 4-A)
+   - Next-session work candidates → registered as wip multi-select tasks via `Skill("backlog", "record", mode="next-session")` (Step 4-C)
    - Session chunk → RAG store (3-C.1)
    - Distilled facts → dual-write to memory (3-C.2)
    - Active artifacts → RAG store check (3-C.3)
-   - fix_plan update (Step 4)
 
 ### cleanup ≠ next Responsibility Separation (HARD STOP)
 
 | Skill | Essence | Invocation timing |
 |------|------|----------|
 | **next** | Natural follow-up recommendation after completing work (single-select, 1 item, immediate execution) | While work is in progress |
-| **wip** | Task registration/tracking/compact restoration (multi-select N-item registration) | While work is in progress + cleanup Step 5 |
-| **cleanup** | Session-end state preservation (delegates to wip — resume in the next session) | On session-end signal |
+| **wip** | Task registration/tracking/compact restoration (multi-select N-item registration) | While work is in progress + cleanup Step 4-C |
+| **cleanup** | Session-end state preservation (delegates to backlog record — resume in the next session) | On session-end signal |
 
 If cleanup calls next, it becomes "select 1 → execute immediately → session continues" → weakens the session-end signal + loses the remaining work candidates. **cleanup → wip multi-select task registration** is the correct approach.
 
@@ -37,16 +39,15 @@ If cleanup calls next, it becomes "select 1 → execute immediately → session 
 - Example: writing only text like "A deploy pattern is repeating → agentify candidate" and stopping there ❌ → call the `claudify improve` skill to actually detect and propose ✅
 - **Reporting a step as "skipped" in prose without the step's own documented skip condition being met** — e.g. saying "no RAG receiver registered, skipped" when the step's own rule (see "RAG store failure = cleanup failure" below) requires a recovery attempt + FAILED status + retry-task registration, not a silent skip. A step-level "skip" in the completion report is only valid when the exact skip condition text from that step's own section is quoted alongside it.
 
-**Task pre-registration (when Task tools are available)**: before executing Steps 1-5, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report, then fall back to the **`claude-task` CLI** (`todowrite` skill's `claude-task` topic — `claude-task --env agent add/list/update`, persisting to `~/.agents/tasks/default/`) as the step-tracking medium, mirroring the fix skill's Step 0 fallback — before that, actually attempt one direct `TaskCreate` call (a ToolSearch no-match alone cannot distinguish "disconnected" from "disabled in this context"; only the call's error text can, and the "disabled" case should be reported to the user). Only if the CLI is also unusable, fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to degrade the *tracking mechanism* for them. Untracked step state is exactly what produces duplicated or dropped report media later in the pass (see the "Same-pass duplication rule"). **Pre-registration creates tasks that Step 0's prune (below) structurally cannot catch** — Step 0 runs once, at entry, and can only see tasks that were already `completed` *before* this cleanup run started. The tasks created by this pre-registration mechanism only reach `completed` status *during* Steps 1-5, after Step 0 has already run — see Step 5.5 "Self-Task Cleanup" for the closing half of this lifecycle.
+**Task pre-registration (when Task tools are available)**: before executing Steps 1-4, register each as a `TaskCreate` entry (in_progress for the current step, pending for the rest) so a step cannot be silently dropped mid-run — this makes "did I skip a step" mechanically checkable via `TaskList` rather than dependent on the completion-report prose being accurate. If `TaskCreate`/`TaskList` are disconnected this session, state that explicitly in the report, then fall back to the **`agent-task` CLI** (`todowrite` skill's `agent-task` topic — `agent-task --env agent --session <verified-current-sessionId> add/list/update`, persisting to the explicit current-session ledger) as the step-tracking medium, mirroring the fix skill's Step 0 fallback — before that, actually attempt one direct `TaskCreate` call (a ToolSearch no-match alone cannot distinguish "disconnected" from "disabled in this context"; only the call's error text can, and the "disabled" case should be reported to the user). Only if the CLI is also unusable, fall back to the per-step Skip decision principle above (still no self-judged skipping) — tool unavailability is not a license to skip steps, only a license to degrade the *tracking mechanism* for them. Untracked step state is exactly what produces duplicated or dropped report media later in the pass (see the "Same-pass duplication rule"). **Pre-registration creates tasks that Step 0's prune (below) structurally cannot catch** — Step 0 runs once, at entry, and can only see tasks that were already `completed` *before* this cleanup run started. The tasks created by this pre-registration mechanism only reach `completed` status *during* Steps 1-4, after Step 0 has already run — see Step 4.5 "Self-Task Cleanup" for the closing half of this lifecycle.
 
 ## Execution Order
 
 1. **Commit session changes** → check for uncommitted changes and commit
 2. **Self-Improve** → mistake analysis + hook/skill review + pattern detection (planned as `/claudify improve`)
 3. **Knowledge Persist** → documentation recommendation + infra check + memory storage (planned as `/claudify persist`)
-4. **Checklist & Backlog Sync** → update completed tasks and sync external trackers via `Skill("backlog")` and helper scripts (`update_item.py`, `plane_sync.py`)
-4.5. **Weekly Report** → record work (company projects only)
-5. **Register next-session work as wip** → delegate to `Skill("wip")` (multi-select task registration, state preservation for compact/rewind)
+4. **Backlog** → delegate completed work recording and next-session candidate registration to `Skill("backlog", "record")` (completed checklist sync + wip task registration)
+
 
 ### Per-Step Invocation Obligation Self-Check Table (HARD STOP)
 
@@ -64,11 +65,9 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | **3-C.2 structured discovery chunk (mode B — HARD STOP)** | **Automatic execution — no ask** | — | If the session produced **reusable discoveries/decisions/deployments** (bug root-cause, infra gotcha, a config/URL/MTU/version that took effort to find, an architecture decision), store each as a keyword-searchable chunk via the **RAG receiver's structured-store dispatch (mode B)** — separate from 3-C.1. Session import (3-C.1 mode A) has **weak keyword retrieval**: it preserves turns but does NOT make a finding queryable (e.g. "DinD MTU hang", "dev-36 k3s runner"). Skip ONLY when the session had zero reusable discovery (pure Q&A / trivial edits) — and say so explicitly in the report row |
 | **3-C.3 check for missed active-artifact RAG store** | **Automatic execution — no ask** | — | Glob → identify this-session mtime artifacts → RAG receiver scroll → immediately store missing files. Matches plan/research/analysis/report/postmortem-*.md patterns |
 | **3-C.4 workspace fix_plan-history sync (mode C)** | **Automatic execution — no ask** | — | If this session added `## Completed` entries to `fix_plan.md` AND the current workspace exposes a fix_plan→RAG sync script (per `rag-store.md` "fix_plan.md Completed Item RAG Sync + Delete Obligation"), run it. Session import (3-C.1) and structured chunks (3-C.2) are conversation-shaped; this sync is deliverable-shaped (task/decision history) — neither of the other two modes substitutes for it |
-| **Step 4 (Checklist & Backlog)** | **`Skill("backlog")` or script helper (`update_item.py` / `plane_sync.py`) mandatory** — update completed items and sync external trackers without direct text editing | Decide target tracker (fix_plan / checklist / Plane) if ambiguous | When this session completed tasks or produced backlog items |
-| Step 4.5 (Weekly Report) | Check company project scope and record weekly report | Weekly Report content/skip approval | Company project work |
-| Step 5 | **`Skill("wip")` call mandatory** (multi-select task registration) | Internal multi-select ask inside wip (N next-session work candidates) — with `--auto`, proceed with the documented safe default instead of asking; the `Skill("wip")` call itself still happens (see "Auto Mode vs. Ralph Mode") | **Always** — state preservation for next-session resume at cleanup end |
-| **Step 5 report (HARD STOP — re-read before writing)** | **Before composing the completion report, scroll back to "Step 5 Completion Report Table Mandatory Rows" and copy its row list literally.** That section sits *above* the Step 1-5 procedure bodies, so executing the steps in order never passes through it again — the report then gets assembled from memory, which is exactly how mandatory rows (Session identity, the 3-A LLM Wiki scope-check row, the separate 3-C.1 / 3-C.2 / 3-C.4 rows) are silently dropped | — | **Always** — applies to the cleanup wrap-up table AND any separate session-end report |
-| Step 5.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4.5+5 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
+| **Step 4 (Backlog)** | **`Skill("backlog", "record")` call mandatory (2 invocations: 4-A mode="completed" + 4-C mode="next-session")** — update completed items and register next-session work candidates | Internal multi-select ask inside wip (N next-session work candidates) — with `--auto`, proceed with the documented safe default instead of asking (see "Auto Mode vs. Ralph Mode") | **Always** — completed checklist sync when tasks completed + next-session candidate registration |
+| **Step 4 report (HARD STOP — re-read before writing)** | **Before composing the completion report, scroll back to "Step 4 Completion Report Table Mandatory Rows" and copy its row list literally.** That section sits *above* the Step 1-4 procedure bodies, so executing the steps in order never passes through it again — the report then gets assembled from memory, which is exactly how mandatory rows (Session identity, the 3-A LLM Wiki scope-check row, the separate 3-C.1 / 3-C.2 / 3-C.4 rows) are silently dropped | — | **Always** — applies to the cleanup wrap-up table AND any separate session-end report |
+| Step 4.5 | `TaskUpdate(status: "deleted")` for every completed task created this run | — | **Always** — this run's pre-registered Step 0-4 tracking tasks (plus any other task created and completed during this run) reach `completed` only after Step 0 already ran, so nothing else prunes them |
 
 **Don't / Do**:
 
@@ -79,8 +78,8 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 | 3 | Defer Step 3 Knowledge Persist to an ask | Call claudify persist. Storage location is decided inside the skill |
 | 4 | Self-compress procedure with "consolidating cleanup because of the preceding fix accumulation" | Per-step invocation obligations cannot be compressed. Compressing the procedure = rule violation |
 | 5 | End a step by treating "candidate text listing = execution" | Already stated above: "listing candidates is not execution" — an actual Skill call is mandatory |
-| 6 | Miss recognizing mandatory steps (3-C.1 auto-import + RAG report row) because run.md's body is long and only the preview was viewed | The table above + the Step 5 completion-report template's mandatory rows are within the preview range — obligations can be satisfied without reading the entire body. If in doubt, confirm the mandatory steps with `grep "3-C.1\|RAG Store" run.md` |
-| 7 | **Demote a defect discovered by Step 2 self-improve (especially one that caused a failure/error this session) into a Step 5 next-action option** (e.g., placing a merge-gating defect as option 1 competing with "End session") | **Important improve results must be confirmed and executed immediately in Phase 3, right after being surfaced.** Step 5 next is a separate step **after** improve handling is done — do not demote improve results into the next menu. Session-failure-causing defects require feedback-memory recording + **actual fix execution** to complete Step 2 |
+| 6 | Miss recognizing mandatory steps (3-C.1 auto-import + RAG report row) because run.md's body is long and only the preview was viewed | The table above + the Step 4 completion-report template's mandatory rows are within the preview range — obligations can be satisfied without reading the entire body. If in doubt, confirm the mandatory steps with `grep "3-C.1\|RAG Store" run.md` |
+| 7 | **Demote a defect discovered by Step 2 self-improve (especially one that caused a failure/error this session) into a Step 4-C next-action option** (e.g., placing a merge-gating defect as option 1 competing with "End session") | **Important improve results must be confirmed and executed immediately in Phase 3, right after being surfaced.** Step 4-C next is a separate step **after** improve handling is done — do not demote improve results into the next menu. Session-failure-causing defects require feedback-memory recording + **actual fix execution** to complete Step 2 |
 
 **Self-check (immediately before entering cleanup + immediately before each step)**:
 1. Check the "invocation obligation" column for the current step
@@ -89,27 +88,27 @@ Each step clearly distinguishes between **automatic skill calls** and **user-dec
 4. Ask applies only to items in the "user decision" column
 5. Attempting to end a step with a text-only report should trigger a forced self-check re-verification
 6. **Self-check immediately before writing the wrap-up report table**: does the report table explicitly include a "RAG store (N chunks added — receiver)" row as required? If missing, add it immediately. This row ensures user visibility — preventing "missed without even knowing" omission
-7. **Self-check immediately before writing Step 5 next options (HARD STOP)**: among the option candidates, is there **an unexecuted defect found by Step 2 self-improve** (especially one that caused a failure/error this session)? — if so, that is **not** a next option but something to execute immediately in Phase 3. Do not demote it into the next menu (competing with "End session"). Only enter Step 5 after the improve result has been executed
+7. **Self-check immediately before writing Step 4-C next options (HARD STOP)**: among the option candidates, is there **an unexecuted defect found by Step 2 self-improve** (especially one that caused a failure/error this session)? — if so, that is **not** a next option but something to execute immediately in Phase 3. Do not demote it into the next menu (competing with "End session"). Only enter Step 4-C after the improve result has been executed
 8. **Verify claudify call trace (HARD STOP — immediately before entering Step 2/3 every time)**: if there's no `Skill("claudify", "improve")` call trace in this response turn's tool-call history right before entering Step 2, call it immediately. If there's no `Skill("claudify", "persist")` call trace right before entering Step 3, call it immediately. **Filling in an inline retrospect report + a comprehensive-matrix table's "claudify improve results" row ≠ a Skill call.** A Skill call = quoting the tool response result. Filling the table with self-written text = a violation of Don't #1. On repeated occurrences, this is a candidate for hook escalation (`block-cleanup-without-claudify.sh` — blocks when the cleanup-completion response's transcript has no `Skill("claudify",` trace)
 9. **Verify the Step 2-B mandatory output format was actually produced (HARD STOP — a Skill call alone does not satisfy this)**: a `Skill("claudify", "improve")` trace existing in the transcript proves the call happened, but NOT that its internal B sub-step (Hook Review + Skill Check, see `improve.md`) produced its documented output. Check the response text for the literal `**Hook summary**: N registered / M OK / ...` line and a named enumeration of skills invoked this session. If either is missing — replaced by an unenumerated conclusion like "0 ignored" or "all skills worked correctly" with no per-hook/per-skill breakdown — the B sub-step was skipped even though the Skill call happened. Re-run it and produce the format before reporting Step 2 as done. A "nothing changed since the last cleanup pass" judgment does not exempt this check — re-confirm the counts explicitly, even if they repeat the prior pass's numbers.
 
-### Step 5 Completion Report Table Mandatory Rows (HARD STOP — applies to both cleanup wrap-up and session-end reporting)
+### Step 4 Completion Report Table Mandatory Rows (HARD STOP — applies to both cleanup wrap-up and session-end reporting)
 
-The cleanup wrap-up completion-report table **and** the resulting **session-end final report** written after wip task registration (e.g., "## ✅ Session Ended", "End session report", carryover summary) must **always** include the following rows. Applying the rule only to the cleanup wrap-up table but burying it in a 1-line prose entry within a separate session-end report is a visibility gap — the same rule violation.
+The cleanup wrap-up completion-report table **and** the resulting **session-end final report** written after backlog next-session task registration (e.g., "## ✅ Session Ended", "End session report", carryover summary) must **always** include the following rows. Applying the rule only to the cleanup wrap-up table but burying it in a 1-line prose entry within a separate session-end report is a visibility gap — the same rule violation.
 
-**Same-pass duplication rule (HARD STOP — mandatory rows repeat, the full matrix does not)**: "must always include the mandatory rows" does NOT mean "re-emit the entire step-by-step table again". When the Step 4.5 comprehensive matrix (or an equivalent full wrap-up table) has already been emitted earlier in the **same** cleanup pass, the subsequent session-end report is composed of exactly three parts:
+**Same-pass duplication rule (HARD STOP — mandatory rows repeat, the full matrix does not)**: "must always include the mandatory rows" does NOT mean "re-emit the entire step-by-step table again". When the Step 4-B comprehensive matrix (or an equivalent full wrap-up table) has already been emitted earlier in the **same** cleanup pass, the subsequent session-end report is composed of exactly three parts:
 
 1. **Always-repeat rows (repeat verbatim — these are visibility anchors, never dedup them away)**: the Session identity row (full UUID + the `/rename` recommendations) and the RAG store rows **with their concrete chunk counts** (3-C.1 session-import N, 3-C.2 discovery-chunk N with keys). These repeat by design so the final visible message carries them even if the earlier table scrolled away.
-2. **Delta rows**: only the steps that completed *after* the earlier table was emitted (typically Step 5 wip-registration result and Step 5.5 self-task prune).
-3. **A one-line reference** to the earlier table for every other row ("full step matrix: see the Step 4.5 report above") — do not re-emit those rows.
+2. **Delta rows**: only the steps that completed *after* the earlier table was emitted (typically Step 4-C wip-registration result and Step 4.5 self-task prune).
+3. **A one-line reference** to the earlier table for every other row ("full step matrix: see the Step 4-B report above") — do not re-emit those rows.
 
 Emitting two near-identical full tables minutes apart buries the delta the user actually needs (what changed since the first table) and doubles the scroll cost. The failure this rule targets is symmetric to the omission failures above: the mandatory-row obligations were all written against *omission*, and over-compliance ("repeat everything to be safe") is the opposite defect.
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Re-emit the full Step 0-5 table as the session-end report because "mandatory rows apply to both" | Mandatory rows ≠ the whole table. Session-end report = always-repeat rows (Session identity + RAG counts) + post-table delta + one-line reference |
+| 1 | Re-emit the full Step 0-4.5 table as the session-end report because "mandatory rows apply to both" | Mandatory rows ≠ the whole table. Session-end report = always-repeat rows (Session identity + RAG counts) + post-table delta + one-line reference |
 | 2 | Dedup so aggressively that the session-end report drops the rename recommendation or the RAG chunk counts | Those rows are the always-repeat set — they must appear again verbatim, counts included |
-| 3 | Emit the Step 4.5 matrix, run Step 5 wip, then rebuild the "final report" from scratch as if no table existed yet | Track that the matrix was already emitted this pass (task entry or explicit note) and compose only the delta + always-repeat rows |
+| 3 | Emit the Step 4-B matrix, run Step 4-C wip, then rebuild the "final report" from scratch as if no table existed yet | Track that the matrix was already emitted this pass (task entry or explicit note) and compose only the delta + always-repeat rows |
 
 | Step | Result |
 |------|------|
@@ -124,19 +123,17 @@ Emitting two near-identical full tables minutes apart buries the delta the user 
 | **3-C.1 RAG Store (mandatory row)** | **State which medium actually fired ([rag-store.md](./rag-store.md) Medium Matrix (1)-(4)) — the wording differs by medium, do not reuse one fixed template for all: purpose-built importer (medium 2) → "N JSONL log step entries / turns recorded (session import, receiver: `<importer>`) — session UUID `<uuid>`. M artifacts imported."; generic MCP store used as 3-C.1 substitute (medium 1, no purpose-built importer found) → "1 ad-hoc summary chunk added (receiver: MCP store) — session UUID `<uuid>`. NOT a full session import (no purpose-built importer found)."; medium (4) local pending queue → "❌ FAILED — queued to local pending-import queue (`<queue-file>`), retry task registered."** |
 | **3-C.2 Structured discovery chunk (mode B — mandatory row)** | **M discovery chunks added (receiver structured-store dispatch, mode B) — keys: `<key1>`, … OR "none — no reusable discovery this session". Session import (mode A) alone ≠ knowledge persisted; discoveries need mode B to be searchable.** |
 | **3-C.4 fix_plan-history sync (mode C — mandatory row when `fix_plan.md` gained Completed entries this session)** | **P points synced (workspace `<name>` sync script) OR "none — no new Completed entries this session" OR "no sync script for this workspace".** |
-| **4. Checklist & Backlog (mandatory row)** | **`Skill("backlog")` or script helper (`update_item.py` / `plane_sync.py`) result — updated items & external sync status** |
-| 4.5. Weekly Report | (skip / write result) |
-| 5. **wip task registration (mandatory row)** | **`Skill("wip")` call result — N tasks registered (next-session resume possible). Enumerate candidates** |
+| **4. Backlog (mandatory row)** | **`Skill("backlog", "record")` result — completed work recorded (`mode="completed"`) + N next-session candidates registered via wip (`mode="next-session"`). Enumerate candidates** |
 
 **The "3-C.1 RAG Store" row is the top visibility priority — bold/highlighting recommended.** Omission triggers "the user doesn't even know it's missing" → triggers this fix (recurrence accumulation).
 
-**If the RAG row is FAILED, the entire cleanup = FAILED** — change the table header to "⚠️ cleanup FAILED (RAG store failed)". Do not declare "✅ Complete" (see the "RAG store failure = cleanup failure" HARD STOP in 3-C.1).
+If the RAG row is FAILED, the entire cleanup = FAILED — change the table header to "⚠️ cleanup FAILED (RAG store failed)". Do not declare "✅ Complete" (see the "RAG store failure = cleanup failure" HARD STOP in 3-C.1).
 
 **Don't / Do**:
 
 | # | Don't | Do |
 |---|-------|-----|
-| 1 | Include only a "3. Knowledge Persist" row in the Step 5 report table without stating the RAG store result | A separate "3-C.1 RAG Store" row is mandatory — chunks N + receiver + session UUID + artifact import result |
+| 1 | Include only a "3. Knowledge Persist" row in the Step 4 report table without stating the RAG store result | A separate "3-C.1 RAG Store" row is mandatory — chunks N + receiver + session UUID + artifact import result |
 | 2 | Bury the RAG store result in prose inside the claudify persist result | Elevate it to a separate row — user-visible at a glance |
 | 3 | RAG receiver readyz responds OK but the import call is skipped while the report table still shows a "RAG Store" row | The call itself is mandatory — the report row displays the result, it is not a bypass channel |
 | 4 | The cleanup wrap-up table explicitly states the RAG row, but the subsequent separate session-end report (e.g., "## ✅ Session Ended") buries the RAG result in a 1-line prose list | The session-end report carries the same obligation — highlight visibility with a separate markdown table row / bold line / dedicated header section |
@@ -259,7 +256,7 @@ Clean up `completed`-status tasks from TaskList and reflect their completion in 
 | 2 | Skip the update by saying "no corresponding item in fix_plan" | Determine this by grepping the task subject keywords |
 | 3 | Check `[x]` on a Plane-indexed fix_plan.md line before the Plane issue itself is completed | Run the "Plane-indexed item completion order" gate below **before** flipping the marker |
 
-### Plane-indexed item completion order (HARD STOP — applies to Step 0 item 2 and Step 4 Step B "matches existing item" below)
+### Plane-indexed item completion order (HARD STOP — applies to Step 0 item 2 and backlog/record.md Step B "matches existing item")
 
 When a workspace has adopted Plane as its canonical backlog (its local `fix_plan.md`/`checklist.md` demoted to an **index** — signalled by a `workspace_profile.py --json` non-empty `plane_host`, or a pinned note in the tracker itself stating Plane is the source of truth), a matched line carrying a `→ Plane (<issue URL>)` suffix must **not** be marked `[x]` locally until the indexed Plane issue itself reflects completion. The local marker is a pointer, not the record — completing the pointer while the record it points at is still open leaves the canonical backlog wrong.
 
@@ -274,7 +271,7 @@ When a workspace has adopted Plane as its canonical backlog (its local `fix_plan
 | 2 | Invent a PATCH-to-Plane call inline because none exists yet | No push script exists — surface the Plane URL to the user instead of fabricating a write path |
 | 3 | Treat "no push script" as license to skip the check entirely and just mark local `[x]` | Absence of automation is not absence of the obligation — ask/report, don't silently complete the index |
 
-**Self-check (before flipping any fix_plan.md marker to `[x]` — Step 0 or Step 4)**:
+**Self-check (before flipping any fix_plan.md marker to `[x]` — Step 0 or Step 4-A)**:
 1. Does the matched line carry a `→ Plane (<url>)` suffix? → If no, proceed as normal.
 2. If yes, does Plane's own state already show completion (via sync or direct check)? → If yes, flip the local marker. If no/unknown, hold the marker and surface the Plane URL instead.
 
@@ -339,17 +336,16 @@ Full procedure: **[run-self-improve.md](./run-self-improve.md)**. Read it before
 
 Full procedure: **[run-knowledge-persist.md](./run-knowledge-persist.md)**. Read it before executing Step 3 — the RAG store modes (3-C.1 session import / 3-C.2 structured discovery / 3-C.3 artifact import / 3-C.4 fix_plan-history sync), the walkthrough obligations and the memory dual-sync rules live there.
 
-## Step 4 / 4.5: Checklist & Backlog Sync, Comprehensive Result Report
+## Step 4: Backlog (Checklist Record, Comprehensive Result Report, Next-Session Handoff)
 
-Full procedure: **[run-checklist-sync.md](./run-checklist-sync.md)**. Read it before executing Step 4 — the backlog sync procedure and the Step 4.5 mandatory report matrix (including the same-pass duplication rule) live there.
+Full procedure: **[run-checklist-sync.md](./run-checklist-sync.md)**. Read it before executing Step 4 — delegates to `Skill("backlog", "record")` (`mode="completed"` in 4-A and `mode="next-session"` in 4-C) and specifies the 4-B comprehensive result report matrix.
 
-## Step 5 / 5.5: wip Handoff and Self-Task Cleanup
+## Step 4.5: Self-Task Cleanup
 
-Full procedure: **[run-wip-handoff.md](./run-wip-handoff.md)**. Read it before executing Step 5 — the wip delegation contract and the Step 5.5 status-based prune HARD STOP live there.
+Full procedure: **[run-wip-handoff.md](./run-wip-handoff.md)**. Read it before executing Step 4.5 — the status-based self-task prune HARD STOP lives there.
 
 ## Notes
 
 - If a step has no findings, skip that step (do not output an empty result)
-- Weekly Report targets only actual code changes/work
 - Documentation recommendations exclude already-documented information
 - Sensitive information (API keys, passwords, etc.) is excluded from documentation/memory targets

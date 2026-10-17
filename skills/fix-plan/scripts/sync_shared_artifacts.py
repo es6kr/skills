@@ -23,7 +23,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-DEFAULT_COLLABMD_BASE = "https://collabmd.dgs.ai.kr/#file=daegunsoftdev-agents-docs/"
+DEFAULT_COLLABMD_BASE = os.environ.get("COLLABMD_BASE_URL", "https://collabmd.example.com/#file=shared-docs/")
 DEFAULT_SHARED_DIR = ".agents/docs/shared"
 
 

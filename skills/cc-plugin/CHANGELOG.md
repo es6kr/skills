@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/cc-plugin-v0.8.0...cc-plugin-v0.8.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **cc-plugin:** clarify temp_git_* lives at cache root, not nested in &lt;marketplace&gt; ([680aecd](https://github.com/es6kr/skills/commit/680aecdd06e5f753eb549aee5a2a4e147fe3d86a))
+* **cc-plugin:** document WSL temp_git_* update-swap failures, fix stale platform note ([668406e](https://github.com/es6kr/skills/commit/668406e7501eaf1534d573fcf89805e167b3bf7a))
+
+
+### Documentation
+
+* **cc-plugin:** document WSL temp_git_* update-swap failures, fix stale platform note ([9e7493d](https://github.com/es6kr/skills/commit/9e7493d13e69f46eadcdb1b90194e8c5cebd1315))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/cc-plugin-v0.7.2...cc-plugin-v0.8.0) (2026-09-24)
 
 

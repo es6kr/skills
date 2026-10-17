@@ -1,0 +1,8 @@
+# Korean scope tokens for block-orca-split-without-ask.sh's split_scope_token.
+# One ERE alternative per line (blank lines and # comments skipped). Kept out
+# of the .sh file itself because this repo's hangul pre-commit/CI gate scans
+# every staged .md/.sh for literal Hangul; a .regex data file is out of its
+# scope (see .githooks/pre-commit "diff-filter" comment).
+분할
+저장소
+터미널

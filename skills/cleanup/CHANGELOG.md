@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/es6kr/skills/compare/cleanup-v0.8.0...cleanup-v0.9.0) (2026-10-04)
+
+
+### Features
+
+* **cleanup:** split run.md step bodies into four topic files ([#580](https://github.com/es6kr/skills/issues/580)) ([283efa9](https://github.com/es6kr/skills/commit/283efa9132514004afc040543039b40bd102ab6e))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/cleanup-v0.7.1...cleanup-v0.8.0) (2026-09-30)
 
 

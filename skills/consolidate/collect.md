@@ -53,6 +53,7 @@ Before accepting any suggestion:
 4. Check: Works on all platforms/environments?
 5. Check: Conflicts with user's prior architectural decisions?
 
+<!-- enforce: requires-skill-call="superpowers:receiving-code-review" trigger="Step 4 (classify)" scope="same-turn" -->
 ## Step 3.6: Invoke superpowers:receiving-code-review
 
 **MANDATORY**: Before analyzing, invoke the review-receiving skill to load the verification framework:

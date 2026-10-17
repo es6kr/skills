@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/es6kr/skills/compare/todowrite-v0.9.4...todowrite-v0.10.0) (2026-10-06)
+
+
+### Features
+
+* **hook-kit:** declarative step-dependency enforcement engine ([9e3d188](https://github.com/es6kr/skills/commit/9e3d18898453d20a947b74b24032e61bf13bc297))
+
+
+### Bug Fixes
+
+* **todowrite:** warn on claude-task resolve_task_dir() mtime fallback ([#599](https://github.com/es6kr/skills/issues/599)) ([948127c](https://github.com/es6kr/skills/commit/948127c3f94883f1122bceae39618d69e8cd8a11))
+
 ## [0.9.4](https://github.com/es6kr/skills/compare/todowrite-v0.9.3...todowrite-v0.9.4) (2026-09-30)
 
 

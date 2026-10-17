@@ -21,6 +21,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-pm-turn-budget.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-rebase-conflict-residue.sh"
           }
         ]
       },
@@ -178,6 +182,10 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-send-without-target-ask.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/orca/resources/block-orca-split-without-ask.sh"
           },
           {
             "type": "command",
@@ -457,6 +465,14 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/cleanup/resources/block-rename-schema-when-wrapup-adjacent.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fa/resources/force-fa-on-correction-signal.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-enforce-markers.py"
           }
         ]
       }
@@ -466,11 +482,23 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fa/resources/force-fa-on-correction-signal.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-slash-command-skill-invoked.sh"
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/fix/resources/fix-and-ambiguity-guard.sh"
           },
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/idle-wait-reactive-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-enforce-markers-next-turn.py"
           }
         ]
       }

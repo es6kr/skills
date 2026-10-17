@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# PreToolUse:Bash + PreToolUse:mcp__playwright__browser_{navigate,click,type,
+# PreToolUse:Bash + PreToolUse:mcp__playwright__browser_{click,type,
 # fill_form,press_key,select_option,drag,drop,file_upload,handle_dialog} —
 # block a state-mutating live action taken against a tracked workspace item
 # (fix_plan.md / checklist.md / task.md) when the session has no evidence of
 # having invoked Skill("task:flow") first.
+#
+# browser_navigate exception: a plain navigate is a GET to a URL and does not
+# by itself mutate anything — the same reasoning that excludes curl GET from
+# the Bash branch below. The actual interaction tools (click/type/fill_form/
+# ...) are what can submit forms or trigger mutations. Flagging navigate
+# blocked read-only page-state diagnosis (opening a URL to see what it
+# currently shows) with no mutating action involved.
 #
 # Background: (see failed-attempts.md "risky-complex-task-live-commands-
 # without-code-workflow-plan") — a Prevention rule asking the agent to
@@ -108,9 +115,6 @@ if [ "${1:-}" = "--test" ]; then
   T2=$(make_transcript tracker-checklist)
   test_case_bash "terraform apply + checklist read + no skill call" 2 \
     "terraform apply -auto-approve" "$T2"
-  T3=$(make_transcript tracker)
-  test_case_tool "browser_navigate + tracker read + no skill call" 2 \
-    "mcp__playwright__browser_navigate" "$T3"
   T4=$(make_transcript tracker)
   test_case_bash "wmux browser click + tracker read + no skill call" 2 \
     'node "$WMUX_CLI" browser click @e3' "$T4"
@@ -126,6 +130,9 @@ if [ "${1:-}" = "--test" ]; then
   T_TASK=$(make_transcript tracker-task)
   test_case_bash "kubectl apply + task.md read + no skill call" 2 \
     "kubectl apply -f authentik.yaml" "$T_TASK"
+  T_QDRANT_UPSERT=$(make_transcript tracker)
+  test_case_bash "curl POST /points/upsert (real mutation, not search/scroll) + tracker read + no skill call" 2 \
+    'curl -X POST http://example.invalid/collections/x/points/upsert -d "{}"' "$T_QDRANT_UPSERT"
 
   echo ""
   echo "=== Negative fixtures (should allow, exit 0) ==="
@@ -165,8 +172,14 @@ if [ "${1:-}" = "--test" ]; then
     "mcp__playwright__browser_navigate" "$T7"
   test_case_tool "browser_snapshot (read-only browser tool, not matched by design)" 0 \
     "mcp__playwright__browser_snapshot" "$(make_transcript tracker)"
+  test_case_tool "browser_navigate (read-only GET, not matched by design) + tracker read + no skill call" 0 \
+    "mcp__playwright__browser_navigate" "$(make_transcript tracker)"
   test_case_bash "curl GET, no method flag, not mutating" 0 \
     "curl -s https://example.com/health"
+  test_case_bash "curl POST /points/search (Qdrant read-only query) + tracker read + no skill call" 0 \
+    'curl -s -X POST http://example.invalid/collections/x/points/search -d "{}"' "$(make_transcript tracker)"
+  test_case_bash "curl POST /points/scroll (Qdrant read-only query) + tracker read + no skill call" 0 \
+    'curl -s -X POST http://example.invalid/collections/x/points/scroll -d "{}"' "$(make_transcript tracker)"
 
   echo ""
   echo "PASS=$PASS FAIL=$FAIL"
@@ -187,7 +200,35 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     'kubectl[[:space:]]+(apply|create|delete|patch|replace|exec)|terraform[[:space:]]+apply|docker[[:space:]]+(exec|rm|stop|kill|run)|git[[:space:]]+push|gh[[:space:]]+(pr[[:space:]]+merge|issue[[:space:]]+close|release)|curl[^|]*(-X[[:space:]]*|--request[[:space:]=]+)['"'"'"]?(POST|PUT|PATCH|DELETE)|curl[^|]*(--data|-d([[:space:]=]|['"'"'"]))|ak[[:space:]]+shell|vault[[:space:]]+kv[[:space:]]+put|kubectl[[:space:]]+create[[:space:]]+secret|wmux[[:space:]]+browser[[:space:]]+(open|click|type|fill)|browser[[:space:]]+(click|type|fill)'; then
     RISKY=1
   fi
-elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(navigate|click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then
+  # Exempt only a single query invocation. A query substring in a compound
+  # payload must never clear a mutation elsewhere in that same payload.
+  READ_ONLY_QUERY=$(printf '%s' "$COMMAND" | python3 -c '
+import os, re, shlex, sys
+from urllib.parse import urlparse
+command = sys.stdin.read()
+try:
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()<>")
+    lexer.whitespace_split = True
+    tokens = list(lexer)
+    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+        tokens.pop(0)
+    urls = [t for t in tokens if t.startswith(("http://", "https://"))]
+    unsafe = ("\n" in command or "$(" in command or "`" in command
+              or any(t and all(c in ";&|()<>" for c in t) for t in tokens)
+              or any(t in ("--next", "--config", "-K", "--upload-file", "-T", "--form", "-F") for t in tokens))
+    methods = [tokens[i + 1].upper() for i, t in enumerate(tokens[:-1]) if t in ("-X", "--request")]
+    methods += [t.split("=", 1)[1].upper() for t in tokens if t.startswith("--request=")]
+    methods += [t[2:].upper() for t in tokens if t.startswith("-X") and t != "-X"]
+    print("1" if tokens and os.path.basename(tokens[0]) == "curl" and not unsafe
+          and len(urls) == 1 and re.search(r"/points/(search|scroll)$", urlparse(urls[0]).path)
+          and all(m in ("GET", "POST") for m in methods) else "0")
+except (ValueError, IndexError):
+    print("0")
+' 2>/dev/null)
+  if [ "$RISKY" = "1" ] && [ "$READ_ONLY_QUERY" = "1" ]; then
+    RISKY=0
+  fi
+elif printf '%s' "$TOOL_NAME" | grep -qE '^mcp__playwright__browser_(click|type|fill_form|press_key|select_option|drag|drop|file_upload|handle_dialog)$'; then
   RISKY=1
 fi
 [ "$RISKY" = "1" ] || exit 0
