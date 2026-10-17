@@ -18,7 +18,7 @@ Route TODO checklists to the appropriate storage based on context, and enforce c
 
 ```
 New TODO arrives
-  ├─ Only needed this session → /wip (TaskCreate/TodoWrite)
+  ├─ Only needed this session → /wip (native tasks or agent-task session ledger)
   ├─ Persists beyond session → file (fix_plan.md, TODO.md)
   └─ Team-shared → issue (GitHub Issues)
 ```
@@ -35,7 +35,7 @@ New TODO arrives
 | fix-plan-sync | — | Always-on | [fix-plan-sync.md](./fix-plan-sync.md) — two-way sync between task medium and checklist medium |
 | priority-prefix | — | Always-on | [priority-prefix.md](./priority-prefix.md) — priority/order via subject prefix (`P{n}`, PR-anchored, `fix-*` > P0) |
 | media-separation | — | On-demand | [media-separation.md](./media-separation.md) — 3-layer model: tracking files vs RAG vs LLM Wiki |
-| claude-task | Task JSON CLI | Permanent / Standalone | [claude-task.md](./claude-task.md) — standalone Python CLI tool (`claude-task.py`) for managing Task JSON files directly from terminal shell |
+| agent-task | Task JSON CLI | Session ledger / Standalone | [agent-task.md](./agent-task.md) — neutral CLI; `claude-task` remains a compatibility alias |
 
 ## Skip exceptions
 

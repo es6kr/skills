@@ -241,6 +241,12 @@ def user_text(d):
     # System-injected envelopes start with a tag or a bracketed marker.
     if not txt or txt[0] in "<[":
         return None
+    # Harness-injected user-role text that starts with plain prose: an injected
+    # skill body (slash command or re-invocation) and Stop-hook feedback. These
+    # are quoted instructions, not something the user typed, and their wording
+    # (do not / wrong / missing) reads as a correction when classified.
+    if txt.startswith(("Base directory for this skill:", "(Re-invocation of /", "Stop hook feedback:")):
+        return None
     return txt
 
 idx, text = -1, ""

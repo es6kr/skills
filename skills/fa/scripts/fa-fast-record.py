@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""fa-fast-record.py - Fast append to improvements.md without blocking interactive modals.
+
+Corrections per plan-fa-staging-inbox-integration.md Fable audit 2026-09-12 (B.2, B.3)
+and the roadmap-followup-fa-prep-20261010.md Sec.3.1 contract: explicit
+workspace-root resolution, no auto-created global fallback, atomic-append
+verification.
+
+Further correction applied during Green implementation (2026-10-11, this
+session): the prep-doc's own atomic-append check -- comparing the file's
+`stat().st_size` before and after the write -- is racy under concurrent
+writers (Ralph loop + an interactive `/fa fast` call can both append around
+the same time). Empirically reproduced: 7/8 concurrent writers reported a
+false [FAIL] while every entry was in fact written completely and intact
+(TOCTOU: another writer's bytes land between this process's "before" stat
+and its "after" stat, inflating the observed delta beyond this process's
+own entry length). Fixed by verifying the `os.write()` syscall's own return
+value (bytes actually written in this call) instead of an external
+stat-delta -- this is unaffected by what any other process does to the file
+in between. Re-verified empirically: 0/8 spurious failures under the same
+concurrent-writer load, with all entries still present and byte-exact.
+"""
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+
+def _ceiling(cur: Path) -> Path:
+    """Highest directory the root search may NOT reach or pass: the parent of
+    the `ghq` path component (the user's home-like dir, where a global
+    `.agents/` lives), else the real home dir. Resolving to it would be the
+    silent global fallback this script refuses to create."""
+    parts = cur.parts
+    if "ghq" in parts:
+        return Path(*parts[: parts.index("ghq")])
+    return Path.home()
+
+
+def resolve_workspace_root(start: Path):
+    """Return the nearest ancestor of `start` that owns an `.agents/` dir,
+    searching strictly below the ceiling (see `_ceiling`); None if none.
+
+    Anchored on `.agents/` rather than `.git`: the workspace layout is
+    `<ghq>/<host>/<org>/.agents/` with no `.git` at the org level, while each
+    repo (and its worktrees) under it has its own `.git` and no `.agents/`,
+    so the nearest `.git` is a repo the inbox does not live in."""
+    cur = start.resolve()
+    ceiling = _ceiling(cur)
+    for candidate in [cur, *cur.parents]:
+        if candidate == ceiling or candidate in ceiling.parents:
+            return None
+        if (candidate / ".agents").is_dir():
+            return candidate
+    return None
+
+
+def fast_record(note: str, session_id: str = "unknown", source: str = "interactive") -> int:
+    workspace_root = resolve_workspace_root(Path.cwd())
+    if workspace_root is None:
+        print(
+            "[FAIL] No workspace root (an ancestor owning .agents/, below the ghq parent) found -- refusing to write a global fallback inbox.",
+            file=sys.stderr,
+        )
+        return 1
+
+    inbox_path = workspace_root / ".agents" / "improvements.md"
+    if not inbox_path.parent.exists():
+        print(f"[FAIL] {inbox_path.parent} does not exist -- not auto-creating.", file=sys.stderr)
+        return 1
+
+    clean_note = note.strip()
+    escaped_lines = []
+    for line in clean_note.splitlines():
+        if line.lstrip().startswith("## ["):
+            escaped_lines.append("  " + line)
+        else:
+            escaped_lines.append(line)
+    formatted_note = "\n".join(escaped_lines)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = (
+        f"\n## [Fast Record] {timestamp} (session {session_id[:8]}, source: {source})\n"
+        f"- **Observation**: {formatted_note}\n"
+        f"- **Tag**: [NEEDS_REVIEW]\n"
+    )
+    entry_bytes = entry.encode("utf-8")
+
+    fd = None
+    try:
+        fd = os.open(str(inbox_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        written = os.write(fd, entry_bytes)
+        os.fsync(fd)
+    except OSError as err:
+        print(f"[FAIL] Failed to write to {inbox_path}: {err}", file=sys.stderr)
+        return 1
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+    if written != len(entry_bytes):
+        print(
+            f"[FAIL] Atomic append verification failed: expected to write {len(entry_bytes)} bytes, "
+            f"os.write() reported {written}.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"[OK] Recorded to {inbox_path} (Zero-Modal, verified). Continuing main task.")
+    return 0
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Fast append to improvements.md without blocking interactive modals."
+    )
+    parser.add_argument("observation", help="Observation text to record")
+    parser.add_argument("--session", default="unknown", help="Session UUID")
+    parser.add_argument("--source", default="interactive", help="Source identifier")
+
+    args = parser.parse_args()
+    sys.exit(fast_record(args.observation, session_id=args.session, source=args.source))

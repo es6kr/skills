@@ -243,6 +243,12 @@ Why: these files are **runtime instructions consumed by AI agents**. Adding / ed
 3. If a match → re-verify the diff: is it actually new behavior / HARD STOP / Don't-Do / self-check addition?
 4. Behavior change → pick a verb from the "behavior-change verbs" row. If the type prefix was `docs:`, change it to `feat:`
 
+**"Drafting" means every medium the message text first appears in, not only an executed `git commit` call (HARD STOP — recurrence source, 7th occurrence of this class)**: an `AskUserQuestion` option's `preview` field, a chat-visible proposed command, or a PR-body draft are all "drafting a commit message" under this self-check — run steps 1-4 above the moment that text is written, before it is ever shown to the user for approval. A guard hook that intercepts the real `git commit` Bash call (e.g. `check-commit-tag-for-prompt-md.js`) is a backstop for the execution point only; it structurally cannot see text that exists solely inside a tool-call payload like an ask preview, so self-check discipline at the drafting point is the only defense there.
+
+| # | Don't | Do |
+|---|-------|-----|
+| 5 | Treat "I haven't run `git commit` yet" as license to skip the self-check while writing the message text into an `AskUserQuestion` preview or chat draft | Apply steps 1-4 the moment the message text is composed, regardless of which medium it first appears in |
+
 ### Exceptions
 
 - skill/rule `.md` file but the change is purely typo / formatting / link fix — behavior unchanged → `docs:` + documentation verb OK

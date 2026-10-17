@@ -6,6 +6,7 @@ description: |
   On /wip invocation, when remaining tasks exist, AskUserQuestion is required for the per-item direction (proceed / split / merge / hold / defer-to-checklist / delete) — asking only about start priority is forbidden.
   After a compact, show prior-work summary then AskUserQuestion(multiSelect) for restore selection and re-register via TodoWrite.
   antigravity - task.md artifact-based checklist (Antigravity environment) [antigravity.md],
+  openclaw - explicit session JSON CLI adapter [openclaw.md],
   claude - TodoWrite/TaskCreate API guide (Claude Code environment) [claude.md],
   resume - environment-agnostic task cleanup + remaining-work workflow [resume.md].
   "wip", "track progress", "register tasks", "task register", "step tracking", "compact recovery", "task resume", "resume task", "cleanup + resume" triggers.
@@ -19,6 +20,7 @@ metadata:
 Track current session work as a checklist.
 
 Hermes runtime: select [hermes.md](./hermes.md) first. Use native `todo_list` for task operations and `clarify` for decisions. Throughout this shared procedure, map `TaskList`/`TaskCreate`/`TaskUpdate`/`TodoWrite` to that topic's native operations, and `AskUserQuestion` to `clarify`. Do not enter Claude missing-tool or CLI fallback paths just because Claude API names are absent. Compaction alone does not authorize deleting inherited work.
+OpenClaw runtime: select [openclaw.md](./openclaw.md) first and map native task notation below to the explicit CLI ledger. Claude-only tool diagnostics do not apply.
 
 ## Topics
 
@@ -26,6 +28,7 @@ Hermes runtime: select [hermes.md](./hermes.md) first. Use native `todo_list` fo
 |-------|-------------|-------|
 | hermes | Native todo_list tracking and clarify decisions | [hermes.md](./hermes.md) |
 | antigravity | task.md artifact-based checklist for Antigravity sessions | [antigravity.md](./antigravity.md) |
+| openclaw | Explicit current-session agent-task JSON CLI | [openclaw.md](./openclaw.md) |
 | claude | TodoWrite/TaskCreate API for Claude Code sessions | [claude.md](./claude.md) |
 | resume | Environment-agnostic task cleanup + remaining-work workflow | [resume.md](./resume.md) |
 
@@ -35,6 +38,7 @@ Hermes runtime: select [hermes.md](./hermes.md) first. Use native `todo_list` fo
 wip (entry — /wip or "task cleanup + remaining work")
   └─→ resume (environment-agnostic workflow)
         ├─→ hermes (Hermes: todo_list + clarify; verified-unavailability fallback only)
+        ├─→ openclaw (agent-task + explicit current sessionId)
         ├─→ claude (Claude Code: TaskList/TaskCreate/TaskUpdate/AskUserQuestion)
         └─→ antigravity (Antigravity: task.md artifact + ask.md emulation)
 ```
@@ -65,7 +69,7 @@ Emitting only a text summary without persistent recording does not satisfy `/wip
 
 **Before dispatching to any topic, classify the args intent.** The `/wip` skill has two mutually-exclusive dispatch paths — resume workflow vs new-task registration — and the wrong choice wastes user time and misapplies the resume gate.
 
-Read args + call no-argument `todo_list` (Hermes), `TaskList` (Claude Code), or read `task.md` (Antigravity). Then classify using the detected environment's native operations:
+Read args + call no-argument `todo_list` (Hermes), `TaskList` (Claude Code), list the explicit session ledger (OpenClaw), or read `task.md` (Antigravity). Then classify using the detected environment's native operations:
 
 | Signal | Mode | Dispatch |
 |--------|------|----------|
@@ -113,6 +117,7 @@ Read args + call no-argument `todo_list` (Hermes), `TaskList` (Claude Code), or 
 
 Environment implementations:
 - Hermes → [hermes.md](./hermes.md) (todo_list first; clarify; no automatic agent-task fallback)
+- OpenClaw → [openclaw.md](./openclaw.md) (agent-task; no Claude tool-error prerequisite)
 - Claude Code → [claude.md](./claude.md) (TaskList/TaskCreate/AskUserQuestion)
 - Antigravity → [antigravity.md](./antigravity.md) (task.md + ask.md)
 
