@@ -491,6 +491,64 @@ if ! echo "$out_14" | grep -q "COND-HOOK-REG.*PASS"; then
 fi
 rm -rf "$REPO_14"
 
+# -----------------------------------------------------------------------------
+# Test 15: Conditional - COND-RELEASE FAIL when marketplace.json has no release CI
+# -----------------------------------------------------------------------------
+REPO_15="$(make_temp_repo)"
+mkdir -p "$REPO_15/.claude-plugin" "$REPO_15/.github/workflows"
+cat > "$REPO_15/.claude-plugin/marketplace.json" << 'EOF'
+{"name": "test", "plugins": [{"name": "foo", "version": "0.1.0"}]}
+EOF
+cat > "$REPO_15/.github/workflows/test.yml" << 'EOF'
+name: Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+EOF
+git_in "$REPO_15" add .claude-plugin/marketplace.json .github/workflows/test.yml
+out_15=$(bash "$SCRIPT" "$REPO_15" 2>&1)
+exit_15=$?
+check "Conditional: COND-RELEASE FAIL (no release automation)" 1 "$exit_15" "$out_15"
+if ! echo "$out_15" | grep -q "COND-RELEASE.*no release/version-bump CI"; then
+  echo "FAIL  COND-RELEASE missing-automation message missing"
+  echo "OUTPUT: $out_15"
+  FAIL=1
+fi
+rm -rf "$REPO_15"
+
+# -----------------------------------------------------------------------------
+# Test 16: Conditional - COND-RELEASE PASS when release-please workflow present
+# -----------------------------------------------------------------------------
+REPO_16="$(make_temp_repo)"
+mkdir -p "$REPO_16/.claude-plugin" "$REPO_16/.github/workflows"
+cat > "$REPO_16/.claude-plugin/marketplace.json" << 'EOF'
+{"name": "test", "plugins": [{"name": "foo", "version": "0.1.0"}]}
+EOF
+cat > "$REPO_16/.github/workflows/release-please.yml" << 'EOF'
+name: release-please
+on:
+  push:
+    branches: [main]
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+EOF
+git_in "$REPO_16" add .claude-plugin/marketplace.json .github/workflows/release-please.yml
+out_16=$(bash "$SCRIPT" "$REPO_16" 2>&1)
+exit_16=$?
+check "Conditional: COND-RELEASE PASS (release-please wired)" 0 "$exit_16" "$out_16"
+if ! echo "$out_16" | grep -q "COND-RELEASE.*PASS"; then
+  echo "FAIL  COND-RELEASE pass row missing"
+  echo "OUTPUT: $out_16"
+  FAIL=1
+fi
+rm -rf "$REPO_16"
+
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "ALL TESTS PASSED"

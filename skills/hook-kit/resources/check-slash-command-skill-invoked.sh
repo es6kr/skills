@@ -31,9 +31,9 @@
 #   Stop             -> the check above, kept as the backstop. An injected
 #                       reminder the model ignores is not a gate.
 
-if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
-
 INPUT=$(cat)
+
+if [[ "${RALPH_LOOP:-}" == "1" ]]; then exit 0; fi
 
 # Only slugs that map to an actual installed skill are checked — native
 # Claude Code commands and unrecognized slugs are skipped entirely.
