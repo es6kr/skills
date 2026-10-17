@@ -37,6 +37,7 @@ graph TD
     C --> C5[COND-PUBLIC: English Hangul Gate]
     C --> C6[COND-CORP: Main Branch Push Block]
     C --> C7[COND-HOOK-REG: Hook Registration Integrity]
+    C --> C8[COND-RELEASE: Release/Version-bump Automation]
 ```
 
 ### Tier 1: Base (Universal) Checks
@@ -63,6 +64,7 @@ graph TD
 | **`COND-PUBLIC`** | Remote is public (`es6kr/*`) | **Public English Gate** | `pre-commit` must contain `check-hangul` gate to enforce English-only text. |
 | **`COND-CORP`** | Remote is corporate (`internal-org/*`) | **Corp Main Block** | `pre-push` must block direct push to `main` / `master` branches. |
 | **`COND-HOOK-REG`** | Repository contains `hooks/hooks.json` | **Hook Registration Integrity** | A hook registration verifier such as `scripts/verify-hooks-json.py` must run in both pre-commit and CI, catching duplicate registrations, ghost paths, and non-executable registered scripts. |
+| **`COND-RELEASE`** | Repository contains `.claude-plugin/marketplace.json` | **Release/Version-bump Automation** | CI must wire a release-automation workflow (`release-please`/`semantic-release`/`changesets`/`auto-ready`, by filename or content). Without it, plugin versions in `marketplace.json` never bump on merge, so a merged PR cannot be distinguished from an actually-deployed one (teammates relying on the marketplace cache may silently not receive the merged content). |
 
 ---
 
