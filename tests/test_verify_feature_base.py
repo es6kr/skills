@@ -55,6 +55,9 @@ class BaseGuardTests(unittest.TestCase):
         self.assertNotEqual(self.run_guard().returncode, 0)
     def test_missing_base(self):
         self.assertNotEqual(self.run_guard(base='absent-ref').returncode, 0)
+    def test_symbolic_base_rejected(self):
+        self.assertNotEqual(self.run_guard(base='HEAD').returncode, 0)
+        self.assertNotEqual(self.run_guard(base='main').returncode, 0)
     def test_missing_scope(self):
         self.assertNotEqual(self.run_guard(paths=()).returncode, 0)
     def test_missing_base_argument(self):
