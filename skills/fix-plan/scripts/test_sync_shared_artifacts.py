@@ -9,6 +9,8 @@ import tempfile
 import unittest
 import filecmp
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from sync_shared_artifacts import (
     parse_frontmatter,
     upsert_frontmatter_fields,
@@ -109,6 +111,18 @@ class TestSyncSharedArtifacts(unittest.TestCase):
         self.assertFalse(os.path.exists(dest_file))
         with open(sample_file, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), initial_content)
+
+    def test_main_rejects_placeholder_base_url_when_writing(self):
+        sample_file = os.path.join(self.src_dir, "plan-cli.md")
+        with open(sample_file, "w", encoding="utf-8") as f:
+            f.write("---\ntitle: CLI Plan\n---\n# Content")
+
+        import subprocess
+        script_path = os.path.join(os.path.dirname(__file__), "sync_shared_artifacts.py")
+        env = {k: v for k, v in os.environ.items() if k != "COLLABMD_BASE_URL"}
+        proc = subprocess.run([sys.executable, script_path, sample_file, "--base-url", "https://collabmd.example.com/#file=shared-docs/"], capture_output=True, text=True, env=env)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("A valid CollabMD base URL is required", proc.stderr)
 
 
 if __name__ == "__main__":

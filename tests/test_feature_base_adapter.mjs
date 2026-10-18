@@ -13,6 +13,8 @@ test('unknown contract fails closed',async()=>assert.equal((await beforeToolCall
 test('caller cannot override base or paths',async()=>assert.equal((await beforeToolCall({...event(),params:{...event().params,base:'other'}},config,valid)).block,true));
 test('malformed configuration fails closed',async()=>assert.equal((await beforeToolCall(event(),{contracts:{task:{...contract,expectedCommits:-1}}},valid)).block,true));
 test('unsupported action fails closed',async()=>assert.equal((await beforeToolCall(event('push'),config,valid)).block,true));
+test('windows absolute worktree path allowed in contract',async()=>assert.equal(await beforeToolCall(event(),{contracts:{task:{...contract,repo:'C:\\\\Users\\\\runneradmin\\\\repo'}}},valid),undefined));
+test('relative worktree path fails closed in contract',async()=>assert.equal((await beforeToolCall(event(),{contracts:{task:{...contract,repo:'relative/path'}}},valid)).block,true));
 test('verifier receives configured base/scope and correct mode',async()=>{let observed;await beforeToolCall(event('start'),config,async(...args)=>{observed=args;return {valid:true};});assert.deepEqual(observed,[contract,'start',0]);});
 test('commit requires message and terminal stage check',async()=>{const e=event('commit');assert.equal((await beforeToolCall(e,config,valid)).block,true);e.params.message='fix: guarded change';let observed;assert.equal(await beforeToolCall(e,config,async(...a)=>{observed=a;return {valid:true};}),undefined);assert.deepEqual(observed,[contract,'stage',0]);});
 test('helper invalid result fails closed',async()=>assert.equal((await beforeToolCall(event(),config,async()=>({valid:false}))).block,true));

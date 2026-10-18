@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -23,8 +24,8 @@ def verify(repo, base, mode, expected_commits, allowed_paths):
     repo = Path(repo).resolve(strict=True)
     if expected_commits < 0 or (mode == 'start' and expected_commits != 0):
         raise Rejected('start requires zero expected commits; counts must be nonnegative')
-    if not base or base.startswith('-'):
-        raise Rejected('explicit base required')
+    if not base or not re.match(r'^(?:[a-f0-9]{40}|[a-f0-9]{64})$', base):
+        raise Rejected('explicit pinned commit SHA required for base')
     if not allowed_paths:
         raise Rejected('explicit nonempty allowed paths required')
     allowed = []
