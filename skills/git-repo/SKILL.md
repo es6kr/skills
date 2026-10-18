@@ -36,7 +36,7 @@ Git repository management and SourceGit GUI client integration.
 | isolate-hunk | stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing (no working-tree changes) | [isolate-hunk.md](./isolate-hunk.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
-| move-worktree | move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
+| move-worktree | move/register unregistered worktrees to .worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
 | patrol | batch inspection of ghq repositories (status, stash, unpushed + commit-splitter integration) | [patrol.md](./patrol.md) |
 | prune | safely detect and remove merged worktrees and remote-tracking expired (`gone`) local branches | [prune.md](./prune.md) |
 | rebase-audit | audit an active interactive rebase's staged files for accidental reverts (HEAD-vs-index diff + revert-pattern heuristic + AskUserQuestion multiSelect) without touching the rebase itself | [rebase-audit.md](./rebase-audit.md) |
@@ -47,7 +47,7 @@ Git repository management and SourceGit GUI client integration.
 | tidy | repository tidy pipeline orchestrator: prune merged resources → temp-rebase-reset uncommitted triage → commit-tidy → diff-merge isolation loop | [tidy.md](./tidy.md) |
 | to-bare | convert a regular repo → bare + worktree at a custom location, preserving uncommitted changes (inverse of to-ghq; helper: `scripts/repo-to-bare-worktree.sh`) | [to-bare.md](./to-bare.md) |
 | to-ghq | migrate bare+worktree → regular `.git` at the ghq path (formerly `migrate`) | [to-ghq.md](./to-ghq.md) |
-| worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.claude/worktrees/` | [worktree.md](./worktree.md) |
+| worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.worktrees/` | [worktree.md](./worktree.md) |
 | worktree-drift-sync | re-verify each worktree's git state immediately before/after applying an identical fix across a repo's multiple worktrees under external concurrent editing | [worktree-drift-sync.md](./worktree-drift-sync.md) |
 | worktree-register | shared: register a populated directory as a worktree via metadata only (used by fix-worktree + to-bare) | [worktree-register.md](./worktree-register.md) |
 
@@ -134,7 +134,7 @@ git status (check for other changes)
 
 1. Leave the new work's diff in place — do NOT stash (preserve the working directory)
 2. `git -C <repo> worktree list` to inspect inactive worktrees (per the decision tree above)
-3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .claude/worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
+3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
 4. cd into the new worktree, then `git checkout -b <new-branch>` (or use the existing inactive branch)
 5. **Re-apply the same diff in the new worktree via Edit** (the original main changes stay on main)
 6. add → commit → push → PR inside the new worktree
