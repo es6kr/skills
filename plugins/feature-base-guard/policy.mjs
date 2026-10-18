@@ -2,6 +2,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {realpath,access} from 'node:fs/promises';
+import {posix,win32} from 'node:path';
 const runFile=promisify(execFile);
 const helper=fileURLToPath(new URL('./resources/verify_feature_base.py',import.meta.url));
 const TOOL='feature_base_action';
@@ -10,7 +11,8 @@ function request(params,config){
   if (!['start','commit','deliver'].includes(params.action)) throw new Error('unsupported action');
   if (typeof params.contractId!=='string' || !Object.hasOwn(config?.contracts??{},params.contractId)) throw new Error('unknown contract');
   const c=config.contracts[params.contractId];
-  if (!c || typeof c.repo!=='string' || !c.repo.startsWith('/') || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(c.base??'') || !Number.isSafeInteger(c.expectedCommits) || c.expectedCommits<0 || !Array.isArray(c.allowedPaths) || !c.allowedPaths.length || c.allowedPaths.some(p=>typeof p!=='string'||!p)) throw new Error('invalid pinned contract');
+  const isAbs=typeof c?.repo==='string' && (posix.isAbsolute(c.repo) || win32.isAbsolute(c.repo));
+  if (!c || !isAbs || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(c.base??'') || !Number.isSafeInteger(c.expectedCommits) || c.expectedCommits<0 || !Array.isArray(c.allowedPaths) || !c.allowedPaths.length || c.allowedPaths.some(p=>typeof p!=='string'||!p)) throw new Error('invalid pinned contract');
   if (params.action==='commit' && (c.expectedCommits<1 || typeof params.message!=='string' || !params.message.trim() || params.message.length>4096 || params.message.includes('\0'))) throw new Error('commit requires expectedCommits >= 1 and message');
   if (params.action!=='commit' && params.message!==undefined) throw new Error('message only supported for commit');
   const mode=params.action==='commit'?'stage':params.action;
