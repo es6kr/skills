@@ -191,6 +191,15 @@ def main():
 
     args = parser.parse_args()
 
+    if not args.dry_run:
+        if not args.base_url or "example.com" in args.base_url or "example.invalid" in args.base_url:
+            print(
+                "ERROR: A valid CollabMD base URL is required before writing links. "
+                "Set COLLABMD_BASE_URL or pass --base-url <url>.",
+                file=sys.stderr
+            )
+            sys.exit(1)
+
     if args.dest_dir is None:
         ws_root = find_workspace_root()
         dest_dir = os.path.join(ws_root, DEFAULT_SHARED_DIR)
