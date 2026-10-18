@@ -523,7 +523,19 @@ rm -rf "$REPO_15"
 # Test 16: Conditional - COND-RELEASE PASS when release-please workflow present
 # -----------------------------------------------------------------------------
 REPO_16="$(make_temp_repo)"
-mkdir -p "$REPO_16/.claude-plugin" "$REPO_16/.github/workflows"
+mkdir -p "$REPO_16/.claude-plugin" "$REPO_16/.github/workflows" "$REPO_16/.githooks"
+git_in "$REPO_16" config core.hooksPath .githooks
+cat > "$REPO_16/.githooks/pre-push" << 'EOF'
+#!/bin/sh
+# Zero SHA early exit
+[ "$1" = "0000000000000000000000000000000000000000" ] && exit 0
+# Local branch push guard
+[ "$1" = "refs/heads/local" ] && exit 1
+# PUSH_MAX_COMMITS
+# Conflicts:
+exit 0
+EOF
+chmod +x "$REPO_16/.githooks/pre-push"
 cat > "$REPO_16/.claude-plugin/marketplace.json" << 'EOF'
 {"name": "test", "plugins": [{"name": "foo", "version": "0.1.0"}]}
 EOF
@@ -548,6 +560,35 @@ if ! echo "$out_16" | grep -q "COND-RELEASE.*PASS"; then
   FAIL=1
 fi
 rm -rf "$REPO_16"
+
+# -----------------------------------------------------------------------------
+# Test 17: Conditional - COND-RELEASE FAIL when tool name is only in a comment or echo
+# -----------------------------------------------------------------------------
+REPO_17="$(make_temp_repo)"
+mkdir -p "$REPO_17/.claude-plugin" "$REPO_17/.github/workflows"
+cat > "$REPO_17/.claude-plugin/marketplace.json" << 'EOF'
+{"name": "test", "plugins": [{"name": "foo", "version": "0.1.0"}]}
+EOF
+cat > "$REPO_17/.github/workflows/test.yml" << 'EOF'
+name: test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # We considered release-please or semantic-release here
+      - run: echo "not a real release-please runner"
+EOF
+git_in "$REPO_17" add .claude-plugin/marketplace.json .github/workflows/test.yml
+out_17=$(bash "$SCRIPT" "$REPO_17" 2>&1)
+exit_17=$?
+check "Conditional: COND-RELEASE FAIL (comment/echo not counted as release automation)" 1 "$exit_17" "$out_17"
+if ! echo "$out_17" | grep -q "COND-RELEASE.*FAIL"; then
+  echo "FAIL  COND-RELEASE fail row missing"
+  echo "OUTPUT: $out_17"
+  FAIL=1
+fi
+rm -rf "$REPO_17"
 
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then

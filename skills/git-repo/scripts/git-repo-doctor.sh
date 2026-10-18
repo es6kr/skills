@@ -322,8 +322,9 @@ fi
 
 # COND-RELEASE: Plugin marketplace release/version-bump automation
 if [[ $HAS_MARKETPLACE -eq 1 ]]; then
-  RELEASE_AUTOMATION_PATTERN='(release-please|semantic-release|changesets|auto-ready)'
-  if grep -qiE "$RELEASE_AUTOMATION_PATTERN" <<< "$CI_WORKFLOW_FILENAMES $CI_WORKFLOW_CONTENT"; then
+  CLEAN_CI_CONTENT="$(echo "$CI_WORKFLOW_CONTENT" | sed 's/#.*//g')"
+  RELEASE_AUTOMATION_PATTERN='(uses:[[:space:]]*[^[:space:]]*(release-please|semantic-release|changesets)|(npx|pnpm|yarn|bunx)[[:space:]]+(semantic-release|changeset)|changeset[[:space:]]+publish|auto-ready)'
+  if grep -qiE "$RELEASE_AUTOMATION_PATTERN" <<< "$CLEAN_CI_CONTENT"; then
     add_result "COND-RELEASE" "Conditional" "Release Automation" "PASS" "Plugin marketplace repository has release/version-bump CI wired (release-please/semantic-release/changesets/auto-ready)."
   else
     add_result "COND-RELEASE" "Conditional" "Release Automation" "FAIL" "Plugin marketplace repository (.claude-plugin/marketplace.json present) has no release/version-bump CI — merged PRs will not update plugin versions, so a merge cannot be distinguished from an actual deploy."
