@@ -6,7 +6,7 @@ metadata:
 depends-on:
   - commit-tidy
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), doctor (hook health & compliance audit — Tier 1 Base + Tier 2 Conditional taxonomy), fix-worktree (bare repo recovery), githooks (hook silently never runs — hooksPath precedence, passthrough chain, install trade-off), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, rebase-audit (accidental-revert detection during an active rebase), to-ghq (formerly migrate), to-bare, worktree-register (metadata register/relink), patrol (batch inspect), move-worktree (register/reclaim merged PR), rename-worktree, safe-relocate (relocate commits onto a clean base branch), sourcegit, ssh-key (multi-account SSH map), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely). Use when: "reuse worktree", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing", "repo doctor", "hook health", "diagnose hooks", "check hooks" triggers.
+  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), doctor (hook health & compliance audit — Tier 1 Base + Tier 2 Conditional taxonomy), fix-worktree (bare repo recovery), githooks (hook silently never runs — hooksPath precedence, passthrough chain, install trade-off), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, patrol (batch inspect), prune (safely remove merged worktrees & gone branches), rebase-audit (accidental-revert detection during an active rebase), rename-worktree, safe-relocate (relocate commits onto a clean base branch), sourcegit, ssh-key (multi-account SSH map), tidy (repo tidy pipeline: prune → temp-rebase-reset uncommitted triage → commit-tidy → diff-merge), to-bare, to-ghq (formerly migrate), move-worktree (register/reclaim merged PR), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely), worktree-register (metadata register/relink). Use when: "reuse worktree", "repo tidy", "repository tidy", "tidy worktrees", "prune worktrees", "prune merged", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing", "repo doctor", "hook health", "diagnose hooks", "check hooks" triggers.
 allowed-tools:
   - Read
   - Edit
@@ -36,17 +36,19 @@ Git repository management and SourceGit GUI client integration.
 | isolate-hunk | stage only your own edit when a tracked file's working tree mixes it with unrelated uncommitted content, via git plumbing (no working-tree changes) | [isolate-hunk.md](./isolate-hunk.md) |
 | merge-duplicate | merge duplicate repositories with the same origin | [merge-duplicate.md](./merge-duplicate.md) |
 | migrate | **renamed → to-ghq** (backward-compat alias) | [migrate.md](./migrate.md) |
-| move-worktree | move/register unregistered worktrees to .claude/worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
+| move-worktree | move/register unregistered worktrees to .worktrees/, reclaim merged PR worktrees | [move-worktree.md](./move-worktree.md) |
 | patrol | batch inspection of ghq repositories (status, stash, unpushed + commit-splitter integration) | [patrol.md](./patrol.md) |
+| prune | safely detect and remove merged worktrees and remote-tracking expired (`gone`) local branches | [prune.md](./prune.md) |
 | rebase-audit | audit an active interactive rebase's staged files for accidental reverts (HEAD-vs-index diff + revert-pattern heuristic + AskUserQuestion multiSelect) without touching the rebase itself | [rebase-audit.md](./rebase-audit.md) |
 | rename-worktree | rename worktree directory and metadata (cross-platform, Windows safe) | [rename-worktree.md](./rename-worktree.md) |
 | feature-base | explicit-base start/stage/deliver range and scope gate | [feature-base.md](./feature-base.md) |
 | safe-relocate | relocate working commits from a stale, diverged, or dirty branch onto a clean branch cut directly off the latest remote base (5-step procedure) | [safe-relocate.md](./safe-relocate.md) |
 | sourcegit | SourceGit preference.json management (add repos, workspaces, folder rename) | [sourcegit.md](./sourcegit.md) |
 | ssh-key | per-repo SSH key mapping for multi-account GitHub (core.sshCommand + IdentityAgent) | [ssh-key.md](./ssh-key.md) |
+| tidy | repository tidy pipeline orchestrator: prune merged resources → temp-rebase-reset uncommitted triage → commit-tidy → diff-merge isolation loop | [tidy.md](./tidy.md) |
 | to-bare | convert a regular repo → bare + worktree at a custom location, preserving uncommitted changes (inverse of to-ghq; helper: `scripts/repo-to-bare-worktree.sh`) | [to-bare.md](./to-bare.md) |
 | to-ghq | migrate bare+worktree → regular `.git` at the ghq path (formerly `migrate`) | [to-ghq.md](./to-ghq.md) |
-| worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.claude/worktrees/` | [worktree.md](./worktree.md) |
+| worktree | unified worktree acquisition: inventory, reuse inactive, or create new at `.worktrees/` | [worktree.md](./worktree.md) |
 | worktree-drift-sync | re-verify each worktree's git state immediately before/after applying an identical fix across a repo's multiple worktrees under external concurrent editing | [worktree-drift-sync.md](./worktree-drift-sync.md) |
 | worktree-register | shared: register a populated directory as a worktree via metadata only (used by fix-worktree + to-bare) | [worktree-register.md](./worktree-register.md) |
 
@@ -133,7 +135,7 @@ git status (check for other changes)
 
 1. Leave the new work's diff in place — do NOT stash (preserve the working directory)
 2. `git -C <repo> worktree list` to inspect inactive worktrees (per the decision tree above)
-3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .claude/worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
+3. Inactive candidate present → reuse via `rename-worktree`; otherwise `git -C <repo> worktree add .worktrees/<branch>` (or the worktree path defined by the active environment context — see `worktree.md` "Default Path Rules")
 4. cd into the new worktree, then `git checkout -b <new-branch>` (or use the existing inactive branch)
 5. **Re-apply the same diff in the new worktree via Edit** (the original main changes stay on main)
 6. add → commit → push → PR inside the new worktree
