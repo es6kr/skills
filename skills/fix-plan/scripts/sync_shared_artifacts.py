@@ -23,7 +23,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-DEFAULT_COLLABMD_BASE = "https://collabmd.dgs.ai.kr/#file=daegunsoftdev-agents-docs/"
+DEFAULT_COLLABMD_BASE = os.environ.get("COLLABMD_BASE_URL", "https://collabmd.example.com/#file=shared-docs/")
 DEFAULT_SHARED_DIR = ".agents/docs/shared"
 
 
@@ -190,6 +190,15 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if not args.dry_run:
+        if not args.base_url or "example.com" in args.base_url or "example.invalid" in args.base_url:
+            print(
+                "ERROR: A valid CollabMD base URL is required before writing links. "
+                "Set COLLABMD_BASE_URL or pass --base-url <url>.",
+                file=sys.stderr
+            )
+            sys.exit(1)
 
     if args.dest_dir is None:
         ws_root = find_workspace_root()

@@ -17,8 +17,33 @@ import urllib.error
 sys.stdout.reconfigure(encoding='utf-8')
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_FIX_PLAN = r"C:\Users\DAEGUNSOFT\ghq\github.com\daegunsoftDev\.agents\fix_plan.md"
-BASE_URL = "https://plane.dgs.ai.kr/api/v1/workspaces/dgs"
+DEFAULT_FIX_PLAN = os.environ.get(
+    "PLANE_FIX_PLAN",
+    os.path.join(os.getcwd(), ".agents", "fix_plan.md")
+)
+PLANE_HOST = os.environ.get("PLANE_HOST", "").rstrip("/")
+PLANE_WORKSPACE = os.environ.get("PLANE_WORKSPACE", "")
+BASE_URL = os.environ.get("PLANE_BASE_URL", "").rstrip("/")
+
+if BASE_URL and (not PLANE_HOST or not PLANE_WORKSPACE):
+    m = re.match(r'^(https?://[^/]+)/api/v1/workspaces/([^/]+)', BASE_URL)
+    if m:
+        if not PLANE_HOST:
+            PLANE_HOST = m.group(1).rstrip("/")
+        if not PLANE_WORKSPACE:
+            PLANE_WORKSPACE = m.group(2)
+
+if not PLANE_HOST:
+    PLANE_HOST = "https://plane.example.com"
+if not PLANE_WORKSPACE:
+    PLANE_WORKSPACE = "default"
+if not BASE_URL:
+    BASE_URL = f"{PLANE_HOST}/api/v1/workspaces/{PLANE_WORKSPACE}"
+
+def is_placeholder_endpoint(host: str, base_url: str) -> bool:
+    target = f"{host} {base_url}".lower()
+    return not host or "example.com" in target or "example.invalid" in target
+
 UA = "Mozilla/5.0 (plane)"
 
 PRIORITY_MAP = {
@@ -29,12 +54,15 @@ PRIORITY_MAP = {
 }
 
 def get_api_key():
-    key = os.environ.get("DGS_PLANE_API_KEY")
+    key = os.environ.get("PLANE_API_KEY") or os.environ.get("DGS_PLANE_API_KEY")
     if not key:
         try:
             import winreg
             reg = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment")
-            key, _ = winreg.QueryValueEx(reg, "DGS_PLANE_API_KEY")
+            try:
+                key, _ = winreg.QueryValueEx(reg, "PLANE_API_KEY")
+            except Exception:
+                key, _ = winreg.QueryValueEx(reg, "DGS_PLANE_API_KEY")
             winreg.CloseKey(reg)
         except Exception:
             pass
@@ -117,7 +145,14 @@ def parse_untracked_items(fix_plan_path):
         if not checkbox_pattern.match(line):
             continue
 
-        if alt_issue_pattern.search(line) or "plane.dgs.ai.kr" in line:
+        # Skip items that are already tracked in Plane
+        has_plane_issue = (
+            alt_issue_pattern.search(line)
+            or "/browse/" in line
+            or "plane." in line
+            or bool(re.search(r'/projects/[a-zA-Z0-9_-]+/issues/', line))
+        )
+        if has_plane_issue:
             continue
 
         if current_section in ("## Flow Chart", "## Pipeline Execution Log", "## Completed", "## Hold", "## REPEAT"):
@@ -205,18 +240,31 @@ def main():
     parser.add_argument("--fix-plan", default=DEFAULT_FIX_PLAN, help="Path to fix_plan.md")
     args = parser.parse_args()
 
-    api_key = get_api_key()
-    if not api_key:
-        print("Error: DGS_PLANE_API_KEY not found.")
-        sys.exit(1)
+    if args.execute:
+        if is_placeholder_endpoint(PLANE_HOST, BASE_URL):
+            print("Error: PLANE_HOST or PLANE_BASE_URL is not configured (refusing to send API key to placeholder endpoint). Set PLANE_HOST and PLANE_WORKSPACE or PLANE_BASE_URL.", file=sys.stderr)
+            sys.exit(1)
+        api_key = get_api_key()
+        if not api_key:
+            print("Error: PLANE_API_KEY / DGS_PLANE_API_KEY not found.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        api_key = get_api_key()
 
-    headers = {
-        "X-API-Key": api_key,
-        "User-Agent": UA,
-        "Content-Type": "application/json"
-    }
+    if is_placeholder_endpoint(PLANE_HOST, BASE_URL):
+        project_map = {"INFRA": "mock-infra", "AIAUTO": "mock-aiauto", "DTWEB": "mock-dtweb", "OPS": "mock-ops"}
+        headers = {}
+    else:
+        if not api_key:
+            print("Error: PLANE_API_KEY / DGS_PLANE_API_KEY not found.", file=sys.stderr)
+            sys.exit(1)
+        headers = {
+            "X-API-Key": api_key,
+            "User-Agent": UA,
+            "Content-Type": "application/json"
+        }
+        project_map = fetch_project_map(headers)
 
-    project_map = fetch_project_map(headers)
     untracked = parse_untracked_items(args.fix_plan)
 
     filtered = []
@@ -283,7 +331,7 @@ def main():
             seq = res.get("sequence_id")
             issue_id = res.get("id")
             key = f"{f['project']}-{seq}"
-            url = f"https://plane.dgs.ai.kr/dgs/projects/{proj_id}/issues/{issue_id}"
+            url = f"{PLANE_HOST}/{PLANE_WORKSPACE}/browse/{key}"
             created_count += 1
             print(f" ✔ Created [{key}]")
             

@@ -9,7 +9,7 @@
 # gate is the later promotion PR.
 #
 # Usage:
-#   local-to-staging-pr.sh <repo-dir> <commit-sha> [--branch <name>] [--base <next-feat|next-fix>] [--push [--body-file <path>]]
+#   local-to-staging-pr.sh <repo-dir> <commit-sha> --allow-path <path> [--allow-path <path> ...] [--branch <name>] [--base <next-feat|next-fix>] [--push [--body-file <path>]]
 #
 # <repo-dir>:   path to the repo working copy (e.g. ~/.agents)
 # <commit-sha>: commit to cherry-pick (must exist on the local branch)
@@ -35,16 +35,19 @@
 
 set -euo pipefail
 
-REPO="${1:?Usage: local-to-staging-pr.sh <repo-dir> <commit-sha> [--branch <name>] [--base <next-feat|next-fix>] [--push [--body-file <path>]]}"
+REPO="${1:?Usage: local-to-staging-pr.sh <repo-dir> <commit-sha> --allow-path <path> [--allow-path <path> ...] [--branch <name>] [--base <next-feat|next-fix>] [--push [--body-file <path>]]}"
 SHA="${2:?missing commit-sha}"
 BRANCH_OVERRIDE=""
 BASE_OVERRIDE=""
 DO_PUSH=0
 BODY_FILE=""
+ALLOWED_PATHS=()
+GUARD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/verify_feature_base.py"
 
 shift 2
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --allow-path) ALLOWED_PATHS+=("$2"); shift 2 ;;
     --branch) BRANCH_OVERRIDE="$2"; shift 2 ;;
     --base) BASE_OVERRIDE="$2"; shift 2 ;;
     --push) DO_PUSH=1; shift ;;
@@ -61,6 +64,15 @@ if [[ -n "$BODY_FILE" && ! -f "$BODY_FILE" ]]; then
   echo "--body-file path does not exist: $BODY_FILE" >&2
   exit 1
 fi
+
+if [[ "${#ALLOWED_PATHS[@]}" -eq 0 ]]; then
+  echo "Explicit --allow-path scope required before transfer." >&2
+  exit 1
+fi
+GUARD_SCOPE=()
+for allowed_path in "${ALLOWED_PATHS[@]}"; do
+  GUARD_SCOPE+=(--allow-path "$allowed_path")
+done
 
 cd "$REPO"
 
@@ -93,6 +105,7 @@ echo "== tag: $TAG -> base: $BASE"
 echo "== feature branch: $BRANCH"
 
 git fetch origin "$BASE"
+BASE_SHA=$(git rev-parse --verify "origin/${BASE}^{commit}")
 
 # Pre-flight scaffolding check: verify every skill directory the commit
 # touches has a SKILL.md on the target base (staging branches can lag behind
@@ -150,7 +163,9 @@ cleanup_worktree() {
 trap cleanup_worktree EXIT INT TERM
 
 CLEANUP_REQUIRED=1
-git worktree add "$WT_DIR" -b "$BRANCH" "origin/$BASE"
+git worktree add "$WT_DIR" -b "$BRANCH" "$BASE_SHA"
+python3 "$GUARD" --repo "$WT_DIR" --base "$BASE_SHA" --mode start \
+  --expected-commits 0 "${GUARD_SCOPE[@]}"
 
 # LC_ALL=C forces English git output regardless of the local git locale
 # config, so the empty-cherry-pick detection below doesn't need a localized
@@ -180,6 +195,9 @@ fi
 
 CLEANUP_REQUIRED=0
 echo "== cherry-pick clean"
+# Keep rejected payload intact for explicit correction; do not reset or widen scope.
+python3 "$GUARD" --repo "$WT_DIR" --base "$BASE_SHA" --mode deliver \
+  --expected-commits 1 "${GUARD_SCOPE[@]}"
 
 # Korean-text check (surfaces any Korean text before you push).
 if ! python3 "$REPO/scripts/check-hangul.py" "$WT_DIR/skills" >/dev/null 2>&1; then
@@ -195,6 +213,8 @@ if [[ "$DO_PUSH" -eq 0 ]]; then
   exit 0
 fi
 
+python3 "$GUARD" --repo "$WT_DIR" --base "$BASE_SHA" --mode deliver \
+  --expected-commits 1 "${GUARD_SCOPE[@]}"
 echo "== pushing (--push given)"
 git -C "$WT_DIR" push -u origin "$BRANCH"
 

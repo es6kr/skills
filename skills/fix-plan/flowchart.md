@@ -63,17 +63,17 @@ Placement: At the top of `fix_plan.md` under a `## TODO` section.
 \```
   - **Node Plan Mappings**:
     - **VaultSecret (Vault Credentials Index Build)**: `.ralph/plan-drafts/vault-workspace-credentials-index.md`
-    - **IaC (K3s IaC Share Improvement)**: `daegunsoftDev/gitops` (`apps/`, `clusters/dev36/`) / `llm-wiki/outputs/plan-plane-dev36-gitops.md`
+    - **IaC (K3s IaC Share Improvement)**: `org/gitops` (`apps/`, `clusters/dev36/`) / `llm-wiki/outputs/plan-plane-dev36-gitops.md`
     - **K3sAdvance (K3s Advancement)**: `llm-wiki/outputs/plan-plane-dev36-gitops.md` / `llm-wiki/outputs/plan-cnpg-failover-drill.md` / `llm-wiki/outputs/plan-qdrant-oci-deploy.md`
-    - **Domain (Domain Registration)**: `.ralph/docs/generated/handoff-cloudflare-letsencrypt-dgs-ai-kr.md` / `.ralph/plan-drafts/wiki-dgs-ai-kr-exposure.md`
-    - **Cert (cert-manager Domain Integration)**: `.ralph/docs/generated/handoff-cloudflare-letsencrypt-dgs-ai-kr.md`
+    - **Domain (Domain Registration)**: `.ralph/docs/generated/handoff-cloudflare-letsencrypt-example-org.md` / `.ralph/plan-drafts/wiki-example-org-exposure.md`
+    - **Cert (cert-manager Domain Integration)**: `.ralph/docs/generated/handoff-cloudflare-letsencrypt-example-org.md`
     - **ClawoRuntime (clawo Server Runtime Prep)**: `llm-wiki/outputs/plan-clawo-container-completion.md`
     - **Clawo (clawo Server Build)**: `llm-wiki/outputs/plan-webhook-pr-review.md`
     - **Roles (Model Role Allocation)**: `.ralph/plan-drafts/model-role-triage-sonnet-opus-fable.md`
     - **PRAuto (PR Automation)**: `llm-wiki/outputs/plan-webhook-pr-review.md`
     - **Pipeline (AI Pipeline Build)**: `llm-wiki/outputs/plan-clawo-container-completion.md` / `llm-wiki/outputs/plan-webhook-pr-review.md`
-    - **WikiRAG (Internal Wiki RAG Exposure)**: `llm-wiki/outputs/plan-wiki-rag-buildout.md` / `.ralph/plan-drafts/wiki-dgs-ai-kr-exposure.md`
-    - **PlaneExposure (Internal Plane Exposure)**: `llm-wiki/outputs/plan-plane-dev36-gitops.md` / `.ralph/docs/generated/handoff-cloudflare-letsencrypt-dgs-ai-kr.md`
+    - **WikiRAG (Internal Wiki RAG Exposure)**: `llm-wiki/outputs/plan-wiki-rag-buildout.md` / `.ralph/plan-drafts/wiki-example-org-exposure.md`
+    - **PlaneExposure (Internal Plane Exposure)**: `llm-wiki/outputs/plan-plane-dev36-gitops.md` / `.ralph/docs/generated/handoff-cloudflare-letsencrypt-example-org.md`
     - **CNPGDrill (CNPG HA Failover Drill)**: `llm-wiki/outputs/plan-cnpg-failover-drill.md`
 ```
 

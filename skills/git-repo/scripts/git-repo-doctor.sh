@@ -86,6 +86,11 @@ if grep -qE '(^|/)hooks/hooks\.json$' <<< "$TRACKED_FILES"; then
   HAS_HOOKS_JSON=1
 fi
 
+HAS_MARKETPLACE=0
+if [[ -f ".claude-plugin/marketplace.json" ]]; then
+  HAS_MARKETPLACE=1
+fi
+
 CORP_ORG_PATTERN="${GIT_REPO_CORP_PATTERN:-internal-org}"
 IS_CORP=0
 if [[ -n "${GIT_REPO_CORP_PATTERN:-}" ]] && { [[ "$REMOTE_URL" =~ ${GIT_REPO_CORP_PATTERN:-} ]] || [[ "$REPO_ROOT" =~ ${GIT_REPO_CORP_PATTERN:-} ]]; }; then
@@ -137,8 +142,10 @@ elif [[ -f ".pre-commit-config.yml" ]]; then
 fi
 
 CI_WORKFLOW_CONTENT=""
+CI_WORKFLOW_FILENAMES=""
 if [[ -d ".github/workflows" ]]; then
   CI_WORKFLOW_CONTENT="$(cat .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null || true)"
+  CI_WORKFLOW_FILENAMES="$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null || true)"
 fi
 
 # Also check .githooks if configured
@@ -310,6 +317,17 @@ if [[ $HAS_HOOKS_JSON -eq 1 ]]; then
     add_result "COND-HOOK-REG" "Conditional" "Hook Registration" "FAIL" "hooks.json present but hook registration integrity is not wired into pre-commit."
   else
     add_result "COND-HOOK-REG" "Conditional" "Hook Registration" "FAIL" "hooks.json present but hook registration integrity is not wired into CI."
+  fi
+fi
+
+# COND-RELEASE: Plugin marketplace release/version-bump automation
+if [[ $HAS_MARKETPLACE -eq 1 ]]; then
+  CLEAN_CI_CONTENT="$(echo "$CI_WORKFLOW_CONTENT" | sed 's/#.*//g')"
+  RELEASE_AUTOMATION_PATTERN='(uses:[[:space:]]*[^[:space:]]*(release-please|semantic-release|changesets)|(npx|pnpm|yarn|bunx)[[:space:]]+(semantic-release|changeset)|changeset[[:space:]]+publish|auto-ready)'
+  if grep -qiE "$RELEASE_AUTOMATION_PATTERN" <<< "$CLEAN_CI_CONTENT"; then
+    add_result "COND-RELEASE" "Conditional" "Release Automation" "PASS" "Plugin marketplace repository has release/version-bump CI wired (release-please/semantic-release/changesets/auto-ready)."
+  else
+    add_result "COND-RELEASE" "Conditional" "Release Automation" "FAIL" "Plugin marketplace repository (.claude-plugin/marketplace.json present) has no release/version-bump CI — merged PRs will not update plugin versions, so a merge cannot be distinguished from an actual deploy."
   fi
 fi
 

@@ -10,6 +10,7 @@
 # Keep this in sync whenever a CI job is added/changed.
 
 set -eu
+export MSYS_NO_PATHCONV=1
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
