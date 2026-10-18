@@ -199,19 +199,19 @@ Among the items decided as "Proceed" in Step 2, decide the start priority → ma
 
 ### Loop continuation (HARD STOP — do not stop with a report mid-batch)
 
-Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` to surface the remaining/follow-up work — do not end with a bare report. This applies even when `next` itself routed the flow into /wip earlier in the same chain — re-invocation is loop-safe: `next`'s gates re-evaluate the new completion state and terminate when no new candidates surface (skip/report or a single wrap-up ask), so the next↔wip cycle cannot spin, and "the duty was already discharged this chain" is not a valid skip reason. Delegating an item to a **background agent** (`run_in_background`) also returns control immediately — the dispatch itself is not a reason to stop.
+Step 3 is a **loop**, not a single action. After each "Proceed" item completes — **including when it finished via a sub-skill call** (`github-flow`, `fix`, `consolidate`, etc.) — control returns to the /wip loop. Drive the **next** Proceed item **in the same turn**. Do not end the turn with a status report while Proceed items remain. When the batch is exhausted, invoke `Skill("next")` (or `skill_view(name="next")` in Hermes) to surface the remaining/follow-up work — do not end with a bare report. This applies even when `next` itself routed the flow into /wip earlier in the same chain — re-invocation is loop-safe: `next`'s gates re-evaluate the new completion state and terminate when no new candidates surface (skip/report or a single wrap-up ask), so the next↔wip cycle cannot spin, and "the duty was already discharged this chain" is not a valid skip reason. Delegating an item to a **background agent** (`run_in_background`) also returns control immediately — the dispatch itself is not a reason to stop.
 
 | # | Don't | Do |
 |---|-------|-----|
 | 1 | A sub-skill (github-flow/fix/…) returns → write a report → end the turn while other Proceed items are pending | Sub-skill return = control is back in the /wip loop. Mark that item done → start the next Proceed item in the same turn |
 | 2 | Treat "the item I just drove via a sub-skill" as the whole batch | Batch = all items marked Proceed in Step 2. One done ≠ batch done |
-| 3 | All Proceed items done → stop with a report | Batch exhausted → invoke `Skill("next")` for next-action options |
+| 3 | All Proceed items done → stop with a report | Batch exhausted → invoke `Skill("next")` (or `skill_view(name="next")` in Hermes) for next-action options |
 | 4 | Dispatch a background agent for one item → end the turn "waiting for the agent" while other pending/follow-up items are drivable | Background dispatch returns control to the loop at once — drive the next drivable item in the same turn (the agent's completion re-invokes the session by itself). Idling past ~5 minutes also expires the prompt cache (5-min TTL), so the completion wake-up re-reads full context uncached |
 | 5 | Treat multiSelect-unselected ask items as "declined" → declare drivable=0 and idle through a long background wait | Unselected multiSelect items are **deferred, not declined** — they are the first fill candidates for an idle window (drive risk-free local ones; re-ask gated ones). When genuinely nothing is drivable and the expected wait exceeds the cache window, never arm one long silent watcher — use short cycles (`timeout` ≤ 240 s, end → notify → re-arm). Enforced by the idle-wait Stop hook (`block-idle-wait-without-short-cycle.sh`) |
 
 **Self-check (every time a sub-skill returns OR an item is marked completed inside Step 3):**
 1. Are there Proceed items not yet driven? → Yes: start the next one in this turn (no report-and-stop)
-2. Batch exhausted? → invoke `Skill("next")` (not a bare report)
+2. Batch exhausted? → invoke `Skill("next")` (or `skill_view(name="next")` in Hermes) (not a bare report)
 3. A blocked item (waiting on a predecessor) is skipped, but skipping it does not satisfy the batch
 4. A background agent is running → are other pending/follow-up items drivable now? Drive them in this turn; an idle wait is acceptable only when nothing else is drivable
 
