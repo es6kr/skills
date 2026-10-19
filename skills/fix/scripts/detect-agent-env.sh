@@ -8,7 +8,7 @@ set -euo pipefail
 
 detect_env() {
   # --- 1. Agent-specific env vars (Top priority: identify agent) ---
-  # Claude Code injects its own environment variable regardless of IDE
+  # Preserve the legacy CLAUDE_CODE compatibility signal and its precedence.
   if [[ -n "${CLAUDE_CODE:-}" ]]; then
     echo "claude-code"
     return
@@ -20,9 +20,15 @@ detect_env() {
     return
   fi
 
+  # Recognize the native Claude signal without changing existing agent conflicts.
+  if [[ -n "${CLAUDECODE:-}" ]]; then
+    echo "claude-code"
+    return
+  fi
+
   # --- 2. macOS IDE fallback: __CFBundleIdentifier ---
   # Only infer from IDE when agent-specific env vars are absent
-  # Note: Claude Code running inside Antigravity IDE is caught above by CLAUDE_CODE
+  # Claude-specific signals are checked before the IDE host.
   case "${__CFBundleIdentifier:-}" in
     com.google.antigravity)           echo "antigravity"; return ;;
     com.google.antigravity-ide)       echo "antigravity-ide"; return ;;
