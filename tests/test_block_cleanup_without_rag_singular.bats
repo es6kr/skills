@@ -106,3 +106,15 @@ Session wrapped up. All good.
   rm -f "$t"
   [ "$status" -eq 2 ]
 }
+
+@test "unrelated bold line with bare chunk word is not treated as RAG visibility row" {
+  local t
+  t="$(_rag_call_transcript)"
+  _run_guard '/cleanup run complete
+
+**Next chunk: continue processing later**
+' "$t"
+  rm -f "$t"
+  [ "$status" -eq 2 ]
+}
+
