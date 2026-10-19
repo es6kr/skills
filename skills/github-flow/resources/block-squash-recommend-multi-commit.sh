@@ -48,6 +48,12 @@ while IFS=$'\t' read -r LABEL TEXT; do
   if ! echo "$TEXT" | grep -qiE 'squash'; then
     continue
   fi
+  # Ignore negated squash references (e.g. 'without squash', 'do not squash')
+  # when the label itself is not an affirmative squash option
+  if echo "$TEXT" | grep -qiE '\b(without|do not|don'\''t|no|not|never|avoid)\s+(be\s+)?(squash|squashed|squashing)\b' && \
+     ! echo "$LABEL" | grep -qiE '^\s*(\[?[0-9a-z_ -]*\]\s*)?squash\b'; then
+    continue
+  fi
   COUNT=$(echo "$TEXT" | grep -oiE 'commit count:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' | head -1)
   if [[ -z "$COUNT" ]]; then
     VIOLATIONS+=("$LABEL :: no commit-count disclosure found")
