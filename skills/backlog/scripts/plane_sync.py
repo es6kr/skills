@@ -44,13 +44,27 @@ from workspace_profile import get_profile, resolve_tracker_root
 UA = "Mozilla/5.0 (plane-backlog)"
 
 INDEX_LINE_RE = re.compile(
-    r'^(?P<indent>\s*)-\s+\[(?P<marker>[^\]]*)\]\s+\[(?P<ident>[A-Z]+-\d+)\]\s+(?P<title>.+?)\s+'
+    r'^(?P<indent>\s*)-\s+\[(?P<marker>[^\]]*)\]\s+(?:\(P[0-3]\)\s+)?'
+    r'\[(?P<ident>[A-Z][A-Z0-9]*-\d+)\]\s+(?P<title>.+?)\s+'
     r'(?:→|->)\s+Plane\s+\((?P<url>https://[^\s)]+)\)(?P<rest>.*)$'
 )
 
 PLANE_URL_RE = re.compile(
     r'https://[^/]+/(?P<workspace>[^/]+)/projects/(?P<project>[0-9a-f-]{36})/issues/(?P<issue>[0-9a-f-]{36})'
 )
+
+# Canonical browse URL (https://<host>/<workspace>/browse/<IDENT>-<SEQ>). It
+# carries no project/issue UUID, and self-hosted Plane CE has no
+# lookup-by-identifier endpoint (v1/v2 identifier routes return 404), so these
+# lines are resolved by listing the workspace's projects and the project's
+# issues -- see resolve_browse_entries().
+PLANE_BROWSE_RE = re.compile(
+    r'https://[^/]+/(?P<workspace>[^/]+)/browse/(?P<ident>[A-Z][A-Z0-9]*-\d+)/?$'
+)
+
+# Upper bound on issue-listing pages per project (100 issues/page), so a
+# malformed cursor response can never loop forever.
+MAX_ISSUE_PAGES = 50
 
 # Plane state_detail.group -> fix_plan marker. Only terminal states are mapped
 # (mirrors sync.md's GitHub MERGED/CLOSED-without-merge rules); non-terminal
@@ -185,18 +199,103 @@ def parse_index_lines(lines: list) -> list:
 
     Returns one dict per matched line: {line_no, match, url_match}. Lines that
     don't match the `- [<marker>] [<IDENT>-<seq>] <title> -> Plane (<url>)`
-    shape, or whose URL doesn't parse as a Plane workspace/project/issue URL,
-    are skipped (untouched by compute_updates())."""
+    shape, or whose URL parses as neither a projects/<uuid>/issues/<uuid> URL
+    nor a browse URL, are skipped (untouched by compute_updates()).
+
+    For a browse URL, url_match is a dict with project/issue set to None --
+    callers that need the UUIDs go through _resolved_index_entries()."""
     matches = []
     for i, line in enumerate(lines):
         m = INDEX_LINE_RE.match(line)
         if not m:
             continue
-        url_m = PLANE_URL_RE.search(m.group("url"))
+        url = m.group("url")
+        url_m = PLANE_URL_RE.search(url)
         if not url_m:
-            continue
+            browse_m = PLANE_BROWSE_RE.match(url)
+            if not browse_m:
+                continue
+            url_m = {
+                "workspace": browse_m.group("workspace"),
+                "ident": browse_m.group("ident"),
+                "project": None,
+                "issue": None,
+            }
         matches.append({"line_no": i, "match": m, "url_match": url_m})
     return matches
+
+
+def _list_project_ids(profile: dict, workspace: str) -> dict:
+    """Map project identifier (e.g. SKILL) -> project UUID for a workspace.
+    Returns {} on API error."""
+    res = make_plane_request(profile, f"workspaces/{workspace}/projects/")
+    if "error" in res:
+        return {}
+    projects = res.get("results", []) if isinstance(res, dict) else res
+    return {p.get("identifier"): p.get("id") for p in projects if p.get("identifier") and p.get("id")}
+
+
+def _list_issue_ids(profile: dict, workspace: str, project_id: str) -> dict:
+    """Map sequence_id -> issue UUID for one project, following the cursor
+    pagination (per_page=100) up to MAX_ISSUE_PAGES pages. Returns whatever
+    was collected before an API error."""
+    by_seq = {}
+    cursor = None
+    for _ in range(MAX_ISSUE_PAGES):
+        path = f"workspaces/{workspace}/projects/{project_id}/issues/?per_page=100"
+        if cursor:
+            path += f"&cursor={urllib.parse.quote(str(cursor))}"
+        res = make_plane_request(profile, path)
+        if "error" in res:
+            break
+        for issue in res.get("results", []):
+            seq = issue.get("sequence_id")
+            if seq is not None and issue.get("id"):
+                by_seq[int(seq)] = issue["id"]
+        cursor = res.get("next_cursor")
+        if not res.get("next_page_results") or not cursor:
+            break
+    return by_seq
+
+
+def resolve_browse_entries(entries: list, profile: dict) -> list:
+    """Fill project/issue UUIDs for browse-URL entries by exact
+    (project identifier, sequence_id) match. Unresolved entries (unknown
+    project, unknown sequence, API error) are dropped -- never guessed.
+    Each workspace's project list and each project's issue list is fetched
+    at most once per call."""
+    project_cache = {}
+    issue_cache = {}
+    resolved = []
+    for entry in entries:
+        um = entry["url_match"]
+        if um["project"] and um["issue"]:
+            resolved.append(entry)
+            continue
+        workspace = um["workspace"]
+        prefix, _, seq = um["ident"].rpartition("-")
+        if workspace not in project_cache:
+            project_cache[workspace] = _list_project_ids(profile, workspace)
+        project_id = project_cache[workspace].get(prefix)
+        if not project_id:
+            continue
+        key = (workspace, project_id)
+        if key not in issue_cache:
+            issue_cache[key] = _list_issue_ids(profile, workspace, project_id)
+        issue_id = issue_cache[key].get(int(seq))
+        if not issue_id:
+            continue
+        resolved.append({
+            **entry,
+            "url_match": {**um, "project": project_id, "issue": issue_id},
+        })
+    return resolved
+
+
+def _resolved_index_entries(lines: list, profile: dict) -> list:
+    """parse_index_lines() + browse-URL resolution: every returned entry has
+    workspace/project/issue populated."""
+    return resolve_browse_entries(parse_index_lines(lines), profile)
 
 
 def fetch_issue_state(profile: dict, workspace: str, project: str, issue: str) -> dict:
@@ -223,7 +322,7 @@ def compute_updates(lines: list, profile: dict) -> list:
     # so many tracked issues share the same state id -- resolve each state
     # id's group at most once per sync run instead of once per issue.
     state_group_cache = {}
-    for entry in parse_index_lines(lines):
+    for entry in _resolved_index_entries(lines, profile):
         um = entry["url_match"]
         issue_data = fetch_issue_state(profile, um["workspace"], um["project"], um["issue"])
         if "error" in issue_data:
@@ -263,7 +362,7 @@ def detect_priority_drift(lines: list, profile: dict) -> list:
     confirms the direction, since existing local markers may carry local
     triage judgment Plane doesn't know about."""
     drifts = []
-    for entry in parse_index_lines(lines):
+    for entry in _resolved_index_entries(lines, profile):
         marker_text = entry["match"].group("marker")
         local_priority = extract_local_priority(marker_text)
         if local_priority is None:
@@ -348,7 +447,7 @@ def compute_local_to_plane_updates(lines: list, profile: dict) -> list:
     human) explicitly transitions it via transition_issue_to_done()."""
     updates = []
     state_group_cache = {}
-    for entry in parse_index_lines(lines):
+    for entry in _resolved_index_entries(lines, profile):
         marker_text = entry["match"].group("marker")
         if marker_text != "x":
             continue
