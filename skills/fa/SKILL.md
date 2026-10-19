@@ -96,6 +96,8 @@ entries go there instead — one memory per class, appended on recurrence. See
      run `/fix` to author + register it."
 6. **Stop.** This skill never autonomously edits rule/hook files directly without `/fix` handover — rule edits remain `/fix`'s job.
 
+   **When the user invoked `/fix` (HARD STOP)**: if the same message carries a `/fix` (or `fix:`) invocation, that skill's procedure *is* the original deliverable. A correction-gate hook that tells you to call `Skill("fa")` first only orders the recording step; it does not replace the invoked skill. After the FA record, continue with `/fix` Step 0-4 (task registration, 5-Why, Step 1.5 action table, approval ask before prompt edits, verification, wrap-up) in the same turn. Reporting the FA stage and any artifact correction as the end result, without running the `/fix` procedure, repeats the failure this clause exists to prevent.
+
    **Scope of "Stop" (HARD STOP — do not over-read it)**: this clause withholds *authority over
    rule/hook/skill files*, not permission to leave a broken artifact broken. When the violation
    you just recorded names a defect in an artifact that **currently exists** — a posted review
