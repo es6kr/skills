@@ -51,4 +51,19 @@ else
   exit 1
 fi
 
+# T3: multiple FA sections, one has token but another lacks it, no RAG calls -> denied (exit 2)
+PAYLOAD_T3=$(jq -n --arg fp "$FA_FILE" --arg tp "$TRANSCRIPT" \
+  '{tool_name:"Edit", tool_input:{file_path:$fp, new_string:"## Section 1 (older section)\n\nfix-rag-search-skipped — prior bypass.\n\n### Problem\n- something\n\n## Section 2 (new section without bypass)\n\n### Problem\n- new issue without RAG or bypass token"}, transcript_path:$tp}')
+set +e
+OUT_T3=$(echo "$PAYLOAD_T3" | bash "$HOOK_SCRIPT" 2>&1)
+RC_T3=$?
+set -e
+if [ "$RC_T3" -eq 2 ] && echo "$OUT_T3" | grep -q "DENIED"; then
+  echo "✓ T3 PASS: denied when a new section lacks its own bypass token"
+else
+  echo "✗ T3 FAIL: expected rc=2 DENIED, got rc=$RC_T3 output was: $OUT_T3"
+  exit 1
+fi
+
 echo "All edit-guard.sh FA-RAG-bypass tests passed successfully!"
+
