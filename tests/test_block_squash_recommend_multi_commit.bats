@@ -56,3 +56,14 @@ _run_guard() {
   run bash "$GUARD" <<< '{"tool_name":"Bash","tool_input":{"command":"echo squash"}}'
   [ "$status" -eq 0 ]
 }
+
+@test "merge-commit option explicitly rejecting squash is allowed without commit disclosure" {
+  _run_guard "$(_mk_payload 'Merge commit (preserve history; do not squash)' 'keep commits discrete')"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-commit option saying without squash is allowed without commit disclosure" {
+  _run_guard "$(_mk_payload 'Merge commit' 'preserve history without squash')"
+  [ "$status" -eq 0 ]
+}
+
