@@ -35,8 +35,8 @@ def _profile():
     return {"plane_host": "https://plane.example.com", "plane_token": "tok"}
 
 
-def _listing(path, *a, **kw):
-    """Fake make_plane_request for the project + issue listing calls."""
+def _listing(profile, path, *a, **kw):
+    """Fake make_plane_request(profile, path, ...) for the listing calls."""
     if path.rstrip("/") == "workspaces/myws/projects":
         return {"results": [{"identifier": "SKILL", "id": PROJECT_ID}],
                 "next_page_results": False}
@@ -106,7 +106,7 @@ class TestBrowseResolution(unittest.TestCase):
              patch.object(plane_sync, "fetch_issue_state", return_value={"state": STATE_ID}), \
              patch.object(plane_sync, "fetch_state_group", return_value={"group": "started"}):
             plane_sync.compute_local_to_plane_updates(lines, _profile())
-        issue_list_calls = [c for c in req.call_args_list if "/issues" in c.args[0]]
+        issue_list_calls = [c for c in req.call_args_list if "/issues" in c.args[1]]
         self.assertEqual(len(issue_list_calls), 1)
 
 
