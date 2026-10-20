@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/es6kr/skills/compare/orca-v0.5.0...orca-v0.5.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **orca:** bind split options and approvals to their owning action ([deba601](https://github.com/es6kr/skills/commit/deba6011b2da5c2e4694a41bceb52ee0fede0d75))
+* **orca:** gate orca split/repo-add on a dedicated prior ask ([#614](https://github.com/es6kr/skills/issues/614)) ([aa1d646](https://github.com/es6kr/skills/commit/aa1d64690f69cdd1360e679723e04ba6fb28f839))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/orca-v0.4.1...orca-v0.5.0) (2026-10-06)
 
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/es6kr/skills/compare/web-browser-v0.2.10...web-browser-v0.3.0) (2026-10-17)
+
+
+### Features
+
+* **web-browser:** add orca-computer topic and allow it for bot-blocked sign-in ([a1a2578](https://github.com/es6kr/skills/commit/a1a2578ada35fc2ae0ef7000b4efd5aa3bc532fb))
+* **web-browser:** add orca-computer topic and allow it for bot-blocked sign-in ([e098191](https://github.com/es6kr/skills/commit/e09819105cc59547216650e599b473291992f906))
+
+
+### Bug Fixes
+
+* **review:** address Copilot and CodeRabbit feedback for PR [#639](https://github.com/es6kr/skills/issues/639) ([1a70705](https://github.com/es6kr/skills/commit/1a707057736ec8ee5f21ae64e2d0dac38d3a2fe7))
+
 ## [0.2.10](https://github.com/es6kr/skills/compare/web-browser-v0.2.9...web-browser-v0.2.10) (2026-10-04)
 
 

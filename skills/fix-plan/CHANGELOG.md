@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.18.0](https://github.com/es6kr/skills/compare/fix-plan-v0.17.2...fix-plan-v0.18.0) (2026-10-17)
+
+
+### Features
+
+* **fix-plan:** add tracker ID uniqueness check and sequence resolver ([#535](https://github.com/es6kr/skills/issues/535)) ([#628](https://github.com/es6kr/skills/issues/628)) ([029c8f8](https://github.com/es6kr/skills/commit/029c8f8453aa266f31e56b1b855da410520faeeb))
+* **todowrite,wip:** add session-scoped agent-task CLI and OpenClaw adapter ([#629](https://github.com/es6kr/skills/issues/629)) ([eb4c4d4](https://github.com/es6kr/skills/commit/eb4c4d4ab6a7f7ba9f719b052d8f3761840012c9))
+
+
+### Bug Fixes
+
+* **review:** address Copilot and CodeRabbit feedback for PR [#639](https://github.com/es6kr/skills/issues/639) ([1a70705](https://github.com/es6kr/skills/commit/1a707057736ec8ee5f21ae64e2d0dac38d3a2fe7))
+
+## [0.17.2](https://github.com/es6kr/skills/compare/fix-plan-v0.17.1...fix-plan-v0.17.2) (2026-10-13)
+
+
+### Bug Fixes
+
+* **fix-plan:** implement auto_graduate in pinned_liveness_check ([#617](https://github.com/es6kr/skills/issues/617)) ([9a532c3](https://github.com/es6kr/skills/commit/9a532c392a74363f679061f46979c7e6f1b2ef8b))
+* **tracker:** preserve pinned ownership and checkout executable checks ([30bcc1e](https://github.com/es6kr/skills/commit/30bcc1e01b78efcf552d9a8b121c42babd68db09))
+
 ## [0.17.1](https://github.com/es6kr/skills/compare/fix-plan-v0.17.0...fix-plan-v0.17.1) (2026-10-04)
 
 

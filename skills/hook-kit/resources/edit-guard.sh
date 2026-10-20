@@ -589,6 +589,24 @@ check_fa_edit_without_rag_search() {
 
   [[ -z "$NEW_CONTENT" ]] && return 0
   echo "$NEW_CONTENT" | grep -qE '^## [^#]' || return 0
+  # Explicit escape valve for a confirmed-new pattern (recurrence already
+  # ruled out by grep) when no RAG receiver is reachable this session.
+  # Each newly added section must carry its own bypass token.
+  if echo "$NEW_CONTENT" | awk '
+    /^## [^#]/ {
+      if (in_sec && !has_token) { missing=1 }
+      in_sec=1
+      has_token=0
+    }
+    /fix-rag-search-skipped/ { has_token=1 }
+    END {
+      if (in_sec && !has_token) { missing=1 }
+      if (in_sec && !missing) { exit 0 }
+      exit 1
+    }
+  '; then
+    return 0
+  fi
 
   local transcript
   transcript=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
