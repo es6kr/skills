@@ -223,6 +223,25 @@ class TestMarketplaceThreeTierArchitecture:
             "./skills/forge",
             "./skills/omz",
             "./skills/code-workflow",
+            "./skills/ralph",
+            "./skills/cleanup",
+            "./skills/commit-tidy",
+            "./skills/skill-kit",
+            "./skills/claudify",
+            "./skills/github-flow",
+            "./skills/consolidate",
+            "./skills/session",
+            "./skills/fix-plan",
+            "./skills/todowrite",
+            "./skills/hook-kit",
+            "./skills/repo",
+            "./skills/git-repo",
+            "./skills/github-repo",
+            "./skills/cc-plugin",
+            "./skills/mcp-config",
+            "./skills/chezmoi",
+            "./skills/dotfile",
+            "./skills/docxport",
         }
         assert expected_labs.issubset(labs_skills), (
             f"Expected labs to contain {expected_labs}, but got {labs_skills}"
@@ -241,10 +260,19 @@ class TestMarketplaceThreeTierArchitecture:
             f"Expected task bundle to contain {expected_task}, but got {task_skills}"
         )
 
-        # Core bundle must not contain labs skills
+        # Core bundle must be minimized to exactly the 4 fundamental public skills
         core_skills = set(plugins["es6kr"].get("skills", []))
+        expected_core = {
+            "./skills/brief",
+            "./skills/fa",
+            "./skills/tdd",
+            "./skills/web-browser",
+        }
+        assert core_skills == expected_core, (
+            f"Expected core bundle 'es6kr' to contain exactly {expected_core}, but got {core_skills}"
+        )
         overlap = core_skills.intersection(expected_labs)
-        assert not overlap, f"Core bundle 'es6kr' must not contain slug-squatting skills: {overlap}"
+        assert not overlap, f"Core bundle 'es6kr' must not contain slug-squatting or duplicate skills: {overlap}"
 
 
 class TestOrphanPluginDirectories:

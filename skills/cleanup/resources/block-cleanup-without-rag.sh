@@ -52,7 +52,7 @@ fi
 # the committed one. Union keeps the committed baseline authoritative; the git-ignored
 # file only ADDS locale variants.
 HG_CLEANUP_MARKERS="${HG_CLEANUP_MARKERS:+${HG_CLEANUP_MARKERS}|}(^|[[:space:]])/cleanup|cleanup run|cleanup wrap-up|cleanup complete|cleanup pass|cleanup finished|Session Ended|Session Cleanup|session-end report"
-HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBILITY}|}chunks added|qdrant"
+HG_CLEANUP_RAG_VISIBILITY="${HG_CLEANUP_RAG_VISIBILITY:+${HG_CLEANUP_RAG_VISIBILITY}|}chunks? added|qdrant"
 # Used only by the skipped-ingest branch at the bottom of this file. A report that
 # declares the failure honestly is NOT the failure mode being guarded, so the
 # failure vocabulary is checked first and wins over the success vocabulary.
@@ -110,7 +110,7 @@ fi
 #   2. Bold line "**chunks added**" / "**qdrant**" / locale variant
 #   3. Header-like "### RAG" / "## RAG"
 HAS_RAG_ROW=0
-if echo "$RESPONSE" | grep -qE '^\s*\|\s*\*{0,2}[^|]*(RAG|qdrant|3-C\.1)[^|]*\*{0,2}\s*\|.*(RAG|qdrant|chunks)'; then
+if echo "$RESPONSE" | grep -qE '^\s*\|\s*\*{0,2}[^|]*(RAG|qdrant|3-C\.1)[^|]*\*{0,2}\s*\|.*(RAG|qdrant|chunks? added)'; then
   HAS_RAG_ROW=1
 elif echo "$RESPONSE" | grep -qE "\*\*.*($HG_CLEANUP_RAG_VISIBILITY).*\*\*"; then
   HAS_RAG_ROW=1
