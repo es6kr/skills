@@ -1,0 +1,11 @@
+{
+  "config": {
+    "host": "https://plane.example.com",
+    "workspace": "demo",
+    "project_id": "44444444-4444-4444-8444-444444444444",
+    "assignee_id": "11111111-1111-4111-8111-111111111111",
+    "repo": "C:/approved/repo"
+  },
+  "states": [{"id": "33333333-3333-4333-8333-333333333333", "group": "unstarted", "is_triage": false}],
+  "issues": [{"id": "22222222-2222-4222-8222-222222222222", "project": "44444444-4444-4444-8444-444444444444", "assignees": ["11111111-1111-4111-8111-111111111111"], "state": "33333333-3333-4333-8333-333333333333", "sequence_id": 7, "name": "오프라인 계획 fixture", "description_stripped": "외부 dispatch 없음"}]
+}
