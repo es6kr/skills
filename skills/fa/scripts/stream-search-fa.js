@@ -129,7 +129,8 @@ async function main() {
     }
   }
 
-  process.exit(0);
+  process.exitCode = 0;
+  return; // Let pending stdout/stderr writes drain naturally.
 }
 
 main().catch((err) => {

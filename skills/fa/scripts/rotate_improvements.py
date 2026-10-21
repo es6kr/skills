@@ -21,7 +21,21 @@ RESOLVED_TAG_PREFIXES = {
     'DONE',
 }
 
-TAG_REGEX = re.compile(r'\*\*Tag\*\*:\s*(\[[^\]]+\])', re.IGNORECASE)
+TAG_REGEX = re.compile(r'^ {0,3}(?:-\s*)?\*\*Tag\*\*:\s*(\[[^\]]+\])', re.IGNORECASE | re.MULTILINE)
+
+
+def markdown_lines(content):
+    """Preserve literal lines while excluding fenced examples from structure."""
+    fence = None
+    for line in content.splitlines(keepends=True):
+        marker = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line.rstrip('\r\n'))
+        literal = fence is not None or marker is not None
+        if fence:
+            if marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= fence[1] and not marker.group(2).strip():
+                fence = None
+        elif marker:
+            fence = (marker.group(1)[0], len(marker.group(1)))
+        yield line, literal
 
 def is_resolved_tag(tag: str) -> bool:
     if not tag or not tag.startswith('[') or not tag.endswith(']'):
@@ -61,15 +75,15 @@ def parse_improvements(content: str):
     current_lines = []
     in_item = False
 
-    for line in lines:
-        if line.startswith('## '):
+    for line, literal in markdown_lines(content):
+        if not literal and line.startswith('## '):
             if in_item and current_lines:
                 items.append((current_h2, current_h3, current_lines))
                 current_lines = []
                 in_item = False
             current_h2 = line
             section_prose.setdefault(current_h2, [])
-        elif line.startswith('### '):
+        elif not literal and line.startswith('### '):
             if in_item and current_lines:
                 items.append((current_h2, current_h3, current_lines))
                 current_lines = []
@@ -93,7 +107,8 @@ def parse_improvements(content: str):
 
     for h2, h3, item_lines in items:
         item_text = "".join(item_lines)
-        match = TAG_REGEX.search(item_text)
+        semantic_text = ''.join(line for line, literal in markdown_lines(item_text) if not literal)
+        match = TAG_REGEX.search(semantic_text)
         tag = match.group(1) if match else ""
 
         entry = {
@@ -218,6 +233,11 @@ def rotate_file(src_path: str, archive_path: str, dry_run: bool = False) -> dict
     # Both go through a temp file + os.replace: two plain open(...,'w') calls leave
     # a window where an interruption truncates the source with its content not yet
     # anywhere else, and this script has no backup to fall back on.
+    # Durable pre-rotation snapshots make the archive-first crash window
+    # recoverable without claiming a cross-file atomic transaction.
+    _atomic_write(src_path + '.bak', content)
+    if os.path.exists(archive_path):
+        _atomic_write(archive_path + '.bak', archive_existing)
     _atomic_write(archive_path, archive_text.strip() + '\n')
     _atomic_write(src_path, active_text.strip() + '\n')
 

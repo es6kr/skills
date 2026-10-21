@@ -11,6 +11,34 @@ import os
 import re
 import sys
 import tempfile
+from functools import wraps
+
+
+def serialized_state(function):
+    """Lock the entire read/modify/replace transaction, not just its write."""
+    @wraps(function)
+    def guarded(*args, **kwargs):
+        os.makedirs(STATE_DIR, exist_ok=True)
+        with open(STATE_FILE + '.lock', 'a+b') as lock:
+            if os.name == 'nt':
+                import msvcrt
+                if os.fstat(lock.fileno()).st_size == 0:
+                    lock.write(b'\0')
+                    lock.flush()
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                return function(*args, **kwargs)
+            finally:
+                if os.name == 'nt':
+                    lock.seek(0)
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    return guarded
 
 CI_POLL_PATTERNS = [
     re.compile(r"\bgh\s+pr\s+checks\b", re.IGNORECASE),
@@ -68,6 +96,7 @@ def save_state(state: dict):
         pass
 
 
+@serialized_state
 def check_polling(tool_name: str, tool_input: dict, session_id: str) -> str | None:
     is_poll = is_ci_poll_command(tool_name, tool_input)
     state = get_state()

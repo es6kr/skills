@@ -72,9 +72,66 @@ class Residual572Tests(unittest.TestCase):
         self.assertEqual(len(state), 8)
 
     def test_fenced_example_does_not_create_fa_section(self):
-        mod = load(ROOT / 'skills/fa/scripts/fa-classify.py', 'classifier')
+        path = ROOT / 'skills/fa/scripts/fa-classify.py'
         text = '# Log\n\n## Actual\nDetails\n```markdown\n## Example only\n```\n\n## Second\nBody\n'
-        self.assertEqual([mod.section_title(s) for s in mod.split_sections(text)], ['Actual', 'Second'])
+        # This CLI owns/reconfigures stdout at import time; isolate that side
+        # effect instead of closing pytest's capture stream in the parent.
+        code = ("import importlib.util,json; s=importlib.util.spec_from_file_location('classifier',%r);"
+                "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+                "print(json.dumps([m.section_title(s) for s in m.split_sections(%r)]))" % (str(path), text))
+        p = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(json.loads(p.stdout), ['Actual', 'Second'])
+
+    def test_rotation_keeps_recovery_snapshots(self):
+        mod = load(ROOT / 'skills/fa/scripts/rotate_improvements.py', 'rotate_backup')
+        text = '# Ledger\n## Topic\n### Applied\n- **Tag**: [APPLIED]\n'
+        with tempfile.TemporaryDirectory() as d:
+            source, archive = Path(d) / 'ledger.md', Path(d) / 'archive.md'
+            source.write_text(text)
+            archive.write_text('Earlier history\n')
+            mod.rotate_file(str(source), str(archive))
+            self.assertTrue(Path(str(source) + '.bak').exists())
+            self.assertEqual(Path(str(source) + '.bak').read_text(), text)
+            self.assertEqual(Path(str(archive) + '.bak').read_text(), 'Earlier history\n')
+
+    def test_rotate_ignores_example_headings_and_tags(self):
+        mod = load(ROOT / 'skills/fa/scripts/rotate_improvements.py', 'rotate')
+        text = '# Ledger\n## Topic\n### Real active\n```markdown\n### Example resolved\n- **Tag**: [APPLIED]\n```\n> - **Tag**: [DONE]\n- **Tag**: [NEEDS_REVIEW]\n'
+        _, _, active, resolved = mod.parse_improvements(text)
+        self.assertEqual(len(active), 1)
+        self.assertEqual(len(resolved), 0)
+        self.assertIn('Example resolved', active[0]['text'])
+
+    def test_loop_threshold_ignores_task_count(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            script = base / 'guard.sh'
+            shutil.copy(ROOT / 'skills/hook-kit/resources/block-premature-ralph-loop-cleanup.sh', script)
+            (base / 'context-usage-inject.sh').write_text('printf "Context usage: ~30k / 100k tokens (30%%)\\n"\n')
+            (base / '.claude').mkdir()
+            (base / '.claude/ralph-loop.local.md').write_text('active: true\ncompletion_promise: finish 3 tasks then context usage > 45%\n')
+            transcript = base / 'transcript.jsonl'
+            transcript.write_text('{}\n')
+            payload = {'tool_name': 'Skill', 'tool_input': {'skill': 'cleanup'}, 'cwd': d, 'transcript_path': str(transcript)}
+            p = subprocess.run(['bash', str(script)], cwd=d, input=json.dumps(payload), text=True, capture_output=True)
+            self.assertEqual(p.returncode, 2, p.stderr)
+            self.assertIn('45%', p.stderr)
+
+    def test_stream_search_waits_for_async_stdout(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'ledger.md').write_text('needle\\n')
+            script = str(ROOT / 'skills/fa/scripts/stream-search-fa.js')
+            # Delayed writable models the async pipe contract on Linux. The actual
+            # CLI source still runs unchanged; this is not a live Linux claim.
+            wrapper = ('const real=process.stdout.write.bind(process.stdout);'
+                       'process.stdout.write=(s)=>{setTimeout(()=>real(s),10);return true;};'
+                       'process.argv=[process.execPath,' + json.dumps(script) + ',"needle","--dir",' + json.dumps(d) + ',"--json"];'
+                       'require(' + json.dumps(script) + ');')
+            p = subprocess.run(['node', '-e', wrapper], capture_output=True, text=True)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertEqual(len(p.stdout.splitlines()), 1)
 
     def test_stream_search_flushes_all_pipe_records(self):
         with tempfile.TemporaryDirectory() as d:
