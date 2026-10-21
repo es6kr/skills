@@ -5,6 +5,13 @@
 
 set -euo pipefail
 
+# Opt out of optional copying without disabling pre-commit/pre-push validation.
+# Unset or any value other than 0 preserves the existing reflection behavior.
+if [ "${ES6KR_DEV_REFLECT:-1}" = "0" ]; then
+  echo "[post-commit] SKIP: reflection explicitly disabled (ES6KR_DEV_REFLECT=0)."
+  exit 0
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DEV_REFLECT_SCRIPT="$REPO_ROOT/skills/cc-plugin/scripts/dev-reflect.sh"
 
