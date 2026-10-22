@@ -108,6 +108,35 @@ Summary: 7 Passed | 0 Warnings | 1 Failed
 
 ---
 
+## Commit-type enforcement audit
+
+`BASE-8` detects a local `core.hooksPath` that shadows an executable global
+`commit-msg` without a declared forwarding call. Syntax-only global checks are
+not substitutes for semantic policy. Forwarding is a source-wiring check, not
+proof of the global validator's live behavior.
+
+For tracked skills (including nested plugin skills), `COND-COMMIT-TAG` requires:
+
+- executable `commit-msg` and `pre-push` hooks invoking the shared policy runner;
+- one repository-local `scripts/check_commit_tags.py` used by both hooks and CI;
+- an executable runner and a real CI range invocation, not comments or an echo;
+- an isolated real Git fixture that rejects a native `docs` commit on a nested
+  skill, accepts `feat`, preserves HEAD/staged content after rejection, and rejects
+  an invalid outgoing commit through the actual pre-push hook.
+
+Git itself may refresh fixture index metadata during a rejected commit; the
+checker-only suite separately verifies raw index-byte immutability.
+
+The helper is `scripts/check-commit-policy-wiring.py` beside the doctor. Doctor
+executes the inspected repository's checker in a temporary fixture: inspect only
+trusted checkouts. It does not stage or commit in the target repository, execute
+its entire pre-push suite, change hooks/configuration, or modify branch protection.
+A PASS is declared wiring plus that bounded local probe, not an observed GitHub
+check or proof that the check is required for merging. Missing policy, a missing
+message hook, an unexecutable runner, a no-op checker, or probe failure is FAIL.
+Only Git's recognized hook filenames require executable permission; registry/data
+files such as `private-refs.regex` do not.
+
 ## Remediation Runbook
 
 ### 1. Fixing Unwired `.githooks` (`BASE-1`)
