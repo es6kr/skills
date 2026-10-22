@@ -12,6 +12,7 @@
 #   1 = One or more checks failed
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Unset parent git environment variables if invoked from within another git hook/process
 unset GIT_DIR GIT_WORK_TREE
@@ -157,8 +158,9 @@ fi
 
 # BASE-2: Executable bit (+x) check
 EXEC_FAIL=0
-for h in "$ACTIVE_HOOKS_DIR"/*; do
-  if [[ -f "$h" && ! "$h" =~ \.(sample|bak)$ ]]; then
+for hook_name in applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge pre-push pre-auto-gc post-rewrite sendemail-validate fsmonitor-watchman reference-transaction post-index-change pre-receive update proc-receive post-receive post-update push-to-checkout; do
+  h="$ACTIVE_HOOKS_DIR/$hook_name"
+  if [[ -f "$h" ]]; then
     if [[ ! -x "$h" ]]; then
       EXEC_FAIL=1
       add_result "BASE-2" "Base" "Permissions" "FAIL" "Hook file '$(basename "$h")' is not executable. Run 'chmod +x $h'."
@@ -366,6 +368,22 @@ if [[ $IS_CORP -eq 1 ]]; then
   if echo "$PRE_PUSH_CONTENT" | grep -qE '(main|master)'; then
     add_result "COND-CORP" "Conditional" "Corp Main Push Block" "PASS" "Corporate repository contains direct main/master push protection."
   fi
+fi
+
+# Inspect global-shadowing and the shared policy with isolated real Git inputs.
+POLICY_PY=""
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+    POLICY_PY="$candidate"
+    break
+  fi
+done
+if [[ -z "$POLICY_PY" ]] || ! POLICY_AUDIT=$("$POLICY_PY" "$SCRIPT_DIR/check-commit-policy-wiring.py" "$REPO_ROOT"); then
+  add_result "COND-COMMIT-TAG" "Conditional" "Commit Tag Semantics" "FAIL" "Cannot execute semantic hook audit; no coverage claim is possible."
+else
+  while IFS='|' read -r policy_id policy_tier policy_cat policy_status policy_message; do
+    [[ -n "$policy_id" ]] && add_result "$policy_id" "$policy_tier" "$policy_cat" "$policy_status" "$policy_message"
+  done <<< "$POLICY_AUDIT"
 fi
 
 # -----------------------------------------------------------------------------
