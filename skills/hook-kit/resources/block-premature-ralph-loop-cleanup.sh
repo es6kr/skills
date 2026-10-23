@@ -71,13 +71,15 @@ if [[ "$ACTIVE" != "true" ]]; then
   exit 0
 fi
 
-# Threshold: parse a numeric percentage out of the state file's
-# completion_promise field (e.g. "context usage > 45%" → 45, locale-
-# agnostic — just extracts the first number). Fall back to the standard 45
-# floor when no number is present (a non-numeric promise, e.g. "user says
-# stop", cannot gate on context % at all — nothing to check).
+# Only an explicit context percentage is a context threshold; task counts and
+# unrelated numbers in completion_promise are not percentages.
 PROMISE_LINE=$(grep -m1 '^completion_promise:' "$STATE_FILE" 2>/dev/null)
-THRESHOLD=$(echo "$PROMISE_LINE" | grep -o '[0-9]\+' | head -1)
+THRESHOLD=$(printf '%s' "$PROMISE_LINE" | python3 -c '
+import re, sys
+m = re.search(r"context[^%\n]*?(\d+(?:\.\d+)?)\s*%", sys.stdin.read(), re.I)
+if m and 0 <= float(m.group(1)) <= 100:
+    print(m.group(1))
+')
 if [[ -z "$THRESHOLD" ]]; then
   exit 0
 fi

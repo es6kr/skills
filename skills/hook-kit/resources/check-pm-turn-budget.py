@@ -5,8 +5,8 @@ Tracks tool calls in PM-mode sessions (e.g. /fix-plan --pm).
 Warns when the cumulative tool-call count reaches 30, preventing the agent
 from sliding into full-stack direct implementation within a PM governance session.
 
-The guard is registered on the Bash matcher only, so a Bash command string is
-its sole activation signal. Activation therefore has to distinguish a command
+The guard observes all tools and activates on an explicit Skill invocation or
+a Bash command that invokes the pipeline. Command activation must distinguish a command
 that *invokes* the pipeline from one that merely *mentions* it: quoted text and
 heredoc bodies are masked out, commands whose job is to read or print text are
 excluded, and the pipeline token must precede the --pm flag the way it does in
@@ -22,6 +22,36 @@ import re
 import shlex
 import sys
 import tempfile
+from functools import wraps
+
+
+def serialized_state(function):
+    """Lock the entire read/modify/replace transaction, not just its write."""
+    @wraps(function)
+    def guarded(*args, **kwargs):
+        if pm_mode_env() is False:
+            return None
+        os.makedirs(STATE_DIR, exist_ok=True)
+        with open(STATE_FILE + '.lock', 'a+b') as lock:
+            if os.name == 'nt':
+                import msvcrt
+                if os.fstat(lock.fileno()).st_size == 0:
+                    lock.write(b'\0')
+                    lock.flush()
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                return function(*args, **kwargs)
+            finally:
+                if os.name == 'nt':
+                    lock.seek(0)
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    return guarded
 
 STATE_DIR = os.path.expanduser("~/.claude/state")
 STATE_FILE = os.path.join(STATE_DIR, "pm-session-counters.json")
@@ -232,6 +262,7 @@ SESSION_TYPE_CHECK = (
 )
 
 
+@serialized_state
 def track_pm_budget(tool_name: str, tool_input: dict, session_id: str) -> str | None:
     forced = pm_mode_env()
     if forced is False:
@@ -248,7 +279,13 @@ def track_pm_budget(tool_name: str, tool_input: dict, session_id: str) -> str | 
         or tool_input.get("command", "")
         or tool_input.get("cmd", "")
     )
-    if is_pm_invocation(cmd):
+    try:
+        skill_pm = (tool_name == 'Skill'
+                    and str(tool_input.get('skill', '')).split(':')[-1] == 'fix-plan'
+                    and '--pm' in shlex.split(str(tool_input.get('args', ''))))
+    except ValueError:
+        skill_pm = False
+    if is_pm_invocation(cmd) or skill_pm:
         session_data["is_pm"] = True
 
     if not session_data.get("is_pm", False) and not forced:

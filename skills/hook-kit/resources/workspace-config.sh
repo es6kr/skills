@@ -60,10 +60,14 @@ done
 
 # Roles a consumer may rely on existing, whatever the config says.
 emit_safe_defaults() {
-  echo "WSCFG_PROFILE=default"
-  for role in ARTIFACTS CHECKLIST BACKLOG RAG WIKI STAGING; do
-    echo "WSCFG_${role}_KIND=none"
-  done
+  if [ "$MODE" = "--json" ]; then
+    printf '%s\n' '{"profile":"default","roles":{"artifacts":{"kind":"none"},"checklist":{"kind":"none"},"backlog":{"kind":"none"},"rag":{"kind":"none"},"wiki":{"kind":"none"},"staging":{"kind":"none"}}}'
+  else
+    echo "WSCFG_PROFILE=default"
+    for role in ARTIFACTS CHECKLIST BACKLOG RAG WIKI STAGING; do
+      echo "WSCFG_${role}_KIND=none"
+    done
+  fi
 }
 
 # Windows ships a python3 stub that exits 49 instead of running, so probe
@@ -117,9 +121,14 @@ FIELDS = ("endpoint", "path", "token_env", "project",
 
 
 def bail():
-    print("WSCFG_PROFILE=default")
-    for r in ROLES:
-        print("WSCFG_%s_KIND=none" % r.upper())
+    if mode == "--json":
+        print(json.dumps({"profile": "default", "roles": {
+            role: {"kind": "none"} for role in ROLES
+        }}))
+    else:
+        print("WSCFG_PROFILE=default")
+        for r in ROLES:
+            print("WSCFG_%s_KIND=none" % r.upper())
     sys.exit(0)
 
 

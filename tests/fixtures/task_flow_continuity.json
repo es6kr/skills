@@ -1,0 +1,158 @@
+{
+  "evidence_kind": "instruction-conformance",
+  "limitation": "These scenarios check owner instructions, not agent behavioral or live adapter proof.",
+  "report_fields": [
+    "original_goal",
+    "owner_scope",
+    "approved_revision/reference",
+    "authorized_actions",
+    "next_unfinished_action",
+    "pending_decisions",
+    "criterion_id",
+    "artifact_revision/digest",
+    "evidence_kind",
+    "procedure",
+    "exit/outcome",
+    "observed_at",
+    "verifier",
+    "acceptance_owner/receipt",
+    "canonical_readback"
+  ],
+  "cases": [
+    {
+      "id": "C1",
+      "transition": "new artifact after FA",
+      "input": "Planning-only approval; original plan absent; FA recorded",
+      "expected": "Create and verify the authorized original plan; FA alone is not completion",
+      "required_clauses": {
+        "skills/task-flow/pipeline.md": [
+          "Create an absent authorized deliverable",
+          "FA record alone never completes the original goal"
+        ]
+      }
+    },
+    {
+      "id": "C2",
+      "transition": "correction detour",
+      "input": "Artifact repair approved; correction completed",
+      "expected": "Resume the next authorized action without duplicate approval",
+      "required_clauses": {
+        "skills/task-flow/pipeline.md": [
+          "next unfinished action",
+          "Continue the next authorized action"
+        ],
+        "skills/task-plan/review.md": [
+          "Do not ask a generic proceed question after recovery"
+        ]
+      }
+    },
+    {
+      "id": "C3",
+      "transition": "record-only or stop",
+      "input": "User limits work to recording or cancels original goal",
+      "expected": "Do not resume; retain stopped or pending state",
+      "required_clauses": {
+        "skills/task-flow/pipeline.md": [
+          "record-only",
+          "cancelled",
+          "Do not resume"
+        ]
+      }
+    },
+    {
+      "id": "C4",
+      "transition": "genuinely new permission",
+      "input": "Planning-only approval; implementation proposed",
+      "expected": "Keep implementation pending; identify missing scope decision",
+      "required_clauses": {
+        "skills/task-plan/review.md": [
+          "Planning-only authorization does not authorize implementation",
+          "Ask only for the missing decision"
+        ]
+      }
+    },
+    {
+      "id": "C5",
+      "transition": "unavailable prerequisite",
+      "input": "Approved scope; provider or host unavailable",
+      "expected": "Block dependent action only; continue authorized independent work",
+      "required_clauses": {
+        "skills/task-flow/pipeline.md": [
+          "Block only the dependent action",
+          "independent authorized work",
+          "Do not claim a provider workaround"
+        ],
+        "skills/task-exec/gate.md": [
+          "Recovery is not expiration",
+          "current isolated-worktree readiness"
+        ]
+      }
+    },
+    {
+      "id": "C6",
+      "transition": "stale evidence",
+      "input": "Approved plan unchanged; artifact digest changed",
+      "expected": "Reject old verification and acceptance; collect fresh evidence",
+      "required_clauses": {
+        "skills/task-exec/verify.md": [
+          "changed artifact digest invalidates prior verification and acceptance",
+          "Collect current evidence",
+          "Historical evidence is not a fresh run"
+        ]
+      }
+    },
+    {
+      "id": "C7",
+      "transition": "partial verification",
+      "input": "One criterion missing or failed",
+      "expected": "Report verified subset; no accepted or canonical Done claim",
+      "required_clauses": {
+        "skills/task-exec/verify.md": [
+          "missing or failed criterion",
+          "Report the verified subset",
+          "Do not claim accepted or canonical Done"
+        ]
+      }
+    },
+    {
+      "id": "C8",
+      "transition": "dispatch not completion",
+      "input": "Only submission receipt or started screen observed",
+      "expected": "Report submitted or started, not executed/verified/accepted",
+      "required_clauses": {
+        "skills/task-exec/verify.md": [
+          "submission receipt or started screen",
+          "submitted or started only",
+          "not executed, verified or accepted"
+        ]
+      }
+    },
+    {
+      "id": "C9",
+      "transition": "accepted not canonical",
+      "input": "Explicit acceptance receipt; tracker mutation not authorized",
+      "expected": "Report accepted with canonical pending; no fabricated read-back",
+      "required_clauses": {
+        "skills/task-exec/delivery.md": [
+          "accepted with canonical pending",
+          "Never fabricate canonical read-back",
+          "existing owner helper",
+          "exact read-back"
+        ]
+      }
+    },
+    {
+      "id": "C10",
+      "transition": "unknown effects",
+      "input": "Recovery lacks authoritative effect settlement",
+      "expected": "Read-only recovery; no blind replay or duplicate launch",
+      "required_clauses": {
+        "skills/task-flow/pipeline.md": [
+          "authoritative settlement",
+          "read-only recovery",
+          "No blind replay or duplicate worker launch"
+        ]
+      }
+    }
+  ]
+}

@@ -2,8 +2,8 @@
 name: backlog
 description: |
   Unified backlog lifecycle management and task tracking. Orchestrates session TODOs, workspace checklists (`fix_plan.md`, `checklist.md`), and issue trackers with vendor-agnostic lifecycle contracts.
-  Topics — triage (classify incoming requests into session/file/issue backlogs), priority (GitHub-aligned P0-P3 urgency tagging and blocker triage), sync (external tracker status polling and resolution), prune (demote lower-priority backlog noise from active focus), lifecycle (authoring, state transitions, DoD criteria), comment (post follow-up notes/sub-findings to parent issues), create (issue and intake issue creation), record (session completed work and next-session candidates).
-  Use when: "backlog", "backlog triage", "backlog sync", "backlog prune", "task lifecycle", "manage backlog", "backlog priority", "backlog cleanup", "plane backlog", "issue comment", "backlog record".
+  Topics — triage (classify incoming requests into session/file/issue backlogs), priority (GitHub-aligned P0-P3 urgency tagging and blocker triage), sync (external tracker status polling and resolution), prune (demote lower-priority backlog noise from active focus), lifecycle (authoring, state transitions, DoD criteria), comment (post follow-up notes/sub-findings to parent issues), create (issue and intake issue creation), record (session completed work and next-session candidates), agent-assignment (explicit-scope offline assignment collection and disabled delivery contracts).
+  Use when: "backlog", "backlog triage", "backlog sync", "backlog prune", "task lifecycle", "manage backlog", "backlog priority", "backlog cleanup", "plane backlog", "issue comment", "backlog record", "agent assignment", "offline assignment".
 metadata:
   author: es6kr
   version: "0.2.0"
@@ -39,6 +39,7 @@ Incoming Task / Request
 
 | Topic | Description | Guide |
 |-------|-------------|-------|
+| `agent-assignment` | Collect synthetic assignments with explicit trusted scope; preserve disabled delivery and approval boundaries | [agent-assignment.md](./agent-assignment.md) |
 | `comment` | Post follow-up notes and nested review findings as comments on parent issues | [comment.md](./comment.md) |
 | `create` | Create issues and intake items via API with fallback mechanisms | [create.md](./create.md) |
 | `prune` | Demote lower-priority items (P2/P3) and stale entries to preserve lean active focus sections | [prune.md](./prune.md) |

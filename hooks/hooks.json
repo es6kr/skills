@@ -3,6 +3,15 @@
   "hooks": {
     "PostToolUse": [
       {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-pm-turn-budget.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Read",
         "hooks": [
           {
@@ -17,10 +26,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/commit-tidy/resources/commit-review-trigger.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-pm-turn-budget.sh"
           },
           {
             "type": "command",
@@ -117,6 +122,15 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-excessive-ci-polling.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -126,10 +140,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/block-compound-commands.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/skills/hook-kit/resources/check-excessive-ci-polling.sh"
           },
           {
             "type": "command",

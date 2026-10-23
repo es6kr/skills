@@ -191,7 +191,21 @@ def _split_trailing_meta(chunk):
 
 def split_sections(text):
     """Sections, each carrying the `fa:` header that precedes its heading."""
-    parts = re.split(r"(?m)^## ", text)
+    parts = []
+    start = offset = 0
+    fence = None
+    for line in text.splitlines(keepends=True):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
+        if fence:
+            if marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= fence[1] and not marker.group(2).strip():
+                fence = None
+        elif marker:
+            fence = (marker.group(1)[0], len(marker.group(1)))
+        elif line.startswith("## "):
+            parts.append(text[start:offset])
+            start = offset + 3
+        offset += len(line)
+    parts.append(text[start:])
     carry = _split_trailing_meta(parts[0])[1]
     out = []
     for chunk in parts[1:]:
