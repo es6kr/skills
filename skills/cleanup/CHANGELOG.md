@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/es6kr/skills/compare/cleanup-v0.11.0...cleanup-v0.12.0) (2026-10-23)
+
+
+### Features
+
+* **marketplace:** decouple duplicate and auxiliary skills to labs bundle to minimize review cost ([dc8fe80](https://github.com/es6kr/skills/commit/dc8fe808769e390dbac2e1628e0a65d94c9a9b53))
+
+
+### Bug Fixes
+
+* **cleanup:** constrain singular chunk RAG visibility to 'chunks? added' (green) ([504e61b](https://github.com/es6kr/skills/commit/504e61b2884e2f246dcea1163bd2fd1d85558c32))
+
 ## [0.11.0](https://github.com/es6kr/skills/compare/cleanup-v0.10.0...cleanup-v0.11.0) (2026-10-17)
 
 
