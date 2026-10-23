@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.1](https://github.com/es6kr/skills/compare/fix-plan-v0.18.0...fix-plan-v0.18.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* address review findings from PR [#644](https://github.com/es6kr/skills/issues/644) ([d0befbf](https://github.com/es6kr/skills/commit/d0befbfbe1bea074544595c2a8d1f5e2656c1d98))
+* **fix-plan:** validate CollabMD base URL before writing frontmatter links ([95c4487](https://github.com/es6kr/skills/commit/95c448734fc466f6c783feba106c2863ccc950e8))
+
 ## [0.18.0](https://github.com/es6kr/skills/compare/fix-plan-v0.17.2...fix-plan-v0.18.0) (2026-10-17)
 
 

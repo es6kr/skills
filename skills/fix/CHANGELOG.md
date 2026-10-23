@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/fix-v0.8.0...fix-v0.8.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **fix:** recognize native Claude environment signals ([#650](https://github.com/es6kr/skills/issues/650)) ([7293ca4](https://github.com/es6kr/skills/commit/7293ca4960f8d24aeb75c3369ba8cfaabb2f6423))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/fix-v0.7.1...fix-v0.8.0) (2026-10-17)
 
 
