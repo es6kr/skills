@@ -10,7 +10,9 @@ import asyncio
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import importlib.util
+import json
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -134,17 +136,28 @@ class TestAutomaticQuotaReservation(unittest.TestCase):
             }
 
             # The booking callback must neither invoke AGY nor contact a provider.
-            with patch.object(socket, "create_connection", side_effect=AssertionError("network forbidden")), \
+            # Create the event loop before fencing sockets: Windows needs an
+            # internal socketpair even though the consumer performs no network I/O.
+            with asyncio.Runner() as loop, \
+                    patch.object(socket, "create_connection", side_effect=AssertionError("network forbidden")), \
                     patch.object(socket.socket, "connect", side_effect=AssertionError("network forbidden")), \
                     patch.object(subprocess, "Popen", side_effect=AssertionError("provider execution forbidden")):
                 adapter = self._load_adapter()
+                runner = fixture / "scripts" / "quota-reservation" / "first_use.py"
+                runner.parent.mkdir(parents=True)
+                shutil.copyfile(PACKAGE / "scripts" / "first_use.py", runner)
+                state = fixture / "quota-reservation"
+                state.mkdir()
+                (state / "policy.json").write_text(json.dumps(settings), encoding="utf-8")
                 consumer = adapter.make_consumer(
                     settings=settings,
                     scheduler=scheduler,
-                    state_dir=fixture / "private-state",
+                    state_dir=state,
+                    profile_home=fixture,
+                    runner_script=runner,
                     clock=lambda: observed + timedelta(seconds=2),
                 )
-                result = asyncio.run(consumer(**deepcopy(incoming)))
+                result = loop.run(consumer(**deepcopy(incoming)))
                 self.assertIsInstance(result, dict)
                 self.assertEqual("handled", result.get("action"))
                 self.assertEqual(1, len(scheduler.create_calls),
@@ -158,8 +171,8 @@ class TestAutomaticQuotaReservation(unittest.TestCase):
                 self.assertEqual("origin", request["deliver"])
                 for field in ("platform", "chat_id", "thread_id", "user_id", "scope_id"):
                     self.assertEqual(source[field], request["origin"][field])
-                self.assertEqual((PACKAGE / "scripts" / "first_use.py").resolve(),
-                                 Path(request["script"]).resolve())
+                self.assertEqual(runner.resolve(), Path(request["script"]).resolve())
+                self.assertTrue(Path(request["workdir"]).is_relative_to(state))
                 self.assertIn("000000000002", scheduler.read_calls,
                               "Creation success alone is not an active-reservation receipt")
                 receipt = scheduler.get_job("000000000002")
@@ -169,7 +182,7 @@ class TestAutomaticQuotaReservation(unittest.TestCase):
                 self.assertEqual(unrelated, scheduler.jobs["000000000001"])
                 self.assertIn("000000000002", result.get("reply", ""))
 
-                repeated = asyncio.run(consumer(**deepcopy(incoming)))
+                repeated = loop.run(consumer(**deepcopy(incoming)))
                 self.assertEqual("handled", repeated.get("action"))
                 self.assertEqual(1, len(scheduler.create_calls),
                                  "Replaying the same admitted message must not create another job")
