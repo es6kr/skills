@@ -213,7 +213,9 @@ class Consumer:
                     db.execute("UPDATE reservations SET job_id=? WHERE event_key=?", (identifier, event_key))
                 return self._reconcile(db, payload, identifier)
             except Exception:
-                db.execute("UPDATE reservations SET state='unknown' WHERE event_key=?", (event_key,))
+                # A late uncertain submission must not revoke another delivery's verified receipt.
+                db.execute("UPDATE reservations SET state='unknown' WHERE event_key=? AND state!='scheduled'",
+                           (event_key,))
                 return handled("Reservation submission unknown; no automatic retry.")
         finally:
             db.close()
@@ -223,13 +225,20 @@ class Consumer:
             if not identifier:
                 matches = [job for job in self.scheduler.list_jobs(include_disabled=True)
                            if job.get("name") == payload["name"] and job.get("workdir") == payload["workdir"]]
+                # An older empty snapshot is uncertainty, not evidence against a newer receipt.
+                if not matches:
+                    raise LookupError("No matching reservation readback yet")
                 identifier = matches[0].get("id") if len(matches) == 1 else None
             job = self.scheduler.get_job(identifier) if identifier else None
             if not self._receipt(job, payload):
-                raise ValueError("Exact active readback missing")
+                # Explicit missing/mismatched/disabled records still revoke execution eligibility.
+                db.execute("UPDATE reservations SET state='unknown' WHERE event_key=?", (payload["event_key"],))
+                return handled("Reservation not verified; submission unknown; no automatic retry.")
             db.execute("UPDATE reservations SET state='scheduled',job_id=? WHERE event_key=?",
                        (identifier, payload["event_key"]))
             return handled("First-use reservation scheduled: " + identifier + " at " + payload["due"])
         except Exception:
-            db.execute("UPDATE reservations SET state='unknown' WHERE event_key=?", (payload["event_key"],))
+            # Transient lookup failure cannot downgrade an already verified reservation.
+            db.execute("UPDATE reservations SET state='unknown' WHERE event_key=? AND state!='scheduled'",
+                       (payload["event_key"],))
             return handled("Reservation not verified; submission unknown; no automatic retry.")
