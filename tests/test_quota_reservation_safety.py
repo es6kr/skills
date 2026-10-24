@@ -148,6 +148,99 @@ class Safety(unittest.TestCase):
         self.assertIn("not verified", self.call(message)["reply"])
         self.assertEqual(1, len(self.scheduler.create_calls))
 
+    def _reservation_state(self):
+        with closing(sqlite3.connect(self.state / "ledger.sqlite3")) as db:
+            rows = db.execute("SELECT state FROM reservations").fetchall()
+        self.assertEqual(1, len(rows))
+        return rows[0][0]
+
+    def _first_use_attempt(self):
+        """Exercise the real runner with an explicit offline CLI collaborator."""
+        request = next((self.state / "requests").iterdir())
+        payload = json.loads((request / "request.json").read_text(encoding="utf-8"))
+        runner = load_module(self.runner, "duplicate_readback_runner")
+        calls = []
+        def declared_cli(command, **kwargs):
+            calls.append((command, kwargs))
+            return SimpleNamespace(returncode=0, stdout=json.dumps({
+                "status": "SUCCESS", "num_turns": 1, "response": "AGY_FIRST_USE_READY"}))
+        receipt, refusal = None, None
+        with patch.object(subprocess, "Popen", side_effect=AssertionError("Real CLI forbidden")):
+            try:
+                receipt = runner.execute_request(
+                    request, clock=lambda: datetime.fromisoformat(payload["due"]), run_cli=declared_cli)
+            except ValueError as error:
+                refusal = str(error)
+        return calls, receipt, refusal
+
+    def test_duplicate_readback_timeout_preserves_verified_first_use(self):
+        self.assertIn("scheduled:", self.call()["reply"])
+        self.assertEqual("scheduled", self._reservation_state())
+        jobs_before = deepcopy(self.scheduler.jobs)
+        with patch.object(self.scheduler, "get_job", side_effect=TimeoutError("Offline readback failure")) as read:
+            self.call()
+        self.assertEqual(1, read.call_count)
+        self.assertEqual(jobs_before, self.scheduler.jobs)
+        self.assertEqual(1, len(self.scheduler.create_calls))
+        state_after = self._reservation_state()
+        calls, receipt, refusal = self._first_use_attempt()
+        self.assertIsNone(refusal, "Previously verified job blocked after " + state_after + ": " + str(refusal))
+        self.assertEqual(1, len(calls))
+        self.assertEqual("response_verified", receipt["state"])
+
+    def test_stale_duplicate_failure_preserves_newer_verified_first_use(self):
+        """Order two real reconciliation calls; no threads or real cron jobs."""
+        class AcceptedLate(RecordingScheduler):
+            def create_job(self, **request):
+                job = super().create_job(**request)
+                self.pending = self.jobs.pop(job["id"])
+                raise TimeoutError("Offline original submission becomes visible later")
+        scheduler = AcceptedLate()
+        control = deepcopy(scheduler.jobs)
+        self.assertIn("unknown", self.call(scheduler=scheduler)["reply"])
+        self.assertEqual("unknown", self._reservation_state())
+        request = next((self.state / "requests").iterdir())
+        payload = json.loads((request / "request.json").read_text(encoding="utf-8"))
+        consumer = self.consumer(scheduler)
+        verified = []
+        def stale_list(include_disabled=True):
+            # The duplicate's older snapshot excludes the accepted job. Before
+            # returning it, finish the original's real exact-readback path.
+            older_snapshot = RecordingScheduler.list_jobs(scheduler, include_disabled=include_disabled)
+            identifier = scheduler.pending["id"]
+            scheduler.jobs[identifier] = deepcopy(scheduler.pending)
+            with closing(sqlite3.connect(self.state / "ledger.sqlite3", isolation_level=None)) as db:
+                result = consumer._reconcile(db, payload, identifier)
+            verified.append((result, self._reservation_state()))
+            return older_snapshot
+        with patch.object(scheduler, "list_jobs", side_effect=stale_list):
+            self.call(scheduler=scheduler)
+        self.assertEqual(1, len(verified), "The controlled interleaving must actually run")
+        self.assertIn("scheduled:", verified[0][0]["reply"])
+        self.assertEqual("scheduled", verified[0][1], "A newer real readback must verify the same request")
+        self.assertEqual(1, len(scheduler.create_calls), "Unknown submission must not be retransmitted")
+        for identifier, job in control.items():
+            self.assertEqual(job, scheduler.jobs[identifier])
+        self.assertIs(True, scheduler.jobs[scheduler.pending["id"]]["enabled"])
+        state_after = self._reservation_state()
+        calls, receipt, refusal = self._first_use_attempt()
+        self.assertIsNone(refusal, "Older duplicate invalidated newer " + state_after + ": " + str(refusal))
+        self.assertEqual(1, len(calls))
+        self.assertEqual("response_verified", receipt["state"])
+
+    def test_explicitly_disabled_duplicate_still_blocks_first_use(self):
+        self.assertIn("scheduled:", self.call()["reply"])
+        self.assertEqual(1, len(self.scheduler.create_calls))
+        identifier = next(
+            job_id for job_id, job in self.scheduler.jobs.items() if job.get("no_agent") is True)
+        self.scheduler.jobs[identifier]["enabled"] = False
+        self.assertIn("not verified", self.call()["reply"])
+        calls, receipt, refusal = self._first_use_attempt()
+        self.assertEqual("Verified reservation binding absent", refusal)
+        self.assertEqual([], calls)
+        self.assertIsNone(receipt)
+        self.assertEqual(1, len(self.scheduler.create_calls))
+
     def test_runner_validates_response_and_does_not_resubmit(self):
         self.call()
         request = next((self.state / "requests").iterdir())
