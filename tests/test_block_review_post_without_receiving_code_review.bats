@@ -29,11 +29,25 @@ _make_transcript_without_skill() {
   echo "$path"
 }
 
+_make_transcript_with_read_file() {
+  local path="$TESTDIR/transcript_with_read_file.jsonl"
+  printf '{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","tool_calls":[{"name":"read_file","args":{"Path":"/path/to/superpowers/skills/receiving-code-review/SKILL.md"}}]}\n' > "$path"
+  echo "$path"
+}
+
 _run_guard() {
   local cmd="$1" transcript="$2"
   cd "$TESTDIR"
   run bash "$GUARD" <<EOF
 {"tool_name":"Bash","tool_input":{"command":$(printf '%s' "$cmd" | jq -Rs .)},"transcript_path":$(printf '%s' "$transcript" | jq -Rs .)}
+EOF
+}
+
+_run_guard_ag() {
+  local cmd="$1" transcript="$2"
+  cd "$TESTDIR"
+  run bash "$GUARD" <<EOF
+{"toolCall":{"name":"run_command","args":{"CommandLine":$(printf '%s' "$cmd" | jq -Rs .)}},"transcript_path":$(printf '%s' "$transcript" | jq -Rs .)}
 EOF
 }
 
@@ -110,4 +124,25 @@ EOF
 {"tool_name":"Bash","tool_input":{}}
 EOF
   [ "$status" -eq 0 ]
+}
+
+@test "Antigravity: review-flavored POST without receiving-code-review in transcript is DENIED with JSON" {
+  local body_file="$TESTDIR/body.md"
+  _review_body > "$body_file"
+  local transcript
+  transcript="$(_make_transcript_without_skill)"
+  _run_guard_ag "gh pr comment 600 -R es6kr/skills --body-file $body_file" "$transcript"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"\"decision\":\"deny\""* ]]
+  [[ "$output" == *"receiving-code-review"* ]]
+}
+
+@test "Antigravity: review-flavored POST with read_file receiving-code-review in transcript PASSES" {
+  local body_file="$TESTDIR/body.md"
+  _review_body > "$body_file"
+  local transcript
+  transcript="$(_make_transcript_with_read_file)"
+  _run_guard_ag "gh pr comment 600 -R es6kr/skills --body-file $body_file" "$transcript"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"\"decision\":\"deny\""* ]]
 }
