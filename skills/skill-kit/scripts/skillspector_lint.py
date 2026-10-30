@@ -74,7 +74,7 @@ class SkillSpector:
         if frontmatter is None:
             errors.append("Invalid or missing YAML frontmatter in SKILL.md")
         else:
-            self._validate_frontmatter(frontmatter, errors, warnings)
+            self._validate_frontmatter(frontmatter, errors, warnings, metadata_only=metadata_only)
             if require_version:
                 self._validate_version(content, errors)
 
@@ -128,9 +128,14 @@ class SkillSpector:
             errors.append('metadata.version must be a double-quoted semver ("X.Y.Z")')
 
     def _validate_frontmatter(
-        self, fm: Dict[str, Any], errors: List[str], warnings: List[str]
+        self, fm: Dict[str, Any], errors: List[str], warnings: List[str],
+        *, metadata_only: bool = False
     ) -> None:
         """Validate frontmatter fields according to standard."""
+        # GUARD: native repository metadata requires a scalar; standalone scans keep legacy behavior.
+        if metadata_only and "allowed-tools" in fm and not isinstance(fm["allowed-tools"], str):
+            errors.append("Frontmatter allowed-tools must be a string")
+
         name = fm.get("name")
         if not name:
             errors.append("Frontmatter missing required field 'name'")

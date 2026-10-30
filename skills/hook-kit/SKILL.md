@@ -8,21 +8,7 @@ depends-on:
   - safe-delete
 description: |
   Hook lifecycle: add (registry-first authoring and tests), audit, edit (dual-sync), install, move, remove, registry (canonical companion inventory). Use when: "add a hook", "new hook", "write a hook", "author a hook", "hook cleanup", "hook audit", "hook edit", "hook install", "hook move", "hook remove", "install hook", "edit hook", "edit guard", "bash-guard", "hook sync", "hook permission", "orphan hook", "chmod +x hook", "exit 126", "hook registry", "hook-registry.yaml", "phantom hook", "ghost hook", "hook registration", "hooks.json", "settings.json hooks"
-allowed-tools:
-  - Read
-  - Edit
-  - Grep
-  - Bash(cp:*)
-  - Bash(diff:*)
-  - Bash(ls:*)
-  - Bash(mkdir:*)
-  - Bash(mv:*)
-  - Bash(bash -n:*)
-  - Bash(jq:*)
-  - Bash(chmod:*)
-  - Bash(test:*)
-  - Bash(find:*)
-  - AskUserQuestion
+allowed-tools: "Read Edit Grep Bash(cp:*) Bash(diff:*) Bash(ls:*) Bash(mkdir:*) Bash(mv:*) Bash(bash -n:*) Bash(jq:*) Bash(chmod:*) Bash(test:*) Bash(find:*) AskUserQuestion"
 ---
 
 # Hook Management

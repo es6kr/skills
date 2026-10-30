@@ -18,6 +18,32 @@ SPEC = importlib.util.spec_from_file_location("metadata_gate_spector", CLI)
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+EXPECTED_ALLOWED_TOOLS = {'backlog': ['Read', 'Edit', 'Write', 'Grep', 'Bash(gh:*)', 'Bash(python3:*)'],
+ 'claudify': ['Read', 'Write', 'Edit', 'Glob', 'Skill', 'Bash(mkdir:*)'],
+ 'consolidate': ['Agent', 'AskUserQuestion', 'Bash', 'Edit', 'Glob', 'Grep', 'Read', 'Write'],
+ 'fix-plan': ['Read', 'Edit', 'Write', 'Grep', 'Bash(gh:*)', 'Bash(mv:*)', 'Bash(mkdir:*)'],
+ 'github-repo': ['Read',
+                 'Edit',
+                 'Write',
+                 'Bash(gh:*)',
+                 'Bash(git:*)',
+                 'Bash(ls:*)',
+                 'Bash(mkdir:*)'],
+ 'hook-kit': ['Read',
+              'Edit',
+              'Grep',
+              'Bash(cp:*)',
+              'Bash(diff:*)',
+              'Bash(ls:*)',
+              'Bash(mkdir:*)',
+              'Bash(mv:*)',
+              'Bash(bash -n:*)',
+              'Bash(jq:*)',
+              'Bash(chmod:*)',
+              'Bash(test:*)',
+              'Bash(find:*)',
+              'AskUserQuestion']}
+
 class MetadataGateTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="skill-metadata-")
@@ -197,6 +223,68 @@ class MetadataGateTests(unittest.TestCase):
         self.repository()
         (self.root / "skills/skill-kit/scripts/skillspector_lint.py").write_text("# not the canonical linter\n", encoding="utf-8")
         self.assertIn("FAIL", self.doctor_row())
+
+
+    def skill_with_tools(self, scalar):
+        path = self.skill()
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("\n---\n", f"\nallowed-tools: {scalar}\n---\n", 1),
+                        encoding="utf-8")
+        return path
+
+    def test_metadata_mode_rejects_nonstring_allowed_tools(self):
+        for scalar in ['[Read, "Bash(gh pr:*)"]', "[]", "null", "true", "42", "{Read: true}"]:
+            with self.subTest(scalar=scalar):
+                result = MODULE.SkillSpector().scan_skill(
+                    str(self.skill_with_tools(scalar)), metadata_only=True)
+                self.assertFalse(result["valid"], result)
+                self.assertTrue(any("allowed-tools must be a string" in error
+                                    for error in result["errors"]), result)
+
+    def test_metadata_mode_accepts_optional_string_allowed_tools(self):
+        self.assertTrue(MODULE.SkillSpector().scan_skill(
+            str(self.skill()), metadata_only=True)["valid"])
+        for value in ["", "Read", "Read Bash(gh pr:*) Bash(bash -n:*)"]:
+            with self.subTest(value=value):
+                result = MODULE.SkillSpector().scan_skill(
+                    str(self.skill_with_tools(json.dumps(value))), metadata_only=True)
+                self.assertTrue(result["valid"], result)
+
+    def test_full_scan_keeps_legacy_list_allowed_tools(self):
+        result = MODULE.SkillSpector().scan_skill(str(self.skill_with_tools('[Read, Grep]')))
+        self.assertTrue(result["valid"], result)
+
+    def test_json_and_text_reject_array_allowed_tools_in_metadata_mode(self):
+        path = self.skill_with_tools('[Read, "Bash(gh pr:*)"]')
+        result = self.cli("--frontmatter-only", "--json", path)
+        rows = json.loads(result.stdout)
+        self.assertEqual(len(rows), 1, rows)
+        self.assertFalse(rows[0]["valid"], rows)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.cli("--frontmatter-only", path)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("allowed-tools must be a string", result.stdout)
+
+    def test_wrapper_rejects_array_allowed_tools(self):
+        self.repository()
+        self.skill_with_tools('[Read, Grep]')
+        result = self.command([self.bash, self.root / "scripts/lint-frontmatter.sh"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("allowed-tools must be a string", result.stdout)
+
+    def test_doctor_rejects_array_allowed_tools(self):
+        self.repository()
+        self.skill_with_tools('[Read, Grep]')
+        self.assertIn("FAIL", self.doctor_row())
+
+    def test_repository_allowed_tools_preserve_all_declared_entries(self):
+        for slug, expected in EXPECTED_ALLOWED_TOOLS.items():
+            with self.subTest(skill=slug):
+                path = ROOT / "skills" / slug / "SKILL.md"
+                metadata, _ = MODULE.SkillSpector()._parse_frontmatter(path.read_text(encoding="utf-8"))
+                self.assertIsNotNone(metadata)
+                self.assertIsInstance(metadata["allowed-tools"], str)
+                self.assertEqual(metadata["allowed-tools"], " ".join(expected))
 
 if __name__ == "__main__":
     unittest.main()

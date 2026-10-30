@@ -9,14 +9,7 @@ metadata:
 depends-on:
   - code-workflow
   - github-flow
-allowed-tools:
-  - Read
-  - Edit
-  - Write
-  - Grep
-  - Bash(gh:*)
-  - Bash(mv:*)
-  - Bash(mkdir:*)
+allowed-tools: "Read Edit Write Grep Bash(gh:*) Bash(mv:*) Bash(mkdir:*)"
 ---
 
 # Fix Plan

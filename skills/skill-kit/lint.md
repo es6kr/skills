@@ -678,3 +678,20 @@ python3 skills/skill-kit/scripts/skillspector_lint.py --json skills/skill-kit
 - `.bak` directories are excluded from scans
 - Always confirm before fixing
 - For plugin skills, consider contributing fixes upstream
+
+### Native tool declarations
+
+The repository's `--frontmatter-only` gate follows the Agent Skills scalar
+contract: `allowed-tools` is optional, but when present it must be a YAML string.
+Encode the existing tool entries in order, without dropping entries or changing
+parenthesized patterns (including patterns with internal spaces):
+
+```yaml
+allowed-tools: "Read Grep Bash(gh:*) Bash(bash -n:*)"
+```
+
+Sequences (including `[]`), mappings, nulls, booleans and numbers are invalid in
+this mode and must propagate a nonzero exit through JSON output, the repository
+wrapper and GitRepo doctor. The standalone prose/security scan keeps its legacy
+behavior; it does not certify native registration. Metadata acceptance is not
+plugin installation, serving-cache refresh or permission to execute these tools.
