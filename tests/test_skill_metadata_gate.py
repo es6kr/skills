@@ -183,5 +183,20 @@ class MetadataGateTests(unittest.TestCase):
         self.repository()
         self.assertIn("PASS", self.doctor_row())
 
+    def test_doctor_rejects_unwired_fallback_hooks(self):
+        self.repository()
+        self.assertEqual(self.command([self.git, "config", "core.hooksPath", ".git/hooks"]).returncode, 0)
+        self.assertIn("FAIL", self.doctor_row())
+
+    def test_doctor_rejects_missing_repository_linter(self):
+        self.repository()
+        (self.root / "skills/skill-kit/scripts/skillspector_lint.py").unlink()
+        self.assertIn("FAIL", self.doctor_row())
+
+    def test_doctor_rejects_drifted_repository_linter(self):
+        self.repository()
+        (self.root / "skills/skill-kit/scripts/skillspector_lint.py").write_text("# not the canonical linter\n", encoding="utf-8")
+        self.assertIn("FAIL", self.doctor_row())
+
 if __name__ == "__main__":
     unittest.main()

@@ -19,7 +19,7 @@ Validate and fix SKILL.md frontmatter issues automatically.
 
 ### Description Length Budget (HARD STOP)
 
-**`description` field must be ≤ 1024 characters.** Claude Code's system reminder truncates descriptions beyond the limit, dropping trigger keywords at the tail — which causes skill discovery failures.
+**`description` must decode to a non-empty string of at most 1024 characters.** Consuming loaders can reject oversized metadata, preventing registration. Count the parsed YAML value, including escape decoding and block-scalar trailing newlines; source bytes or shell command-substitution length are not an enforcement gate.
 
 **Measure** (3-layer fallback — first available wins):
 
@@ -626,6 +626,26 @@ description: Example skill for demo. "example", "demo" triggers
 allowed-tools: [Read, Edit]
 ---
 ```
+
+## Required Repository Entry Point (HARD STOP)
+
+For plugin/skill source changes, run `bash scripts/lint-frontmatter.sh` before
+source delivery. Existing pre-push hooks and CI must invoke this exact required
+entry point; a missing script, parser or nonzero result is a failure, never a
+reason to skip validation. GitRepo's doctor checks the wiring and executes this
+canonical validator independently. Do not introduce a second YAML/length engine.
+
+The wrapper delegates to SkillSpector with `--frontmatter-only --require-version
+--tracked`. It covers root `SKILL.md` and nested plugin skill trees, preserves the
+double-quoted `metadata.version` convention, and excludes untracked local skills,
+backup directories and separate worktrees. JSON output is diagnostic formatting,
+not a success override: invalid results exit 1 in both output modes. The default
+standalone scan still runs the existing security checks; metadata-only repository
+lint does not certify prose security or native runtime activation.
+
+Use `requirements-lint.txt` for the safe YAML parser dependency. Do not install
+missing tools without installation authority. The manual fallback measurements
+above are estimates only and cannot replace a failing mandatory repository gate.
 
 ## SkillSpector Static Analysis & Security Scanner
 

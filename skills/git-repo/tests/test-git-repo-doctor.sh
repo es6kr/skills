@@ -216,6 +216,30 @@ done
 bash scripts/lint-frontmatter.sh
 EOF
 
+# A compliant skill repository needs real metadata lint and CI, not a hook name.
+mkdir -p "$REPO_6/scripts" "$REPO_6/.github/workflows" "$REPO_6/skills/skill-kit/scripts"
+cp "$REPO_ROOT/scripts/lint-frontmatter.sh" "$REPO_6/scripts/lint-frontmatter.sh"
+cp "$REPO_ROOT/skills/skill-kit/SKILL.md" "$REPO_6/skills/skill-kit/SKILL.md"
+cp "$REPO_ROOT/skills/skill-kit/scripts/skillspector_lint.py" "$REPO_6/skills/skill-kit/scripts/skillspector_lint.py"
+cat > "$REPO_6/.github/workflows/lint.yml" << 'EOF'
+name: Skill lint
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash scripts/lint-frontmatter.sh
+EOF
+cat > "$REPO_6/skills/sample-skill/SKILL.md" << 'EOF'
+---
+name: sample-skill
+metadata:
+  version: "0.1.0"
+description: A valid fixture skill.
+---
+# Example
+EOF
+git_in "$REPO_6" add .
 chmod +x "$REPO_6/.githooks/pre-commit" "$REPO_6/.githooks/pre-push"
 out_6=$(bash "$SCRIPT" "$REPO_6" 2>&1)
 exit_6=$?
