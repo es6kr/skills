@@ -7,14 +7,7 @@ depends-on:
   - github-flow
 description: |
   GitHub repository configuration and verification. Topics — actions (GitHub Actions workflow generation + Dependabot grouping by dependency type), setup (integrations: CodeRabbit, Copilot, issue/PR templates, CODEOWNERS, branch protection), verify (repo prerequisites checklist for github-flow: remote, default branch, PR template, branch protection, GitHub Actions, CONTRIBUTING, LICENSE). Use when: "github actions", "workflow generation", "CI workflow", "dependabot", "dependabot groups", "coderabbit", "copilot setup", "GitHub Actions", "repo setup", "CODEOWNERS", "PR template", "issue template", "branch protection", "repo verify".
-allowed-tools:
-  - Read
-  - Edit
-  - Write
-  - Bash(gh:*)
-  - Bash(git:*)
-  - Bash(ls:*)
-  - Bash(mkdir:*)
+allowed-tools: "Read Edit Write Bash(gh:*) Bash(git:*) Bash(ls:*) Bash(mkdir:*)"
 ---
 
 # GitHub Repo

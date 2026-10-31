@@ -234,4 +234,4 @@ bats tests/
 # CI job: pytest (Deploy Tests) — run the whole tests/ dir so test_check_hangul.py
 # is exercised too, not just test_deploy.py.
 echo "Running pytest (tests)..."
-uvx --from pytest pytest tests -v
+uvx --with-requirements requirements-lint.txt --from pytest pytest tests -v

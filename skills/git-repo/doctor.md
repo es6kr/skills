@@ -58,7 +58,7 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **`COND-MD`** | Repository contains `*.md` | **Markdown Lint** | `pre-commit` or `pre-push` must contain markdown/hangul or link reference validator. |
 | **`COND-MD-STYLE`** | Repository contains `*.md` | **Markdown Style Lint** | A markdown style/whitespace linter (`markdownlint`, `remark-lint`, `mdl`, or `prettier --check` on `*.md`) declared in a `Makefile`, `package.json`, or `scripts/` must be invoked from `pre-commit`, `pre-push`, or CI. Distinct from `COND-MD`: frontmatter and hangul checks do not catch trailing whitespace or style drift, so a repository can pass `COND-MD` while having no style lint at all. WARN when no tooling manifest is present, or when a manifest exists but declares no style linter; FAIL when a linter is declared but never invoked. |
-| **`COND-SKILL`** | Repository contains `skills/*/SKILL.md` | **Skill Frontmatter** | `pre-push` or `pre-commit` must run `lint-frontmatter.sh` or equivalent metadata validator. |
+| **`COND-SKILL`** | Repository contains tracked root or nested `SKILL.md` | **Skill Frontmatter** | Require executable `scripts/lint-frontmatter.sh` calls in a Git hook and CI; the wrapper must reuse SkillSpector with decoded metadata/version/tracked checks. Execute the canonical linter and fail for invalid descriptions, missing dependencies, wrapper, or wiring. A hook name alone never passes. |
 | **`COND-AGENT`** | Workspace is `.agents/` or has `fix_plan.md` | **Tracker Guard** | `pre-commit` must protect against committing untracked/dirty `fix_plan.md`. |
 | **`COND-GO`** | `go.mod` is present | **Go Toolchain** | `pre-commit`/`pre-push` must run `gofmt` / `go vet` / `go test`. |
 | **`COND-PUBLIC`** | Remote is public (`es6kr/*`) | **Public English Gate** | `pre-commit` must contain `check-hangul` gate to enforce English-only text. |
@@ -107,6 +107,35 @@ Summary: 7 Passed | 0 Warnings | 1 Failed
 ```
 
 ---
+
+## Commit-type enforcement audit
+
+`BASE-8` detects a local `core.hooksPath` that shadows an executable global
+`commit-msg` without a declared forwarding call. Syntax-only global checks are
+not substitutes for semantic policy. Forwarding is a source-wiring check, not
+proof of the global validator's live behavior.
+
+For tracked skills (including nested plugin skills), `COND-COMMIT-TAG` requires:
+
+- executable `commit-msg` and `pre-push` hooks invoking the shared policy runner;
+- one repository-local `scripts/check_commit_tags.py` used by both hooks and CI;
+- an executable runner and a real CI range invocation, not comments or an echo;
+- an isolated real Git fixture that rejects a native `docs` commit on a nested
+  skill, accepts `feat`, preserves HEAD/staged content after rejection, and rejects
+  an invalid outgoing commit through the actual pre-push hook.
+
+Git itself may refresh fixture index metadata during a rejected commit; the
+checker-only suite separately verifies raw index-byte immutability.
+
+The helper is `scripts/check-commit-policy-wiring.py` beside the doctor. Doctor
+executes the inspected repository's checker in a temporary fixture: inspect only
+trusted checkouts. It does not stage or commit in the target repository, execute
+its entire pre-push suite, change hooks/configuration, or modify branch protection.
+A PASS is declared wiring plus that bounded local probe, not an observed GitHub
+check or proof that the check is required for merging. Missing policy, a missing
+message hook, an unexecutable runner, a no-op checker, or probe failure is FAIL.
+Only Git's recognized hook filenames require executable permission; registry/data
+files such as `private-refs.regex` do not.
 
 ## Remediation Runbook
 
@@ -168,11 +197,9 @@ esac
 In `.githooks/pre-push`:
 
 ```sh
-# Verify SKILL.md frontmatter and dependencies
-if [ -f "scripts/lint-frontmatter.sh" ]; then
-  echo "Checking SKILL.md frontmatter..."
-  bash scripts/lint-frontmatter.sh
-fi
+# Mandatory: fail closed if the wrapper or parser is missing.
+# This same command must also run in CI.
+bash scripts/lint-frontmatter.sh
 ```
 
 ### 6. Adding Push Commit Limit Guard (`BASE-6`)

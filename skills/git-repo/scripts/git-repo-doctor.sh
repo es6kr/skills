@@ -12,9 +12,12 @@
 #   1 = One or more checks failed
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Unset parent git environment variables if invoked from within another git hook/process
 unset GIT_DIR GIT_WORK_TREE
+
+DOCTOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REPO_DIR="${1:-.}"
 # Normalize Windows backslashes to forward slashes
@@ -157,8 +160,9 @@ fi
 
 # BASE-2: Executable bit (+x) check
 EXEC_FAIL=0
-for h in "$ACTIVE_HOOKS_DIR"/*; do
-  if [[ -f "$h" && ! "$h" =~ \.(sample|bak)$ ]]; then
+for hook_name in applypatch-msg pre-applypatch post-applypatch pre-commit pre-merge-commit prepare-commit-msg commit-msg post-commit pre-rebase post-checkout post-merge pre-push pre-auto-gc post-rewrite sendemail-validate fsmonitor-watchman reference-transaction post-index-change pre-receive update proc-receive post-receive post-update push-to-checkout; do
+  h="$ACTIVE_HOOKS_DIR/$hook_name"
+  if [[ -f "$h" ]]; then
     if [[ ! -x "$h" ]]; then
       EXEC_FAIL=1
       add_result "BASE-2" "Base" "Permissions" "FAIL" "Hook file '$(basename "$h")' is not executable. Run 'chmod +x $h'."
@@ -288,12 +292,52 @@ if [[ $HAS_MD -eq 1 ]]; then
   fi
 fi
 
-# COND-SKILL: Skills structure lint hook requirement
+# COND-SKILL: required executable wiring AND actual canonical metadata validation.
 if [[ $HAS_SKILLS -eq 1 ]]; then
-  if echo "$CLEAN_HOOKS_CONTENT" | grep -qE '(lint-frontmatter|frontmatter-lint|skill-yaml-validate)'; then
-    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "PASS" "Skill files present and verified by metadata/frontmatter lint hook."
+  SKILL_WRAPPER="scripts/lint-frontmatter.sh"
+  SKILL_LINTER="$DOCTOR_SCRIPT_DIR/../../skill-kit/scripts/skillspector_lint.py"
+  # Match runnable command lines, not comments, echo strings, or hook names.
+  SKILL_COMMAND='^[[:space:]]*(-[[:space:]]+run:[[:space:]]*)?(bash[[:space:]]+)?(\./)?scripts/lint-frontmatter\.sh([[:space:]]|$)'
+  SKILL_FAILURE=""
+  SKILL_ACTIVE_HOOKS_CONTENT=""
+  for skill_hook in pre-commit pre-push; do
+    if [[ -f "$ACTIVE_HOOKS_DIR/$skill_hook" ]]; then
+      SKILL_ACTIVE_HOOKS_CONTENT+="$(sed 's/#.*//g' "$ACTIVE_HOOKS_DIR/$skill_hook")"$'\n'
+    fi
+  done
+  if [[ ! -f "$SKILL_WRAPPER" ]]; then
+    SKILL_FAILURE="Required scripts/lint-frontmatter.sh is missing."
+  elif ! grep -qE "$SKILL_COMMAND" <<< "$SKILL_ACTIVE_HOOKS_CONTENT"; then
+    SKILL_FAILURE="Skill lint is not invoked by an active Git hook."
+  elif ! grep -qE "$SKILL_COMMAND" <<< "$CI_WORKFLOW_CONTENT"; then
+    SKILL_FAILURE="Skill lint is not invoked by CI."
+  elif ! grep -vE '^[[:space:]]*#' "$SKILL_WRAPPER" | grep -q 'skillspector_lint\.py'; then
+    SKILL_FAILURE="Repository wrapper does not reuse canonical SkillSpector."
+  elif ! grep -vE '^[[:space:]]*#' "$SKILL_WRAPPER" | grep -qE '^[[:space:]]*exec .*--frontmatter-only.*--require-version.*--tracked'; then
+    SKILL_FAILURE="Repository wrapper does not enforce decoded metadata, version, and tracked discovery."
+  elif [[ ! -f "$SKILL_LINTER" ]]; then
+    SKILL_FAILURE="Canonical SkillSpector is unavailable; no substitute validator is accepted."
+  elif ! cmp -s "$SKILL_LINTER" "$REPO_ROOT/skills/skill-kit/scripts/skillspector_lint.py"; then
+    SKILL_FAILURE="Repository SkillSpector is missing or differs from the canonical validator."
   else
-    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "FAIL" "Repository contains skills (skills/*/SKILL.md) but lacks a frontmatter/semver lint hook."
+    SKILL_PY=""
+    for candidate in "${PYTHON:-}" python3 python; do
+      [[ -n "$candidate" ]] || continue
+      if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import yaml' >/dev/null 2>&1; then
+        SKILL_PY="$candidate"
+        break
+      fi
+    done
+    if [[ -z "$SKILL_PY" ]]; then
+      SKILL_FAILURE="Python with PyYAML is required for actual skill lint."
+    elif ! "$SKILL_PY" "$SKILL_LINTER" --frontmatter-only --require-version --tracked --json "$REPO_ROOT" >/dev/null 2>&1; then
+      SKILL_FAILURE="Actual SkillSpector metadata lint failed; run bash scripts/lint-frontmatter.sh."
+    fi
+  fi
+  if [[ -n "$SKILL_FAILURE" ]]; then
+    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "FAIL" "$SKILL_FAILURE"
+  else
+    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "PASS" "Required hook and CI wiring present; actual root/nested tracked metadata lint passed."
   fi
 fi
 
@@ -366,6 +410,22 @@ if [[ $IS_CORP -eq 1 ]]; then
   if echo "$PRE_PUSH_CONTENT" | grep -qE '(main|master)'; then
     add_result "COND-CORP" "Conditional" "Corp Main Push Block" "PASS" "Corporate repository contains direct main/master push protection."
   fi
+fi
+
+# Inspect global-shadowing and the shared policy with isolated real Git inputs.
+POLICY_PY=""
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+    POLICY_PY="$candidate"
+    break
+  fi
+done
+if [[ -z "$POLICY_PY" ]] || ! POLICY_AUDIT=$("$POLICY_PY" "$SCRIPT_DIR/check-commit-policy-wiring.py" "$REPO_ROOT"); then
+  add_result "COND-COMMIT-TAG" "Conditional" "Commit Tag Semantics" "FAIL" "Cannot execute semantic hook audit; no coverage claim is possible."
+else
+  while IFS='|' read -r policy_id policy_tier policy_cat policy_status policy_message; do
+    [[ -n "$policy_id" ]] && add_result "$policy_id" "$policy_tier" "$policy_cat" "$policy_status" "$policy_message"
+  done <<< "$POLICY_AUDIT"
 fi
 
 # -----------------------------------------------------------------------------

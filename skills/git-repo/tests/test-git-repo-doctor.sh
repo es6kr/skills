@@ -7,6 +7,8 @@
 # Exit: 0 = all pass, 1 = any fail.
 
 set -u
+# Fixture repositories must not inherit the operator's machine-wide hooks.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="$SCRIPT_DIR/../scripts/git-repo-doctor.sh"
@@ -216,10 +218,38 @@ done
 bash scripts/lint-frontmatter.sh
 EOF
 
+# A compliant skill repository needs real metadata lint and CI, not a hook name.
+mkdir -p "$REPO_6/scripts" "$REPO_6/.github/workflows" "$REPO_6/skills/skill-kit/scripts"
+cp "$REPO_ROOT/scripts/lint-frontmatter.sh" "$REPO_6/scripts/lint-frontmatter.sh"
+cp "$REPO_ROOT/skills/skill-kit/SKILL.md" "$REPO_6/skills/skill-kit/SKILL.md"
+cp "$REPO_ROOT/skills/skill-kit/scripts/skillspector_lint.py" "$REPO_6/skills/skill-kit/scripts/skillspector_lint.py"
+cat > "$REPO_6/.github/workflows/lint.yml" << 'EOF'
+name: Skill lint
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: bash scripts/lint-frontmatter.sh
+EOF
+cat > "$REPO_6/skills/sample-skill/SKILL.md" << 'EOF'
+---
+name: sample-skill
+metadata:
+  version: "0.1.0"
+description: A valid fixture skill.
+---
+# Example
+EOF
+git_in "$REPO_6" add .
 chmod +x "$REPO_6/.githooks/pre-commit" "$REPO_6/.githooks/pre-push"
 out_6=$(bash "$SCRIPT" "$REPO_6" 2>&1)
 exit_6=$?
-check "Fully compliant repository passes all checks" 0 "$exit_6"
+check "Legacy compliant repository now detects missing semantic policy" 1 "$exit_6" "$out_6"
+if ! printf '%s\n' "$out_6" | python3 -c 'import re,sys; s=re.sub(r"\x1b\[[0-9;]*m", "", sys.stdin.read()); bad=[l for l in s.splitlines() if re.search(r"\bFAIL\b",l)]; sys.exit(0 if bad and all(l.startswith("COND-COMMIT-TAG") for l in bad) else 1)'; then
+  echo "FAIL  legacy compliant fixture has unexpected additional failures"
+  FAIL=1
+fi
 rm -rf "$REPO_6"
 
 # -----------------------------------------------------------------------------
@@ -589,6 +619,8 @@ if ! echo "$out_17" | grep -q "COND-RELEASE.*FAIL"; then
   FAIL=1
 fi
 rm -rf "$REPO_17"
+
+python3 -m unittest discover -s "$SCRIPT_DIR" -p test_commit_policy_doctor.py -v || FAIL=1
 
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then

@@ -5,18 +5,10 @@ metadata:
   version: "0.1.2"
 depends-on:
   - commit-tidy
+  - skill-kit
 description: |
-  Git repository and SourceGit integration. Topics — clone (ghq), conflict-dry-run (isolated merge test), credential-helper (multi-account HTTPS token), doctor (hook health & compliance audit — Tier 1 Base + Tier 2 Conditional taxonomy), fix-worktree (bare repo recovery), githooks (hook silently never runs — hooksPath precedence, passthrough chain, install trade-off), isolate-hunk (stage own edit amid unrelated content), merge-duplicate, patrol (batch inspect), prune (safely remove merged worktrees & gone branches), rebase-audit (accidental-revert detection during an active rebase), rename-worktree, safe-relocate (relocate commits onto a clean base branch), sourcegit, ssh-key (multi-account SSH map), tidy (repo tidy pipeline: prune → temp-rebase-reset uncommitted triage → commit-tidy → diff-merge), to-bare, to-ghq (formerly migrate), move-worktree (register/reclaim merged PR), worktree (inventory + reuse + create), worktree-drift-sync (mirror fix across worktrees safely), worktree-register (metadata register/relink). Use when: "reuse worktree", "repo tidy", "repository tidy", "tidy worktrees", "prune worktrees", "prune merged", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing", "repo doctor", "hook health", "diagnose hooks", "check hooks" triggers.
-allowed-tools:
-  - Read
-  - Edit
-  - Write
-  - Bash(ghq:*)
-  - Bash(git:*)
-  - Bash(mv:*)
-  - Bash(ls:*)
-  - Bash(pgrep:*)
-  - Bash(cat:*)
+  Git/SourceGit management. Topics: clone, conflict-dry-run, credential-helper, doctor, feature-base, fix-worktree, githooks, isolate-hunk, merge-duplicate, patrol, prune, rebase-audit, rename-worktree, safe-relocate, sourcegit, ssh-key, tidy, to-bare, to-ghq, move-worktree, worktree, worktree-drift-sync, worktree-register. Use when: "reuse worktree", "repo tidy", "repository tidy", "tidy worktrees", "prune worktrees", "prune merged", "multi-account clone", "Repository not found", "wrong account", "concurrent uncommitted edit", "accidental revert", "githooks ignored", "hook not running", "core.hooksPath", "hook not firing", "repo doctor", "hook health", "diagnose hooks", "check hooks" triggers.
+allowed-tools: "Read Edit Write Bash(ghq:*) Bash(git:*) Bash(mv:*) Bash(ls:*) Bash(pgrep:*) Bash(cat:*)"
 ---
 
 # Git Repo
@@ -226,6 +218,29 @@ Key features:
 - Optional fetch all at the end
 
 [Detailed guide](./patrol.md)
+
+## Mandatory Skill-Source Lint (HARD STOP)
+
+For any repository containing tracked `SKILL.md` files, inspect root skills and
+nested plugin skill trees before editing. Reuse SkillKit's canonical
+`skillspector_lint.py`; do not introduce another YAML or description-length
+implementation. The decoded description must be a non-empty string of at most
+1024 characters, including YAML escapes and block-scalar trailing newlines.
+Preserve trigger keywords and topic bodies when shortening metadata.
+
+Before commit/push/PR delivery, run `bash scripts/lint-frontmatter.sh` from the
+owning repository and require exit zero. The wrapper must invoke SkillSpector
+with `--frontmatter-only --require-version --tracked`; both text and JSON modes
+must fail nonzero for invalid input. Root and nested tracked skills are in scope;
+untracked local skills and separate worktrees are not publishing surface.
+
+Run this skill's `scripts/git-repo-doctor.sh <repository> --json` as well.
+`COND-SKILL` must verify real hook and CI invocations and execute the canonical
+metadata validator, rather than trusting a hook name or a semver-only wrapper.
+Missing parser dependencies, wrapper, wiring or invalid metadata block source
+delivery; never skip them or treat parseable JSON as success. Use the existing
+`requirements-lint.txt` dependency declaration. Installation, runtime reflection
+and Gateway refresh remain separately authorized actions.
 
 ## Common Workflow
 
