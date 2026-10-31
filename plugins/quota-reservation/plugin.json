@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "quota-reservation",
+  "version": "0.1.0",
+  "description": "Bound one-shot first-use reservations with exact readback and no uncertain resubmission.",
+  "extensions": {
+    "es6kr": {
+      "bundledSkills": ["skills/quota-reservation"],
+      "nativeHermesAdapter": "adapters/hermes"
+    }
+  }
+}
