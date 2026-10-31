@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/es6kr/skills/compare/github-flow-v0.12.0...github-flow-v0.13.0) (2026-10-23)
+
+
+### Features
+
+* **marketplace:** decouple duplicate and auxiliary skills to labs bundle to minimize review cost ([dc8fe80](https://github.com/es6kr/skills/commit/dc8fe808769e390dbac2e1628e0a65d94c9a9b53))
+
+
+### Bug Fixes
+
+* **github-flow:** ignore negated squash references in squash-recommend guard (green) ([472c478](https://github.com/es6kr/skills/commit/472c478cd7f04f9576c40c1a7a3904dce55bf0ea))
+* **github-flow:** verify review-bot integration before running Step 9 ([402b267](https://github.com/es6kr/skills/commit/402b26791d850fbf59795aa15dff591edecd151b))
+
 ## [0.12.0](https://github.com/es6kr/skills/compare/github-flow-v0.11.4...github-flow-v0.12.0) (2026-10-17)
 
 

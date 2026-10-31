@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.14.0](https://github.com/es6kr/skills/compare/git-repo-v0.13.0...git-repo-v0.14.0) (2026-10-23)
+
+
+### Features
+
+* **git-repo:** add tidy and prune topic guides for repository cleanup loop ([a716e6c](https://github.com/es6kr/skills/commit/a716e6cffda544a7457ac947cac2e0f9205e06e5))
+* **git-repo:** add tidy and prune topic guides for repository cleanup loop ([d130277](https://github.com/es6kr/skills/commit/d13027767c426644a0c5d5fa15941275f125b700))
+* **git-repo:** gate feature ranges on pinned base and scope ([64d2493](https://github.com/es6kr/skills/commit/64d24939b728bb98a8d127d64ae28821dcab6c5f))
+
+
+### Bug Fixes
+
+* address review findings from PR [#644](https://github.com/es6kr/skills/issues/644) ([d0befbf](https://github.com/es6kr/skills/commit/d0befbfbe1bea074544595c2a8d1f5e2656c1d98))
+* **git-repo,openclaw:** gate feature base, scope, and captured-runtime delivery ([4c66758](https://github.com/es6kr/skills/commit/4c66758880991b0c792724088d2a080b260d86fb))
+* **git-repo:** add COND-RELEASE check for plugin marketplace repos ([5810781](https://github.com/es6kr/skills/commit/5810781a3fe8fa160293673d10df8846736e6ba7))
+* **git-repo:** add COND-RELEASE check for plugin marketplace repos ([484326f](https://github.com/es6kr/skills/commit/484326f8e4c94b222115c112683b2d3b5af10bf6))
+* **git-repo:** add loop-verifier file-count gate guidance alongside BASE-6 ([b28c0fa](https://github.com/es6kr/skills/commit/b28c0fa895189a5c0e38e52262d6c070766b0b5d))
+* **git-repo:** address CodeRabbit review on worktree paths, prune safety and squash deletion ([8571b51](https://github.com/es6kr/skills/commit/8571b519745313769cbb0fb6138da7ea325398b3))
+* **git-repo:** constrain release automation detection to active CI steps ([28a4580](https://github.com/es6kr/skills/commit/28a45804cf2ef14a1e12dc7f762c213e03d8ea6a))
+* **git-repo:** document temp-rebase-reset uncommitted triage and diff-merge deduplication ([f2ca2c5](https://github.com/es6kr/skills/commit/f2ca2c558cdeadaa307d868cf4523d90189367b7))
+* **git-repo:** enforce pinned hex commit SHA for base in verify_feature_base ([15745f1](https://github.com/es6kr/skills/commit/15745f1af440017626521ec56b57ae82603131f8))
+* **git-repo:** explain branch-scoped automatic cache sync ([c6400f4](https://github.com/es6kr/skills/commit/c6400f48af61204383fa5a233543212765099631))
+* **git-repo:** verify semantic commit types and CI coverage ([45a13e3](https://github.com/es6kr/skills/commit/45a13e3b761c2dbb4aa1bfe8f9e71c2669f5e72f))
+* **git-repo:** verify semantic commit types and CI coverage ([9c09725](https://github.com/es6kr/skills/commit/9c09725a8f0869482de67822b0861612127b28ef))
+
 ## [0.13.0](https://github.com/es6kr/skills/compare/git-repo-v0.12.1...git-repo-v0.13.0) (2026-10-06)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/es6kr/skills/compare/next-v0.12.0...next-v0.12.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* close remaining PR572 polling, state, ledger and approval defects ([cde0101](https://github.com/es6kr/skills/commit/cde010140dcae0eca56b252b3a21f0958edb3548))
+
 ## [0.12.0](https://github.com/es6kr/skills/compare/next-v0.11.0...next-v0.12.0) (2026-10-17)
 
 

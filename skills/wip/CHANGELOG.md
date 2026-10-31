@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/es6kr/skills/compare/wip-v0.8.0...wip-v0.8.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* address review findings from PR [#644](https://github.com/es6kr/skills/issues/644) ([d0befbf](https://github.com/es6kr/skills/commit/d0befbfbe1bea074544595c2a8d1f5e2656c1d98))
+* **wip:** map next-action follow-up to native skill_view in Hermes ([35af448](https://github.com/es6kr/skills/commit/35af448ffa39dbba346ea8ca3d5f2204b9efcabb))
+
 ## [0.8.0](https://github.com/es6kr/skills/compare/wip-v0.7.4...wip-v0.8.0) (2026-10-17)
 
 

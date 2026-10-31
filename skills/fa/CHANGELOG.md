@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.1](https://github.com/es6kr/skills/compare/fa-v0.6.0...fa-v0.6.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* close remaining PR572 polling, state, ledger and approval defects ([cde0101](https://github.com/es6kr/skills/commit/cde010140dcae0eca56b252b3a21f0958edb3548))
+* **fa:** continue the invoked /fix procedure after the FA record ([#647](https://github.com/es6kr/skills/issues/647)) ([2f262e7](https://github.com/es6kr/skills/commit/2f262e70883b8c91a5b99f661607e3966e166bd0))
+* **fa:** preserve source-owned Hermes gate and credential preflight ([#652](https://github.com/es6kr/skills/issues/652)) ([6338908](https://github.com/es6kr/skills/commit/6338908c4e90695593665e6d3c9702594cecdd76))
+
 ## [0.6.0](https://github.com/es6kr/skills/compare/fa-v0.5.2...fa-v0.6.0) (2026-10-17)
 
 

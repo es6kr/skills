@@ -5,6 +5,21 @@ All notable changes to the `backlog` skill will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/es6kr/skills/compare/backlog-v0.5.0...backlog-v0.6.0) (2026-10-23)
+
+
+### Features
+
+* **backlog:** add scoped offline agent assignment and completion gates ([#651](https://github.com/es6kr/skills/issues/651)) ([719ea5a](https://github.com/es6kr/skills/commit/719ea5aa5355492ab3106d48a4f1cee51c731184))
+
+
+### Bug Fixes
+
+* address review findings from PR [#644](https://github.com/es6kr/skills/issues/644) ([d0befbf](https://github.com/es6kr/skills/commit/d0befbfbe1bea074544595c2a8d1f5e2656c1d98))
+* **backlog:** fail closed on unset endpoint and refine Plane issue detection ([d2555d6](https://github.com/es6kr/skills/commit/d2555d6ce29fef5cf3c33c096a3670630992c775))
+* **backlog:** resolve browse-URL index lines in plane_sync ([d5b74b9](https://github.com/es6kr/skills/commit/d5b74b9f76f34af7ac68330978a1bc35b5ff88f8))
+* **backlog:** resolve browse-URL index lines in plane_sync ([1bcd45a](https://github.com/es6kr/skills/commit/1bcd45a2e1987a4ca3226fd2915cb65670af6add))
+
 ## [0.5.0](https://github.com/es6kr/skills/compare/backlog-v0.4.2...backlog-v0.5.0) (2026-10-17)
 
 
