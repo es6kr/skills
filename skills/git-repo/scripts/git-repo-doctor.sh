@@ -17,6 +17,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Unset parent git environment variables if invoked from within another git hook/process
 unset GIT_DIR GIT_WORK_TREE
 
+DOCTOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 REPO_DIR="${1:-.}"
 # Normalize Windows backslashes to forward slashes
 REPO_DIR="${REPO_DIR//\\//}"
@@ -290,12 +292,52 @@ if [[ $HAS_MD -eq 1 ]]; then
   fi
 fi
 
-# COND-SKILL: Skills structure lint hook requirement
+# COND-SKILL: required executable wiring AND actual canonical metadata validation.
 if [[ $HAS_SKILLS -eq 1 ]]; then
-  if echo "$CLEAN_HOOKS_CONTENT" | grep -qE '(lint-frontmatter|frontmatter-lint|skill-yaml-validate)'; then
-    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "PASS" "Skill files present and verified by metadata/frontmatter lint hook."
+  SKILL_WRAPPER="scripts/lint-frontmatter.sh"
+  SKILL_LINTER="$DOCTOR_SCRIPT_DIR/../../skill-kit/scripts/skillspector_lint.py"
+  # Match runnable command lines, not comments, echo strings, or hook names.
+  SKILL_COMMAND='^[[:space:]]*(-[[:space:]]+run:[[:space:]]*)?(bash[[:space:]]+)?(\./)?scripts/lint-frontmatter\.sh([[:space:]]|$)'
+  SKILL_FAILURE=""
+  SKILL_ACTIVE_HOOKS_CONTENT=""
+  for skill_hook in pre-commit pre-push; do
+    if [[ -f "$ACTIVE_HOOKS_DIR/$skill_hook" ]]; then
+      SKILL_ACTIVE_HOOKS_CONTENT+="$(sed 's/#.*//g' "$ACTIVE_HOOKS_DIR/$skill_hook")"$'\n'
+    fi
+  done
+  if [[ ! -f "$SKILL_WRAPPER" ]]; then
+    SKILL_FAILURE="Required scripts/lint-frontmatter.sh is missing."
+  elif ! grep -qE "$SKILL_COMMAND" <<< "$SKILL_ACTIVE_HOOKS_CONTENT"; then
+    SKILL_FAILURE="Skill lint is not invoked by an active Git hook."
+  elif ! grep -qE "$SKILL_COMMAND" <<< "$CI_WORKFLOW_CONTENT"; then
+    SKILL_FAILURE="Skill lint is not invoked by CI."
+  elif ! grep -vE '^[[:space:]]*#' "$SKILL_WRAPPER" | grep -q 'skillspector_lint\.py'; then
+    SKILL_FAILURE="Repository wrapper does not reuse canonical SkillSpector."
+  elif ! grep -vE '^[[:space:]]*#' "$SKILL_WRAPPER" | grep -qE '^[[:space:]]*exec .*--frontmatter-only.*--require-version.*--tracked'; then
+    SKILL_FAILURE="Repository wrapper does not enforce decoded metadata, version, and tracked discovery."
+  elif [[ ! -f "$SKILL_LINTER" ]]; then
+    SKILL_FAILURE="Canonical SkillSpector is unavailable; no substitute validator is accepted."
+  elif ! cmp -s "$SKILL_LINTER" "$REPO_ROOT/skills/skill-kit/scripts/skillspector_lint.py"; then
+    SKILL_FAILURE="Repository SkillSpector is missing or differs from the canonical validator."
   else
-    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "FAIL" "Repository contains skills (skills/*/SKILL.md) but lacks a frontmatter/semver lint hook."
+    SKILL_PY=""
+    for candidate in "${PYTHON:-}" python3 python; do
+      [[ -n "$candidate" ]] || continue
+      if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import yaml' >/dev/null 2>&1; then
+        SKILL_PY="$candidate"
+        break
+      fi
+    done
+    if [[ -z "$SKILL_PY" ]]; then
+      SKILL_FAILURE="Python with PyYAML is required for actual skill lint."
+    elif ! "$SKILL_PY" "$SKILL_LINTER" --frontmatter-only --require-version --tracked --json "$REPO_ROOT" >/dev/null 2>&1; then
+      SKILL_FAILURE="Actual SkillSpector metadata lint failed; run bash scripts/lint-frontmatter.sh."
+    fi
+  fi
+  if [[ -n "$SKILL_FAILURE" ]]; then
+    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "FAIL" "$SKILL_FAILURE"
+  else
+    add_result "COND-SKILL" "Conditional" "Skill Frontmatter Lint" "PASS" "Required hook and CI wiring present; actual root/nested tracked metadata lint passed."
   fi
 fi
 
