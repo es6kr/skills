@@ -83,7 +83,8 @@ class TestAgyCleanup(unittest.TestCase):
             "guards": [{"text": "Guard 1"}],
             "validation": {"verified": True, "node_count": 207, "edge_count": 494}
         }
-        with patch.object(agy, "run_cmd", return_value=(0, json.dumps(fake_graph), "")):
+        with patch.object(agy, "run_cmd", return_value=(0, json.dumps(fake_graph), "")), \
+             patch("pathlib.Path.exists", return_value=True):
             graph = agy.load_procedure_graph()
             self.assertTrue(graph["validation"]["verified"])
             self.assertEqual(len(graph["stages"]), 2)
