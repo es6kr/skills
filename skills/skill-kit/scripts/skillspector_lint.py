@@ -194,7 +194,7 @@ def _discover_skill_files(path: Path, tracked: bool):
     """Discover root and nested skills without following unrelated worktrees."""
     if not path.exists():
         raise ValueError(f"Path does not exist: {path}")
-    path = path.absolute()
+    path = path.resolve()
     if tracked:
         directory = path.parent if path.is_file() else path
         root_result = subprocess.run(
