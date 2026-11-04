@@ -287,6 +287,16 @@ def resolve_tracker_root(target_path: str = None, workspace_name: str = None) ->
     return ".ralph"
 
 
+def _read_plane_token_cache(path: Path) -> str:
+    """Read one bare value, allowing blank lines and whole-line provenance comments."""
+    values = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+              if line.strip() and not line.lstrip().startswith("#")]
+    # Do not join, guess, or silently repair ambiguous/malformed credentials.
+    if len(values) != 1 or any(not 0x21 <= ord(char) <= 0x7e for char in values[0]):
+        raise ValueError("invalid Plane token cache")
+    return values[0]
+
+
 def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
     """Get merged profile dictionary for given workspace."""
     user_config = load_user_config()
@@ -306,9 +316,11 @@ def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
     if not profile["plane_token"] and profile.get("token_file"):
         token_path = Path(profile["token_file"]).expanduser()
         try:
-            profile["plane_token"] = token_path.read_text(encoding="utf-8").strip()
-        except OSError as exc:
-            print(f"Warning: token_file unreadable ({token_path}): {exc}", file=sys.stderr)
+            profile["plane_token"] = _read_plane_token_cache(token_path)
+        except (OSError, UnicodeError, ValueError) as exc:
+            # Exception text can contain cache bytes; expose only its safe category.
+            profile["plane_token_error"] = type(exc).__name__
+            print(f"Warning: Plane token cache unavailable or invalid ({type(exc).__name__}).", file=sys.stderr)
 
     # Resolve the tracker root dynamically (env > raw config > auto-detect > ".ralph"),
     # overriding the static DEFAULT_PROFILE value so consumers get the real root.
