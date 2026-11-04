@@ -71,6 +71,13 @@ gh api repos/{owner}/{repo}/issues/{N}/comments \
 
 > The grep above matches the `requesting-code-review` link. A Code Review whose body carries bot-layer content drops that link by design (`internal.md`, "Bot-layer content in the body drops the suffix") and instead names its engines in the heading — so a `0` here does not by itself mean no Code Review exists. Confirm against the heading before concluding it is absent: `gh api repos/{owner}/{repo}/issues/{N}/comments --jq '.[] | select(.body | test("consolidate:verified")) | .body | split("\n")[0]'` (and the same over `pulls/{N}/reviews`, since the review medium is where inline-bearing Code Reviews land).
 
+### Pre-Summary gate — Receiving Code Review Verification Gate (HARD STOP)
+
+**Before posting the Summary, verify that `superpowers:receiving-code-review` was actively executed to review each finding against codebase reality (line-level inspection, explicit VALID vs REJECTED verdict).**
+
+1. **Transcript Verification**: The session transcript must show an actual invocation of `superpowers:receiving-code-review` (or file read of its `SKILL.md` in Antigravity). The literal heading `## AI Review Summary — [receiving-code-review](...)` alone does not satisfy this requirement.
+2. **Technical Reality Check**: Every finding listed in the Consolidated Findings table must be verified against current source files. Do not bulk-mark findings as `🟡 Deferred (author follow-up)` without verifying whether the issue actually exists or is a false positive / YAGNI candidate (`⚪ Rejected`).
+
 ### Step 3.5.3 review comment ↔ Step 7 Summary paired pattern
 
 - Step 3.5.3 = Internal Code Review (`internal.md` `### Post/update review comment` section: `## Internal Code Review — [requesting-code-review](...)`) — code-reviewer subagent findings
@@ -220,6 +227,7 @@ Localize the disclaimer to the repo's default language (Korean for PRIVATE Korea
 3. Step 5 Axis B = APPROVE/COMMENT/REQUEST_CHANGES (not Skip)?
 4. All 3 yes → **Unified POST** (go to 7-B with Summary body). Skip 7-A
 5. Any no → **Separate**. Post 7-A issue comment; conditionally POST 7-B if Axis B = APPROVE/COMMENT/REQUEST_CHANGES
+6. Was `superpowers:receiving-code-review` actively executed, and was each finding checked against codebase reality for an explicit VALID vs REJECTED verdict? (If no, STOP and perform technical verification first)
 
 #### Damage control — Summary already posted in wrong medium (HARD STOP — 2026-05-26)
 

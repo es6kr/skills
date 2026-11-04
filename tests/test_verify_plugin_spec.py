@@ -210,9 +210,20 @@ class TestMarketplaceThreeTierArchitecture:
         data = json.loads(marketplace_path.read_text(encoding="utf-8"))
         plugins = {p["name"]: p for p in data.get("plugins", [])}
 
-        assert set(plugins.keys()) == {"es6kr", "task", "labs"}, (
-            f"Expected plugins ['es6kr', 'task', 'labs'], got {list(plugins.keys())}"
+        root_bundles = {name for name, entry in plugins.items() if entry.get("source") == "./"}
+        assert root_bundles == {"es6kr", "task", "labs"}, (
+            f"Expected exactly the three root tiers, got {root_bundles}"
         )
+        assert len(plugins) == len(data["plugins"]), "Duplicate plugin names are not allowed"
+        assert set(plugins) == root_bundles | {"quota-reservation"}, (
+            f"Unexpected standalone packages: {set(plugins) - root_bundles}"
+        )
+        quota = plugins["quota-reservation"]
+        assert quota["source"] == "./plugins/quota-reservation"
+        quota_manifest = json.loads((REPO_ROOT / "plugins/quota-reservation/plugin.json").read_text(encoding="utf-8"))
+        assert quota_manifest["name"] == "quota-reservation"
+        assert quota["version"] == quota_manifest["version"] == "0.1.0"
+        assert quota["strict"] is True
 
         labs_skills = set(plugins["labs"].get("skills", []))
         expected_labs = {

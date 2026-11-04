@@ -20,10 +20,9 @@
 #   - Claude Code:  stdin {tool_name, tool_input.command, transcript_path};
 #                   block = exit 2 + stderr.
 #   - Antigravity:  stdin {toolCall.name, toolCall.args...}; block = stdout
-#                   {"decision":"deny","reason":...} (+ exit 0). Antigravity has no
-#                   discoverable transcript_path equivalent at this hook's I/O layer,
-#                   so on Antigravity this hook fails open (cannot verify -> exit 0)
-#                   until that gap is confirmed in a real Antigravity session.
+#                   {"decision":"deny","reason":...} (+ exit 0). Antigravity transcript
+#                   resolved via ANTIGRAVITY_APP_DATA_DIR/ANTIGRAVITY_CONVERSATION_ID
+#                   or explicit transcript_path if passed.
 #
 # Bypass (explicit user override, per-command only — never session-wide):
 #   ALLOW_REVIEW_POST_WITHOUT_RECEIVING_CODE_REVIEW=1 <command>
@@ -45,6 +44,10 @@ elif [[ -n "$AG_TOOL" ]]; then
   RUNTIME="antigravity"
   [[ "$AG_TOOL" != "run_command" ]] && exit 0
   COMMAND=$(echo "$INPUT" | jq -r '.toolCall.args.command // .toolCall.args.CommandLine // (.toolCall.args | tostring) // empty' 2>/dev/null)
+  TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+  if [[ -z "$TRANSCRIPT_PATH" && -n "$ANTIGRAVITY_APP_DATA_DIR" && -n "$ANTIGRAVITY_CONVERSATION_ID" ]]; then
+    TRANSCRIPT_PATH="$ANTIGRAVITY_APP_DATA_DIR/brain/$ANTIGRAVITY_CONVERSATION_ID/.system_generated/logs/transcript.jsonl"
+  fi
 else
   exit 0
 fi
@@ -81,35 +84,44 @@ if echo "$BODY" | grep -qiE 'coderabbit|copilot|code[ -]?review|review summary' 
 fi
 [[ -z "$REVIEW_FLAVORED" ]] && exit 0
 
-# --- Antigravity: no transcript to check here yet -> fail open ---
-if [[ "$RUNTIME" == "antigravity" ]]; then
-  exit 0
-fi
-
-# --- Claude Code: check the TRANSCRIPT (not the body) for an actual Skill invocation ---
+# --- check the TRANSCRIPT (not the body) for an actual receiving-code-review invocation ---
 if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
   # Can't verify -> fail open rather than wedge the session on an env mismatch.
   exit 0
 fi
 
-if grep -F '"name":"Skill"' "$TRANSCRIPT_PATH" 2>/dev/null | grep -qF 'receiving-code-review'; then
+SKILL_INVOKED=""
+if [[ "$RUNTIME" == "claude" ]]; then
+  if grep -F '"name":"Skill"' "$TRANSCRIPT_PATH" 2>/dev/null | grep -qF 'receiving-code-review'; then
+    SKILL_INVOKED=1
+  fi
+elif [[ "$RUNTIME" == "antigravity" ]]; then
+  if grep -F '"name":"Skill"' "$TRANSCRIPT_PATH" 2>/dev/null | grep -qF 'receiving-code-review'; then
+    SKILL_INVOKED=1
+  elif grep -E '("name":"read_file"|"type":"USER_INPUT")' "$TRANSCRIPT_PATH" 2>/dev/null | grep -qE 'receiving-code-review(/SKILL\.md)?'; then
+    SKILL_INVOKED=1
+  fi
+fi
+
+if [[ -n "$SKILL_INVOKED" ]]; then
   exit 0   # the skill was actually invoked this session — compliant
 fi
 
-# --- DENY ---
+# --- DENY (dual-emit) ---
+REASON="Review-flavored PR/issue POST has no record of Skill(\"superpowers:receiving-code-review\") being invoked or read in this session's transcript. consolidate/collect.md Step 3.6 requires that protocol BEFORE classifying/posting any AI review feedback — a template containing the literal \"receiving-code-review\" link text in its title is NOT the same as the skill actually having been invoked (see FA class receiving-code-review-superpowers-invocation-omission)."
+
+if [[ "$RUNTIME" == "antigravity" ]]; then
+  printf '{"decision":"deny","reason":%s}\n' "$(printf '%s' "$REASON" | jq -Rs .)"
+  exit 0
+fi
+
 cat >&2 <<EOF
-[block-review-post-without-receiving-code-review] DENIED: this review-flavored PR/issue
-POST has no record of Skill("superpowers:receiving-code-review") being invoked in this
-session's transcript. consolidate/collect.md Step 3.6 requires that call BEFORE
-classifying/posting any AI review feedback — a template containing the literal
-"receiving-code-review" link text in its title is NOT the same as the skill actually
-having been invoked (that gap is what let this recur; see FA class
-receiving-code-review-superpowers-invocation-omission).
+[block-review-post-without-receiving-code-review] DENIED: $REASON
 
 Attempted command:
   $COMMAND
 
-Call the Skill tool once this session (skill="superpowers:receiving-code-review"), then
+Call the Skill tool once this session (skill="superpowers:receiving-code-review") or read the skill definition, then
 retry. If a subagent will do the actual posting, invoke the skill yourself in the
 orchestrating session before dispatching it, or include the call explicitly in the
 subagent's instructions.

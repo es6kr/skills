@@ -1,4 +1,4 @@
-# Plane agent assignment — Phase 1 (offline only)
+# Plane agent assignment — offline CLI and explicit integration ports
 
 ## Scope and source of truth
 
@@ -111,3 +111,57 @@ Envelope fixes allowed_actions=classify/research/plan, execute_allowed=False. un
 5. Preserve task-flow: brainstorm → plan → user review → execute → verify → delivery. Assignment replaces no implementation/deployment/split approval.
 6. Actually verify user-only Windows ACLs for DB/WAL/SHM/lock. chmod 0600 is not ACL verification. Temporary-directory tests do not establish operational ACLs.
 7. Operational wrapper/plugin link/cron/receiver/Plane comment readback/direct execution/other harnesses/E2E each require separate approval/integration. No activation command or active poller/model/tool dispatch is installed here.
+
+## Explicit collection and bounded admission ports
+
+These standard-library APIs are source contracts, verified by offline/injected and
+ephemeral loopback fixtures. They are not an installed poller or live E2E receipt.
+The fixture CLI, its activation refusal, and default `DisabledReceiver` are unchanged.
+
+- `agent_assignment.live_read.ReadOnlyPlanePort(client, config)` accepts an explicit
+  operator-supplied client. Its mutable `profile` must continue matching trusted
+  host/workspace. Only this project's states and cursor-based issues GETs are allowed;
+  request bodies, writes, alternate endpoints, fragments and ambiguous cursors fail
+  closed. States pagination must complete and retain actual boolean `is_triage`.
+  No credential discovery, environment fallback, default principal, or cache/intake
+  lookup is added. Matching profile metadata does not authenticate its principal or
+  attest its HTTP redirect/proxy behavior; the host verifies both separately.
+- `agent_assignment.live_cycle.collect_once(config, client, ledger_path, *, now)`
+  takes the existing `poll.lock`, completes the snapshot, then recovers/applies it.
+  It never calls a receiver. Partial scans do not open/change the ledger. The result
+  is `{complete, pending, error_code}`; `pending=None` means unobserved, not zero.
+  First-snapshot existing assignments remain baseline-only; repeated collection
+  does not issue another outbox. These functions print no body/credential/raw error.
+- `admit_pending_once(config, client, ledger_path, receiver, *, expected_outbox_id,
+  preflight, now)` holds the same lock through a fresh scan, eligibility/revision/
+  workspace/candidate checks and at most one existing `dispatch_one` call.
+  Missing activation inputs return `disabled`; partial/busy/mismatched candidates,
+  changed revisions/workspaces and failed host verification do not claim or submit.
+  It does not select a different pending request when the approved ID differs.
+  This local lock does not atomically fence concurrent edits in Plane.
+- `preflight` is a trusted in-process host port returning the approved receiver
+  identity revision. It is not an authenticated human approval adapter. A constant
+  lambda, matching UUID, issue text or model-generated input cannot authorize live
+  admission. The operator must separately verify scope, principal, host/profile/PID,
+  permissions, and approval before supplying real ports. Existing receiver-side
+  fresh verification and **no-tools** restrictions remain mandatory.
+- `Ledger.delivery_binding(outbox_id)` returns a copy of only frozen ID/hash,
+  receiver identity and status. It changes no schema or receipt policy.
+- `reconcile_known(ledger_path, receiver, *, outbox_id, now)` uses the same lock and
+  stored binding; it calls **lookup only**, never submit. Known sending/uncertain
+  admission can become delivered only through an exact validated receipt. Already
+  delivered is an immutable no-op. Unknown ID/run, 404, timeout, scope/hash/session
+  mismatch and expired retention are not permission for a new POST/key/session/
+  generation or SQL reset. Runtime mismatch remains blocked. Receipt admission is
+  not plan completion or execution success, including failed/interrupted runs.
+
+Focused synthetic suites are `test_agent_assignment_live_read.py`,
+`test_agent_assignment_live_cycle.py`, and `test_agent_assignment_reconcile.py`.
+The latter reuses the owned ephemeral HTTP fixture to prove GET-only recovery
+after a bad readback and no resend after a lost POST response. Fixture host
+callbacks and synthetic receipts do not attest a real runtime.
+
+Actual read-only collection, new single-run admission, tool-enabled `task-flow`,
+authenticated execution approvals, direct/Orca work, Plane feedback/completion and
+operational scheduling remain separately gated. Do not rerun a completed earlier
+planning issue as evidence of a new full-collector assignment transition.

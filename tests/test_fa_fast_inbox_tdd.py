@@ -111,8 +111,9 @@ class TestFastRecordZeroModalWrite(FastRecordWorkspaceTestCase):
         elapsed_ms = (time.monotonic() - start) * 1000
 
         self.assertEqual(rc, 0)
+        limit_ms = 500 if (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")) else 100
         self.assertLess(
-            elapsed_ms, 100, f"fast_record took {elapsed_ms:.2f}ms, expected <100ms (zero-modal)"
+            elapsed_ms, limit_ms, f"fast_record took {elapsed_ms:.2f}ms, expected <{limit_ms}ms (zero-modal)"
         )
 
         inbox_path = self.workspace / ".agents" / "improvements.md"

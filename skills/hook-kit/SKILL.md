@@ -6,22 +6,9 @@ metadata:
 depends-on:
   - archive
   - safe-delete
-description: "Hook management. add - author a NEW hook end-to-end: when a hook is the right medium, registry-first check, sibling mirroring, per-event emit schema, --test harness weighted toward negatives, dual registration (hooks.json + hook-registry.yaml) [add.md]. audit - reference/permission/orphan checks (stale references + chmod +x missing + unowned hook detection) [audit.md]. edit - hook script modification + dual-sync [edit.md]. install - install from resources/ to hooks/ + settings.json registration [install.md]. move - move hooks from scripts/ to hooks/ + update settings.json paths [move.md]. remove - remove hook entries from settings.json [remove.md]. registry - canonical hook inventory hook-registry.yaml now lives in a private companion repository (relocated 2026-09-10); consult before any registration change [registry.md]. Use when: \"add a hook\", \"new hook\", \"write a hook\", \"author a hook\", \"hook cleanup\", \"hook audit\", \"hook edit\", \"hook install\", \"hook move\", \"hook remove\", \"install hook\", \"edit hook\", \"edit guard\", \"bash-guard\", \"hook sync\", \"hook permission\", \"orphan hook\", \"chmod +x hook\", \"exit 126\", \"hook registry\", \"hook-registry.yaml\", \"phantom hook\", \"ghost hook\", \"hook registration\", \"hooks.json\", \"settings.json hooks\""
-allowed-tools:
-  - Read
-  - Edit
-  - Grep
-  - Bash(cp:*)
-  - Bash(diff:*)
-  - Bash(ls:*)
-  - Bash(mkdir:*)
-  - Bash(mv:*)
-  - Bash(bash -n:*)
-  - Bash(jq:*)
-  - Bash(chmod:*)
-  - Bash(test:*)
-  - Bash(find:*)
-  - AskUserQuestion
+description: |
+  Hook lifecycle: add (registry-first authoring and tests), audit, edit (dual-sync), install, move, remove, registry (canonical companion inventory). Use when: "add a hook", "new hook", "write a hook", "author a hook", "hook cleanup", "hook audit", "hook edit", "hook install", "hook move", "hook remove", "install hook", "edit hook", "edit guard", "bash-guard", "hook sync", "hook permission", "orphan hook", "chmod +x hook", "exit 126", "hook registry", "hook-registry.yaml", "phantom hook", "ghost hook", "hook registration", "hooks.json", "settings.json hooks"
+allowed-tools: "Read Edit Grep Bash(cp:*) Bash(diff:*) Bash(ls:*) Bash(mkdir:*) Bash(mv:*) Bash(bash -n:*) Bash(jq:*) Bash(chmod:*) Bash(test:*) Bash(find:*) AskUserQuestion"
 ---
 
 # Hook Management

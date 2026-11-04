@@ -16,7 +16,7 @@ description: |
   Use when: "review consolidate", "PR review", "AI review", "CodeRabbit review", "Copilot review",
   "review check", "review summary", "merge ready", "internal review", "code-reviewer",
   "inline review", "line-level comment", "PR line review".
-allowed-tools: [Agent, AskUserQuestion, Bash, Edit, Glob, Grep, Read, Write]
+allowed-tools: "Agent AskUserQuestion Bash Edit Glob Grep Read Write"
 ---
 
 # Consolidate

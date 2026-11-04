@@ -39,7 +39,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pytest
+      - run: pip install pytest -r requirements-lint.txt
       - run: python -m pytest tests -v
 
   hangul-check:
@@ -86,6 +86,7 @@ jobs:
       #   test-guards-config.sh       )  in this repo — they cannot pass here
       #   test-check-session-rag.sh      R6/R7 assertions fail
       #   fa/scripts/test-fa-classify-meta.py  fa_classify.parse_section_meta missing
+      - run: pip install -r requirements-lint.txt
       - name: Shell tests
         run: |
           set -u
@@ -139,6 +140,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-lint.txt
       - run: bash scripts/lint-frontmatter.sh
 
   hooks-json-lint:

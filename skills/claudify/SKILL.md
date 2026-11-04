@@ -5,13 +5,7 @@ description: |
 metadata:
   author: es6kr
   version: "0.1.2"
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Skill
-  - Bash(mkdir:*)
+allowed-tools: "Read Write Edit Glob Skill Bash(mkdir:*)"
 ---
 
 # Claudify

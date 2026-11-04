@@ -63,6 +63,14 @@ owns the decision.
 entering? Have I opened that file in this session? If not, open it before acting — including
 when a line in this file already told me what to do.
 
+### Receiving Code Review Technical Verification Gate (HARD STOP)
+
+**Defaulting findings to `🟡 Deferred` without line-level codebase verification under `superpowers:receiving-code-review` is strictly prohibited (HARD STOP).**
+The `## AI Review Summary — [receiving-code-review](...)` header is a binding claim that every finding was independently verified against codebase reality:
+1. **Mandatory Protocol Loading**: `Skill("superpowers:receiving-code-review")` (or reading `superpowers/skills/receiving-code-review/SKILL.md` on Antigravity) must be physically executed in the session transcript before analyzing or posting findings.
+2. **Explicit Validity Verdict First**: Every finding must receive an explicit validity verdict (`VALID` vs `⚪ REJECTED`) based on code inspection (grep callers, inspect diff, check intent). Timing (`Deferred` vs immediate fix) applies ONLY to valid findings.
+3. **No Bulk-Deferral Rubber-Stamping**: Marking 100% of findings as `Deferred` without reading the relevant code files or considering the pushback/reject path reduces the review to decorative compliance.
+
 
 ## Step 1: Identify PR
 

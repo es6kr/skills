@@ -25,6 +25,7 @@ import json
 import re
 import urllib.request
 import urllib.parse
+import urllib.error
 import argparse
 from pathlib import Path
 
@@ -143,19 +144,35 @@ def _build_opener() -> urllib.request.OpenerDirector:
     return urllib.request.build_opener(_NoRedirect)
 
 
+class _SyncReadFailure(RuntimeError):
+    """A required read was not verified; no sync writes may start."""
+
+
+def _checked_read(profile: dict, response):
+    # Preserve legacy list-returning helpers, but fail closed inside a strict sync run.
+    if isinstance(response, dict) and "error" in response and profile.get("_strict_sync_reads"):
+        raise _SyncReadFailure("Plane read failed")
+    return response
+
+
 def make_plane_request(profile: dict, path: str, method: str = "GET", data: dict = None) -> dict:
     """Make an authenticated HTTP request to Plane REST API."""
     token = profile.get("plane_token")
     if not token:
         return {"error": f"API token ({profile.get('plane_token_env', 'plane_token')}) not set"}
+    # Invalid header values can be echoed by urllib exceptions; reject them before transport.
+    if not isinstance(token, str) or any(not 0x21 <= ord(char) <= 0x7e for char in token):
+        return {"error": "Invalid Plane API token input"}
 
     host = str(profile.get("plane_host", "")).rstrip("/")
-    scheme = urllib.parse.urlparse(host).scheme
+    try:
+        scheme = urllib.parse.urlparse(host).scheme
+    except ValueError:
+        return {"error": "Invalid Plane HTTPS endpoint"}
     if scheme != "https":
         # Never put the token on the wire in the clear.
         return {
-            "error": f"refusing to send the Plane API token over a non-HTTPS host: "
-                     f"{host!r} (scheme {scheme or 'missing'!r}); set plane_host to an https:// URL"
+            "error": "Refusing to send the Plane API token over a non-HTTPS endpoint"
         }
 
     url = f"{host}/api/v1/{path.lstrip('/')}"
@@ -165,10 +182,9 @@ def make_plane_request(profile: dict, path: str, method: str = "GET", data: dict
         "User-Agent": UA
     }
 
-    req_data = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
-
     try:
+        req_data = json.dumps(data).encode("utf-8") if data else None
+        req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
         with _build_opener().open(req, timeout=5) as resp:
             # Any 2xx is success. PATCH commonly answers 204 No Content, which
             # the old 200/201-only test reported as a failure even though the
@@ -178,8 +194,11 @@ def make_plane_request(profile: dict, path: str, method: str = "GET", data: dict
                 if not body.strip():
                     return {}
                 return json.loads(body)
-    except Exception as e:
-        return {"error": str(e)}
+    except urllib.error.HTTPError as exc:
+        # The reason, URL, response body, or exception string may contain credentials.
+        return {"error": f"Plane HTTP request failed (status {int(exc.code)})"}
+    except Exception as exc:
+        return {"error": f"Plane request failed ({type(exc).__name__})"}
 
     return {"error": "Request failed"}
 
@@ -228,7 +247,7 @@ def parse_index_lines(lines: list) -> list:
 def _list_project_ids(profile: dict, workspace: str) -> dict:
     """Map project identifier (e.g. SKILL) -> project UUID for a workspace.
     Returns {} on API error."""
-    res = make_plane_request(profile, f"workspaces/{workspace}/projects/")
+    res = _checked_read(profile, make_plane_request(profile, f"workspaces/{workspace}/projects/"))
     if "error" in res:
         return {}
     projects = res.get("results", []) if isinstance(res, dict) else res
@@ -245,7 +264,7 @@ def _list_issue_ids(profile: dict, workspace: str, project_id: str) -> dict:
         path = f"workspaces/{workspace}/projects/{project_id}/issues/?per_page=100"
         if cursor:
             path += f"&cursor={urllib.parse.quote(str(cursor))}"
-        res = make_plane_request(profile, path)
+        res = _checked_read(profile, make_plane_request(profile, path))
         if "error" in res:
             break
         for issue in res.get("results", []):
@@ -253,8 +272,15 @@ def _list_issue_ids(profile: dict, workspace: str, project_id: str) -> dict:
             if seq is not None and issue.get("id"):
                 by_seq[int(seq)] = issue["id"]
         cursor = res.get("next_cursor")
-        if not res.get("next_page_results") or not cursor:
+        if not res.get("next_page_results"):
             break
+        if not cursor:
+            if profile.get("_strict_sync_reads"):
+                raise _SyncReadFailure("Incomplete Plane issue listing")
+            break
+    else:
+        if profile.get("_strict_sync_reads"):
+            raise _SyncReadFailure("Plane issue page limit reached")
     return by_seq
 
 
@@ -278,12 +304,16 @@ def resolve_browse_entries(entries: list, profile: dict) -> list:
             project_cache[workspace] = _list_project_ids(profile, workspace)
         project_id = project_cache[workspace].get(prefix)
         if not project_id:
+            if profile.get("_strict_sync_reads"):
+                raise _SyncReadFailure("Plane project could not be resolved")
             continue
         key = (workspace, project_id)
         if key not in issue_cache:
             issue_cache[key] = _list_issue_ids(profile, workspace, project_id)
         issue_id = issue_cache[key].get(int(seq))
         if not issue_id:
+            if profile.get("_strict_sync_reads"):
+                raise _SyncReadFailure("Plane issue could not be resolved")
             continue
         resolved.append({
             **entry,
@@ -324,21 +354,25 @@ def compute_updates(lines: list, profile: dict) -> list:
     state_group_cache = {}
     for entry in _resolved_index_entries(lines, profile):
         um = entry["url_match"]
-        issue_data = fetch_issue_state(profile, um["workspace"], um["project"], um["issue"])
+        issue_data = _checked_read(profile, fetch_issue_state(profile, um["workspace"], um["project"], um["issue"]))
         if "error" in issue_data:
             # sync.md rule: never change state on API error.
             continue
         state_id = issue_data.get("state")
         if not state_id:
+            if profile.get("_strict_sync_reads"):
+                raise _SyncReadFailure("Plane issue state could not be verified")
             continue
         # Key includes project because fetch_state_group() calls the
         # project-scoped states/ endpoint -- resolving a state_id requires
         # knowing which project it belongs to.
         cache_key = (um["project"], state_id)
         if cache_key not in state_group_cache:
-            state_data = fetch_state_group(profile, um["workspace"], um["project"], state_id)
+            state_data = _checked_read(profile, fetch_state_group(profile, um["workspace"], um["project"], state_id))
             state_group_cache[cache_key] = None if "error" in state_data else state_data.get("group")
         state_group = state_group_cache[cache_key]
+        if not state_group and profile.get("_strict_sync_reads"):
+            raise _SyncReadFailure("Plane state group could not be verified")
         new_marker = STATE_TO_MARKER.get(state_group)
         if new_marker is None:
             # Non-terminal state (backlog/unstarted/started) -> no change.
@@ -368,7 +402,7 @@ def detect_priority_drift(lines: list, profile: dict) -> list:
         if local_priority is None:
             continue
         um = entry["url_match"]
-        issue_data = fetch_issue_state(profile, um["workspace"], um["project"], um["issue"])
+        issue_data = _checked_read(profile, fetch_issue_state(profile, um["workspace"], um["project"], um["issue"]))
         if "error" in issue_data:
             # sync.md rule: never report on API error -- same as compute_updates().
             continue
@@ -390,7 +424,7 @@ def fetch_project_states(profile: dict, workspace: str, project: str) -> list:
     requires this list -- PATCHing an issue's state needs the state's own id,
     not its group name."""
     path = f"workspaces/{workspace}/projects/{project}/states/"
-    res = make_plane_request(profile, path)
+    res = _checked_read(profile, make_plane_request(profile, path))
     if "error" in res:
         return []
     return res.get("results", []) if isinstance(res, dict) else res
@@ -404,7 +438,7 @@ def find_state_id_by_group(states: list, group: str) -> str:
     return None
 
 
-def transition_issue_to_done(profile: dict, workspace: str, project: str, issue: str) -> dict:
+def transition_issue_to_done(profile: dict, workspace: str, project: str, issue: str, done_state_id: str = None) -> dict:
     """PATCH a Plane issue's state to the project's `completed`-group state.
 
     This is the ONLY state-mutation this module performs on a Plane issue --
@@ -414,8 +448,10 @@ def transition_issue_to_done(profile: dict, workspace: str, project: str, issue:
     Done, never remove it). Returns {"error": ...} if the project has no
     completed-group state or the PATCH fails; otherwise the updated issue
     payload."""
-    states = fetch_project_states(profile, workspace, project)
-    done_state_id = find_state_id_by_group(states, "completed")
+    # A sync run supplies the preflighted state to avoid new reads after its first write.
+    if done_state_id is None:
+        states = fetch_project_states(profile, workspace, project)
+        done_state_id = find_state_id_by_group(states, "completed")
     if not done_state_id:
         return {"error": f"No completed-group state found for project {project}"}
     path = f"workspaces/{workspace}/projects/{project}/issues/{issue}/"
@@ -452,16 +488,20 @@ def compute_local_to_plane_updates(lines: list, profile: dict) -> list:
         if marker_text != "x":
             continue
         um = entry["url_match"]
-        issue_data = fetch_issue_state(profile, um["workspace"], um["project"], um["issue"])
+        issue_data = _checked_read(profile, fetch_issue_state(profile, um["workspace"], um["project"], um["issue"]))
         if "error" in issue_data:
             continue
         state_id = issue_data.get("state")
         if not state_id:
+            if profile.get("_strict_sync_reads"):
+                raise _SyncReadFailure("Plane issue state could not be verified")
             continue
         cache_key = (um["project"], state_id)
         if cache_key not in state_group_cache:
-            state_data = fetch_state_group(profile, um["workspace"], um["project"], state_id)
+            state_data = _checked_read(profile, fetch_state_group(profile, um["workspace"], um["project"], state_id))
             state_group_cache[cache_key] = None if "error" in state_data else state_data.get("group")
+        if not state_group_cache[cache_key] and profile.get("_strict_sync_reads"):
+            raise _SyncReadFailure("Plane state group could not be verified")
         if state_group_cache[cache_key] == "completed":
             continue
         updates.append({
@@ -485,17 +525,23 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
     transitions any Plane issue whose linked local item is already `[x]` but
     whose Plane state isn't yet `completed` to Done (never DELETE; see
     transition_issue_to_done()) -- respects --dry-run same as the primary sync."""
+    # Run-local strictness must not leak into a caller's shared profile dictionary.
+    profile = {**profile, "_strict_sync_reads": True}
     if not fix_plan_path.exists():
         print(f"Target fix_plan file {fix_plan_path} not found.", file=sys.stderr)
-        return
+        return 1
 
     print(f"[Plane Sync] Workspace: {profile['workspace_name']} (Plane Host: {profile['plane_host']})")
     token = profile.get("plane_token")
 
+    if profile.get("plane_token_error"):
+        print("[Plane Sync] Failed: credential cache is unavailable or invalid. No writes performed.", file=sys.stderr)
+        return 1
+
     if not token:
         print(f"[Plane Sync] Token '{profile['plane_token_env']}' is not set in environment.")
         print("[Plane Sync] Operating in Local Offline Mode (Graceful degradation).")
-        return
+        return 0
 
     original_bytes = fix_plan_path.read_bytes()
     lines = original_bytes.decode("utf-8").splitlines(keepends=True)
@@ -503,7 +549,29 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
     # write the file back verbatim except for the replaced marker text.
     stripped_lines = [l.rstrip("\n") for l in lines]
 
-    drifts = detect_priority_drift(stripped_lines, profile)
+    # Complete every required GET, including every project's Done-state lookup,
+    # before the first PATCH or local marker write. Partial reads are not a no-op.
+    try:
+        drifts = detect_priority_drift(stripped_lines, profile)
+        updates = compute_updates(stripped_lines, profile)
+        push_updates = compute_local_to_plane_updates(stripped_lines, profile) if push_done else []
+        # A successful Done push supersedes its earlier Cancelled projection;
+        # if any push fails, local writes below are aborted instead.
+        pushed_lines = {update["line_no"] for update in push_updates}
+        updates = [update for update in updates if update["line_no"] not in pushed_lines]
+        done_states = {}
+        for update in push_updates:
+            key = (update["workspace"], update["project"])
+            if key not in done_states:
+                states = fetch_project_states(profile, *key)
+                done_states[key] = find_state_id_by_group(states, "completed")
+            if not done_states[key]:
+                raise _SyncReadFailure("Completed state could not be resolved")
+            update["done_state_id"] = done_states[key]
+    except _SyncReadFailure:
+        print("[Plane Sync] Failed: required reads could not be verified. No writes performed.", file=sys.stderr)
+        return 1
+
     if drifts:
         print(f"[Plane Sync] Priority drift detected on {len(drifts)} line(s) (report-only, not applied):")
         for d in drifts:
@@ -512,33 +580,38 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
                 f"local={d['local_priority']} vs Plane={d['plane_priority']}"
             )
 
+    # The tracker is also the remote-write input; reject a changed preimage before PATCH.
+    if not dry_run and (updates or push_updates) and fix_plan_path.read_bytes() != original_bytes:
+        print("[Plane Sync] Aborted: concurrent tracker edit detected. No writes performed.", file=sys.stderr)
+        return 1
+
     if push_done:
-        push_updates = compute_local_to_plane_updates(stripped_lines, profile)
         if not push_updates:
             print("[Plane Sync] --push-done: no local [x] items pending a Done transition.")
         elif dry_run:
             for u in push_updates:
                 print(f"[Plane Sync] --push-done (dry-run): [{u['ident']}] would transition to Done.")
         else:
+            applied = 0
             for u in push_updates:
-                result = transition_issue_to_done(profile, u["workspace"], u["project"], u["issue"])
+                result = transition_issue_to_done(profile, u["workspace"], u["project"], u["issue"], done_state_id=u["done_state_id"])
                 if "error" in result:
-                    print(f"[Plane Sync] --push-done: [{u['ident']}] failed: {result['error']}", file=sys.stderr)
-                else:
-                    print(f"[Plane Sync] --push-done: [{u['ident']}] transitioned to Done.")
-
-    updates = compute_updates(stripped_lines, profile)
+                    # An already-completed PATCH cannot be rolled back by a local error report.
+                    print(f"[Plane Sync] --push-done failed after {applied} successful update(s). Local tracker unchanged.", file=sys.stderr)
+                    return 1
+                applied += 1
+                print(f"[Plane Sync] --push-done: [{u['ident']}] transitioned to Done.")
 
     if not updates:
         print("[Plane Sync] No changes (0 index lines moved to completed/cancelled).")
-        return
+        return 0
 
     for u in updates:
         print(f"[Plane Sync] line {u['line_no'] + 1}: {u['old'].strip()!r} -> {u['new'].strip()!r}")
 
     if dry_run:
         print(f"[Plane Sync] --dry-run: {len(updates)} line(s) would change. No write performed.")
-        return
+        return 0
 
     # compute_updates() above made one HTTP request per linked issue, so an
     # editor could have changed the tracker during that window. Re-read and
@@ -550,7 +623,7 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
             "(concurrent edit detected). Re-run sync.",
             file=sys.stderr,
         )
-        return
+        return 1
 
     for u in updates:
         newline = "\n" if lines[u["line_no"]].endswith("\n") else ""
@@ -559,9 +632,10 @@ def sync_checklist_with_plane(fix_plan_path: Path, profile: dict, dry_run: bool 
     # Atomic write: write to a sibling temp file, then rename over the target
     # so a crash/interrupt mid-write never leaves a partially-written tracker.
     tmp_path = fix_plan_path.with_name(fix_plan_path.name + ".tmp")
-    tmp_path.write_text("".join(lines), encoding="utf-8")
+    tmp_path.write_text("".join(lines), encoding="utf-8", newline="")
     tmp_path.replace(fix_plan_path)
     print(f"[Plane Sync] {len(updates)} line(s) updated in {fix_plan_path}.")
+    return 0
 
 
 if __name__ == "__main__":
@@ -583,4 +657,4 @@ if __name__ == "__main__":
     if not fix_plan_file.exists():
         fix_plan_file = Path(target_path) / resolve_tracker_root(target_path) / "fix_plan.md"
 
-    sync_checklist_with_plane(fix_plan_file, profile, dry_run=args.dry_run, push_done=args.push_done)
+    sys.exit(sync_checklist_with_plane(fix_plan_file, profile, dry_run=args.dry_run, push_done=args.push_done))

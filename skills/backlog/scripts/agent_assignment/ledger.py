@@ -67,6 +67,16 @@ class Ledger:
         row = self._connection.execute('SELECT * FROM task WHERE issue_uuid=? AND assignment_generation=?', (issue_id, generation)).fetchone()
         return dict(row) if row else None
 
+    def delivery_binding(self, outbox_id):
+        """Read frozen admission identity without returning body or mutable DB rows."""
+        import re
+        # GUARD: A caller must supply an exact ID, never a repaired or SQL token.
+        if not isinstance(outbox_id, str) or not re.fullmatch(r'pa-[0-9a-f]{64}', outbox_id):
+            raise ValueError('outbox_id_invalid')
+        row = self._connection.execute('''SELECT outbox_id,request_sha256,
+            receiver_identity_revision,status FROM outbox WHERE outbox_id=?''', (outbox_id,)).fetchone()
+        return dict(row) if row is not None else None
+
     def outbox_count(self):
         return self._connection.execute('SELECT count(*) FROM outbox').fetchone()[0]
 

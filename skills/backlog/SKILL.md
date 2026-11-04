@@ -11,13 +11,7 @@ depends-on:
   - fix-plan
   - todowrite
   - github-flow
-allowed-tools:
-  - Read
-  - Edit
-  - Write
-  - Grep
-  - Bash(gh:*)
-  - Bash(python3:*)
+allowed-tools: "Read Edit Write Grep Bash(gh:*) Bash(python3:*)"
 ---
 
 # Backlog
