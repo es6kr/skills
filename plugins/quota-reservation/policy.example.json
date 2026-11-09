@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "profile": "default",
+  "approval_ref": "",
+  "allowed_user_ids": [],
+  "allowed_origins": [],
+  "allow_existing_default": false,
+  "agy_executable": "<absolute-existing-cli-path>"
+}

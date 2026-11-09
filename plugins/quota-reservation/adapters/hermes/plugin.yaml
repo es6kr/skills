@@ -1,0 +1,5 @@
+name: quota-reservation-hermes
+version: 0.1.0
+description: Profile-scoped admitted-message bridge for the portable quota-reservation package.
+provides_hooks:
+  - post_gateway_admission

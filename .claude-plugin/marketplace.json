@@ -80,6 +80,13 @@
       ],
       "strict": true,
       "version": "0.1.2"
+    },
+    {
+      "name": "quota-reservation",
+      "description": "Bound one-shot first-use reservations with exact readback and no uncertain resubmission.",
+      "source": "./plugins/quota-reservation",
+      "strict": true,
+      "version": "0.1.0"
     }
   ]
 }

@@ -1,0 +1,2 @@
+# Safe YAML parsing shared by SkillSpector and repository metadata gates.
+PyYAML==6.0.3
