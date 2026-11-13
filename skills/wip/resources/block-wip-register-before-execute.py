@@ -163,7 +163,13 @@ def was_workflow_or_registration_without_followup(log_path, registered_pattern):
     utext = text_of(e_user) or raw_user
     
     # Check for slash commands or explicit task directives
-    is_workflow = bool(re.search(r"/(fix|fa|code-workflow|deploy|consolidate|wip|fix-plan)\b", utext, re.I)
+    # GUARD: the canonical/qualified name has the same registration prerequisite.
+    checklist_call = bool(
+        re.search(r"/(?:[a-zA-Z0-9_-]+:)?checklist(?=$|[ \t\r\n])", utext, re.I)
+        or re.search(r"command-name>/?(?:[a-zA-Z0-9_-]+:)?checklist<", raw_user, re.I)
+    )
+    is_workflow = bool(checklist_call
+                      or re.search(r"/(fix|fa|code-workflow|deploy|consolidate|wip|fix-plan)\b", utext, re.I)
                       or re.search(r"command-name>/?(fix|fa|code-workflow|deploy|consolidate|wip|fix-plan)<", raw_user, re.I)
                       or (re.search(r"command-name>/?wip<", raw_user) and re.search(r"(" + REGISTER_VERBS + r")", utext, re.I)))
     

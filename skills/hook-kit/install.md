@@ -1,5 +1,12 @@
 # Install
 
+Checklist caller compatibility: resolve the installed checklist member and its
+actual qualified name before using the `draft` topic below. Retain a verified
+`/fix-plan` legacy entry until approved cutover; do not assume `/checklist` is
+installed merely because its source exists. Existing hook registrations remain
+unchanged until their separate installation gate, with each hook owned and
+registered only once. `/ralph fix-plan` is a separate topic, not this alias.
+
 Install hook scripts from skill resources (source) to `~/.claude/hooks/` and register in settings.json.
 
 ## When to Use

@@ -102,8 +102,9 @@ fi
 # notes, so it needs the session id at prompt time — but not the message UUID
 # (only the RAG-import callers below need that). /cleanup is handled in the
 # message-UUID branch because its 3-C.1 step calls the RAG import topic.
+# GUARD: keep legacy/qualified aliases while rejecting longer command names.
 if [[ "$PROMPT" =~ ^/(claude-)?session[[:space:]]+id([[:space:]]|$) ]] || \
-   [[ "$PROMPT" =~ ^/fix-plan($|[[:space:]]) ]]; then
+   [[ "$PROMPT" =~ ^/([a-zA-Z0-9_-]+:)?(fix-plan|checklist)($|[[:space:]]) ]]; then
   emit_session_only ""
   exit 0
 fi
