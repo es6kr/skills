@@ -329,6 +329,19 @@ def get_profile(workspace_name: str = None, target_path: str = None) -> dict:
     return profile
 
 
+def redact_profile(profile: dict) -> dict:
+    """Return a copy of profile with sensitive credentials masked for human-facing CLI output.
+
+    Preserves the dictionary schema so downstream consumers relying on key existence
+    do not regress, while preventing credential leakage (such as plane_token) in CLI output.
+    Does not mutate the original dictionary in place.
+    """
+    safe = profile.copy()
+    if safe.get("plane_token"):
+        safe["plane_token"] = "[REDACTED]"
+    return safe
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-Workspace Profile Resolver")
     parser.add_argument("--workspace", help="Force specific workspace profile name (must exist in config.json profiles)")
@@ -339,7 +352,7 @@ if __name__ == "__main__":
     profile = get_profile(workspace_name=args.workspace, target_path=args.path)
 
     if args.json:
-        print(json.dumps(profile, indent=2, ensure_ascii=False))
+        print(json.dumps(redact_profile(profile), indent=2, ensure_ascii=False))
     else:
         print(f"Active Workspace Profile: {profile['workspace_name']}")
         print(f"  Plane Host: {profile['plane_host']}")
