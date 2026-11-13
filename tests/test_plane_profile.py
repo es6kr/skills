@@ -415,3 +415,145 @@ def test_resolve_profile_carries_k3s_target_keys(scripts_on_path, monkeypatch):
         "workspace profile has no effect"
     )
     assert profile.get("k3s_workload") == "deploy/plane-api"
+
+
+def _write_synthetic_profile_config(target_dir, ws_name, plane_host, **profile_kwargs):
+    """Write an isolated config.json with a single synthetic profile."""
+    config_path = target_dir / "config.json"
+    profile_data = {
+        "workspace_name": ws_name,
+        "plane_host": plane_host,
+        **profile_kwargs,
+    }
+    config_path.write_text(
+        json.dumps({"profiles": {ws_name: profile_data}}),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _run_workspace_profile_cli_json(env, workspace_name):
+    """Invoke workspace_profile.py with --json in an isolated environment."""
+    import subprocess
+
+    script_path = FIX_PLAN_SCRIPTS / "workspace_profile.py"
+    return subprocess.run(
+        [sys.executable, str(script_path), "--workspace", workspace_name, "--json"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+
+
+def test_cli_json_redacts_plane_token_from_env(tmp_path):
+    """CLI --json must redact plane_token and never print raw token from env."""
+    sentinel_token = "synthetic-sentinel-env-token-secret-999"
+    config_file = _write_synthetic_profile_config(
+        tmp_path,
+        "sentinel_ws",
+        "https://plane.sentinel.invalid",
+        plane_token_env="SENTINEL_PLANE_TOKEN",
+    )
+
+    env = dict(
+        os.environ,
+        AGENT_WORKSPACE_CONFIG=str(config_file),
+        SENTINEL_PLANE_TOKEN=sentinel_token,
+    )
+    proc = _run_workspace_profile_cli_json(env, "sentinel_ws")
+
+    assert sentinel_token not in proc.stdout, (
+        "CLI --json output printed raw plane_token from environment variable"
+    )
+    assert sentinel_token not in proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["plane_token"] == "[REDACTED]", (
+        "CLI --json output must mask plane_token to [REDACTED]"
+    )
+    assert payload["plane_host"] == "https://plane.sentinel.invalid"
+    assert payload["workspace_name"] == "sentinel_ws"
+
+
+def test_cli_json_redacts_plane_token_from_token_file(tmp_path):
+    """CLI --json must redact plane_token and never print raw token from token_file."""
+    sentinel_token = "synthetic-sentinel-file-token-secret-888"
+    token_file = tmp_path / "token.txt"
+    token_file.write_text(sentinel_token, encoding="utf-8")
+
+    config_file = _write_synthetic_profile_config(
+        tmp_path,
+        "file_ws",
+        "https://plane.file.invalid",
+        plane_token_env="UNSET_VAR_XYZ",
+        token_file=str(token_file),
+    )
+
+    env = dict(
+        os.environ,
+        AGENT_WORKSPACE_CONFIG=str(config_file),
+    )
+    env.pop("UNSET_VAR_XYZ", None)
+    env.pop("PLANE_API_KEY", None)
+
+    proc = _run_workspace_profile_cli_json(env, "file_ws")
+
+    assert sentinel_token not in proc.stdout, (
+        "CLI --json output printed raw plane_token from token_file"
+    )
+    assert sentinel_token not in proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["plane_token"] == "[REDACTED]", (
+        "CLI --json output must mask plane_token to [REDACTED]"
+    )
+
+
+def test_internal_get_profile_preserves_raw_token_precedence(tmp_path, scripts_on_path, monkeypatch):
+    """Internal get_profile() callers must receive unredacted token with full precedence."""
+    import workspace_profile
+
+    sentinel_token = "synthetic-sentinel-internal-token-777"
+    config_file = _write_synthetic_profile_config(
+        tmp_path,
+        "internal_ws",
+        "https://plane.internal.invalid",
+        plane_token_env="INTERNAL_PLANE_TOKEN",
+    )
+
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE", config_file)
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE_V2", tmp_path / "absent-v2.json")
+    monkeypatch.setattr(workspace_profile, "CONFIG_FILE_AGENTS", tmp_path / "absent-agents.json")
+    monkeypatch.setenv("INTERNAL_PLANE_TOKEN", sentinel_token)
+
+    profile = workspace_profile.get_profile(workspace_name="internal_ws")
+    assert profile["plane_token"] == sentinel_token, (
+        "get_profile() must retain unredacted plane_token for internal consumers"
+    )
+
+
+def test_redact_profile_preserves_original_dict(scripts_on_path):
+    """redact_profile() must not mutate the original dictionary in place."""
+    import workspace_profile
+
+    raw_token = "synthetic-preserve-check-raw-token"
+    original = {
+        "plane_token": raw_token,
+        "plane_host": "https://plane.test.invalid",
+        "workspace_name": "preserve_ws",
+        "tracker_root": ".agents",
+    }
+    copy_for_check = dict(original)
+
+    assert hasattr(workspace_profile, "redact_profile"), (
+        "workspace_profile module must expose redact_profile function"
+    )
+    redacted = workspace_profile.redact_profile(original)
+
+    assert original == copy_for_check, (
+        "redact_profile() must not mutate the input dictionary in place"
+    )
+    assert original["plane_token"] == raw_token
+    assert redacted["plane_token"] == "[REDACTED]"
+    assert redacted["plane_host"] == original["plane_host"]
+    assert redacted["workspace_name"] == original["workspace_name"]
+    assert redacted["tracker_root"] == original["tracker_root"]
