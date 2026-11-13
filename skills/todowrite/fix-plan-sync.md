@@ -1,5 +1,12 @@
 # Task ↔ Checklist Two-Way Sync (HARD STOP)
 
+Resolve the installed, registered checklist owner before a skill/helper call;
+use its actual qualified name when the harness requires one. `/fix-plan` may
+remain a supported legacy entry during cutover, but its availability must not be
+assumed. `/ralph fix-plan` below is the separate Ralph topic, and `fix_plan.md`
+/ `checklist.md` are data filenames: neither is a blanket rename target. Missing
+native support does not authorize direct tracker writes or another receiver.
+
 When a task changes state (`completed` / `deleted`), the corresponding checklist entry (`fix_plan.md` or workspace `checklist.md`) **must** be updated in the same turn. The same is true in reverse: when an item moves to a checklist, the task medium must be cleaned up.
 
 ## Sync map

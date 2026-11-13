@@ -157,10 +157,11 @@ if (EVENT_NAME === 'SessionStart') {
   process.exit(0);
 }
 
-// session-only injection (no message UUID): /session id, and /fix-plan.
+// session-only injection (no message UUID): /session id and checklist aliases.
 if (
   /^\/(claude-)?session[ \t]+id([ \t]|$)/.test(PROMPT) ||
-  /^\/fix-plan($|[ \t])/.test(PROMPT)
+  // GUARD: accept qualified aliases without matching longer, unrelated commands.
+  /^\/(?:[a-zA-Z0-9_-]+:)?(?:fix-plan|checklist)($|[ \t])/.test(PROMPT)
 ) {
   emitSessionOnly('');
   process.exit(0);

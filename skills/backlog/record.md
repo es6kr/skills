@@ -23,10 +23,17 @@ Record and synchronize the work performed in this conversation with the checklis
 
 In Antigravity (Gemini) and interactive sessions, modifying `fix_plan.md` or `checklist.md` directly via raw text editing (`replace_file_content`, `multi_replace_file_content`, `write_to_file`) is **strictly prohibited (`HARD STOP`)**.
 - All checklist mutations (completing items via `--set-marker '[x]'`, moving to Completed via `--move`, appending progress notes via `--append-note`) **MUST** be performed by executing dedicated CLI scripts:
-  - `python skills/fix-plan/scripts/update_item.py --file <path> --match "<keyword>" --set-marker '[x]'`
-  - `python skills/fix-plan/scripts/update_item.py --file <path> --match "<keyword>" --move`
-  - `python skills/fix-plan/scripts/add_item.py`
+  - `python "<resolved-checklist-root>/scripts/update_item.py" --file <path> --match "<keyword>" --set-marker '[x]'`
+  - `python "<resolved-checklist-root>/scripts/update_item.py" --file <path> --match "<keyword>" --move`
+  - `python "<resolved-checklist-root>/scripts/add_item.py"`
   - `Skill("backlog")` / `skills/backlog/scripts/plane_sync.py` (when Plane or secondary tracker is canonical)
+
+  Resolve `<resolved-checklist-root>` from the installed, registered checklist
+  owner before executing a helper. The placeholder is not a repository-relative
+  path. Until an approved cutover, a retained legacy installation may supply the
+  same interface; absence of the owner is an unsupported operation, not
+  permission to edit the tracker directly or copy another engine. Keep the
+  configured receiver, account and data filename unchanged.
 - Bypassing script helpers by performing raw string replacements is a direct rule violation.
 
 ### Checklist file decision order
@@ -69,7 +76,7 @@ The core purpose is **tidying (state refresh + pruning completed items)**, not "
 
    | Canonical medium | Handling for the two creating rows |
    |------------------|------------------------------------|
-   | **Canonical** (this file holds the real backlog) | Append to this file via script helper (`add_item.py` / `python skills/fix-plan/scripts/update_item.py`) |
+   | **Canonical** (this file holds the real backlog) | Append to this file via the resolved owner's script helper (`add_item.py` / `python "<resolved-checklist-root>/scripts/update_item.py"`) |
    | **Index into an external tracker** | **First create the issue/item in the external tracker** (via `Skill("backlog", "create")` or Plane API), then append an index line (`- [ ] {summary} → <Tracker> (<issue URL>)`) to this file |
 
 3. **Step C — forbidden actions (HARD STOP)**:
