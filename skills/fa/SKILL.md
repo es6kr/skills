@@ -71,6 +71,10 @@ entries go there instead — one memory per class, appended on recurrence. See
    of truth — not duplicated here).
 2. **Perform the write** — follow [retrospect.md](./retrospect.md) (this skill's own topic)
    Steps 2-4: Problem/Cause/Prevention write + feedback memory + FA HOT entry + RAG store.
+   Read the complete retrospect topic before any record mutation; preserve its
+   item-selection, storage, read-back and mandatory follow-up requirements.
+   Loading this entry point is not completion evidence. Use the active host's
+   native loader and question tool for genuinely unresolved decisions.
 3. **Read back the Nth-count** and look up the escalation stage from
    [`fix/step2-improvement.md`](../fix/step2-improvement.md)'s "4-stage progressive" matrix
    (single source of truth for the matrix itself).
@@ -94,7 +98,13 @@ entries go there instead — one memory per class, appended on recurrence. See
      candidate), mark the FA entry `status=hook-pending`; otherwise `status=watch`.
    - **4th+**: "Recorded — 4th+ occurrence. Hook implementation is mandatory per the matrix;
      run `/fix` to author + register it."
-6. **Stop.** This skill never autonomously edits rule/hook files directly without `/fix` handover — rule edits remain `/fix`'s job.
+6. **Respect the current scope.** This skill never autonomously edits rule/hook files directly without `/fix` handover — rule edits remain `/fix`'s job.
+
+   Bind continuation to the latest direct human request, not an older task or a
+   stage label. A retrospective-only request does not authorize recovery or relaunch.
+   Preserve existing owners and unanswered decisions. Continue independently
+   authorized original work only when that latest scope permits it; recording
+   alone neither grants nor revokes execution authority.
 
    **When the user invoked `/fix` (HARD STOP)**: if the same message carries a `/fix` (or `fix:`) invocation, that skill's procedure *is* the original deliverable. A correction-gate hook that tells you to call `Skill("fa")` first only orders the recording step; it does not replace the invoked skill. After the FA record, continue with `/fix` Step 0-4 (task registration, 5-Why, Step 1.5 action table, approval ask before prompt edits, verification, wrap-up) in the same turn. Reporting the FA stage and any artifact correction as the end result, without running the `/fix` procedure, repeats the failure this clause exists to prevent.
 
