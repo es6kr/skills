@@ -218,6 +218,11 @@ Immediately after 4-2's file write, store a structured chunk to the same abstrac
 
 **Self-check (before ending Step 4)**: did the just-written HOT entry get a RAG-store call this turn (not just a file Edit)? If a RAG-store tool is registered in the environment and this step was skipped, go back and store it before proceeding to Step 5. If the store call failed, did the medium (4) queue-file write above happen this turn?
 
+A different memory provider is not evidence of the configured receiver. Confirm
+the receiver identity and independent retrieval of the exact document and metadata
+before claiming RAG storage verified. If access or storage fails, preserve the
+durable pending payload required above and report it as queued, not stored.
+
 ### 5. Skill malfunction check
 
 Check the skills used in the session to identify any that need improvement.
@@ -262,7 +267,15 @@ After completing retrospect recording, **always** do the following:
 
 ### 7. Completion report
 
-Concisely report the number of recorded items and the file list.
+Lead with the actual Problem/Cause/Prevention, then concisely report the number
+of recorded items and the file list. Storage receipts, recovery results and
+checkpoint availability do not replace the requested retrospective.
+
+Check selected items, feedback memory, the FA store, configured RAG
+storage/read-back or its pending payload, skill-malfunction inspection and the prune invocation
+against their actual results and approval state. A root skill load or classifier
+result alone does not complete those steps. Report incomplete layers separately;
+do not equate source guidance changes with installed or live enforcement.
 
 **RAG store quantity reporting obligation (HARD STOP)**: if this retrospect made a store call to the RAG receiver, **state the number of chunks added quantitatively at the end of the response**. Status-only reports like "RAG store complete (qdrant)" are forbidden. Format:
 
