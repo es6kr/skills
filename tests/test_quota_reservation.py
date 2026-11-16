@@ -172,7 +172,9 @@ class TestAutomaticQuotaReservation(unittest.TestCase):
                 for field in ("platform", "chat_id", "thread_id", "user_id", "scope_id"):
                     self.assertEqual(source[field], request["origin"][field])
                 self.assertEqual(runner.resolve(), Path(request["script"]).resolve())
-                self.assertTrue(Path(request["workdir"]).is_relative_to(state))
+                # The consumer resolves its state dir; on macOS the temp dir is a symlink
+                # (/var -> /private/var), so compare against the resolved path.
+                self.assertTrue(Path(request["workdir"]).is_relative_to(state.resolve()))
                 self.assertIn("000000000002", scheduler.read_calls,
                               "Creation success alone is not an active-reservation receipt")
                 receipt = scheduler.get_job("000000000002")
